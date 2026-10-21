@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- The shell's side of the service: pipe client with the server check, error mapping, fail-closed decisions. No UI. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>CouchHud.ServiceClient</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CouchHud.Service.Contracts\CouchHud.Service.Contracts.csproj" />
+    <ProjectReference Include="..\CouchHud.Core\CouchHud.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CouchHud.ServiceClient.Tests" />
+  </ItemGroup>
+</Project>

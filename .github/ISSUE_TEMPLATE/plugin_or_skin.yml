@@ -1,0 +1,52 @@
+name: Plugin oder Skin einreichen / Submit a plugin or skin
+description: Eintrag für den Katalog vorschlagen. / Propose a catalog entry.
+labels: ["catalog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Der Katalog liegt im Repo [kewe87/CouchHUD-Catalog](https://github.com/kewe87/CouchHUD-Catalog), das Format steht in [docs/PLUGINS.md](https://github.com/kewe87/CouchHUD/blob/master/docs/PLUGINS.md). Der Inhaber prüft den Quellcode und signiert den Katalog selbst.
+        The catalog lives in [kewe87/CouchHUD-Catalog](https://github.com/kewe87/CouchHUD-Catalog); the format is in [docs/PLUGINS.md](https://github.com/kewe87/CouchHUD/blob/master/docs/PLUGINS.md). The owner reviews the source and signs the catalog.
+  - type: input
+    id: name
+    attributes:
+      label: Name
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Art / Kind
+      options:
+        - Plugin
+        - Skin
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Beschreibung / Description
+      description: Kurz, was es tut. / What it does, briefly.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Link zum Quellcode / Source code link
+      placeholder: "https://github.com/..."
+    validations:
+      required: true
+  - type: input
+    id: license
+    attributes:
+      label: Lizenz / License
+      placeholder: "GPL-3.0, MIT, ..."
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Bestätigung / Confirmation
+      options:
+        - label: Der Quellcode ist öffentlich lesbar, und ich darf ihn unter dieser Lizenz weitergeben (auch Grafiken und Schriften). / The source is publicly readable and I may distribute it under this license (including graphics and fonts).
+          required: true

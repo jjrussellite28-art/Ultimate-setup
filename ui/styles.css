@@ -1,0 +1,4314 @@
+:root {
+  --bg: #07090f;
+  --fg: #f2f5fa;
+  --muted: rgba(242, 245, 250, 0.7);
+  --accent: #3b9cff;
+  /* Text and icons on accent-filled surfaces (focus, pills, badges). Every skin sets its own. */
+  --accent-contrast: #06101f;
+  /* The accent as text color on dark panels, where it has to reach 4.5:1 on its own. */
+  --accent-text: var(--accent);
+  --accent-glow: rgba(59, 156, 255, 0.55);
+  /* The HUD pointer, see the mouse section: image, size and hotspot (fraction of the size). */
+  --pointer: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%2392dcff'/><stop offset='1' stop-color='%23367bff'/></linearGradient></defs><path d='M5 3 L5 35 L13 27.5 L19 41 L25.5 38.2 L19.5 25 L31 25 Z' fill='url(%23g)' stroke='%2312141c' stroke-width='3.2' stroke-linejoin='round' paint-order='stroke'/><path d='M9 11 L9 28' stroke='%23fff' stroke-opacity='.55' stroke-width='1.8' stroke-linecap='round'/></svg>");
+  --pointer-size: 4.6rem;
+  --pointer-hx: 0.104;
+  --pointer-hy: 0.0625;
+  --panel: rgba(16, 20, 32, 0.72);
+  --tile-radius: 0.6rem;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --font: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --shelf-tile: 12rem;
+  --focus-scale: 1.08;
+  color-scheme: dark;
+}
+
+/* Everything scales with the screen height: 20px root at 1080p, 40px at 4K. */
+html {
+  font-size: calc(100vh / 54);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  /* The system cursor is replaced by the big pointer in components/mouse.js. */
+  cursor: none;
+  user-select: none;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+h1, h2, h3, p {
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------ bg */
+
+#bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+}
+
+.bg-layer {
+  --h: 220;
+  position: absolute;
+  inset: -2rem;
+  background:
+    radial-gradient(ellipse at 70% 20%, hsl(var(--h) 60% 30% / 0.9), transparent 60%),
+    radial-gradient(ellipse at 10% 90%, hsl(calc(var(--h) + 40) 50% 18% / 0.8), transparent 55%),
+    var(--bg);
+  background-size: cover;
+  background-position: center;
+  filter: blur(1.5rem) saturate(1.2);
+  opacity: 0;
+  transform: scale(1.04);
+  transition: opacity 0.7s var(--ease), transform 6s linear;
+}
+
+.bg-layer.visible {
+  opacity: 0.85;
+  transform: scale(1.1);
+}
+
+.bg-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, rgba(7, 9, 15, 0.55), rgba(7, 9, 15, 0.15) 30%, rgba(7, 9, 15, 0.6) 70%, rgba(7, 9, 15, 0.95)),
+    linear-gradient(to right, rgba(7, 9, 15, 0.7), transparent 60%);
+}
+
+/* ------------------------------------------------------------------ header */
+
+#top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2rem 4rem 0;
+}
+
+#tabs {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+#tab-list {
+  display: flex;
+  gap: 2.2rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#tab-list li {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0.3rem 0;
+  border-bottom: 0.18rem solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+#tab-list li.active {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+#status {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+#clock {
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ glyphs */
+
+.glyph {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.7rem;
+  height: 1.7rem;
+  padding: 0 0.4rem;
+  border-radius: 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--fg);
+}
+
+.glyph.shoulder {
+  border-radius: 0.4rem;
+  opacity: 0.8;
+}
+
+/* Dark symbols on the colored discs: white only reached 2.3 to 3.4:1 here. */
+.btn-a { background: #3fb950; color: #06130a; }
+.btn-b { background: #e5534b; color: #1a0605; }
+.btn-x { background: #3b82f6; color: #040d1f; }
+.btn-y { background: #d4a72c; color: #111; }
+
+/* Keys with a label rather than a letter get a fixed cap width, so the hint bar keeps its
+   size when a skin swaps the label (OPTIONS, MENU, ☰, L1 ...). */
+.hint .glyph {
+  white-space: nowrap;
+}
+
+.hint .glyph.btn-lb,
+.hint .glyph.btn-rb,
+.hint .glyph[class*="btn-≡"] {
+  min-width: 3.6rem;
+  border-radius: 0.4rem;
+  padding: 0 0.3rem;
+}
+
+.hint .glyph.btn-enter,
+.hint .glyph.btn-esc,
+.hint .glyph[class*="btn-⌫"],
+.hint .glyph[class*="btn-⌨"] {
+  min-width: 2.6rem;
+  border-radius: 0.4rem;
+  padding: 0 0.4rem;
+}
+
+/* On the keyboard and code pages LB/RB belong to the page, not to the tabs. */
+body[data-view="keyboard"] #tabs .shoulder,
+body[data-view="passcode"] #tabs .shoulder {
+  visibility: hidden;
+}
+
+/* ------------------------------------------------------------------ view */
+
+#view {
+  position: relative;
+  min-height: 0;
+  padding: 0 4rem;
+}
+
+.art {
+  --h: 220;
+  position: relative;
+  border-radius: var(--tile-radius);
+  background:
+    linear-gradient(160deg, hsl(var(--h) 55% 38%), hsl(calc(var(--h) + 50) 45% 16%));
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+
+.art-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 0.8rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.15;
+  text-shadow: 0 0.1rem 0.4rem rgba(0, 0, 0, 0.6);
+}
+
+.art.loaded .art-fallback {
+  display: none;
+}
+
+/* Landscape art on a portrait or square tile: whole picture in the middle, a blurred copy fills the rest. */
+.art.art-wide::before,
+.art.art-wide::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-image: var(--art-img);
+}
+
+.art.art-wide::before {
+  inset: -1rem;
+  background-size: cover;
+  filter: blur(1rem) brightness(0.7);
+}
+
+.art.art-wide::after {
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+/* Generated banner: shown when no image exists. Pure CSS, hue from the exe icon or the name. */
+.art {
+  container-type: inline-size;
+}
+
+.art-fallback {
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 88% 6%, hsl(var(--h) 85% 64% / 0.38), transparent 62%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0 0.12rem, transparent 0.12rem 0.95rem);
+}
+
+.gen-mark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-bottom: 12%;
+  font-size: 3rem;
+  font-size: 38cqw;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  opacity: 0.2;
+  text-shadow: none;
+  pointer-events: none;
+}
+
+.gen-icon {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 46%;
+  max-width: 8rem;
+  aspect-ratio: 1;
+  object-fit: contain;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0.25rem 0.6rem rgba(0, 0, 0, 0.5));
+  pointer-events: none;
+}
+
+.gen-name {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.tile {
+  position: relative;
+  flex: none;
+  border-radius: var(--tile-radius);
+  transition: transform 0.22s var(--ease), box-shadow 0.22s var(--ease), opacity 0.22s;
+  box-shadow: 0 0.5rem 1.4rem rgba(0, 0, 0, 0.45);
+}
+
+.tile.focused {
+  transform: scale(var(--focus-scale));
+  animation: focus-in 0.2s var(--ease);
+  box-shadow:
+    0 0 0 0.2rem var(--fg),
+    0 0 2rem 0.3rem var(--accent-glow),
+    0 1rem 2.5rem rgba(0, 0, 0, 0.6);
+  z-index: 2;
+}
+
+.fav {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  color: #ffd75e;
+  font-size: 1.1rem;
+  text-shadow: 0 0 0.4rem rgba(0, 0, 0, 0.8);
+}
+
+/* The running game on the home shelf */
+.running-badge {
+  position: absolute;
+  left: 0.6rem;
+  top: 0.6rem;
+  padding: 0.2rem 0.7rem;
+  border-radius: 2rem;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 0.2rem 0.8rem rgba(0, 0, 0, 0.5);
+}
+
+.tile.running::after {
+  content: "";
+  position: absolute;
+  inset: -0.25rem;
+  border-radius: calc(var(--tile-radius, 0.6rem) + 0.25rem);
+  border: 0.15rem solid var(--accent);
+  opacity: 0.7;
+  animation: running-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes running-pulse {
+  50% { opacity: 0.2; }
+}
+
+/* Home */
+
+.home {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 3rem;
+  gap: 2rem;
+}
+
+/* Fixed height: a two-line title or a tall clear logo must never move the shelf. */
+.hero-info {
+  flex: none;
+  height: var(--hero-height, 12rem);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+
+.hero-info h1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.18;
+  font-size: 3.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  max-width: 60rem;
+  text-shadow: 0 0.2rem 1.2rem rgba(0, 0, 0, 0.5);
+}
+
+.hero-logo {
+  display: block;
+  max-width: 30rem;
+  max-height: 9rem;
+  object-fit: contain;
+  object-position: left bottom;
+  filter: drop-shadow(0 0.3rem 1.2rem rgba(0, 0, 0, 0.55));
+  animation: logo-in 0.35s var(--ease);
+}
+
+@keyframes logo-in {
+  from { opacity: 0; transform: translateY(0.4rem); }
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 1.15rem;
+  margin-top: 0.4rem;
+}
+
+.hero-info .meta {
+  flex: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shelf-wrap {
+  flex: none;
+  margin: 0 -4rem;
+  padding: 2rem 4rem;
+  overflow: hidden;
+}
+
+.shelf {
+  display: flex;
+  gap: 1.4rem;
+  transition: transform 0.35s var(--ease);
+}
+
+.shelf .tile {
+  width: var(--shelf-tile);
+}
+
+.shelf .cover {
+  aspect-ratio: 2 / 3;
+}
+
+.tile-special {
+  aspect-ratio: 2 / 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  background: var(--panel);
+  border: 0.1rem solid rgba(255, 255, 255, 0.12);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.special-icon {
+  font-size: 3rem;
+  opacity: 0.8;
+}
+
+/* Grids */
+
+#view[data-view="spiele"],
+#view[data-view="apps"],
+#view[data-view="collection"] {
+  display: flex;
+  flex-direction: column;
+}
+
+.grid-title {
+  display: flex;
+  align-items: baseline;
+  gap: 1.2rem;
+  padding: 1.6rem 0 0.4rem;
+}
+
+.grid-title h2 {
+  font-size: 1.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grid-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  margin: 0 -4rem;
+  padding: 0 4rem;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.5rem, #000 calc(100% - 2.5rem), transparent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  gap: 1.6rem 1.4rem;
+  padding: 1.5rem 0 3rem;
+}
+
+.grid .cover {
+  aspect-ratio: 2 / 3;
+}
+
+.grid-apps .cover {
+  aspect-ratio: 16 / 9;
+}
+
+/* The focused tile grows by about 0.9rem per side: the gap must leave room for that. */
+.grid-apps {
+  gap: 2.4rem 2.2rem;
+}
+
+.tile-label {
+  display: block;
+  margin-top: 0.5rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tile.focused .tile-label {
+  color: var(--fg);
+}
+
+.grid-apps .art-fallback {
+  justify-content: center;
+  align-items: flex-end;
+  text-align: center;
+  font-size: 1.6rem;
+}
+
+.grid-apps .gen-icon {
+  top: 38%;
+  width: 34%;
+}
+
+.grid-apps .gen-mark {
+  font-size: 2rem;
+  font-size: 22cqw;
+}
+
+.empty {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 0.8rem;
+  color: var(--muted);
+}
+
+.empty h2 {
+  color: var(--fg);
+  font-size: 2rem;
+}
+
+/* System */
+
+.system {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 46rem) 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: start;
+  gap: 4rem;
+  padding-top: 2rem;
+  padding-bottom: 1rem;
+}
+
+.settings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.settings li {
+  display: flex;
+  align-items: center;
+  gap: 1.3rem;
+  padding: 1rem 1.4rem;
+  border-radius: 0.7rem;
+  background: var(--panel);
+  border: 0.1rem solid transparent;
+  transition: transform 0.18s var(--ease), background 0.18s, border-color 0.18s;
+}
+
+.settings li.focused {
+  background: rgba(59, 156, 255, 0.18);
+  border-color: var(--accent);
+  transform: translateX(0.6rem);
+}
+
+.settings .icon {
+  width: 2.2rem;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+.settings strong {
+  font-size: 1.25rem;
+}
+
+.settings p {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-top: 0.15rem;
+}
+
+.about {
+  align-self: start;
+  padding: 1.6rem 2rem;
+  border-radius: 0.9rem;
+  background: var(--panel);
+  color: var(--muted);
+  line-height: 1.7;
+  max-width: 26rem;
+}
+
+.about h3 {
+  color: var(--fg);
+  font-size: 1.4rem;
+  margin-bottom: 0.4rem;
+}
+
+/* Detail page */
+
+.detail {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26rem;
+  gap: 4rem;
+  align-items: end;
+  padding-bottom: 2.5rem;
+}
+
+.detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+  max-width: 62rem;
+}
+
+.detail-title {
+  font-size: 3.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0.2rem 1.2rem rgba(0, 0, 0, 0.5);
+}
+
+.detail-logo {
+  max-width: 34rem;
+  max-height: 11rem;
+  object-fit: contain;
+  object-position: left bottom;
+  filter: drop-shadow(0 0.3rem 1.2rem rgba(0, 0, 0, 0.6));
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.8rem;
+  border-radius: 2rem;
+  border: 0.1rem solid rgba(255, 255, 255, 0.18);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  font-size: 1.2rem;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  font-weight: 600;
+  transition: transform 0.18s var(--ease), background 0.18s, color 0.18s;
+}
+
+.action.focused {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast, #fff);
+  transform: scale(1.06);
+  box-shadow: 0 0 1.6rem var(--accent-glow);
+}
+
+.action-icon {
+  font-size: 1.1em;
+}
+
+.detail-desc {
+  font-size: 1.2rem;
+  line-height: 1.55;
+  color: var(--fg);
+  max-width: 52rem;
+  text-shadow: 0 0.1rem 0.6rem rgba(0, 0, 0, 0.6);
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.detail-info {
+  align-self: end;
+}
+
+.detail-info dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem 1.2rem;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.detail-info dt {
+  color: var(--muted);
+}
+
+.detail-info dd {
+  margin: 0;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+#view[data-view="details"] {
+  padding-top: 1rem;
+}
+
+/* ------------------------------------------------------------------ footer */
+
+#hints {
+  position: relative;
+  /* Above dialogs (10) and the guide panel (9): the hints must stay sharp and readable. */
+  z-index: 12;
+  display: flex;
+  justify-content: flex-end;
+  gap: 2.2rem;
+  padding: 1.2rem 4rem 2rem;
+  font-size: 1.05rem;
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* ------------------------------------------------------------------ overlay */
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  /* Keeps the dialog clear of the hint bar, which sits above the overlay. */
+  padding: 0 4rem 5.5rem;
+  background: rgba(3, 5, 10, 0.6);
+  backdrop-filter: blur(0.6rem);
+  z-index: 10;
+}
+
+#overlay[hidden] {
+  display: none;
+}
+
+/* Pickers with a live preview (design): the screen behind stays sharp, the list sits on the right. */
+#overlay.preview {
+  place-items: center end;
+  background: linear-gradient(to left, rgba(3, 5, 10, 0.55), transparent 45%);
+  backdrop-filter: none;
+}
+
+/* The picker sits over the live preview: opaque, so the settings behind it do not shine through. */
+#overlay.preview .dialog {
+  background: #141928;
+  backdrop-filter: none;
+}
+
+/* The hints bar over a blurred, dimmed screen gets its own calm backing. */
+body.overlay-open #hints {
+  background: linear-gradient(to top, rgba(3, 5, 10, 0.85), rgba(3, 5, 10, 0));
+}
+
+.dialog {
+  min-width: 26rem;
+  max-width: min(44rem, 90vw);
+  padding: 2rem;
+  border-radius: 1.2rem;
+  background: rgba(20, 25, 40, 0.95);
+  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.6);
+  animation: pop 0.2s var(--ease);
+}
+
+.dialog-title {
+  font-size: 1.6rem;
+  margin-bottom: 1.2rem;
+}
+
+.dialog-count {
+  margin-left: 1rem;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.dialog-text {
+  margin: -0.6rem 0 1.2rem;
+  max-width: 34rem;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.dialog-text[hidden] {
+  display: none;
+}
+
+.menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.menu li {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1.2rem;
+  border-radius: 0.6rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  border: 0.1rem solid transparent;
+}
+
+.menu.with-icons li {
+  padding: 0.6rem 1.1rem;
+}
+
+.menu-icon {
+  flex: none;
+  width: 1.8rem;
+  text-align: center;
+  font-size: 1.3rem;
+}
+
+.menu-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.menu li.danger .menu-label,
+.menu li.danger .menu-icon { color: #ff7b72; }
+
+.menu li.danger { border-color: rgba(255, 123, 114, 0.35); }
+
+.menu li.focused {
+  background: rgba(59, 156, 255, 0.2);
+  border-color: var(--accent);
+}
+
+@keyframes focus-in {
+  from { transform: scale(1); }
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.96); }
+}
+
+/* ------------------------------------------------------------------ toast */
+
+#toast {
+  position: fixed;
+  top: 6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.9rem 1.6rem;
+  border-radius: 2rem;
+  background: rgba(20, 25, 40, 0.92);
+  border: 0.1rem solid rgba(255, 255, 255, 0.12);
+  font-weight: 600;
+  z-index: 20;
+  animation: pop 0.2s var(--ease);
+}
+
+#toast[hidden] {
+  display: none;
+}
+
+/* Scrollable lists inside a view (system menu, settings): the page never scrolls. */
+.list-scroll {
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.2rem, #000 calc(100% - 1.6rem), transparent);
+  /* Room on every side, so the mouse-hover outline (and focus glow) is not cut off by the clip. */
+  padding: 0.6rem 1.2rem 1.2rem 0.6rem;
+  margin-right: -1.2rem;
+  margin-left: -0.6rem;
+}
+
+.overlay-scroll,
+.menu {
+  max-height: calc(100vh - 16rem);
+  overflow: hidden;
+  /* Long pickers fade out at the edge, so it is clear there is more. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 0.8rem, #000 calc(100% - 1.4rem), transparent);
+  padding: 0.6rem 0.4rem 1.2rem;
+  margin: -0.6rem -0.4rem -1.2rem;
+}
+
+.menu li small {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ settings center */
+
+.settings-center {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 19rem minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 3rem;
+  padding: 2rem 0 1rem;
+}
+
+.settings-cats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.settings-cats li {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.2rem;
+  border-radius: 0.7rem;
+  font-size: 1.2rem;
+  color: var(--muted);
+  border: 0.1rem solid transparent;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+
+.settings-cats li .icon {
+  width: 2rem;
+  text-align: center;
+  font-size: 1.3rem;
+}
+
+.settings-cats li.focused {
+  color: var(--fg);
+  background: var(--panel);
+  border-color: var(--accent);
+}
+
+/* While the right pane has focus the chosen category stays marked, but calmer. */
+.settings-cats.inactive li.focused {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.settings-items {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.settings-heading {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.settings-items .settings {
+  flex: 1;
+}
+
+.setting {
+  justify-content: space-between;
+}
+
+/* While the category list has focus the settings on the right are only a preview. Keyed on the
+   category list's state (always current), mild enough to keep text above 4.5:1. */
+.settings-cats:not(.inactive) ~ .settings-items .setting {
+  opacity: 0.86;
+}
+
+.setting-text {
+  min-width: 0;
+}
+
+.setting-info {
+  color: var(--fg) !important;
+  overflow-wrap: anywhere;
+}
+
+.setting-value {
+  flex: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.focused .setting-value {
+  color: var(--fg);
+}
+
+.pill {
+  flex: none;
+  min-width: 4.2rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 2rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.pill.on {
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+
+.pill.off {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ on-screen keyboard */
+
+.osk-wrap {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3rem;
+}
+
+.osk-phone {
+  flex: none;
+  width: 15rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 1.2rem;
+  border-radius: 1rem;
+  background: var(--panel);
+  text-align: center;
+}
+
+.osk-qr {
+  width: 12rem;
+  height: 12rem;
+  padding: 0.4rem;
+  border-radius: 0.6rem;
+  background: #fff;
+}
+
+.osk-qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.osk-phone-icon {
+  font-size: 2.6rem;
+}
+
+.osk-phone-hint {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.osk {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1.4rem;
+}
+
+.osk-title {
+  font-size: 1.8rem;
+}
+
+.osk-field {
+  width: min(64rem, 100%);
+  min-height: 4rem;
+  display: flex;
+  align-items: center;
+  padding: 0.8rem 1.4rem;
+  border-radius: 0.8rem;
+  background: rgba(0, 0, 0, 0.45);
+  border: 0.12rem solid var(--accent);
+  font-size: 1.6rem;
+  overflow: hidden;
+  white-space: pre;
+}
+
+.osk-placeholder {
+  color: var(--muted);
+}
+
+.osk-caret {
+  width: 0.12rem;
+  height: 1.8rem;
+  margin-left: 0.1rem;
+  background: var(--fg);
+  animation: caret 1s steps(1) infinite;
+}
+
+@keyframes caret {
+  50% { opacity: 0; }
+}
+
+.osk-hint {
+  color: var(--muted);
+}
+
+.osk-board {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.2rem;
+  border-radius: 1rem;
+  background: var(--panel);
+}
+
+.osk-row {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.osk-key {
+  min-width: 4.2rem;
+  height: 4.2rem;
+  padding: 0 1rem;
+  border-radius: 0.6rem;
+  border: 0.1rem solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+  font: inherit;
+  font-size: 1.35rem;
+  font-weight: 600;
+  transition: transform 0.12s var(--ease), background 0.12s;
+}
+
+.osk-wide {
+  font-size: 1.05rem;
+}
+
+/* Function keys have one width each, whatever their label says. */
+.osk-key[data-key="?123"],
+.osk-key[data-key="ABC"] {
+  min-width: 6rem;
+}
+
+.osk-key[data-key="⌫"],
+.osk-key[data-key="done"] {
+  min-width: 9.5rem;
+}
+
+.osk-space {
+  min-width: 20rem;
+}
+
+.osk-done {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.osk-key.active {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.osk-key.focused {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast, #fff);
+  transform: scale(1.1);
+  box-shadow: 0 0 1.4rem var(--accent-glow);
+}
+
+/* ------------------------------------------------------------------ file browser and lists */
+
+.files {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 2rem 0 1rem;
+  max-width: 70rem;
+}
+
+.files-head h2 {
+  font-size: 2rem;
+}
+
+.files-path {
+  overflow-wrap: anywhere;
+}
+
+.file-list,
+.check-list {
+  list-style: none;
+  margin: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.file-row,
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.2rem;
+  border-radius: 0.6rem;
+  background: var(--panel);
+  border: 0.1rem solid transparent;
+  font-size: 1.15rem;
+}
+
+.file-row.focused,
+.check-row.focused {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.file-icon,
+.check-box {
+  width: 2rem;
+  flex: none;
+  text-align: center;
+}
+
+.check-box {
+  height: 2rem;
+  line-height: 2rem;
+  border-radius: 0.4rem;
+  border: 0.12rem solid var(--muted);
+  font-weight: 800;
+}
+
+.check-row.checked .check-box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+
+.check-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.check-main small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.file-pick {
+  font-weight: 700;
+}
+
+.empty-note {
+  color: var(--muted);
+  font-size: 1.2rem;
+}
+
+/* ------------------------------------------------------------------ mouse */
+
+#cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  /* The hotspot (--pointer-hx/hy, a fraction of the box) sits exactly on the mouse position. */
+  width: var(--pointer-size);
+  height: var(--pointer-size);
+  margin: calc(var(--pointer-size) * var(--pointer-hy) * -1) 0 0 calc(var(--pointer-size) * var(--pointer-hx) * -1);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s;
+  filter: drop-shadow(0 0 0.5rem var(--accent-glow)) drop-shadow(0 0.25rem 0.4rem rgba(0, 0, 0, 0.55));
+}
+
+/* Skin pointer: the skin's --pointer image, so skins (also installed ones) bring their own. */
+#cursor .cp {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--pointer) 0 0 / 100% 100% no-repeat;
+  transform-origin: calc(var(--pointer-hx) * 100%) calc(var(--pointer-hy) * 100%);
+}
+
+#cursor.click .cp {
+  animation: cm-squish 0.22s ease-out;
+}
+
+/* Real pointer: the system cursor shows, no overlay. */
+:root[data-pointer="system"] body {
+  cursor: auto;
+}
+
+:root[data-pointer="system"] #cursor {
+  display: none;
+}
+
+/* The comic mouse (easter egg) keeps its own size and hotspot: the nose at 6.5/64. */
+:root[data-pointer="mouse"] #cursor {
+  --pointer-size: 4.6rem;
+  --pointer-hx: 0.1;
+  --pointer-hy: 0.1;
+}
+
+:root[data-motion="off"] #cursor.click .cp,
+:root[data-motion="off"] #cursor.click svg,
+:root[data-motion="off"] #cursor .cm-eyes,
+:root[data-motion="off"] #cursor .cm-tail {
+  animation: none;
+}
+
+#cursor svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform-origin: 10% 10%;
+}
+
+#cursor .cm-scarf {
+  stroke: var(--accent);
+}
+
+#cursor .cm-tail {
+  transform-origin: 46px 46px;
+  transform-box: view-box;
+}
+
+#cursor.moving .cm-tail {
+  animation: cm-wag 0.35s ease-in-out infinite alternate;
+}
+
+#cursor .cm-eyes {
+  transform-origin: 15px 15px;
+  transform-box: view-box;
+  animation: cm-blink 4.5s infinite;
+}
+
+#cursor.click svg {
+  animation: cm-squish 0.22s ease-out;
+}
+
+@keyframes cm-wag {
+  from { transform: rotate(-14deg); }
+  to { transform: rotate(14deg); }
+}
+
+@keyframes cm-blink {
+  0%, 94%, 100% { transform: scale(1); }
+  97% { transform: scale(1, 0.1); }
+}
+
+@keyframes cm-squish {
+  40% { transform: scale(0.82); }
+  100% { transform: scale(1); }
+}
+
+body.mouse-active #cursor {
+  opacity: 1;
+  transition: opacity 0.08s;
+}
+
+body.mouse-active .hover:not(.focused) {
+  outline: 0.14rem solid rgba(255, 255, 255, 0.45);
+  outline-offset: 0.1rem;
+}
+
+body.mouse-active .tile.hover:not(.focused) {
+  transform: scale(1.03);
+}
+
+/* ------------------------------------------------------------------ guide menu */
+
+#session-status {
+  padding: 0.35rem 0.9rem;
+  border-radius: 2rem;
+  background: var(--panel);
+  border: 0.08rem solid var(--accent);
+  font-weight: 600;
+  font-size: 0.95rem;
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#tab-list li,
+#status > * {
+  white-space: nowrap;
+}
+
+#parental-status {
+  padding: 0.35rem 0.9rem;
+  border-radius: 2rem;
+  background: var(--panel);
+  border: 0.08rem solid var(--muted);
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+#parental-status.warn {
+  border-color: #ffb000;
+  color: #ffd166;
+}
+
+.timeup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  height: 100%;
+  text-align: center;
+}
+
+.timeup h2 {
+  margin: 0;
+  font-size: 2.8rem;
+}
+
+.timeup .meta {
+  max-width: 40rem;
+  margin: 0;
+}
+
+.timeup-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-width: 30rem;
+}
+
+.timeup-option {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 0.9rem 1.4rem;
+  border-radius: var(--tile-radius);
+  background: var(--panel);
+  border: 0.12rem solid transparent;
+  text-align: left;
+}
+
+.timeup-option.focused {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  box-shadow: 0 0 1.4rem var(--accent-glow);
+}
+
+.timeup-option strong,
+.timeup-option small {
+  display: block;
+}
+
+.timeup-option small {
+  opacity: 0.85;
+}
+
+.timeup-icon {
+  font-size: 1.8rem;
+}
+
+#quick {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9;
+  width: min(30rem, 100vw);
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  padding: 2.4rem 2rem 7rem;
+  background: rgba(10, 13, 22, 0.92);
+  backdrop-filter: blur(1.4rem) saturate(1.3);
+  border-left: 0.08rem solid rgba(255, 255, 255, 0.1);
+  box-shadow: -2rem 0 4rem rgba(0, 0, 0, 0.5);
+  transform: translateX(105%);
+  transition: transform 0.3s var(--ease);
+}
+
+#quick.open {
+  transform: none;
+}
+
+/* The hints sit on top of the panel and stay inside its width. */
+body.quick-open #hints {
+  width: min(30rem, 100vw);
+  margin: 0 0 0 auto;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  font-size: 0.9rem;
+  padding: 0.8rem 1rem 1.4rem;
+  background: none;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  border-radius: 0;
+}
+
+body.quick-open #view,
+body.quick-open #top {
+  filter: brightness(0.55) blur(0.15rem);
+  transition: filter 0.3s;
+}
+
+.quick-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.quick-time {
+  font-size: 3.4rem;
+  font-weight: 300;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.quick-date {
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.quick-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.6rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.quick-session {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 1rem 1.2rem;
+  border-radius: 0.8rem;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03));
+  border: 0.08rem solid rgba(255, 255, 255, 0.12);
+}
+
+.quick-session small {
+  color: var(--accent-text);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+
+.quick-session strong {
+  font-size: 1.4rem;
+}
+
+.quick-session span {
+  color: var(--muted);
+}
+
+.quick-list {
+  list-style: none;
+  /* Rows are exactly as wide as the header above; the padding is room for the hover outline. */
+  margin: -0.6rem -0.7rem 0;
+  padding: 0.6rem 0.7rem 1.2rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.quick-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  border-radius: 0.6rem;
+  border: 0.1rem solid transparent;
+  font-size: 1.1rem;
+}
+
+.quick-row.focused {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+}
+
+.quick-icon {
+  width: 2rem;
+  flex: none;
+  text-align: center;
+  font-size: 1.2rem;
+}
+
+.quick-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.quick-label small {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-slider {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.quick-track {
+  flex: 1;
+  height: 0.5rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.quick-fill {
+  height: 100%;
+  border-radius: 1rem;
+  background: var(--accent);
+  transition: width 0.15s var(--ease);
+}
+
+.quick-level {
+  width: 4rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ media layer */
+
+.bg-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transform: scale(1.02);
+  transition: opacity 1s var(--ease), transform 8s linear;
+}
+
+.bg-video.visible {
+  opacity: 0.55;
+  transform: scale(1.06);
+}
+
+/* Glow in the artwork's own color; --ambient is set from the focused cover. */
+.bg-ambient {
+  position: absolute;
+  inset: -25% -15% auto 25%;
+  height: 120%;
+  color: var(--ambient, transparent);
+  background: radial-gradient(closest-side, currentColor, transparent);
+  opacity: 0.32;
+  filter: blur(3rem);
+  transition: color 1.2s var(--ease);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ screen transitions */
+
+#view.enter-left { animation: enter-left 0.32s var(--ease); }
+#view.enter-right { animation: enter-right 0.32s var(--ease); }
+#view.enter-up { animation: enter-up 0.32s var(--ease); }
+
+@keyframes enter-left {
+  from { opacity: 0; transform: translateX(2.5rem); }
+}
+
+@keyframes enter-right {
+  from { opacity: 0; transform: translateX(-2.5rem); }
+}
+
+@keyframes enter-up {
+  from { opacity: 0; transform: translateY(1.5rem) scale(0.99); }
+}
+
+/* ------------------------------------------------------------------ boot */
+
+#boot {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 2rem;
+  background: var(--bg);
+  transition: opacity 0.6s var(--ease), visibility 0.6s;
+}
+
+#boot.done {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.boot-icon {
+  width: 9rem;
+  height: 9rem;
+  animation: boot-logo 1.1s var(--ease) both;
+  filter: drop-shadow(0 0 2.5rem var(--accent-glow));
+}
+
+.boot-logo {
+  font-size: 5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  animation: boot-logo 1.1s var(--ease) both;
+  text-shadow: 0 0 3rem var(--accent-glow);
+}
+
+.boot-logo span {
+  color: var(--accent);
+}
+
+.boot-bar {
+  width: 16rem;
+  height: 0.25rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.boot-bar div {
+  height: 100%;
+  width: 40%;
+  border-radius: 1rem;
+  background: var(--accent);
+  animation: boot-bar 1.1s ease-in-out infinite;
+}
+
+@keyframes boot-logo {
+  from { opacity: 0; transform: scale(0.92); filter: blur(0.6rem); }
+}
+
+@keyframes boot-bar {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #view.enter-left, #view.enter-right, #view.enter-up, .boot-logo, .boot-bar div { animation: none; }
+  .bg-video { transition: none; }
+}
+
+/* ------------------------------------------------------------------ weather + smart home */
+
+#weather {
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.smarthome {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.ha-grid {
+  flex: 1;
+  display: grid;
+  /* Cards clip their content; without this the rows would squeeze to fit the box. */
+  grid-auto-rows: max-content;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-content: start;
+  gap: 1rem;
+  padding: 1.2rem 1.2rem 1.5rem 1.2rem;
+  margin-left: -1.2rem;
+}
+
+.ha-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 1rem;
+  align-items: center;
+  padding: 1.2rem 1.4rem;
+  border-radius: 1rem;
+  background: var(--panel);
+  border: 0.1rem solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.18s var(--ease), background 0.25s, border-color 0.18s, box-shadow 0.25s;
+}
+
+.ha-icon {
+  grid-row: span 2;
+  font-size: 2.2rem;
+  filter: grayscale(0.6);
+  transition: filter 0.25s;
+}
+
+.ha-name {
+  font-size: 1.1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ha-state {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ha-card.on {
+  background: linear-gradient(135deg, rgba(255, 196, 80, 0.22), var(--panel));
+}
+
+.ha-card.on .ha-icon {
+  filter: none;
+  text-shadow: 0 0 1rem rgba(255, 200, 80, 0.8);
+}
+
+.ha-card.on .ha-state {
+  color: var(--fg);
+}
+
+.ha-card.focused {
+  border-color: var(--accent);
+  transform: scale(1.04);
+  box-shadow: 0 0 1.6rem var(--accent-glow);
+}
+
+.ha-sensor .ha-state {
+  color: var(--fg);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ CaseHUD */
+
+.casehud .ch-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  /* Room for the focus glow of the tiles and the scale-up. */
+  padding: 0.6rem 1.2rem 1.5rem 1.2rem;
+  margin-left: -1.2rem;
+}
+
+.casehud .update-section {
+  margin-top: 0.6rem;
+}
+
+.ch-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+  gap: 1rem;
+  padding: 0.4rem 0;
+}
+
+.ch-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.8rem;
+  border-radius: 1rem;
+  background: var(--panel);
+  border: 0.1rem solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.18s var(--ease), border-color 0.18s, box-shadow 0.25s;
+}
+
+.ch-tile.focused {
+  border-color: var(--accent);
+  transform: scale(1.03);
+  box-shadow: 0 0 1.6rem var(--accent-glow);
+}
+
+.ch-frame {
+  position: relative;
+  aspect-ratio: 1;
+  /* A fan display is round; the picture is square, so the frame cuts it like the real thing. */
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+  max-width: 14rem;
+  width: 100%;
+  align-self: center;
+}
+
+.ch-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ch-badge {
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 1rem;
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.ch-name {
+  text-align: center;
+  font-size: 1.1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ch-detail {
+  text-align: center;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ch-tile.dim .ch-art {
+  filter: grayscale(1) brightness(0.6);
+}
+
+.ch-tile.dim .ch-detail {
+  color: var(--fg);
+}
+
+.casehud .check-row.static {
+  opacity: 0.9;
+}
+
+/* A notice the user has to act on (CaseHUD's first-start disclaimer): framed in the skin's accent. */
+.casehud .check-row.ch-card {
+  padding: 1.1rem 1.3rem;
+  background: var(--panel);
+  border: 0.15rem solid var(--accent);
+  border-radius: var(--tile-radius);
+}
+
+.casehud .check-row.ch-card strong {
+  font-size: 1.3rem;
+}
+
+.casehud .check-row.ch-card small {
+  white-space: normal;
+}
+
+/* The colour of a lighting parameter, next to its name. */
+.ch-swatch {
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin: 0 0.8rem 0 auto;
+  border-radius: 50%;
+  border: 0.12rem solid var(--fg);
+}
+
+/* ------------------------------------------------------------------ news */
+
+.news {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-top: 1.2rem;
+}
+
+.news-grid {
+  flex: 1;
+  display: grid;
+  /* Cards clip their content; without this the rows would squeeze to fit the box. */
+  grid-auto-rows: max-content;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+  gap: 1.4rem;
+  /* Room on all sides for the focused card's scale and glow; the margin keeps the layout. */
+  padding: 0.8rem 1.2rem 2rem 1.2rem;
+  margin-left: -1.2rem;
+}
+
+.news-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--panel);
+  border: 0.1rem solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.2s var(--ease), border-color 0.2s, box-shadow 0.2s;
+}
+
+.news-card.focused {
+  border-color: var(--accent);
+  transform: scale(1.03);
+  box-shadow: 0 0 2rem var(--accent-glow), 0 1rem 2rem rgba(0, 0, 0, 0.5);
+}
+
+.news-image {
+  --h: 220;
+  aspect-ratio: 16 / 8;
+  background: linear-gradient(135deg, hsl(var(--h) 50% 30%), hsl(calc(var(--h) + 60) 40% 14%));
+  background-size: cover;
+  background-position: center;
+}
+
+/* The photo fades in over the tinted placeholder instead of popping in. */
+.news-image,
+.reader-image {
+  position: relative;
+  overflow: hidden;
+}
+
+.photo {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 0.5s var(--ease);
+}
+
+.photo.in {
+  opacity: 1;
+}
+
+.news-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem 1.2rem 1.2rem;
+}
+
+.news-source {
+  color: var(--accent-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.news-text h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.news-text p {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The newest story spans the first row with image and text side by side. */
+.news-card.news-lead {
+  grid-column: 1 / -1;
+  flex-direction: row;
+}
+
+.news-lead .news-image {
+  flex: 1.3;
+  aspect-ratio: auto;
+  min-height: 16rem;
+}
+
+.news-lead .news-text {
+  flex: 1;
+  justify-content: center;
+  padding: 2rem 2.4rem;
+}
+
+.news-lead h3 {
+  font-size: 2rem;
+}
+
+.news-lead p {
+  -webkit-line-clamp: 5;
+  font-size: 1.1rem;
+}
+
+.reader {
+  height: 100%;
+  max-width: 58rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 6rem;
+  /* Text fades out at the bottom instead of being cut off. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.5rem, #000 calc(100% - 4rem), transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.reader h1 {
+  font-size: 2.6rem;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.reader-image {
+  aspect-ratio: 16 / 7;
+  border-radius: 1rem;
+  background-size: cover;
+  background-position: center;
+}
+
+.reader p {
+  font-size: 1.35rem;
+  line-height: 1.65;
+  color: var(--fg);
+}
+
+/* ------------------------------------------------------------------ tabs in lists (plugins) */
+
+.tab-strip {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0.4rem 0 0.8rem;
+}
+
+.tab-chip {
+  padding: 0.35rem 1.1rem;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--fg);
+  border: 2px solid currentColor;
+  opacity: 0.6;
+}
+
+.tab-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast, #fff);
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------------ updates */
+
+.update-section {
+  margin: 1.2rem 0 0.2rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.update-row.highlight .check-box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+
+.update-busy {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 0.6rem;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+.spinner {
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  border: 0.18rem solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.settings-cats .badge {
+  margin-left: auto;
+  min-width: 1.6rem;
+  padding: 0 0.45rem;
+  border-radius: 1rem;
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ assistant */
+
+.assistant-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  padding-top: 1.4rem;
+  max-width: 82rem;
+}
+
+.assistant-head {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.assistant-head h2 {
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.chat-model {
+  color: var(--muted);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+/* A slowly turning glow: the assistant's "face". */
+.assistant-orb {
+  width: 3.4rem;
+  height: 3.4rem;
+  flex: none;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, var(--accent), #b44cff, #ff4f8b, var(--accent));
+  box-shadow: 0 0 2rem var(--accent-glow);
+  animation: spin 6s linear infinite;
+  mask: radial-gradient(circle, transparent 38%, #000 40%);
+}
+
+.chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.4rem 1rem 0.8rem 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.bubble {
+  max-width: 62rem;
+  padding: 1rem 1.3rem;
+  border-radius: 1.2rem;
+  font-size: 1.3rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  animation: bubble-in 0.25s ease-out;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  border-bottom-right-radius: 0.3rem;
+}
+
+.bubble.assistant {
+  align-self: flex-start;
+  background: var(--panel);
+  border: 0.1rem solid rgba(255, 255, 255, 0.08);
+  border-bottom-left-radius: 0.3rem;
+}
+
+.bubble.error {
+  align-self: flex-start;
+  background: rgba(255, 70, 70, 0.14);
+  border: 0.1rem solid rgba(255, 90, 90, 0.5);
+}
+
+.bubble.thinking {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.bubble.thinking small {
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.dots {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.dots i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: dot 1.1s ease-in-out infinite;
+}
+
+.dots i:nth-child(2) { animation-delay: 0.15s; }
+.dots i:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes dot {
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-0.3rem); }
+}
+
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(0.6rem); }
+}
+
+.chat-empty {
+  margin: auto 0;
+  max-width: 46rem;
+}
+
+.chat-empty strong {
+  display: block;
+  font-size: 2.6rem;
+  line-height: 1.15;
+  margin-bottom: 0.8rem;
+}
+
+.chat-empty p {
+  color: var(--muted);
+  font-size: 1.25rem;
+  line-height: 1.5;
+}
+
+.chips {
+  list-style: none;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.chip {
+  padding: 0.75rem 1.2rem;
+  border-radius: 2rem;
+  background: var(--panel);
+  border: 0.12rem solid rgba(255, 255, 255, 0.1);
+  font-size: 1.1rem;
+  transition: transform 0.12s, border-color 0.12s, background 0.12s;
+}
+
+.chip.primary {
+  font-weight: 700;
+}
+
+.chip.focused {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.05);
+  box-shadow: 0 0 1.2rem var(--accent-glow);
+}
+
+.setting-secret {
+  font-family: ui-monospace, Consolas, monospace;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ system tools */
+
+.check-row .pill {
+  margin-left: auto;
+  flex: none;
+}
+
+/* Dimmed by color, not by opacity: faded text dropped below readable contrast. */
+.check-row.dim strong,
+.check-row.dim .check-box {
+  color: var(--muted);
+}
+
+.files-head .meta {
+  max-width: 60rem;
+  line-height: 1.45;
+}
+
+/* ------------------------------------------------------------------ phone pairing */
+
+.pairing {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4rem;
+  max-width: 76rem;
+}
+
+.pair-qr {
+  flex: none;
+  width: 22rem;
+  height: 22rem;
+  padding: 0.8rem;
+  border-radius: 1.2rem;
+  background: #fff;
+  box-shadow: 0 0 3rem var(--accent-glow);
+}
+
+.pair-qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.pair-off {
+  display: grid;
+  place-items: center;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 1.3rem;
+  box-shadow: none;
+}
+
+.pair-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.pair-text h2 {
+  font-size: 2.4rem;
+  line-height: 1.15;
+}
+
+.pair-steps {
+  margin: 0;
+  padding-left: 1.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  font-size: 1.35rem;
+  line-height: 1.45;
+}
+
+/* ------------------------------------------------------------------ notifications */
+
+#notify-bell {
+  padding: 0.3rem 0.8rem;
+  border-radius: 1rem;
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+#notify-stack {
+  position: fixed;
+  top: 6.5rem;
+  right: 2.5rem;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  width: 26rem;
+  pointer-events: none;
+}
+
+.notify-card {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+  padding: 0.9rem 1.1rem;
+  border-radius: 1rem;
+  background: rgba(16, 20, 32, 0.92);
+  border: 0.1rem solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1rem 2.4rem rgba(0, 0, 0, 0.5), 0 0 1.4rem var(--accent-glow);
+  backdrop-filter: blur(1rem);
+  animation: notify-in 0.35s var(--ease);
+}
+
+.notify-card.leaving {
+  animation: notify-out 0.4s ease-in forwards;
+}
+
+@keyframes notify-in {
+  from { opacity: 0; transform: translateX(2rem); }
+}
+
+@keyframes notify-out {
+  to { opacity: 0; transform: translateX(2rem); }
+}
+
+.notify-app,
+.browser-badge {
+  flex: none;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.8rem;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: #fff;
+  /* Dark enough for white letters at any hue (4.5:1 and up). */
+  background: linear-gradient(135deg, hsl(var(--h) 60% 32%), hsl(calc(var(--h) + 40) 60% 24%));
+}
+
+/* Same width as the icon boxes of the other rows, so the text column lines up. */
+.check-row .browser-badge {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+}
+
+.notify-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.notify-text small {
+  color: var(--muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.notify-text strong {
+  font-size: 1.1rem;
+}
+
+.notify-text p {
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.notify-row .notify-app {
+  width: 2.2rem;
+  height: 2.2rem;
+  font-size: 1rem;
+}
+
+/* ------------------------------------------------------------------ captures */
+
+.capture-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 1.2rem;
+  padding: 0.6rem 1.2rem 2rem 1.2rem;
+  margin-left: -1.2rem;
+}
+
+.capture {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 0.8rem;
+  overflow: hidden;
+  background: var(--panel);
+  border: 0.15rem solid transparent;
+  transition: transform 0.15s var(--ease), border-color 0.15s;
+}
+
+.capture img,
+.capture video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.capture.focused {
+  border-color: var(--accent);
+  transform: scale(1.04);
+  box-shadow: 0 0 1.6rem var(--accent-glow);
+}
+
+.capture-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 2.4rem;
+  color: #fff;
+  text-shadow: 0 0 1rem rgba(0, 0, 0, 0.7);
+}
+
+.capture-meta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1.4rem 0.8rem 0.5rem;
+  font-size: 0.9rem;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+}
+
+.viewer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.viewer-media {
+  max-width: 100%;
+  max-height: calc(100% - 4rem);
+  border-radius: 0.8rem;
+  box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.6);
+}
+
+.viewer-caption {
+  display: flex;
+  gap: 1.2rem;
+  align-items: baseline;
+  color: var(--muted);
+}
+
+.viewer-caption strong {
+  color: var(--fg);
+}
+
+/* ------------------------------------------------------------------ performance in the guide menu */
+
+.quick-perf {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.quick-perf span {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.85rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.quick-perf b {
+  display: block;
+  font-size: 1.05rem;
+}
+
+.capture-clip {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 1rem 1rem 2rem;
+  text-align: center;
+  color: var(--muted);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));
+  overflow: hidden;
+}
+
+.progress {
+  display: block;
+  width: min(30rem, 100%);
+  height: 0.4rem;
+  margin-top: 0.45rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  box-shadow: 0 0 0.6rem var(--accent-glow);
+}
+
+.check-row .setting-value {
+  margin-left: auto;
+  flex: none;
+}
+
+/* ------------------------------------------------------------------ HDR */
+/* Active with :root[data-hdr] (Windows HDR on, or CouchHud turned it on).
+   Artwork and trailers get the full brightness range; the UI switches to
+   wide-gamut colours, light sweeps and stronger glow. */
+
+:root[data-hdr] img,
+:root[data-hdr] video,
+:root[data-hdr] .art,
+:root[data-hdr] .bg-layer,
+:root[data-hdr] .bg-video,
+:root[data-hdr] .capture,
+:root[data-hdr] .news-image {
+  dynamic-range-limit: no-limit;
+}
+
+@supports (color: color(display-p3 1 1 1)) {
+  :root[data-hdr] {
+    --accent: color(display-p3 0.12 0.6 1);
+    --accent-glow: color(display-p3 0.15 0.6 1 / 0.8);
+    --hdr-white: color(display-p3 1 1 1);
+  }
+}
+
+/* Extended-range white where the engine supports it: brighter than paper white on HDR screens. */
+@supports (color: color(srgb-linear 2 2 2)) {
+  :root[data-hdr] {
+    --hdr-white: color(srgb-linear 2.2 2.2 2.2);
+  }
+}
+
+/* The light reflection on the focused tile (.glare, see "Depth and motion") turns brighter than white here. */
+
+:root[data-hdr] .tile.focused {
+  box-shadow:
+    0 0 0 0.2rem var(--hdr-white, #fff),
+    0 0 2.6rem 0.4rem var(--accent-glow),
+    0 1.2rem 3rem rgba(0, 0, 0, 0.6);
+}
+
+:root[data-hdr] .hero-logo {
+  filter: drop-shadow(0 0 1.6rem rgba(255, 255, 255, 0.35)) drop-shadow(0 0.3rem 1.2rem rgba(0, 0, 0, 0.55));
+}
+
+:root[data-hdr] .hero-info h1 {
+  color: var(--hdr-white, #fff);
+  text-shadow: 0 0 2rem var(--accent-glow), 0 0.2rem 1.2rem rgba(0, 0, 0, 0.5);
+}
+
+:root[data-hdr] #tab-list li.active,
+:root[data-hdr] .focused .pill.on {
+  text-shadow: 0 0 1rem var(--accent-glow);
+}
+
+:root[data-hdr] .bg-ambient {
+  opacity: 1;
+  filter: saturate(1.4);
+}
+
+:root[data-hdr] .boot-logo {
+  color: var(--hdr-white, #fff);
+  animation: hdr-boot 1.6s ease-out both;
+}
+
+@keyframes hdr-boot {
+  0% { filter: brightness(0.2) blur(0.6rem); }
+  45% { filter: brightness(2.2) drop-shadow(0 0 3rem var(--accent-glow)); }
+  100% { filter: brightness(1) drop-shadow(0 0 1.2rem var(--accent-glow)); }
+}
+
+:root[data-hdr] .quick-row.focused,
+:root[data-hdr] .check-row.focused,
+:root[data-hdr] .settings li.focused {
+  box-shadow: 0 0 1.8rem var(--accent-glow);
+}
+
+:root[data-hdr] #cursor {
+  filter: drop-shadow(0 0 1rem var(--accent-glow)) drop-shadow(0 0.25rem 0.4rem rgba(0, 0, 0, 0.55));
+}
+
+/* Controller passcode */
+
+.passcode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  height: 100%;
+  text-align: center;
+}
+
+.passcode-lock {
+  font-size: 3.5rem;
+  filter: drop-shadow(0 0 1.2rem var(--accent-glow));
+}
+
+.passcode h2 {
+  margin: 0;
+  font-size: 2.4rem;
+}
+
+.passcode-dots {
+  display: flex;
+  gap: 1.2rem;
+  margin-top: 1rem;
+}
+
+.passcode-dot {
+  display: grid;
+  place-items: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 50%;
+  border: 0.15rem solid var(--muted);
+  font-size: 1.3rem;
+  font-weight: 700;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.passcode-dot.filled {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  transform: scale(1.08);
+  box-shadow: 0 0 1rem var(--accent-glow);
+}
+
+.passcode-error {
+  min-height: 1.5rem;
+  margin: 0;
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+.passcode-error:not(:empty) ~ .passcode-help,
+.passcode-error:not(:empty) {
+  animation: passcode-shake 0.35s;
+}
+
+.passcode-help {
+  margin: 0;
+  color: var(--muted);
+}
+
+@keyframes passcode-shake {
+  25% { transform: translateX(-0.6rem); }
+  75% { transform: translateX(0.6rem); }
+}
+
+/* Burn-in protection: pixel shift moves everything a few pixels */
+/* Only the content moves; the full-screen backdrop stays put, so no colored edge shows up. */
+#top,
+#view,
+#hints {
+  translate: var(--shift-x, 0) var(--shift-y, 0);
+  transition: translate 2s ease-in-out;
+}
+
+/* Screensaver */
+
+#screensaver {
+  position: fixed;
+  inset: -2rem;
+  z-index: 100;
+  background: #000;
+  opacity: 0;
+  transition: opacity 0.4s;
+  cursor: none;
+  overflow: hidden;
+}
+
+#screensaver.on {
+  opacity: 1;
+}
+
+#screensaver.saver-style-dim {
+  background: rgba(0, 0, 0, 0.82);
+}
+
+.saver-slide {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 30%, hsl(var(--h, 220) 55% 30%), #000 75%) center / cover no-repeat;
+  opacity: 0;
+  transform: scale(1.12) translate(0, 0);
+  transition: opacity 3s ease-in-out;
+  filter: brightness(0.75);
+}
+
+.saver-slide.visible {
+  opacity: 1;
+  animation: saver-drift 24s linear forwards;
+}
+
+@keyframes saver-drift {
+  to { transform: scale(1.12) translate(var(--dx), var(--dy)); }
+}
+
+.saver-clock {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.55);
+  text-shadow: 0 0.2rem 1.5rem rgba(0, 0, 0, 0.8);
+  transition: left 3s ease-in-out, top 3s ease-in-out;
+}
+
+.saver-clock strong {
+  font-size: 7rem;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.saver-clock span {
+  font-size: 1.6rem;
+}
+
+.saver-clock.small strong {
+  font-size: 3.2rem;
+}
+
+.saver-clock.small span {
+  font-size: 1rem;
+}
+
+/* Transparency page */
+
+.transparency-row .check-main {
+  gap: 0.25rem;
+}
+
+.transparency-row small {
+  white-space: normal;
+}
+
+.transparency-where,
+.transparency-undo {
+  font-size: 0.85em;
+}
+
+.transparency-where {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.transparency-tags {
+  display: flex;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.transparency-tags .pill {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.pill.tag {
+  min-width: 0;
+  padding: 0.2rem 0.7rem;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* Disclaimer and privacy */
+
+.legal .legal-text {
+  max-width: 70rem;
+  /* Scrolled with the controller; no native scrollbar (list-scroll hides the overflow). */
+  padding-right: 1rem;
+}
+
+.legal-intro {
+  font-size: 1.25rem;
+  color: var(--fg);
+}
+
+.legal-heading {
+  margin: 1.6rem 0 0.4rem;
+  color: var(--accent-text);
+  font-size: 1.5rem;
+}
+
+.legal section h4 {
+  margin: 1rem 0 0.3rem;
+  font-size: 1.15rem;
+}
+
+.legal section p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ------------------------------------------------------------------ settings: structure, facts, console setup */
+
+/* The category list scrolls like the item list; rows never shrink. */
+.settings-cats.list-scroll {
+  margin: -0.6rem 0 0 -0.6rem;
+  padding: 0.6rem 0.8rem 1.2rem 0.6rem;
+}
+
+.settings-cats li {
+  flex: none;
+}
+
+.settings-cats li .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cat-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Row and menu icons (core/glyph-icons.js): same outline family, centered in a fixed box so rows with and without icon line up. */
+.glyph-icon {
+  width: 1.3em;
+  height: 1.3em;
+  flex: none;
+  vertical-align: middle;
+}
+
+.glyph-icon.filled {
+  fill: currentColor;
+}
+
+.menu-icon,
+.quick-icon,
+.check-box,
+.action-icon,
+.setting-value:has(svg) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Room on the right so the focused row (it slides out a little) stays inside the screen margin. */
+.settings-items .settings-scroll {
+  flex: 1;
+  margin-right: 0;
+  margin-left: -0.6rem;
+  padding: 0.6rem 1.6rem 1.2rem 0.6rem;
+}
+
+.settings-items .settings-scroll > .settings {
+  flex: none;
+}
+
+/* "Experte" dividers in the category list and inside a category. */
+.settings-cats li.settings-divider,
+.settings-items .settings li.settings-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.5rem 0.4rem 0;
+  margin-top: 0.8rem;
+  min-height: 0;
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  clip-path: none !important;
+  transform: none !important;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.settings-cats li.settings-divider::after,
+.settings-items .settings li.settings-divider::after {
+  content: '';
+  flex: 1;
+  height: 0.1rem;
+  background: currentColor;
+  opacity: 0.3;
+}
+
+/* Information is read, not operated: no row, no focus. */
+.settings-facts {
+  margin: 1.6rem 0 0.4rem;
+  padding: 0.2rem 0 0.2rem 1.3rem;
+  display: grid;
+  gap: 0.8rem;
+  border-left: 0.2rem solid rgba(255, 255, 255, 0.14);
+}
+
+.settings-facts .fact dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.settings-facts .fact dd {
+  margin: 0.1rem 0 0;
+  color: var(--fg);
+  font-size: 1.05rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* The one big button of the simple mode. */
+.settings li.setting-primary {
+  padding: 1.5rem 1.8rem;
+  /* Only the focus draws an accent frame, otherwise two rows look focused at once. */
+  background: linear-gradient(100deg, rgba(59, 156, 255, 0.22), var(--panel));
+}
+
+.settings-facts.after-items {
+  margin-top: 2.2rem;
+  padding-top: 1.2rem;
+  border-top: 0.1rem solid rgba(255, 255, 255, 0.14);
+}
+
+/* More categories below the visible part: the list fades out at the bottom edge. */
+.settings-cats.more-below {
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 5rem), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 5rem), transparent);
+}
+
+.settings li.setting-primary strong {
+  font-size: 1.6rem;
+}
+
+.settings li.setting-primary .setting-value {
+  font-size: 2rem;
+}
+
+/* Breadcrumb in the header of pages opened from the settings. */
+.crumb {
+  margin-bottom: 0.3rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+}
+
+/* Console setup / way back */
+.console-page {
+  max-width: 76rem;
+  gap: 0.8rem;
+}
+
+.console-steps {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.console-step .pill {
+  min-width: 8.5rem;
+}
+
+.console-step.status-running {
+  border-color: var(--accent);
+}
+
+.console-step.status-failed .check-box {
+  color: #ff6b6b;
+}
+
+.console-step.status-skipped,
+.console-step.status-aborted,
+.console-step.status-na {
+  opacity: 0.75;
+}
+
+.console-notes p {
+  margin: 0.25rem 0;
+  color: var(--muted);
+  font-size: 0.98rem;
+  line-height: 1.4;
+}
+
+.console-actions {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: 44rem;
+}
+
+/* Console setup: compact rows so all steps, notes and buttons fit one screen. */
+.console-step {
+  padding: 0.28rem 1rem;
+  font-size: 1.05rem;
+}
+
+.console-step .check-box {
+  width: 1.7rem;
+  height: 1.7rem;
+  line-height: 1.7rem;
+}
+
+.console-step .check-main small {
+  font-size: 0.85rem;
+}
+
+.console-step.status-ok .check-box,
+.console-step.status-done .check-box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+
+.console-step.status-failed .check-box {
+  border-color: #ff6b6b;
+}
+
+.console-actions {
+  flex-direction: row;
+  max-width: none;
+}
+
+.console-actions .console-action {
+  flex: 0 1 28rem;
+  justify-content: center;
+}
+
+.console-step .pill.on {
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+
+/* Values on a focused row keep the row's text colour (yellow/white focus fills in some skins). */
+[data-skin="cyberpunk"] .settings li.focused .setting-value,
+[data-skin="xbox"] .settings li.focused .setting-value {
+  color: inherit;
+}
+
+.console-step .pill {
+  padding: 0.15rem 0.8rem;
+}
+
+.console-step {
+  padding: 0.2rem 1rem;
+}
+
+.console-page {
+  gap: 0.5rem;
+}
+
+/* ------------------------------------------------------------------ depth and motion */
+/* ui/core/motion.js moves #bg, .hero-info, .shelf-wrap and the focused tile with inline
+   transform / rotate only. data-motion="on" on :root means it is active (off with reduced
+   motion, system or ReduceMotion config). Skins set --tilt-scale (0 = no tilt) and --glare-color. */
+
+:root {
+  --tilt-scale: 1;
+  --glare-color: rgba(255, 255, 255, 0.3);
+  --glare-opacity: 1;
+}
+
+:root[data-motion="on"] .shelf,
+:root[data-motion="on"] .grid {
+  perspective: 90rem;
+}
+
+:root[data-motion="on"] #bg,
+:root[data-motion="on"] .tile.focused {
+  will-change: transform;
+}
+
+.glare {
+  position: absolute;
+  inset: -50%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  background: radial-gradient(closest-side, var(--glare-color), transparent);
+}
+
+.tile.focused > .art > .glare {
+  opacity: var(--glare-opacity);
+}
+
+/* The resting drift of the reflection runs on the compositor, no JS involved. */
+:root[data-motion="on"] .tile.focused > .art > .glare {
+  animation: glare-drift 7s ease-in-out infinite alternate;
+}
+
+:root[data-motion="off"] .glare {
+  display: none;
+}
+
+@keyframes glare-drift {
+  from { translate: -6% -4%; }
+  to { translate: 6% 4%; }
+}
+
+:root[data-hdr] {
+  --glare-color: rgba(255, 255, 255, 0.5);
+}
+
+:root[data-hdr] .glare {
+  mix-blend-mode: plus-lighter;
+}
+
+:root[data-skin="ps4"] { --tilt-scale: 0.55; --glare-color: rgba(190, 220, 255, 0.22); }
+:root[data-skin="xbox"] { --tilt-scale: 0.8; --glare-color: rgba(200, 255, 200, 0.22); }
+:root[data-skin="cyberpunk"] { --tilt-scale: 0.6; --glare-color: rgba(252, 238, 10, 0.18); }
+:root[data-skin="nova"] { --tilt-scale: 1.2; --glare-color: rgba(190, 215, 255, 0.4); }
+
+/* ------------------------------------------------------------------ launch transition */
+/* components/launch-overlay.js. Skins steer it with --launch-* variables and the
+   [data-skin] blocks below; the structure is the same everywhere. */
+
+:root {
+  --launch-dim: rgba(4, 6, 12, 0.66);
+  --launch-card-radius: var(--tile-radius);
+  --launch-bar-height: 0.3rem;
+  --launch-bar-radius: 1rem;
+  --launch-bar-fill: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+
+.launch {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #000;
+  opacity: 0;
+  transition: opacity 0.35s var(--ease);
+}
+
+.launch.in { opacity: 1; }
+.launch.out { opacity: 0; transition-duration: 0.38s; }
+
+.launch-backdrop,
+.launch-shade {
+  position: absolute;
+  inset: -3rem;
+}
+
+.launch-backdrop {
+  background: radial-gradient(ellipse at 50% 40%, hsl(215 40% 22%), var(--bg));
+  background-size: cover;
+  background-position: center;
+  filter: blur(0.6rem) saturate(1.15);
+  transform: scale(1.02);
+}
+
+.launch.in .launch-backdrop {
+  transform: scale(1.12);
+  transition: transform 22s linear;
+}
+
+.launch-shade {
+  background:
+    radial-gradient(ellipse at 50% 45%, transparent 0, var(--launch-dim) 85%),
+    var(--launch-dim);
+}
+
+.launch-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.2rem;
+}
+
+.launch-card {
+  position: relative;
+  height: 25rem;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--launch-card-radius);
+  overflow: hidden;
+  box-shadow: 0 0 0 0.15rem rgba(255, 255, 255, 0.25), 0 0 5rem 0.5rem var(--accent-glow), 0 2rem 5rem rgba(0, 0, 0, 0.7);
+  transform: scale(0.8);
+  opacity: 0;
+}
+
+.launch-card .art {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+}
+
+.launch.in .launch-card {
+  animation: launch-zoom 0.7s var(--ease) forwards, launch-breathe 4s 0.7s ease-in-out infinite;
+}
+
+/* One light sweep over the cover as it arrives */
+.launch-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%);
+  transform: translateX(-110%);
+}
+
+.launch.in .launch-shine {
+  animation: launch-shine 1.1s 0.5s var(--ease) forwards;
+}
+
+.launch-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  min-width: 26rem;
+  opacity: 0;
+  transform: translateY(1rem);
+}
+
+.launch.in .launch-info {
+  animation: launch-rise 0.6s 0.25s var(--ease) forwards;
+}
+
+.launch-title {
+  font-size: 2.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+  max-width: 44rem;
+  text-shadow: 0 0.2rem 1.2rem rgba(0, 0, 0, 0.6);
+}
+
+.launch-logo {
+  max-width: 26rem;
+  max-height: 7rem;
+  object-fit: contain;
+  filter: drop-shadow(0 0.3rem 1.2rem rgba(0, 0, 0, 0.7));
+}
+
+.launch-status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--fg);
+}
+
+.launch-dots {
+  display: inline-block;
+  animation: launch-dots 1.4s steps(4, end) infinite;
+  clip-path: inset(0 100% 0 0);
+}
+
+.launch-ring {
+  display: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 0.22rem solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent-text);
+  animation: launch-spin 0.9s linear infinite;
+}
+
+.launch-bar {
+  position: relative;
+  width: 22rem;
+  height: var(--launch-bar-height);
+  border-radius: var(--launch-bar-radius);
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.launch-bar i {
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  border-radius: inherit;
+  background: var(--launch-bar-fill);
+  animation: launch-bar 1.5s var(--ease) infinite;
+}
+
+.launch-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin-top: 0.4rem;
+}
+
+@keyframes launch-zoom {
+  from { opacity: 0; transform: scale(0.8); filter: blur(0.6rem); }
+  to { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+
+@keyframes launch-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.025); }
+}
+
+@keyframes launch-shine {
+  to { transform: translateX(110%); }
+}
+
+@keyframes launch-rise {
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes launch-bar {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(230%); }
+}
+
+@keyframes launch-dots {
+  to { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes launch-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* PS4: calm blue wash, a hair-thin line instead of a bar, square cover */
+[data-skin="ps4"] .launch-backdrop { background-color: #00164a; }
+[data-skin="ps4"] .launch-shade { background: radial-gradient(ellipse at 50% 45%, rgba(0, 20, 70, 0.35), rgba(0, 6, 24, 0.9) 90%); }
+[data-skin="ps4"] .launch-card { box-shadow: 0 0 0 0.1rem rgba(255, 255, 255, 0.5), 0 2rem 4rem rgba(0, 0, 0, 0.6); }
+[data-skin="ps4"] .launch-bar { --launch-bar-height: 0.12rem; width: 26rem; background: rgba(255, 255, 255, 0.25); }
+[data-skin="ps4"] .launch-bar i { background: #fff; }
+[data-skin="ps4"] .launch-status { font-weight: 300; letter-spacing: 0.12em; text-transform: uppercase; font-size: 1.1rem; }
+
+/* Xbox: green ring spinner and a soft green glow behind the cover */
+[data-skin="xbox"] .launch-ring { display: block; border-top-color: var(--accent-bright, var(--accent-text)); }
+[data-skin="xbox"] .launch-bar { display: none; }
+[data-skin="xbox"] .launch-card { box-shadow: 0 0 0 0.2rem #fff, 0 0 6rem 0.5rem var(--accent-glow), 0 2rem 4rem rgba(0, 0, 0, 0.6); }
+[data-skin="xbox"] .launch-shade { background: radial-gradient(ellipse at 50% 55%, rgba(16, 124, 16, 0.22), rgba(5, 8, 5, 0.9) 80%); }
+
+/* Cyberpunk: hard edges, segmented bar, a short glitch now and then */
+[data-skin="cyberpunk"] .launch-card { clip-path: polygon(0 0, calc(100% - 1.2rem) 0, 100% 1.2rem, 100% 100%, 1.2rem 100%, 0 calc(100% - 1.2rem)); box-shadow: none; }
+[data-skin="cyberpunk"] .launch-bar { border-radius: 0; background: rgba(252, 238, 10, 0.12); }
+[data-skin="cyberpunk"] .launch-bar i { border-radius: 0; background: repeating-linear-gradient(90deg, var(--accent) 0 0.5rem, transparent 0.5rem 0.75rem); }
+[data-skin="cyberpunk"] .launch-status { text-transform: uppercase; letter-spacing: 0.15em; color: var(--accent-text); animation: launch-glitch 5s steps(1) infinite; }
+[data-skin="cyberpunk"] .launch-shade { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 0.12rem, transparent 0.12rem 0.25rem), radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.9) 85%); }
+
+@keyframes launch-glitch {
+  0%, 92%, 100% { transform: none; text-shadow: none; }
+  93% { transform: translateX(0.25rem); text-shadow: -0.15rem 0 #00e5ff, 0.15rem 0 #ff2a6d; }
+  95% { transform: translateX(-0.2rem); text-shadow: 0.15rem 0 #00e5ff, -0.15rem 0 #ff2a6d; }
+  97% { transform: none; text-shadow: none; }
+}
+
+/* Nova: glass panel under the cover, aurora light, gradient bar */
+[data-skin="nova"] .launch-shade { background: radial-gradient(40% 35% at 25% 30%, rgba(124, 231, 255, 0.22), transparent 70%), radial-gradient(35% 40% at 78% 25%, rgba(155, 140, 255, 0.24), transparent 70%), rgba(5, 6, 13, 0.72); }
+[data-skin="nova"] .launch-info { padding: 1.6rem 2.6rem; border-radius: 1.4rem; background: rgba(255, 255, 255, 0.07); border: 0.1rem solid var(--glass-border, rgba(255, 255, 255, 0.14)); backdrop-filter: blur(1.4rem) saturate(1.3); }
+[data-skin="nova"] .launch-bar i { background: linear-gradient(90deg, #7ce7ff, #9b8cff, #ff8bd8); }
+[data-skin="nova"] .launch-card { box-shadow: 0 0 4rem rgba(138, 180, 255, 0.4), 0 2rem 4rem rgba(0, 0, 0, 0.6); }
+
+/* Calm mode: the cover just fades in, the bar stands still */
+:root[data-motion="off"] .launch.in .launch-card { animation: launch-fade 0.4s forwards; }
+:root[data-motion="off"] .launch.in .launch-info { animation: launch-fade 0.4s forwards; transform: none; }
+:root[data-motion="off"] .launch-shine { display: none; }
+:root[data-motion="off"] .launch.in .launch-backdrop { transform: none; transition: none; }
+:root[data-motion="off"] .launch-bar i { animation: none; width: 100%; opacity: 0.7; }
+:root[data-motion="off"] .launch-ring,
+:root[data-motion="off"] .launch-dots,
+:root[data-motion="off"] .launch-card,
+:root[data-motion="off"] .launch-status { animation: none; }
+:root[data-motion="off"] .launch-dots { clip-path: none; }
+:root[data-motion="off"] .launch.in .launch-card { animation: launch-fade 0.4s forwards; }
+
+@keyframes launch-fade {
+  from { opacity: 0; }
+  to { opacity: 1; transform: none; }
+}
+
+
+/* ------------------------------------------------------------------ artwork picker */
+
+.pick-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding-top: 1.6rem;
+}
+
+.pick-tabs {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.pick-tabs .chip.active {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.pick-note {
+  color: var(--muted);
+  font-size: 1.05rem;
+  max-width: 70rem;
+}
+
+.pick-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  /* The focused tile grows; the gap must be wider than its growth or neighbours touch. */
+  gap: 2.4rem 2.2rem;
+  padding: 1.5rem 0.6rem 3rem;
+}
+
+.pick-hero .pick-action { aspect-ratio: 96 / 36; min-height: 0; }
+.pick-logo .pick-action { aspect-ratio: 16 / 10; min-height: 0; }
+
+.pick-tile {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--tile-radius);
+  background: var(--panel);
+  overflow: visible;
+}
+
+.pick-img {
+  border-radius: var(--tile-radius);
+  overflow: hidden;
+  /* Transparent logos sit on a neutral checker, not on the page. */
+  background: repeating-conic-gradient(rgba(255, 255, 255, 0.07) 0% 25%, rgba(0, 0, 0, 0.25) 0% 50%) 0 0 / 1.2rem 1.2rem;
+}
+
+.pick-cover .pick-img { aspect-ratio: 2 / 3; }
+.pick-hero .pick-img { aspect-ratio: 96 / 31; }
+.pick-logo .pick-img { aspect-ratio: 16 / 9; }
+
+.pick-img img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pick-logo .pick-img img {
+  object-fit: contain;
+}
+
+.pick-source {
+  padding: 0.35rem 0.2rem 0.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pick-tile.focused .pick-source {
+  color: var(--fg);
+}
+
+.pick-tile.current .pick-source {
+  color: var(--accent-text);
+}
+
+.pick-tile.broken {
+  opacity: 0.35;
+}
+
+.pick-action {
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 0.1rem solid rgba(255, 255, 255, 0.12);
+  font-weight: 600;
+  font-size: 1.05rem;
+  text-align: center;
+  min-height: 7rem;
+}
+
+.pick-cover .pick-action { aspect-ratio: 2 / 3; }
+
+.pick-action .special-icon {
+  font-size: 2.4rem;
+}
+
+/* A hidden logo must stay hidden: the display rule of .hero-logo would otherwise show the previous item's logo.
+   The same for the title: its display:-webkit-box (line clamp) beat the hidden attribute, so a sliver of it showed under the logo. */
+.hero-logo[hidden],
+.hero-info h1[hidden] {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ idle animations */
+/* Endless animations only run while someone can see them: motion.js sets data-live="off" when the HUD
+   is not in front (game running, screensaver, launch transition, hidden window). */
+/* #view keeps its enter animation: it is short, and frozen half way the page would stay invisible (and the browser page
+   would be measured at its start offset). */
+:root[data-live="off"] *:not(.launch):not(.launch *):not(#screensaver):not(#screensaver *):not(#view),
+:root[data-live="off"] *::before,
+:root[data-live="off"] *::after {
+  animation-play-state: paused !important;
+}
+
+/* The finished boot screen and the hidden mouse cursor keep nothing running. */
+#boot.done .boot-bar div,
+#boot.done .boot-logo,
+body:not(.mouse-active) #cursor .cm-eyes,
+body:not(.mouse-active) #cursor .cm-tail {
+  animation: none;
+}
+
+/* "Reduce animations": no decorative endless motion in any skin. */
+:root[data-motion="off"] .boot-bar div,
+:root[data-motion="off"] .tile.focused::before,
+:root[data-motion="off"] .tile.focused::after,
+:root[data-motion="off"] #bg::before,
+:root[data-motion="off"] .hero-info h1,
+:root[data-motion="off"] .grid-title h2 {
+  animation: none;
+}
+
+.chip .glyph-icon {
+  margin-right: 0.5rem;
+}
+
+.pick-action .special-icon .glyph-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+}
+
+.pick-tile.current .pick-img {
+  outline: 0.2rem solid var(--accent);
+  outline-offset: -0.2rem;
+}
+
+/* Add tile (last tile of the game and app pages) and the list of installed programs */
+.empty.empty-above {
+  height: auto;
+  padding: 1rem 0 0.5rem;
+}
+
+.tile-add .cover,
+.tile-add img {
+  object-fit: cover;
+}
+
+.app-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  object-fit: contain;
+  display: block;
+}
+
+.app-picker .app-icon-box {
+  width: 3rem;
+  height: 3rem;
+  display: grid;
+  place-items: center;
+}
+
+.app-picker .app-icon:not([src]) {
+  visibility: hidden;
+}
+
+.app-picker .letter {
+  margin-left: auto;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ browser tab */
+
+/* The bar is HUD; the placeholder below it is where the host puts the native page (it paints above everything else). */
+.browser-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1rem 0 0.6rem;
+}
+
+.bbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem;
+  border-radius: calc(var(--tile-radius) + 0.3rem);
+  background: var(--panel);
+  backdrop-filter: blur(0.8rem);
+}
+
+.bbar-btn,
+.bbar-address {
+  flex: none;
+  height: 3rem;
+  border: 0.15rem solid transparent;
+  border-radius: var(--tile-radius);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--fg);
+  font: inherit;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+
+.bbar-btn {
+  width: 3.6rem;
+  font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets", sans-serif;
+  font-size: 1.35rem;
+  cursor: pointer;
+}
+
+.bbar-address {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 1.1rem;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.bbar-lock {
+  font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets", sans-serif;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.bbar-url {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 1.15rem;
+}
+
+.bbar-btn:hover,
+.bbar-address:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--accent);
+}
+
+.bbar .focused {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 1.2rem var(--accent-glow);
+  transform: scale(1.05);
+}
+
+.bbar .disabled {
+  opacity: 0.35;
+}
+
+.browser-slot {
+  flex: 1;
+  min-height: 0;
+  border-radius: calc(var(--tile-radius) * 0.6);
+  background: #000;
+  outline: 0.15rem solid transparent;
+  transition: outline-color 0.15s var(--ease);
+}
+
+.browser-slot.page-focus {
+  outline-color: var(--accent);
+}
+
+/* ------------------------------------------------------------------ setup assistant (views/setup-wizard.js) */
+/* Skin tokens only. Nothing here clips: no overflow on the containers, and room around the cards for the focus scale and glow. */
+
+body[data-view="setup-wizard"] #tabs {
+  visibility: hidden;
+}
+
+/* No notification cards over the first-run questions (notifications.js stops new ones; this hides those already showing),
+   except security notices, which the host flags and which always show. */
+body[data-view="setup-wizard"] #notify-stack .notify-card:not(.security),
+body[data-view="terms"] #notify-stack .notify-card:not(.security) {
+  display: none;
+}
+
+.wizard {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.3rem;
+  padding: 1rem 1rem 0.6rem;
+  text-align: center;
+}
+
+.wizard-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wizard-dots li {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 1rem;
+  background: var(--muted);
+  opacity: 0.4;
+  transition: width 0.25s var(--ease), background 0.25s, opacity 0.25s;
+}
+
+.wizard-dots li.done {
+  background: var(--accent);
+  opacity: 0.65;
+}
+
+.wizard-dots li.active {
+  width: 2.2rem;
+  background: var(--accent);
+  opacity: 1;
+  box-shadow: 0 0 0.8rem var(--accent-glow);
+}
+
+.wizard-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wizard-head h2 {
+  font-size: 2.6rem;
+}
+
+.wizard-icon {
+  color: var(--accent-text);
+}
+
+.wizard-icon .cat-icon {
+  width: 3rem;
+  height: 3rem;
+  filter: drop-shadow(0 0 0.8rem var(--accent-glow));
+}
+
+.wizard-lead {
+  max-width: 56rem;
+  color: var(--muted);
+  font-size: 1.3rem;
+}
+
+.wizard-logo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.wizard-logo img {
+  width: 4.6rem;
+  height: 4.6rem;
+  filter: drop-shadow(0 0 1.2rem var(--accent-glow));
+}
+
+.wizard-brand {
+  font-size: 3.2rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.wizard-brand b {
+  color: var(--accent-text);
+}
+
+.wizard-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.6rem;
+}
+
+.wizard-line {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+/* Big cards stay on one line and get narrower on narrower screens (16:10, 4:3); many small ones (skins) wrap. */
+.wizard-options {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 1.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The whole width, so the cards size by their basis and not by their text. */
+.wizard-cards .wizard-options {
+  width: 100%;
+}
+
+.wizard-options:has(> .compact) {
+  flex-wrap: wrap;
+  gap: 1.2rem;
+}
+
+.wizard-option {
+  border: 0.15rem solid color-mix(in srgb, var(--fg) 12%, transparent);
+  background: var(--panel);
+  transition: transform 0.18s var(--ease), border-color 0.18s, background 0.18s, box-shadow 0.18s;
+}
+
+.wizard-option.focused {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  box-shadow: 0 0 1.6rem var(--accent-glow);
+  transform: scale(1.04);
+}
+
+/* Cards: icon, short title, up to three bullets */
+
+.wizard-card {
+  flex: 0 1 27rem;
+  min-width: 0;
+  min-height: 19rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 1.6rem 1.8rem 1.4rem;
+  border-radius: calc(var(--tile-radius) * 2);
+  text-align: left;
+}
+
+.wizard-card.compact {
+  flex: 0 1 14rem;
+  min-height: 11rem;
+  padding: 1.2rem 1.3rem;
+}
+
+.wizard-card-top {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.wizard-card-icon {
+  color: var(--accent-text);
+}
+
+.wizard-card-icon .cat-icon {
+  width: 2.6rem;
+  height: 2.6rem;
+}
+
+.wizard-card.compact .wizard-card-icon .cat-icon {
+  width: 2rem;
+  height: 2rem;
+}
+
+.wizard-badge {
+  padding: 0.2rem 0.75rem;
+  border-radius: 1rem;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.wizard-card-title {
+  font-size: 2.1rem;
+  line-height: 1.15;
+}
+
+.wizard-card.compact .wizard-card-title {
+  font-size: 1.45rem;
+}
+
+.wizard-card-tag {
+  color: var(--accent-text);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wizard-bullets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 1.2rem;
+}
+
+.wizard-bullets li {
+  position: relative;
+  padding-left: 1.3rem;
+}
+
+.wizard-bullets li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.wizard-card.compact .wizard-bullets {
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.wizard-card.compact .wizard-bullets li {
+  padding-left: 0;
+}
+
+.wizard-card.compact .wizard-bullets li::before {
+  display: none;
+}
+
+.wizard-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.6rem;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.wizard-card-foot .cat-icon {
+  flex: none;
+  width: 1.3rem;
+  height: 1.3rem;
+  color: var(--accent-text);
+}
+
+/* Chips (pointer) */
+
+.wizard-line-label {
+  color: var(--muted);
+  font-size: 1.15rem;
+}
+
+.wizard-chip-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.3rem;
+  border-radius: 2rem;
+  font-size: 1.15rem;
+}
+
+.wizard-chips .wizard-options {
+  gap: 0.9rem;
+}
+
+.wizard-check {
+  color: var(--accent-text);
+  font-weight: 800;
+}
+
+.wizard-chip-option.focused .wizard-check {
+  color: inherit;
+}
+
+/* Rows (game clients) and buttons */
+
+.wizard-step-clients .wizard-body {
+  gap: 0.8rem;
+}
+
+.wizard-line.wizard-list {
+  width: min(46rem, 100%);
+}
+
+.wizard-list .wizard-options {
+  width: 100%;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 0.8rem;
+}
+
+.wizard-card.previewing {
+  border-color: var(--accent);
+}
+
+.wizard-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.4rem;
+  border-radius: var(--tile-radius);
+  font-size: 1.35rem;
+}
+
+.wizard-row strong {
+  flex: 1;
+  text-align: left;
+}
+
+.wizard-row-icon {
+  display: inline-flex;
+  color: var(--accent-text);
+}
+
+.wizard-row.focused {
+  transform: scale(1.02);
+}
+
+.wizard-button {
+  align-self: center;
+  min-width: 16rem;
+  padding: 0.9rem 2.6rem;
+  border-radius: 2rem;
+  font-size: 1.4rem;
+  text-align: center;
+}
+
+.wizard-button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.wizard-button.primary.focused {
+  background: var(--accent);
+}
+
+/* Summary */
+
+.wizard-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.8rem;
+  max-width: 72rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wizard-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1.3rem;
+  border-radius: 2rem;
+  border: 0.1rem solid color-mix(in srgb, var(--fg) 12%, transparent);
+  background: var(--panel);
+  font-size: 1.25rem;
+}
+
+.wizard-chip-icon {
+  display: inline-flex;
+  color: var(--accent-text);
+}
+
+.wizard-note {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 60rem;
+  font-size: 1.2rem;
+}
+
+.wizard-note .cat-icon {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--accent-text);
+}
+
+.wizard-later {
+  max-width: 60rem;
+  color: var(--muted);
+  font-size: 1.05rem;
+}

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <!-- img-src keeps https: on purpose: the artwork picker shows SteamGridDB thumbnails and the news show their photos straight from the web
+       (the user is browsing). Library artwork from Steam, Epic and SteamGridDB is served by art.couchhud, a cache that holds nothing else.
+       A skin cannot use that to call a stranger's server: its stylesheet is cleaned of external addresses where local.couchhud serves it
+       (see SkinCss.cs). Videos: our own host and Steam's trailer CDN only. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://local.couchhud; font-src 'self' https://local.couchhud; media-src 'self' https://local.couchhud https://*.steamstatic.com https://*.steampowered.com https://*.akamaihd.net; script-src 'self'">
+  <title>CouchHUD</title>
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" id="skin-css">
+</head>
+<body>
+  <div id="bg">
+    <div class="bg-layer"></div>
+    <div class="bg-layer"></div>
+    <div class="bg-ambient"></div>
+    <div class="bg-shade"></div>
+  </div>
+
+  <header id="top">
+    <nav id="tabs">
+      <span class="glyph shoulder" data-glyph="LB">LB</span>
+      <ol id="tab-list"></ol>
+      <span class="glyph shoulder" data-glyph="RB">RB</span>
+    </nav>
+    <div id="status">
+      <span id="session-status" hidden></span>
+      <span id="parental-status" hidden></span>
+      <span id="weather" hidden></span>
+      <span id="pad-status" title="Controller" data-i18n-title="index.pad"></span>
+      <time id="clock"></time>
+    </div>
+  </header>
+
+  <main id="view"></main>
+
+  <footer id="hints"></footer>
+
+  <aside id="quick" data-i18n-aria="index.guideMenu"></aside>
+
+  <div id="overlay" hidden>
+    <div class="dialog">
+      <h2 class="dialog-title"></h2>
+      <p class="dialog-text" hidden></p>
+      <ul class="menu"></ul>
+    </div>
+  </div>
+
+  <div id="toast" hidden></div>
+
+  <div id="boot" aria-hidden="true">
+    <img class="boot-icon" src="assets/icon.svg" alt="">
+    <div class="boot-logo">Couch<span>HUD</span></div>
+    <div class="boot-bar"><div></div></div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

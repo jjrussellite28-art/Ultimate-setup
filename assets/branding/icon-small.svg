@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- docs/logo.svg simplified for 16-32 px (tray, taskbar, window title): full-bleed tile, thicker
+       frame and outlines, no glow and no face buttons. -->
+  <defs>
+    <linearGradient id="frame" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#3d8bff"/>
+      <stop offset="0.55" stop-color="#6a4cff"/>
+      <stop offset="1" stop-color="#c04dff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="104" fill="#11142a"/>
+  <rect x="56" y="48" width="400" height="272" rx="56" fill="#1d1f4a" stroke="url(#frame)" stroke-width="56"/>
+  <rect x="112" y="108" width="72" height="104" rx="16" fill="#5d7dff"/>
+  <rect x="220" y="96" width="72" height="128" rx="16" fill="#fff"/>
+  <rect x="328" y="108" width="72" height="104" rx="16" fill="#b46bff"/>
+  <g fill="#eef1f8" stroke="#11142a" stroke-width="28">
+    <rect x="30" y="290" width="138" height="180" rx="50"/>
+    <rect x="344" y="290" width="138" height="180" rx="50"/>
+    <rect x="128" y="256" width="256" height="214" rx="52"/>
+  </g>
+</svg>

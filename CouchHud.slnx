@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CouchHud.Sdk/CouchHud.Sdk.csproj" />
+    <Project Path="src/CouchHud.Core/CouchHud.Core.csproj" />
+    <Project Path="src/CouchHud.Privileged/CouchHud.Privileged.csproj" />
+    <Project Path="src/CouchHud.Shell/CouchHud.Shell.csproj" />
+    <Project Path="src/CouchHud.Service.Contracts/CouchHud.Service.Contracts.csproj" />
+    <Project Path="src/CouchHud.Service/CouchHud.Service.csproj" />
+    <Project Path="src/CouchHud.ServiceClient/CouchHud.ServiceClient.csproj" />
+  </Folder>
+  <Folder Name="/plugins/">
+    <Project Path="plugins/CouchHud.Plugin.Wand/CouchHud.Plugin.Wand.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CouchHud.Core.Tests/CouchHud.Core.Tests.csproj" />
+    <Project Path="tests/CouchHud.Service.Tests/CouchHud.Service.Tests.csproj" />
+    <Project Path="tests/CouchHud.Privileged.Tests/CouchHud.Privileged.Tests.csproj" />
+    <Project Path="tests/CouchHud.ServiceClient.Tests/CouchHud.ServiceClient.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,104 @@
+# Skins für CouchHUD
+
+Ein Skin ist ein Stylesheet plus optional eigene Button-Symbole. Er ändert Farben, Schriften, Formen, Abstände, Animationen, wie du willst.
+
+## Aufbau
+
+```
+%APPDATA%\CouchHud\skins\synthwave\
+  skin.json
+  skin.css
+  (Schriften, Bilder …)
+```
+
+**skin.json**
+
+```json
+{
+  "name": "Synthwave",
+  "description": "Neon, Sonnenuntergang, 1986",
+  "glyphs": { "A": "✕", "B": "○", "X": "□", "Y": "△", "LB": "L1", "RB": "R1" },
+  "sounds": { "move": "move.ogg", "select": "select.ogg", "back": "back.ogg", "notify": "notify.ogg" }
+}
+```
+
+`sounds` ist optional. Mögliche Ereignisse: `move`, `tab`, `select`, `back`, `bump`, `open`, `close`, `notify`, `toggle`, `boot` und `music`. `music` ist ein Hintergrund-Track, der in Schleife läuft, wenn der Nutzer „UI-Sounds und Musik“ gewählt hat; ohne ihn spielt die eingebaute Musik des Skins. Erlaubt sind `.wav`, `.ogg` und `.mp3` aus dem Skin-Ordner. Für fehlende Ereignisse spielt CouchHUD das eingebaute Klangset.
+
+**HDR**: Ist der HDR-Modus aktiv, steht `data-hdr="on"` am Root-Element. Dort kannst du kräftigere Farben setzen, am besten in Display-P3:
+
+```css
+@supports (color: color(display-p3 1 1 1)) {
+  :root[data-skin="user:synthwave"][data-hdr] {
+    --accent: color(display-p3 1 0.1 0.85);
+  }
+}
+```
+
+**skin.css**: Alle Regeln gelten nur, wenn dein Skin aktiv ist:
+
+```css
+:root[data-skin="user:synthwave"] {
+  --bg: #12001f;
+  --fg: #ffe9ff;
+  --muted: rgba(255, 233, 255, 0.6);
+  --accent: #ff2bd6;
+  --accent-glow: rgba(255, 43, 214, 0.55);
+  --panel: rgba(40, 0, 60, 0.7);
+  --font: "Orbitron", system-ui, sans-serif;
+  --tile-radius: 0.2rem;
+  --shelf-tile: 13rem;
+  --focus-scale: 1.1;
+}
+
+[data-skin="user:synthwave"] .tile.focused {
+  box-shadow: 0 0 0 0.15rem #fff, 0 0 2.5rem var(--accent-glow);
+}
+```
+
+Eigene Schriften und Bilder legst du in den Skin-Ordner und bindest sie relativ ein (`url("orbitron.woff2")`).
+
+**Nur lokale Dateien:** CouchHUD ersetzt Internet-Adressen (`http://`, `https://`, `//host/…`) in `skin.css` durch `about:blank`, bevor es das Stylesheet ausliefert. Ein Skin soll nicht bei jedem Bild bei einem fremden Server anfragen können und ihm so verraten, wann jemand auf der Couch sitzt. Bilder, Schriften und Klänge gehören deshalb in den Skin-Ordner (oder als `data:`-Adresse ins CSS). Der Skin-Ordner darf nur auf lokale Laufwerke zeigen, nie auf Netzlaufwerke oder Freigaben (`\\server\…`). Beim Installieren per `.zip` weist CouchHUD darauf hin, dass ein Skin Inhalte laden kann.
+
+## Wichtige Variablen
+
+| Variable | Wirkung |
+|---|---|
+| `--bg`, `--fg`, `--muted` | Hintergrund, Text, gedämpfter Text |
+| `--accent`, `--accent-glow`, `--accent-contrast` | Akzentfarbe, ihr Leuchten, Textfarbe auf dem Akzent |
+| `--panel` | Hintergrund von Karten, Listen, Menüs |
+| `--font` | Schriftfamilie |
+| `--tile-radius`, `--shelf-tile`, `--focus-scale` | Ecken, Kachelgröße auf Home, Zoom des Fokus |
+
+Für alles andere kannst du die Selektoren aus `ui/styles.css` überschreiben. Die eingebauten Skins in `ui/skins/` (PS4, Xbox, Cyberpunk, Nova) zeigen, wie weit das geht: Die PS4-Skin dreht z.B. das ganze Home-Layout um.
+
+## Mauszeiger
+
+Bewegt der Nutzer eine Maus, zeichnet CouchHUD einen eigenen Zeiger. Er kommt aus dem Skin: Jeder Skin darf ihn setzen, ein Skin ohne eigenen Zeiger zeigt automatisch den Standard-Pfeil von CouchHUD. Mit der Einstellung „Echter Mauszeiger“ (Einstellungen › Darstellung) zeigt der Nutzer stattdessen den normalen Windows-Zeiger, dann greift dein Zeiger nicht.
+
+| Variable | Wirkung |
+|---|---|
+| `--pointer` | Bild des Zeigers, am besten ein kleines SVG als `data:`-Adresse: `url("data:image/svg+xml,…")` (`#` als `%23` schreiben) |
+| `--pointer-size` | Kantenlänge des quadratischen Bildes, Standard `4.6rem` |
+| `--pointer-hx`, `--pointer-hy` | Hotspot als Bruchteil der Größe, `0 0` ist die linke obere Ecke, `0.5 0.5` die Mitte. Genau dort sitzt die Mausposition |
+
+```css
+:root[data-skin="user:synthwave"] {
+  --pointer: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><path d='M5 3 L5 35 L13 27.5 L19 41 L25.5 38.2 L19.5 25 L31 25 Z' fill='%23ff2bd6' stroke='%2312141c' stroke-width='3.2' stroke-linejoin='round'/></svg>");
+  --pointer-hx: 0.104;  /* Spitze des Pfeils bei (5, 3) von 48 */
+  --pointer-hy: 0.0625;
+}
+```
+
+Tipps: Ein Zeiger muss auf dem Fernseher aus dem Sessel auffallen. Eine dunkle Kontur (hier `#12141c`) hält ihn auf hellem Hintergrund sichtbar, eine helle Füllung auf dunklem. Der Zeiger ruht, solange die Maus still steht, bitte keine Endlos-Animation. Wer den Zeiger per CSS selbst zeichnen will, kann `#cursor .cp` direkt stylen (`.click` am `#cursor` liegt kurz beim Klick an) und bei `:root[data-motion="off"]` auf Bewegung verzichten, das ist die Einstellung „Animationen reduzieren“. Ein relativer Pfad in `--pointer` ist nur zuverlässig, wenn du ihn direkt als `background-image` von `#cursor .cp` setzt.
+
+Das ist nur der Zeiger innerhalb von CouchHUD. In anderen Fenstern bleibt es der Windows-Zeiger.
+
+## Ausprobieren
+
+CouchHUD mit `--dev` starten, unter *Einstellungen › Darstellung › Skin* deinen Skin wählen. Änderungen an der CSS siehst du nach erneutem Auswählen.
+
+Ohne Windows geht es auch: `node scripts/preview-server.js` startet die Oberfläche mit Beispieldaten im Browser. Eigene Skins dort einfach als weitere Datei in `ui/skins/` anlegen und in `ui/skins/index.js` eintragen.
+
+## Teilen
+
+Ordner als `.zip` packen (mit oder ohne übergeordneten Ordner), auf GitHub mit dem Topic `couchhud-skin` veröffentlichen. Andere installieren ihn in CouchHUD unter *Einstellungen › Darstellung › Neue Skins installieren*.

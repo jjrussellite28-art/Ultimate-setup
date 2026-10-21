@@ -1,0 +1,169 @@
+using CouchHud.Service.Contracts;
+
+namespace CouchHud.ServiceClient.Tests;
+
+/// <summary>The migrations of the local hash and mode and storing a new code, against a fake service that answers like the real one.</summary>
+public class CodeFlowTests
+{
+    private const string Hash = "pbkdf2-sha256$100000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+    /// <summary>A service with the codes it has: the first code of an account is open, everything else needs an approval.</summary>
+    private sealed class FakeCodes
+    {
+        public HashSet<string> Has { get; } = [];
+        public string Mode { get; set; } = LockModes.Off;
+        public List<string> Calls { get; } = [];
+
+        public byte[] Answer(byte[] request)
+        {
+            var op = FakePipeServer.OpOf(request);
+            var parsed = new RequestValidator(_ => true).Validate(request).Request!;
+            var grant = parsed.Grant is null ? "-" : "g";
+            switch (parsed.Args)
+            {
+                case LockModeArgs mode:
+                    lock (Calls) Calls.Add($"{op}:{mode.Mode}{(mode.Hash is null ? "" : "+" + mode.Kind)}:{grant}");
+                    if (LockModes.Rank(mode.Mode) < LockModes.Rank(Mode) && parsed.Grant is null) return FakePipeServer.Fail(ErrorCodes.NeedGrant);
+                    if (mode.Hash is not null && (LockModes.Rank(Mode) > 0 || Has.Count > 0)) return FakePipeServer.Fail(ErrorCodes.Denied);
+                    Mode = mode.Mode;
+                    if (mode.Hash is not null) Has.Add(CodeKinds.Couch);
+                    return FakePipeServer.Ok();
+                case PasscodeHashArgs args:
+                    lock (Calls) Calls.Add($"{op}:{args.Kind}:{grant}");
+                    var kinds = args.Kind == CodeKinds.Both ? new[] { CodeKinds.Couch, CodeKinds.Parent } : [args.Kind];
+                    if (op == nameof(Operation.EnrollPasscode))
+                    {
+                        if (kinds.Any(Has.Contains)) return FakePipeServer.Fail(ErrorCodes.Denied);
+                        if (Has.Count > 0 && parsed.Grant is null) return FakePipeServer.Fail(ErrorCodes.NeedGrant);
+                        Has.UnionWith(kinds);
+                        return FakePipeServer.Ok();
+                    }
+                    if (!kinds.Any(Has.Contains)) return FakePipeServer.Fail(ErrorCodes.Denied);
+                    return parsed.Grant is null ? FakePipeServer.Fail(ErrorCodes.NeedGrant) : FakePipeServer.Ok();
+                default:
+                    return FakePipeServer.Ok();
+            }
+        }
+    }
+
+    private static ServiceOps Ops(FakePipeServer server)
+    {
+        var scm = FakeScm.RunningHere();
+        var client = new ServiceClient(scm, server.Options());
+        return new ServiceOps(client, new ServiceProbe(scm, client, new Version(0, 4, 1), (_, _) => Task.CompletedTask), null, (_, _) => Task.CompletedTask);
+    }
+
+    [Fact]
+    public async Task Without_a_lock_the_migration_enrolls_the_couch_code_alone()
+    {
+        var codes = new FakeCodes();
+        await using var server = new FakePipeServer(codes.Answer);
+        Assert.Equal(MigrationResult.Done, await CodeFlow.MigrateAsync(Ops(server), Hash, LockModes.Off));
+        Assert.Equal(["EnrollPasscode:couch:-"], codes.Calls);
+    }
+
+    [Fact]
+    public async Task The_code_lock_migrates_with_its_code_in_one_step()
+    {
+        var codes = new FakeCodes();
+        await using var server = new FakePipeServer(codes.Answer);
+        Assert.Equal(MigrationResult.Done, await CodeFlow.MigrateAsync(Ops(server), Hash, LockModes.Code));
+        Assert.Equal(["SetLockMode:code+couch:-"], codes.Calls);
+        Assert.Equal(LockModes.Code, codes.Mode);
+    }
+
+    [Fact]
+    public async Task The_windows_lock_migrates_without_a_code_and_a_stricter_service_is_a_conflict()
+    {
+        var codes = new FakeCodes();
+        await using var server = new FakePipeServer(codes.Answer);
+        Assert.Equal(MigrationResult.Done, await CodeFlow.MigrateAsync(Ops(server), Hash, LockModes.Windows));
+        Assert.Equal(["SetLockMode:windows:-"], codes.Calls);
+        // The service holds a lock now: a config that says "code" with its own hash does not get its code in.
+        Assert.Equal(MigrationResult.Conflict, await CodeFlow.MigrateAsync(Ops(server), Hash, LockModes.Code));
+    }
+
+    [Fact]
+    public void A_parents_code_the_shell_did_not_set_is_flagged()
+    {
+        Assert.True(CodeFlow.UnknownParentCode(new HeldCodes(true, true, LockModes.Code), parentalEnabled: false));
+        Assert.False(CodeFlow.UnknownParentCode(new HeldCodes(true, true, LockModes.Code), parentalEnabled: true));
+        Assert.False(CodeFlow.UnknownParentCode(new HeldCodes(true, false, LockModes.Code), parentalEnabled: false));
+        Assert.False(CodeFlow.UnknownParentCode(null, parentalEnabled: false));
+    }
+
+    [Fact]
+    public async Task A_service_with_its_own_code_is_a_conflict_not_a_success()
+    {
+        var codes = new FakeCodes();
+        codes.Has.Add(CodeKinds.Couch);
+        await using var server = new FakePipeServer(codes.Answer);
+        Assert.Equal(MigrationResult.Conflict, await CodeFlow.MigrateAsync(Ops(server), Hash, LockModes.Off));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("service")]
+    [InlineData("pbkdf2-sha256$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")]
+    public async Task Nothing_that_is_not_a_hash_of_ours_is_migrated(string local)
+    {
+        var codes = new FakeCodes();
+        await using var server = new FakePipeServer(codes.Answer);
+        Assert.Equal(MigrationResult.NotYet, await CodeFlow.MigrateAsync(Ops(server), local, LockModes.Off));
+        Assert.Empty(codes.Calls);
+    }
+
+    [Fact]
+    public async Task Without_parental_controls_the_couch_code_alone_enrolled_then_changed_with_its_grant()
+    {
+        var codes = new FakeCodes();
+        await using var server = new FakePipeServer(codes.Answer);
+        var ops = Ops(server);
+        var asked = new List<Operation>();
+        Task<OpResult> WithGrant(Operation op, Func<Task<OpResult>> call) => GrantFlow.WithGrantAsync(call, () =>
+        {
+            asked.Add(op);
+            ops.Cache.Set(new GrantData(Convert.ToBase64String(new byte[32]), GrantKindNames.WindowsAdmin, 30, [op.ToString()]));
+            return Task.FromResult(true);
+        });
+        Assert.True((await CodeFlow.StoreAsync(ops, Hash, parental: false, WithGrant)).Ok);
+        Assert.Empty(asked);
+        // The couch grant of the unlock changes it without asking anybody.
+        ops.Cache.Set(new GrantData(Convert.ToBase64String(Enumerable.Repeat((byte)1, 32).ToArray()), GrantKindNames.Couch, 120));
+        Assert.True((await CodeFlow.StoreAsync(ops, Hash, parental: false, WithGrant)).Ok);
+        Assert.Empty(asked);
+        Assert.Contains("ChangePasscode:couch:g", codes.Calls);
+    }
+
+    [Fact]
+    public async Task With_parental_controls_both_codes_in_one_step_and_a_change_needs_the_parents()
+    {
+        var codes = new FakeCodes();
+        await using var server = new FakePipeServer(codes.Answer);
+        var ops = Ops(server);
+        var asked = new List<Operation>();
+        Task<OpResult> WithGrant(Operation op, Func<Task<OpResult>> call) => GrantFlow.WithGrantAsync(call, () =>
+        {
+            asked.Add(op);
+            ops.Cache.Set(new GrantData(Convert.ToBase64String(new byte[32]), GrantKindNames.WindowsAdmin, 30, [op.ToString()]));
+            return Task.FromResult(true);
+        });
+        Assert.True((await CodeFlow.StoreAsync(ops, Hash, parental: true, WithGrant)).Ok);
+        Assert.Equal(["EnrollPasscode:both:-"], codes.Calls);
+        // Even with the couch grant at hand, the pair changes only with a parent's (here: the administrator's fallback) approval.
+        ops.Cache.Set(new GrantData(Convert.ToBase64String(Enumerable.Repeat((byte)1, 32).ToArray()), GrantKindNames.Couch, 120));
+        Assert.True((await CodeFlow.StoreAsync(ops, Hash, parental: true, WithGrant)).Ok);
+        Assert.Equal([Operation.ChangePasscode], asked);
+        Assert.Equal("ChangePasscode:both:g", codes.Calls[^1]);
+    }
+
+    [Fact]
+    public async Task A_refused_approval_stops_with_the_refusal()
+    {
+        var codes = new FakeCodes();
+        codes.Has.Add(CodeKinds.Couch);
+        await using var server = new FakePipeServer(codes.Answer);
+        var result = await CodeFlow.StoreAsync(Ops(server), Hash, parental: false, (_, call) => GrantFlow.WithGrantAsync(call, () => Task.FromResult(false)));
+        Assert.Equal(FailureKind.NeedGrant, result.Failure);
+    }
+}

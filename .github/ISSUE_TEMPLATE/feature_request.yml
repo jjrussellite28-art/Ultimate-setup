@@ -1,0 +1,31 @@
+name: Funktionswunsch / Feature request
+description: Eine Idee oder ein Wunsch. / An idea or request.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Was willst du erreichen, was geht heute nicht? / What do you want to do that you cannot today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Vorschlag / Proposal
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativen / Alternatives
+      description: Was hast du bisher versucht oder erwogen? / What have you tried or considered?
+    validations:
+      required: false
+  - type: textarea
+    id: couch
+    attributes:
+      label: Bezug zu Controller und TV / Controller and TV context
+      description: Wie würde man es mit dem Controller auf dem Fernseher bedienen? / How would it be used with a controller on a TV?
+    validations:
+      required: true

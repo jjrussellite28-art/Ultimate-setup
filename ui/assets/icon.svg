@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- CouchHUD logo: a couch seen from behind, in front of a glowing TV that shows the tile row.
+       Same tile and glow language as CaseHUD, own colors (blue to violet). 16-32 px: assets/branding/icon-small.svg -->
+  <defs>
+    <linearGradient id="frame" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#3d8bff"/>
+      <stop offset="0.55" stop-color="#6a4cff"/>
+      <stop offset="1" stop-color="#c04dff"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#171c2e"/>
+      <stop offset="1" stop-color="#0b0d16"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d1f4a"/>
+      <stop offset="1" stop-color="#0e1024"/>
+    </linearGradient>
+    <linearGradient id="couch" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f6fb"/>
+      <stop offset="1" stop-color="#d5dae6"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="12"/></filter>
+  </defs>
+
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#tile)" stroke="#262c44" stroke-width="6"/>
+
+  <!-- TV: glow, screen, frame -->
+  <rect x="88" y="92" width="336" height="228" rx="40" fill="none" stroke="url(#frame)" stroke-width="30" filter="url(#glow)" opacity=".6"/>
+  <rect x="88" y="92" width="336" height="228" rx="40" fill="url(#screen)" stroke="url(#frame)" stroke-width="30"/>
+
+  <!-- the tile row on the screen, middle tile focused -->
+  <rect x="132" y="146" width="62" height="84" rx="12" fill="#3d8bff" opacity=".45"/>
+  <rect x="212" y="134" width="88" height="110" rx="14" fill="#6a4cff" stroke="#fff" stroke-width="8"/>
+  <rect x="318" y="146" width="62" height="84" rx="12" fill="#c04dff" opacity=".45"/>
+
+  <!-- couch from behind: armrests, backrest, legs; dark outline keeps it apart from the frame -->
+  <g stroke="#0b0d16" stroke-width="14" fill="url(#couch)">
+    <rect x="78" y="300" width="86" height="118" rx="36"/>
+    <rect x="348" y="300" width="86" height="118" rx="36"/>
+    <rect x="124" y="270" width="264" height="148" rx="44"/>
+  </g>
+  <rect x="116" y="418" width="22" height="30" rx="8" fill="#d5dae6"/>
+  <rect x="374" y="418" width="22" height="30" rx="8" fill="#d5dae6"/>
+
+  <!-- face buttons stitched into the backrest -->
+  <g fill="url(#frame)">
+    <circle cx="256" cy="306" r="12"/>
+    <circle cx="256" cy="362" r="12"/>
+    <circle cx="228" cy="334" r="12"/>
+    <circle cx="284" cy="334" r="12"/>
+  </g>
+</svg>

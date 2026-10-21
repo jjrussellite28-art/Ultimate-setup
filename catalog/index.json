@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "name": "CouchHUD Katalog",
+  "entries": [
+    {
+      "id": "wand",
+      "folder": "CouchHud.Plugin.Wand",
+      "name": "Wand",
+      "type": "plugin",
+      "version": "1.0.0",
+      "minCouchHud": "0.3.0",
+      "author": "kewe87",
+      "description": {
+        "de": "Cheats und Mods für deine Spiele über Wand (früher WeMod)",
+        "en": "Cheats and mods for your games through Wand (formerly WeMod)"
+      },
+      "homepage": "https://github.com/kewe87/couchhud/tree/master/plugins/CouchHud.Plugin.Wand",
+      "icon": "https://raw.githubusercontent.com/kewe87/couchhud-catalog/main/icons/wand.png",
+      "download": "https://github.com/kewe87/couchhud-catalog/releases/download/wand-1.0.0/CouchHud.Plugin.Wand-1.0.0.zip",
+      "sha256": "8c9dcd14119d57ff21856d24ee4a5b25852321c8b8ce77fe89f26280117d7dd6"
+    },
+    {
+      "id": "synthwave",
+      "name": "Synthwave",
+      "type": "skin",
+      "version": "1.0.0",
+      "minCouchHud": "0.3.0",
+      "author": "kewe87",
+      "description": {
+        "de": "Neon, Sonnenuntergang, Gitterboden",
+        "en": "Neon, sunset, grid floor"
+      },
+      "homepage": "https://github.com/kewe87/couchhud-catalog/tree/main/skins/synthwave",
+      "icon": "https://raw.githubusercontent.com/kewe87/couchhud-catalog/main/icons/synthwave.png",
+      "download": "https://github.com/kewe87/couchhud-catalog/releases/download/synthwave-1.0.0/synthwave-1.0.0.zip",
+      "sha256": "78f237840055426ba8a95edc669787f9da7e12db267b7476cc461e0482a00b2d"
+    }
+  ]
+}

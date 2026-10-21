@@ -1,0 +1,11 @@
+{
+  "name": "Wand",
+  "version": "1.0.0",
+  "author": "kewe87",
+  "description": {
+    "de": "Cheats und Mods für deine Spiele über Wand (früher WeMod)",
+    "en": "Cheats and mods for your games through Wand (formerly WeMod)"
+  },
+  "homepage": "https://www.wand.com",
+  "sdk": 1
+}

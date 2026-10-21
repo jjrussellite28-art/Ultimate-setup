@@ -1,0 +1,17 @@
+"libraryfolders"
+{
+	"0"
+	{
+		"path"		"__STEAM__"
+		"label"		""
+		"contentid"		"123"
+		"apps"
+		{
+			"1245620"		"50000"
+		}
+	}
+	"1"
+	{
+		"path"		"__LIB2__"
+	}
+}

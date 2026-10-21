@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Testfeed</title>
+    <item>
+      <title>Windows 11: Neues Update &amp; mehr</title>
+      <link>https://example.com/news/1</link>
+      <pubDate>Sat, 17 Oct 2026 20:15:00 +0200</pubDate>
+      <description><![CDATA[<p>Kurzer <b>Teaser</b> zum Update.</p>]]></description>
+      <content:encoded><![CDATA[<p>Erster Absatz.</p><p>Zweiter Absatz mit <a href="#">Link</a>.</p><img src="http://img.example.com/1.jpg"/>]]></content:encoded>
+    </item>
+    <item>
+      <title>Ältere Meldung</title>
+      <link>https://example.com/news/2</link>
+      <pubDate>Fri, 16 Oct 2026 08:00:00 GMT</pubDate>
+      <description>Nur Text</description>
+      <enclosure url="https://img.example.com/2.jpg" type="image/jpeg" length="1"/>
+    </item>
+    <item><description>ohne Titel</description></item>
+  </channel>
+</rss>

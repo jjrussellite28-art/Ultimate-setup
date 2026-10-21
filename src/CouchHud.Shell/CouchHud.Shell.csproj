@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <!-- Windows 10 1809+: WinRT for Bluetooth and notifications. -->
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>CouchHud</AssemblyName>
+    <RootNamespace>CouchHud.Shell</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>couchhud.ico</ApplicationIcon>
+    <!-- Shown in Task Manager and the file properties. -->
+    <AssemblyTitle>CouchHUD</AssemblyTitle>
+    <!-- Elevated helpers inherit the user's environment: no DOTNET_STARTUP_HOOKS code may run in them. -->
+    <StartupHookSupport>false</StartupHookSupport>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- WinForms is only used for the tray icon and suspend; keep WPF names unambiguous. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+    <!-- WPF leaves System.IO out of the implicit usings (Path clashes with Shapes.Path). -->
+    <Using Include="System.IO" />
+    <!-- The administrator code (registry, tasks, firewall, sign-in): used here where it used to live. -->
+    <Using Include="CouchHud.Privileged" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Kestrel for the optional MCP server (works on the LAN without URL ACLs). -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.0" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CouchHud.Core\CouchHud.Core.csproj" />
+    <ProjectReference Include="..\CouchHud.Privileged\CouchHud.Privileged.csproj" />
+    <!-- Every administrator operation goes through the CouchHUD service (pipe client with the server check). -->
+    <ProjectReference Include="..\CouchHud.ServiceClient\CouchHud.ServiceClient.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Window and tray icon; the exe gets it through ApplicationIcon. -->
+    <Resource Include="couchhud.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\ui\**\*" LinkBase="ui" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

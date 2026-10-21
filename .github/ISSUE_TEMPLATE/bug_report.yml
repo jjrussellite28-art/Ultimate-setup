@@ -1,0 +1,92 @@
+name: Fehlerbericht / Bug report
+description: Etwas funktioniert nicht wie erwartet. / Something does not work as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für den Bericht! Bitte fülle alle Felder aus.
+        Thanks for the report! Please fill in all fields.
+  - type: input
+    id: version
+    attributes:
+      label: CouchHUD-Version / CouchHUD version
+      description: Zu finden unter Einstellungen › Info. / Found under Settings › About.
+      placeholder: "0.x.y"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows-Version / Windows version
+      placeholder: "Windows 11 24H2 (Build 26100)"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Modus / Mode
+      options:
+        - Light
+        - Volle Einbindung / Full integration
+        - Als Shell / As shell
+    validations:
+      required: true
+  - type: input
+    id: skin
+    attributes:
+      label: Skin
+      placeholder: "Nova, Xbox, PS4, Cyberpunk, ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: input
+    attributes:
+      label: Eingabe / Input
+      description: Womit ist der Fehler aufgetreten? / What were you using when it happened?
+      options:
+        - Controller (Xbox)
+        - Controller (PlayStation)
+        - Controller (anderer / other)
+        - Tastatur / Keyboard
+        - Handy / Phone
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Schritte zum Nachstellen / Steps to reproduce
+      placeholder: "1. ...\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Erwartet / Expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Tatsächlich / Actual
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logdatei / Log file
+      description: |
+        Die Logs liegen unter `%LOCALAPPDATA%\CouchHud\logs`. Füge den relevanten Ausschnitt ein oder hänge die Datei an.
+        Prüfe sie vorher auf persönliche Daten (Benutzername, Pfade, Namen, Adressen) und entferne sie.
+        Logs are in `%LOCALAPPDATA%\CouchHud\logs`. Paste the relevant part or attach the file.
+        Check it for personal data (user name, paths, names, addresses) and remove it first.
+      render: text
+    validations:
+      required: true
+  - type: checkboxes
+    id: not-security
+    attributes:
+      label: Sicherheit / Security
+      options:
+        - label: Keine Sicherheitslücke (die bitte vertraulich melden, siehe SECURITY.md) / Not a security vulnerability (report those privately, see SECURITY.md)
+          required: true

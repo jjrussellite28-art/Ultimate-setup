@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- A Windows service (LocalSystem). WinExe: never a console window. Published self-contained into {app}\service (P8). -->
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>CouchHud.Service</RootNamespace>
+    <AssemblyName>CouchHud.Service</AssemblyName>
+    <!-- Small footprint: workstation GC, not concurrent, no hosting framework (ServiceBase directly). -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <!-- Published (P8, build.yml) as one self-contained exe, never self-extracting: extraction would unpack native libraries or content
+       into a temp folder at run time and load them from there, outside the protected {app}\service. Only with a runtime identifier
+       (a publish), so a plain build of the solution is unaffected. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>false</IncludeAllContentForSelfExtract>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.0" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CouchHud.Service.Contracts\CouchHud.Service.Contracts.csproj" />
+    <ProjectReference Include="..\CouchHud.Privileged\CouchHud.Privileged.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CouchHud.Service.Tests" />
+  </ItemGroup>
+</Project>

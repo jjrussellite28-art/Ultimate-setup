@@ -1,0 +1,2 @@
+catalog/* -text
+*.sh text eol=lf

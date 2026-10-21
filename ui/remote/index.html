@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0b0d14">
+  <title>CouchHUD</title>
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCIgeTE9IjAiIHgyPSI1MTIiIHkyPSI1MTIiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjM2Q4YmZmIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMC41NSIgc3RvcC1jb2xvcj0iIzZhNGNmZiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNiMDNkZmYiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8cmFkaWFsR3JhZGllbnQgaWQ9InNoaW5lIiBjeD0iMC4zIiBjeT0iMC4xNSIgcj0iMC43NSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2ZmZiIgc3RvcC1vcGFjaXR5PSIwLjM1Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI2ZmZiIgc3RvcC1vcGFjaXR5PSIwIi8+CiAgICA8L3JhZGlhbEdyYWRpZW50PgogICAgPGZpbHRlciBpZD0ic29mdCIgeD0iLTIwJSIgeT0iLTIwJSIgd2lkdGg9IjE0MCUiIGhlaWdodD0iMTQwJSI+CiAgICAgIDxmZURyb3BTaGFkb3cgZHg9IjAiIGR5PSIxMCIgc3RkRGV2aWF0aW9uPSIxMiIgZmxvb2QtY29sb3I9IiMxYTBiNGQiIGZsb29kLW9wYWNpdHk9IjAuNDUiLz4KICAgIDwvZmlsdGVyPgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExNiIgZmlsbD0idXJsKCNiZykiLz4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExNiIgZmlsbD0idXJsKCNzaGluZSkiLz4KICA8Zz4KICAgIDwhLS0gY291Y2g6IGJhY2tyZXN0LCBhcm1yZXN0cywgc2VhdCwgbGVncyAtLT4KICAgIDxyZWN0IHg9IjEwNCIgeT0iMTU2IiB3aWR0aD0iMzA0IiBoZWlnaHQ9IjE0NCIgcng9IjQ2IiBmaWxsPSIjZmZmIi8+CiAgICA8cmVjdCB4PSI1NiIgeT0iMjMyIiB3aWR0aD0iOTIiIGhlaWdodD0iMTUwIiByeD0iNDAiIGZpbGw9IiNmZmYiIHN0cm9rZT0idXJsKCNiZykiIHN0cm9rZS13aWR0aD0iMjIiLz4KICAgIDxyZWN0IHg9IjM2NCIgeT0iMjMyIiB3aWR0aD0iOTIiIGhlaWdodD0iMTUwIiByeD0iNDAiIGZpbGw9IiNmZmYiIHN0cm9rZT0idXJsKCNiZykiIHN0cm9rZS13aWR0aD0iMjIiLz4KICAgIDxyZWN0IHg9IjEzNiIgeT0iMjg4IiB3aWR0aD0iMjQwIiBoZWlnaHQ9Ijc0IiByeD0iMjQiIGZpbGw9IiNmZmYiIHN0cm9rZT0idXJsKCNiZykiIHN0cm9rZS13aWR0aD0iMjIiLz4KICAgIDxyZWN0IHg9IjkyIiB5PSIzNzgiIHdpZHRoPSIyNiIgaGVpZ2h0PSIzNiIgcng9IjEwIiBmaWxsPSIjZmZmIi8+CiAgICA8cmVjdCB4PSIzOTQiIHk9IjM3OCIgd2lkdGg9IjI2IiBoZWlnaHQ9IjM2IiByeD0iMTAiIGZpbGw9IiNmZmYiLz4KICA8L2c+Cjwvc3ZnPgo=">
+  <style>
+    :root {
+      --bg: #0b0d14;
+      --panel: #161a26;
+      --line: #262b3b;
+      --fg: #f2f5fa;
+      --muted: #9aa3b8;
+      --accent: #3b9cff;
+      --a: #3fb950;
+      --b: #f0524f;
+      --x: #3b82f6;
+      --y: #e3b341;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: radial-gradient(120% 60% at 50% 0%, #1b2140 0%, var(--bg) 60%);
+      color: var(--fg);
+      font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      user-select: none;
+    }
+    header { display: flex; align-items: center; justify-content: space-between; }
+    .brand { font-weight: 800; font-size: 20px; letter-spacing: -0.01em; }
+    .brand span { color: var(--accent); }
+    .status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.on { background: var(--a); box-shadow: 0 0 8px var(--a); }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+    .field-title { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+    .field-title strong { color: var(--fg); }
+    textarea {
+      width: 100%;
+      min-height: 64px;
+      resize: vertical;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #0e111a;
+      color: var(--fg);
+      font: inherit;
+      font-size: 17px;
+      user-select: text;
+    }
+    textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .row { display: flex; gap: 10px; margin-top: 10px; }
+    button {
+      font: inherit;
+      color: var(--fg);
+      border: 1px solid var(--line);
+      background: #1d2232;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-weight: 600;
+      touch-action: manipulation;
+    }
+    button:active { transform: scale(0.96); filter: brightness(1.2); }
+    .primary { background: var(--accent); border-color: var(--accent); color: #fff; flex: 1; }
+    .ghost { flex: 1; }
+    .pad { --k: min(56px, 12.5vw); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; }
+    .dpad { display: grid; grid-template-columns: repeat(3, var(--k)); grid-template-rows: repeat(3, var(--k)); gap: 6px; justify-content: center; }
+    .dpad button { padding: 0; font-size: 22px; }
+    .dpad .u { grid-column: 2; grid-row: 1; }
+    .dpad .l { grid-column: 1; grid-row: 2; }
+    .dpad .r { grid-column: 3; grid-row: 2; }
+    .dpad .d { grid-column: 2; grid-row: 3; }
+    .face { display: grid; grid-template-columns: repeat(3, var(--k)); grid-template-rows: repeat(3, var(--k)); gap: 6px; justify-content: center; }
+    .face button { border-radius: 50%; padding: 0; font-size: 20px; font-weight: 800; color: #fff; border: none; }
+    .face .y { grid-column: 2; grid-row: 1; background: var(--y); }
+    .face .x { grid-column: 1; grid-row: 2; background: var(--x); }
+    .face .b { grid-column: 3; grid-row: 2; background: var(--b); }
+    .face .a { grid-column: 2; grid-row: 3; background: var(--a); }
+    .shoulders { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .message { text-align: center; color: var(--muted); padding: 24px 8px; }
+    .message h1 { color: var(--fg); font-size: 22px; margin: 0 0 8px; }
+    .toast { position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: #262c3f; padding: 10px 16px; border-radius: 999px; font-size: 14px; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+    .toast.show { opacity: 1; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">Couch<span>Hud</span></div>
+    <div class="status"><span class="dot" id="dot"></span><span id="status"></span></div>
+  </header>
+
+  <section class="card message" id="unpaired" hidden>
+    <h1 data-r="unpairedTitle"></h1>
+    <p data-r-html="unpairedText"></p>
+  </section>
+
+  <main id="app" hidden>
+    <section class="card">
+      <div class="field-title" id="fieldTitle"></div>
+      <textarea id="text" rows="3" data-r-ph="placeholder" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+      <div class="row">
+        <button class="ghost" id="paste" data-r="paste"></button>
+        <button class="ghost" id="send" data-r="send"></button>
+        <button class="primary" id="sendEnter" data-r="done"></button>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top: 18px">
+      <div class="shoulders">
+        <button data-b="lb">LB</button>
+        <button data-b="guide">⌂</button>
+        <button data-b="start">≡</button>
+        <button data-b="rb">RB</button>
+      </div>
+      <div class="pad" style="margin-top: 16px">
+        <div class="dpad">
+          <button class="u" data-b="up" data-r-aria="up">▲</button>
+          <button class="l" data-b="left" data-r-aria="left">◀</button>
+          <button class="r" data-b="right" data-r-aria="right">▶</button>
+          <button class="d" data-b="down" data-r-aria="down">▼</button>
+        </div>
+        <div class="face">
+          <button class="y" data-b="y">Y</button>
+          <button class="x" data-b="x">X</button>
+          <button class="b" data-b="b">B</button>
+          <button class="a" data-b="a">A</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // Tiny dictionary: this page stands alone (phone browser), German for de-*, English otherwise.
+    const R = {
+      de: {
+        connecting: 'Verbinde …', // i18n-ignore
+        unpairedTitle: 'Nicht gekoppelt',
+        unpairedText: 'Öffne am TV <b>Einstellungen › Handy › Handy koppeln</b> und scanne den QR-Code.', // i18n-ignore
+        sendToTv: 'Text an den TV senden',
+        placeholder: 'Tippen, diktieren oder einfügen …', // i18n-ignore
+        paste: 'Einfügen', // i18n-ignore
+        send: 'Senden',
+        done: 'Fertig ⏎', // i18n-ignore
+        up: 'Hoch', left: 'Links', right: 'Rechts', down: 'Runter',
+        phone: 'Handy',
+        error: 'Fehler {status}',
+        paired: 'Gekoppelt',
+        keyboardOpen: 'Eingabe am TV offen',
+        connected: 'Verbunden',
+        notPaired: 'Nicht gekoppelt',
+        tvInput: 'Eingabe am TV: ',
+        sendHint: 'Text senden: geht in das Eingabefeld am TV oder in ein Login- bzw. Browser-Fenster, das CouchHUD geöffnet hat', // i18n-ignore
+        noConnection: 'Keine Verbindung',
+        sent: 'Gesendet',
+        transferred: 'Übertragen', // i18n-ignore
+        pasteHint: 'Lange auf das Feld tippen und „Einfügen“ wählen' // i18n-ignore
+      },
+      en: {
+        connecting: 'Connecting …',
+        unpairedTitle: 'Not paired',
+        unpairedText: 'On the TV open <b>Settings › Phone › Pair phone</b> and scan the QR code.',
+        sendToTv: 'Send text to the TV',
+        placeholder: 'Type, dictate or paste …',
+        paste: 'Paste',
+        send: 'Send',
+        done: 'Done ⏎',
+        up: 'Up', left: 'Left', right: 'Right', down: 'Down',
+        phone: 'Phone',
+        error: 'Error {status}',
+        paired: 'Paired',
+        keyboardOpen: 'Input open on the TV',
+        connected: 'Connected',
+        notPaired: 'Not paired',
+        tvInput: 'Input on the TV: ',
+        sendHint: 'Send text: goes to the input field on the TV or to a sign-in or browser window opened by CouchHUD',
+        noConnection: 'No connection',
+        sent: 'Sent',
+        transferred: 'Transferred',
+        pasteHint: 'Long-press the field and choose "Paste"'
+      }
+    };
+    const LANG = /^de/i.test(navigator.language || 'de') ? 'de' : 'en';
+    const tr = (key, params = {}) => R[LANG][key].replace(/\{(\w+)\}/g, (m, n) => (n in params ? params[n] : m));
+    document.documentElement.lang = LANG;
+    for (const n of document.querySelectorAll('[data-r]')) n.textContent = tr(n.dataset.r);
+    for (const n of document.querySelectorAll('[data-r-html]')) n.innerHTML = tr(n.dataset.rHtml);
+    for (const n of document.querySelectorAll('[data-r-ph]')) n.placeholder = tr(n.dataset.rPh);
+    for (const n of document.querySelectorAll('[data-r-aria]')) n.setAttribute('aria-label', tr(n.dataset.rAria));
+    document.getElementById('status').textContent = tr('connecting');
+    document.getElementById('fieldTitle').textContent = tr('sendToTv');
+
+    const KEY = 'couchhud-token';
+    const $ = (id) => document.getElementById(id);
+    let token = null;
+    let keyboardOpen = false;
+    let lastTitle = '';
+
+    try { token = localStorage.getItem(KEY); } catch { /* private mode: pair again next time */ }
+
+    function toast(text) {
+      const t = $('toast');
+      t.textContent = text;
+      t.classList.add('show');
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => t.classList.remove('show'), 1800);
+    }
+
+    async function api(path, body) {
+      const res = await fetch(path, {
+        method: body ? 'POST' : 'GET',
+        headers: { 'Content-Type': 'application/json', 'X-CouchHUD-Token': token ?? '' },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      if (res.status === 401) throw Object.assign(new Error('unpaired'), { unpaired: true });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || tr('error', { status: res.status }));
+      return data;
+    }
+
+    function deviceName() {
+      const ua = navigator.userAgent;
+      if (/iPhone/.test(ua)) return 'iPhone';
+      if (/iPad/.test(ua)) return 'iPad';
+      const m = ua.match(/Android [\d.]+; ([^;)]+)/);
+      return m ? m[1].trim() : tr('phone');
+    }
+
+    async function pairFromLink() {
+      const m = location.hash.match(/pair=([A-Za-z0-9]+)/);
+      if (!m) return;
+      // The code is single use; keep it out of the history and screenshots.
+      history.replaceState(null, '', location.pathname);
+      try {
+        const r = await api('/api/pair', { code: m[1], name: deviceName() });
+        token = r.token;
+        try { localStorage.setItem(KEY, token); } catch { /* ignore */ }
+        toast(tr('paired'));
+      } catch (e) {
+        toast(e.message);
+      }
+    }
+
+    function show(paired) {
+      $('app').hidden = !paired;
+      $('unpaired').hidden = paired;
+      $('dot').classList.toggle('on', paired);
+      $('status').textContent = paired ? (keyboardOpen ? tr('keyboardOpen') : tr('connected')) : tr('notPaired');
+    }
+
+    async function poll() {
+      if (!token) return show(false);
+      try {
+        const s = await api('/api/state');
+        keyboardOpen = !!s.keyboard?.open;
+        const title = keyboardOpen ? s.keyboard.title : '';
+        $('fieldTitle').innerHTML = '';
+        if (keyboardOpen) {
+          $('fieldTitle').append(tr('tvInput'));
+          const strong = document.createElement('strong');
+          strong.textContent = title;
+          $('fieldTitle').append(strong);
+          // Fresh field on the TV: start from what it holds (never for secrets).
+          if (title !== lastTitle && !s.keyboard.secret) $('text').value = s.keyboard.text ?? '';
+          $('text').style.webkitTextSecurity = s.keyboard.secret ? 'disc' : 'none';
+        } else {
+          $('fieldTitle').textContent = tr('sendHint');
+        }
+        lastTitle = title;
+        show(true);
+      } catch (e) {
+        if (e.unpaired) {
+          token = null;
+          try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+          return show(false);
+        }
+        $('dot').classList.remove('on');
+        $('status').textContent = tr('noConnection');
+      }
+    }
+
+    async function send(submit) {
+      try {
+        await api('/api/text', { text: $('text').value, submit });
+        toast(submit ? tr('sent') : tr('transferred'));
+        if (submit) $('text').value = '';
+      } catch (e) {
+        toast(e.message);
+      }
+    }
+
+    $('send').onclick = () => send(false);
+    $('sendEnter').onclick = () => send(true);
+    $('paste').onclick = async () => {
+      try {
+        $('text').value = await navigator.clipboard.readText();
+      } catch {
+        $('text').focus();
+        toast(tr('pasteHint'));
+      }
+    };
+
+    for (const btn of document.querySelectorAll('[data-b]')) {
+      btn.addEventListener('click', async () => {
+        navigator.vibrate?.(12);
+        try {
+          await api('/api/button', { button: btn.dataset.b });
+        } catch (e) {
+          toast(e.unpaired ? tr('notPaired') : tr('noConnection'));
+        }
+      });
+    }
+
+    (async () => {
+      await pairFromLink();
+      await poll();
+      setInterval(poll, 1500);
+    })();
+  </script>
+</body>
+</html>

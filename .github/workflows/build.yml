@@ -1,0 +1,147 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: write
+  # Build provenance of the setup (actions/attest-build-provenance), checked by scripts/sign-release.ps1.
+  id-token: write
+  attestations: write
+
+# Every action is pinned to a full commit SHA (the tag in the comment): a moved tag cannot change what builds the setup.
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+
+      # The app's own version (Directory.Build.props) is what an installed CouchHUD compares with the release.
+      # A tag that says something else would make every install update to itself again and again.
+      - name: Tag matches version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content Directory.Build.props
+          $version = $props.Project.PropertyGroup.Version
+          $tag = $env:GITHUB_REF_NAME.TrimStart('v')
+          if ($tag -ne $version) { throw "Tag $env:GITHUB_REF_NAME does not match <Version>$version</Version> in Directory.Build.props. Bump the version first, then tag." }
+
+      - name: Restore
+        run: dotnet restore CouchHud.slnx
+
+      - name: Build
+        run: dotnet build CouchHud.slnx --no-restore -c Release
+
+      - name: Test
+        run: dotnet test CouchHud.slnx --no-build -c Release --logger "console;verbosity=normal"
+
+      # Same UI checks as scripts/check.sh: every file parsed as an ES module, de/en kept in step.
+      - name: UI checks
+        shell: bash
+        run: |
+          find ui scripts -name '*.js' -o -name '*.mjs' | while read -r f; do
+            node --input-type=module --check < "$f" || { echo "in $f"; exit 1; }
+          done
+          node scripts/ui-logic-check.mjs
+          node scripts/css-check.mjs
+          node scripts/i18n-check.mjs
+
+      - name: Publish
+        run: dotnet publish src/CouchHud.Shell/CouchHud.Shell.csproj -c Release -r win-x64 --self-contained true -o publish
+
+      # CouchHud.Service (LocalSystem): self-contained single file in its own folder (two self-contained apps in one folder collide).
+      # Single file without any self-extraction is set in CouchHud.Service.csproj (extraction would unpack DLLs into a temp folder at
+      # run time); everything stays in the protected {app}\service. Debug symbols embedded, so the folder holds exactly the one exe.
+      - name: Publish service
+        shell: pwsh
+        run: |
+          dotnet publish src/CouchHud.Service/CouchHud.Service.csproj -c Release -r win-x64 --self-contained true -p:DebugType=embedded -o publish/service
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $files = @(Get-ChildItem publish/service -Recurse -File | ForEach-Object Name)
+          if ($files.Count -ne 1 -or $files[0] -ne 'CouchHud.Service.exe') { throw "publish/service should hold only CouchHud.Service.exe, found: $($files -join ', ')" }
+
+      - name: Publish bundled plugins
+        run: dotnet publish plugins/CouchHud.Plugin.Wand/CouchHud.Plugin.Wand.csproj -c Release -o publish/plugins/CouchHud.Plugin.Wand
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: CouchHud-win-x64
+          path: publish
+
+      - name: Setup version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content Directory.Build.props
+          $version = $props.Project.PropertyGroup.Version
+          if ($env:GITHUB_REF -like 'refs/tags/v*') { $version = $env:GITHUB_REF_NAME.TrimStart('v') }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Download WebView2 bootstrapper
+        shell: pwsh
+        run: Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile installer/MicrosoftEdgeWebview2Setup.exe
+
+      - name: Build setup
+        shell: pwsh
+        run: |
+          # Pinned: every update runs a setup built by exactly this compiler, whatever the runner image ships.
+          # Chocolatey lags behind, so the official installer is fetched and checked by hash and signature.
+          $isUrl = 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe'
+          $isSha = '9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732'
+          $isExe = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          Invoke-WebRequest -Uri $isUrl -OutFile $isExe
+          if ((Get-FileHash $isExe -Algorithm SHA256).Hash.ToLowerInvariant() -ne $isSha) { throw "Inno Setup installer hash mismatch" }
+          $sig = Get-AuthenticodeSignature $isExe
+          if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notlike 'CN=Pyrsys B.V.*') { throw "Inno Setup installer signature not valid" }
+          $isDir = Join-Path $env:RUNNER_TEMP 'InnoSetup'
+          Start-Process -FilePath $isExe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=`"$isDir`"" -Wait
+          $iscc = Join-Path $isDir 'ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found after installing Inno Setup" }
+          & $iscc "/DAppVersion=${{ steps.version.outputs.version }}" "/DPublishDir=..\publish" "/DWebView2Setup=MicrosoftEdgeWebview2Setup.exe" installer\CouchHud.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # The runner is a throwaway admin VM: install the setup silently, check the service's real SCM configuration against the
+      # .iss values (pinned to ServiceHardening by InstallerTests), that it runs and serves its pipe, then uninstall and check it is gone.
+      - name: Service smoke test (install, check, uninstall)
+        shell: pwsh
+        timeout-minutes: 15
+        run: ./scripts/ci-service-smoke.ps1 -Setup (Get-ChildItem installer/output/CouchHud-Setup-*.exe | Select-Object -First 1).FullName -Iss installer/CouchHud.iss
+
+      # sha256sum format ("<hash>  <file>", LF). CouchHUD installs a self-update only if this file carries a
+      # valid signature (.sha256.sig). CI can't sign: the private key lives on the maintainer's PC, see
+      # scripts/sign-release.ps1. Don't touch the file after it is signed.
+      - name: Checksum
+        shell: pwsh
+        run: |
+          foreach ($setup in Get-ChildItem installer/output/CouchHud-Setup-*.exe) {
+            $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            [IO.File]::WriteAllText("$($setup.FullName).sha256", "$hash  $($setup.Name)`n", [Text.UTF8Encoding]::new($false))
+          }
+
+      - name: Attest build provenance
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: installer/output/CouchHud-Setup-*.exe
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: CouchHud-Setup
+          path: |
+            installer/output/*.exe
+            installer/output/*.sha256
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          files: |
+            installer/output/*.exe
+            installer/output/*.sha256
+          generate_release_notes: true

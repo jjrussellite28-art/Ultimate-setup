@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>CouchHud.Privileged</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CouchHud.Core\CouchHud.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The code that runs with administrator rights: used by the service, and for now by the shell's elevated helpers. -->
+    <InternalsVisibleTo Include="CouchHud" />
+    <InternalsVisibleTo Include="CouchHud.Privileged.Tests" />
+  </ItemGroup>
+</Project>

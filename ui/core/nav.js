@@ -1,0 +1,144 @@
+// Tabs, the page stack on top of them, and the render/update cycle.
+//
+// Views build their DOM once (build) and only adjust focus, texts and position
+// while navigating (update). Rebuilding on every move made lists flash back to
+// their start for a frame and killed all transitions.
+
+import { $, el } from './dom.js';
+import { t } from './i18n.js';
+import { state } from './state.js';
+import { sound } from '../sound.js';
+import { glyph } from './skins.js';
+import { stopTrailer } from './media.js';
+
+let tabs = [];
+
+/** Sets the tab views; the active tab stays active even when tabs are added before it. */
+export function setTabs(views) {
+  const active = tabs[state.tab];
+  tabs = views;
+  const index = views.indexOf(active);
+  state.tab = index >= 0 ? index : Math.min(state.tab, views.length - 1);
+}
+
+export const tabViews = () => tabs;
+
+export const currentView = () => state.stack.at(-1) ?? tabs[state.tab];
+
+/** Rebuilds the current view; for tab switches and changed data, not for moving the cursor. */
+let lastRendered = null;
+let lastTab = 0;
+
+export function render() {
+  renderTabs();
+  const root = $('#view');
+  const view = currentView();
+  // Views with media restart their trailer in build(); everything else stays calm.
+  if (!view.keepsTrailer) stopTrailer();
+  root.replaceChildren();
+  root.dataset.view = view.id || view.name.toLowerCase();
+  document.body.dataset.view = root.dataset.view;
+  view.build(root);
+  renderHints();
+
+  // Slide in when the screen changes, not when the same view redraws.
+  if (lastRendered !== view) {
+    const direction = state.stack.length || lastRendered?.id === 'detail' ? 'up' : state.tab >= lastTab ? 'left' : 'right';
+    root.classList.remove('enter-left', 'enter-right', 'enter-up');
+    void root.offsetWidth;
+    root.classList.add(`enter-${direction}`);
+  }
+  lastRendered = view;
+  lastTab = state.tab;
+}
+
+export function renderTabs() {
+  $('#tab-list').replaceChildren(...tabs.map((v, i) =>
+    el('li', { className: i === state.tab ? 'active' : '', textContent: v.name })));
+}
+
+export function renderHints() {
+  const hints = state.overlay
+    ? state.overlay.hints?.() ?? [['A', t('nav.select')], ['B', t('nav.back')]]
+    : state.panel?.hints() ?? currentView().hints();
+  $('#hints').replaceChildren(...hints.map(([btn, label]) =>
+    el('span', { className: 'hint', dataset: { btn } },
+      el('span', { className: `glyph btn-${btn.toLowerCase()}`, textContent: glyph(btn) }), label)));
+}
+
+/** Moves a view's cursor; wraps never, bumps at the ends. */
+export function move(view, delta, length, clamp = false) {
+  let next = view.index + delta;
+  if (next < 0 || next >= length) {
+    if (clamp || Math.abs(delta) > 1) {
+      sound.bump();
+      return false;
+    }
+    next = Math.max(0, Math.min(length - 1, next));
+    if (next === view.index) {
+      sound.bump();
+      return false;
+    }
+  }
+  view.index = next;
+  sound.move();
+  view.update();
+  // The hints depend on what is focused now.
+  renderHints();
+  return true;
+}
+
+/**
+ * Closes every page on the stack and tells each one (an open code prompt must
+ * resolve, not hang). Sticky pages, like the first-start notice, stay.
+ */
+export function clearStack() {
+  const closing = state.stack.filter((p) => !p.sticky);
+  state.stack = state.stack.filter((p) => p.sticky);
+  for (const page of closing.reverse()) page.onClose?.();
+}
+
+/** Removes one page if it is still open; never anything else. */
+export function removePage(page) {
+  const i = state.stack.indexOf(page);
+  if (i >= 0) state.stack.splice(i, 1);
+}
+
+export function switchTab(tab) {
+  const next = (tab + tabs.length) % tabs.length;
+  clearStack();
+  if (next === state.tab) return render();
+  state.tab = next;
+  tabs[next].onEnter?.();
+  sound.tab();
+  render();
+}
+
+/** Opens a page on top of the current one. */
+export function push(page) {
+  state.stack.push(page);
+  sound.select();
+  render();
+}
+
+/** Closes the topmost page; false if there was none. */
+export function pop() {
+  if (!state.stack.length) return false;
+  const page = state.stack.pop();
+  page.onClose?.();
+  sound.back();
+  render();
+  return true;
+}
+
+export function popTo(page) {
+  while (state.stack.length && state.stack.at(-1) !== page) state.stack.pop();
+  render();
+}
+
+/** Sorting changes after favorites/launches; keep the tab's cursor on the same item. */
+export function keepFocusOn(item) {
+  const view = tabs[state.tab];
+  const index = view.items ? view.items().findIndex((i) => i.id === item.id) : -1;
+  if (index >= 0) view.index = index;
+}

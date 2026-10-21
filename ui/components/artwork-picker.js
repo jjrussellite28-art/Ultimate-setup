@@ -1,0 +1,178 @@
+// "Artwork ändern": all known images per slot (cover, banner, logo) to choose from, or an own file.
+
+import { iconEl } from '../core/glyph-icons.js';
+import { api } from '../core/api.js';
+import { el, keepInView, setFocused } from '../core/dom.js';
+import { refreshBackground } from '../core/art.js';
+import { attempt, toast } from '../core/feedback.js';
+import { move, push, render } from '../core/nav.js';
+import { sound } from '../sound.js';
+import { openFileBrowser } from './file-browser.js';
+import { detailPage } from '../views/detail.js';
+import { guarded } from './passcode.js';
+import { t } from '../core/i18n.js';
+
+const SLOTS = [
+  { id: 'cover', get label() { return t('artworkPicker.slot.cover'); }, cols: 6 },
+  { id: 'hero', get label() { return t('artworkPicker.slot.hero'); }, cols: 3 },
+  { id: 'logo', get label() { return t('artworkPicker.slot.logo'); }, cols: 4 }
+];
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+
+export function artworkPickerPage(item) {
+  return {
+    id: 'artwork-picker',
+    name: t('artworkPicker.name'),
+    item,
+    slot: 0,
+    index: 0,
+    choices: null,
+    failed: false,
+    /** Cursor position per slot, so switching back and forth keeps your place. */
+    positions: [0, 0, 0],
+    // LB / RB switch between cover, banner and logo instead of the tabs.
+    captures: (action) => action === 'lb' || action === 'rb',
+    entries() {
+      const slot = SLOTS[this.slot];
+      const current = this.item.art?.[slot.id]?.[0];
+      const found = (this.choices?.[slot.id] ?? []).map((c) => ({ kind: 'choice', choice: c, current: c.current === true || c.thumb === current || c.url === current }));
+      return [{ kind: 'own' }, { kind: 'auto' }, ...found];
+    },
+    async load() {
+      this.choices = await attempt(() => api.getArtworkChoices(this.item.id), t('artworkPicker.loadFailed'));
+      this.failed = !this.choices;
+      render();
+    },
+    build(root) {
+      if (!this.choices && !this.failed) {
+        this.load();
+        this.tiles = [];
+        this.list = [];
+        root.append(el('div', { className: 'files' }, el('div', { className: 'files-head' },
+          el('h2', { textContent: t('artworkPicker.title') }),
+          el('p', { className: 'meta', textContent: t('artworkPicker.searching') }))));
+        return;
+      }
+      const slot = SLOTS[this.slot];
+      this.list = this.entries();
+      this.index = Math.min(this.index, this.list.length - 1);
+      // Which image is in use: the choice whose thumbnail or url matches (file names compared as a fallback).
+      const baseName = (u) => String(u ?? '').split(/[\\/?#]/).filter(Boolean).pop();
+      const cur = baseName(this.item.art?.[slot.id]?.[0]);
+      for (const e of this.list) {
+        if (e.kind === 'choice' && !e.current && cur && (baseName(e.choice.thumb) === cur || baseName(e.choice.url) === cur)) e.current = true;
+      }
+
+      const chips = SLOTS.map((s, i) => {
+        const n = this.choices?.[s.id]?.length ?? 0;
+        return el('span', { className: `chip${i === this.slot ? ' primary active' : ''}`, textContent: `${s.label} (${n})` });
+      });
+      const grid = el('div', { className: `pick-grid pick-${slot.id}` });
+      grid.style.setProperty('--cols', slot.cols);
+      this.tiles = this.list.map((entry, i) => {
+        const tile = el('div', { className: `tile pick-tile${entry.current ? ' current' : ''}`, dataset: { index: i } });
+        if (entry.kind === 'choice') {
+          const img = el('img', { src: entry.choice.thumb, alt: '', decoding: 'async' });
+          img.onerror = () => tile.classList.add('broken');
+          tile.append(el('div', { className: 'pick-img' }, img),
+            el('span', { className: 'pick-source', textContent: entry.current ? t('artworkPicker.current') : entry.choice.source }));
+        } else {
+          tile.classList.add('pick-action');
+          tile.append(el('span', { className: 'special-icon' }, iconEl(entry.kind === 'own' ? '+' : '↺')),
+            el('span', { textContent: entry.kind === 'own' ? t('artworkPicker.own') : t('artworkPicker.auto') }));
+        }
+        grid.append(tile);
+        return tile;
+      });
+
+      // What happened here first, then why, then how to get more.
+      const notes = [];
+      if (this.failed) notes.push(t('artworkPicker.note.failed'));
+      if (this.choices && !(this.choices[slot.id]?.length)) notes.push(t('artworkPicker.note.none'));
+      if (this.choices?.note) notes.push(this.choices.note);
+      if (this.choices && !this.choices.hasKey) {
+        notes.push(t('artworkPicker.note.key'));
+      }
+
+      this.scroller = el('div', { className: 'grid-scroll' }, grid);
+      root.append(el('div', { className: 'pick-page' },
+        el('div', { className: 'files-head' },
+          el('h2', { textContent: t('artworkPicker.title') }),
+          el('p', { className: 'meta', textContent: this.item.name })),
+        el('div', { className: 'pick-tabs' }, chips),
+        notes.length ? el('p', { className: 'pick-note', textContent: notes.join(' ') }) : null,
+        this.scroller));
+      this.update({ instant: true });
+    },
+    update({ instant = false } = {}) {
+      if (!this.tiles?.length) return;
+      setFocused(this.tiles, this.index);
+      keepInView(this.scroller, this.tiles[this.index], { center: true, instant });
+    },
+    switchSlot(delta) {
+      const next = this.slot + delta;
+      if (next < 0 || next >= SLOTS.length) return sound.bump();
+      this.positions[this.slot] = this.index;
+      this.slot = next;
+      this.index = this.positions[next];
+      sound.tab();
+      render();
+    },
+    async apply(value, message) {
+      const slot = SLOTS[this.slot];
+      const updated = await attempt(() => api.setArtwork(this.item.id, slot.id, value), t('artworkPicker.applyFailed'));
+      if (!updated) return;
+      Object.assign(this.item, updated);
+      refreshBackground();
+      toast(message);
+      render();
+    },
+    async activate() {
+      const entry = this.list[this.index];
+      if (!entry) return;
+      const slot = SLOTS[this.slot];
+      if (entry.kind === 'auto') return this.apply(null, t('artworkPicker.autoAgain', { slot: slot.label }));
+      if (entry.kind === 'own') {
+        const path = await openFileBrowser({ title: t('artworkPicker.pickTitle', { slot: slot.label }), mode: 'file', extensions: IMAGE_EXTENSIONS });
+        if (path) await this.apply(path, t('artworkPicker.changed', { slot: slot.label }));
+        return;
+      }
+      if (this.tiles[this.index].classList.contains('broken')) return sound.bump();
+      return this.apply(entry.choice.url, t('artworkPicker.changed', { slot: slot.label }));
+    },
+    handle(action) {
+      const cols = SLOTS[this.slot].cols;
+      const n = this.list?.length ?? 0;
+      switch (action) {
+        case 'lb': return this.switchSlot(-1);
+        case 'rb': return this.switchSlot(1);
+        case 'left': return n && move(this, -1, n);
+        case 'right': return n && move(this, 1, n);
+        case 'up': return n && move(this, -cols, n, true);
+        case 'down': return n && move(this, cols, n, true);
+        case 'a': return this.activate();
+        case 'y': return this.apply(null, t('artworkPicker.autoAgain', { slot: SLOTS[this.slot].label }));
+      }
+    },
+    pointer(node, index, dispatch) {
+      if (node.matches('.chip')) {
+        const target = index;
+        if (target !== this.slot) this.switchSlot(target - this.slot);
+        return;
+      }
+      this.index = index;
+      this.update();
+      dispatch('a');
+    },
+    hints() {
+      const entry = this.list?.[this.index];
+      const a = entry?.kind === 'own' ? t('artworkPicker.hint.pick') : entry?.kind === 'auto' ? t('artworkPicker.hint.auto') : t('artworkPicker.hint.apply');
+      const slot = this.slot;
+      return [['A', a], ...(entry?.kind === 'auto' ? [] : [['Y', t('artworkPicker.hint.auto')]]),
+        ...(slot > 0 ? [['LB', SLOTS[slot - 1].label]] : []), ...(slot < SLOTS.length - 1 ? [['RB', SLOTS[slot + 1].label]] : []),
+        ['B', t('artworkPicker.hint.back')]];
+    }
+  };
+}
+
+detailPage.extraActions.push((item) => ({ label: t('artworkPicker.action'), icon: '🖼', run: guarded(t('artworkPicker.title'), () => push(artworkPickerPage(item))) }));

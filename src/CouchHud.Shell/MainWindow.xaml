@@ -1,0 +1,11 @@
+<Window x:Class="CouchHud.Shell.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="CouchHUD"
+        Icon="couchhud.ico"
+        Background="#07090F"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        WindowState="Normal">
+    <!-- The WebView2 control is created in code so it can be rebuilt after a browser crash. -->
+</Window>
