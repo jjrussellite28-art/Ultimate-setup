@@ -36,6 +36,15 @@ export const POWER_ACTIONS = [
     run: () => api.enterPcMode()
   },
   {
+    id: 'quit',
+    icon: '✕',
+    get label() { return t('power.quit.label'); },
+    get detail() { return t('power.quit.detail'); },
+    get confirm() { return { title: t('power.quit.confirmTitle'), label: t('power.quit.label'), message: t('power.quit.confirmMessage') }; },
+    get unlock() { return t('power.quit.unlock'); },
+    run: () => api.quit()
+  },
+  {
     id: 'restart',
     icon: '↻',
     get label() { return t('power.restart.label'); },
@@ -81,7 +90,7 @@ export function powerEntries(ids = POWER_ACTIONS.map((a) => a.id), { onCancel } 
     icon: a.icon,
     label: a.label,
     detail: a.detail,
-    danger: a.id !== 'standby' && a.id !== 'pc-mode',
+    danger: a.id !== 'standby' && a.id !== 'pc-mode' && a.id !== 'quit',
     run: async () => {
       // Cancelling the question goes back to the menu it came from, not out of everything.
       if (!(await requestPower(a.id))) onCancel?.(a.id);
@@ -92,7 +101,7 @@ export function powerEntries(ids = POWER_ACTIONS.map((a) => a.id), { onCancel } 
 /** The Start menu: standby first (reversible), "Abbrechen" last. */
 export function powerMenu({ sleepTimer = true, index = 0 } = {}) {
   // After cancelling a question the menu comes back with the entry the question was about.
-  const entries = powerEntries(['standby', 'pc-mode', 'restart', 'restart-pc', 'shutdown'], {
+  const entries = powerEntries(['standby', 'pc-mode', 'quit', 'restart', 'restart-pc', 'shutdown'], {
     onCancel: (id) => openOverlay(powerMenu({ sleepTimer, index: Math.max(0, entries.findIndex((e) => e.id === id)) }))
   });
   if (sleepTimer) entries.push({ icon: '⏲', label: t('power.sleepTimer'), detail: sleepTimerDetail(), run: () => chooseSleepTimer() });

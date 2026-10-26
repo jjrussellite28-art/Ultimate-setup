@@ -25,7 +25,7 @@ import { openKeyboard } from '../components/keyboard.js';
 import { skinMenu } from '../components/skin-menu.js';
 import { choosePasscode, ensureParentCode, ensureUnlocked, guarded, isLocked } from '../components/passcode.js';
 import { addEntryFlow, gameFoldersPage, hiddenItemsPage, scanFolderFlow } from '../components/library-tools.js';
-import { refreshWeather } from '../core/weather.js';
+import { refreshWeather, setWeatherUnit, weatherUnit } from '../core/weather.js';
 import { preloadSmartHome, smartHomeView } from './smarthome.js';
 import { setTabs, tabViews } from '../core/nav.js';
 import { updateCount, updatesPage } from './updates.js';
@@ -39,7 +39,7 @@ import { pluginsPage } from './plugins.js';
 import { networkPage } from './network.js';
 import { chooseSleepTimer, powerEntries, sleepTimerDetail } from '../core/power.js';
 import { displayItems } from './display.js';
-import { nightModeItems } from './deck.js';
+import { healthPage, nightModeItems } from './deck.js';
 import { categoryIcon } from './settings-icons.js';
 import { consoleRevertPage, consoleSetupPage, hasConsoleSetup, isConsoleReady, openSetupSteps } from './console-setup.js';
 import { saveSettingsItems } from '../components/savegames.js';
@@ -876,7 +876,7 @@ const powerItems = (ids) => powerEntries(ids).map((e) => action(e.label, e.detai
 
 function categories() {
   const s = settings ?? {};
-  const [pcMode, standby, restart, shutdown, restartPc] = powerItems(['pc-mode', 'standby', 'restart', 'shutdown', 'restart-pc']);
+  const [pcMode, standby, restart, shutdown, restartPc, quit] = powerItems(['pc-mode', 'standby', 'restart', 'shutdown', 'restart-pc', 'quit']);
   const holdOptions = [500, 1000, 1500, 2000].map((ms) => ({ label: holdLabel(ms), value: ms }));
   return [
     { id: 'console', icon: 'console', name: t('settings.cat.console'), items: consoleItems(s) },
@@ -1012,6 +1012,18 @@ function categories() {
           value: () => s.weatherPlace?.name ?? t('settings.home.placeNone'),
           run: chooseWeatherPlace
         },
+        {
+          kind: 'choice',
+          label: t('settings.weather.unit'),
+          desc: t('settings.weather.unitDesc'),
+          value: () => ({ auto: t('settings.weather.unitAuto'), c: '°C', f: '°F' })[weatherUnit()],
+          run: async () => {
+            const v = await chooseDialog(t('settings.weather.unit'), [
+              { label: t('settings.weather.unitAuto'), value: 'auto' }, { label: '°C (Celsius)', value: 'c' }, { label: '°F (Fahrenheit)', value: 'f' }
+            ], weatherUnit());
+            if (v !== undefined) setWeatherUnit(v);
+          }
+        },
         ...expert(
           {
             kind: 'text',
@@ -1105,11 +1117,12 @@ function categories() {
       items: [
         standby,
         pcMode,
+        quit,
         restart,
         ...expert(restartPc),
         shutdown,
         // Quit is safe as the shell too: the host starts the normal Windows desktop before it closes.
-        action(t('settings.info.quit'), t('settings.info.quitDesc'), guarded(t('settings.info.quit'), () => attempt(() => api.quit())), '✕', t('settings.hint.quit')),
+        quit,
         { kind: 'choice', label: t('settings.power.timer'), desc: t('settings.power.timerDesc'), value: () => sleepTimerDetail(), run: chooseSleepTimer }
       ]
     },
@@ -1119,6 +1132,7 @@ function categories() {
       name: t('settings.cat.info'),
       items: [
         action(t('settings.info.notifications'), t('settings.info.notificationsDesc'), () => openPage(notificationsPage(), t('settings.info.notifications')), '🔔'),
+        action(t('health.title'), t('health.quickDetail'), () => openPage(healthPage(), t('settings.cat.info')), '♥'),
         action(t('settings.info.testNotify'), t('settings.info.testNotifyDesc'), () => attempt(() => api.testNotification(), t('settings.info.testNotifyFailed')), '🔔'),
         action(t('settings.info.factoryReset'), t('settings.info.factoryResetDesc'), guarded(t('settings.info.factoryReset'), async () => {
           if (!(await confirmDialog(t('settings.info.factoryResetConfirm'), t('settings.info.factoryResetGo'), { danger: true, message: t('settings.info.factoryResetMessage'), focusCancel: true }))) return;

@@ -9,6 +9,8 @@ import { currentView, move, push, render } from '../core/nav.js';
 import { chooseDialog } from '../components/overlay.js';
 import { detailPage } from './detail.js';
 import { sound } from '../sound.js';
+import { state } from '../core/state.js';
+import { updateCount } from './updates.js';
 
 // ---------------------------------------------------------------------------
 // Game profiles: applied when the game starts, undone when it ends.
@@ -159,6 +161,64 @@ export function downloadsPage() {
         })),
         ...(data.length ? [] : [{ icon: '✓', label: t('deck.noInstallers'), detail: t('deck.noInstallersDetail') }])
       ];
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Health check: is the PC (and its fans and lights, with CaseHUD) doing fine?
+
+export function healthPage() {
+  let data = null;
+  let loading = false;
+  let timer;
+  const quiet = (fn) => Promise.resolve().then(fn).catch(() => null);
+  const load = (self) => {
+    if (loading) return;
+    loading = true;
+    Promise.all([quiet(() => api.getPerformance()), quiet(() => api.getPads()), quiet(() => api.getServiceStatus())]).then(([perf, pads, service]) => {
+      loading = false;
+      data = { perf, pads, service };
+      if (currentView() === self) render();
+    });
+  };
+  const ok = (label, detail) => ({ icon: '✓', label, detail });
+  const warn = (label, detail) => ({ icon: '⚠', label, detail, highlight: true });
+  const note = (label, detail) => ({ icon: 'ℹ', label, detail });
+  return listPage({
+    id: 'health',
+    title: t('health.title'),
+    intro: t('health.intro'),
+    rows(self) {
+      if (!data) {
+        load(self);
+        return null;
+      }
+      clearTimeout(timer);
+      timer = setTimeout(() => currentView() === self && load(self), 5000);
+      const { perf, pads, service } = data;
+      const rows = [];
+      if (perf) {
+        rows.push(perf.cpu >= 90 ? warn(t('health.cpu'), t('health.busy', { n: perf.cpu })) : ok(t('health.cpu'), t('health.load', { n: perf.cpu })));
+        if (perf.gpu != null) rows.push(perf.gpu >= 98 ? warn(t('health.gpu'), t('health.busy', { n: perf.gpu })) : ok(t('health.gpu'), t('health.load', { n: perf.gpu })));
+        const pct = perf.ramTotalGb ? (perf.ramUsedGb / perf.ramTotalGb) * 100 : 0;
+        const mem = t('health.ramDetail', { used: perf.ramUsedGb.toFixed(1), total: perf.ramTotalGb.toFixed(1) });
+        rows.push(pct >= 90 ? warn(t('health.ram'), mem) : ok(t('health.ram'), mem));
+      }
+      const waiting = updateCount();
+      if (!state.updates) rows.push(note(t('health.updates'), t('health.updatesUnknown')));
+      else rows.push(waiting ? warn(t('health.updates'), t('health.updatesWaiting', { count: waiting })) : ok(t('health.updates'), t('health.updatesNone')));
+      if (Array.isArray(pads)) rows.push(pads.length ? ok(t('health.pad'), t('health.padCount', { count: pads.length })) : warn(t('health.pad'), t('health.padNone')));
+      rows.push(navigator.onLine ? ok(t('health.net'), t('health.netOk')) : warn(t('health.net'), t('health.netOff')));
+      if (service && service.state && service.state !== 'notInstalled') {
+        rows.push(service.healthy === false || service.problem ? warn(t('health.service'), t('health.serviceBad')) : ok(t('health.service'), t('health.serviceOk')));
+      }
+      const c = state.caseHud;
+      if (c) {
+        if (!c.installed) rows.push(note(t('health.case'), t('health.caseNone')));
+        else rows.push(c.running ? ok(t('health.case'), t('health.caseOk')) : warn(t('health.case'), t('health.caseStopped')));
+      }
+      return rows;
     }
   });
 }

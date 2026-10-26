@@ -22,7 +22,19 @@ export function describe(code, isDay = true) {
   return ['🌡️', ''];
 }
 
-export const temp = (t) => `${Math.round(t)}°`;
+// Temperature unit: "auto" follows the language of the PC (Fahrenheit for en-US), or °C / °F fixed. Kept on this device.
+const UNIT_KEY = 'megahub.weather.unit';
+export const weatherUnit = () => {
+  try { const v = localStorage.getItem(UNIT_KEY); if (v === 'c' || v === 'f') return v; } catch { /* storage blocked: auto */ }
+  return 'auto';
+};
+export function setWeatherUnit(unit) {
+  try { localStorage.setItem(UNIT_KEY, unit); } catch { /* not kept this time */ }
+  show();
+}
+const useFahrenheit = () => (weatherUnit() === 'auto' ? /^en-(US|LR|MM)\b/i.test(navigator.language || '') : weatherUnit() === 'f');
+/** Open-Meteo reports °C. */
+export const temp = (c) => `${Math.round(useFahrenheit() ? c * 9 / 5 + 32 : c)}°${useFahrenheit() ? 'F' : 'C'}`;
 
 /** Short form for header and guide menu, e.g. "🌤️ 12° Berlin". */
 export function weatherLine(withPlace = false) {
@@ -32,7 +44,7 @@ export function weatherLine(withPlace = false) {
   return `${icon} ${temp(w.temperature)}${withPlace ? ` ${w.place}` : ''}`;
 }
 
-function show() {
+export function show() {
   const node = $('#weather');
   if (!node) return;
   node.hidden = !state.weather;

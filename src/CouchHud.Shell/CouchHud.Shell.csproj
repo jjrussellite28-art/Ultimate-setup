@@ -12,6 +12,7 @@
     <ApplicationIcon>couchhud.ico</ApplicationIcon>
     <!-- Shown in Task Manager and the file properties. -->
     <AssemblyTitle>MegaHub</AssemblyTitle>
+    <AssemblyDescription>MegaHub</AssemblyDescription>
     <!-- Elevated helpers inherit the user's environment: no DOTNET_STARTUP_HOOKS code may run in them. -->
     <StartupHookSupport>false</StartupHookSupport>
   </PropertyGroup>

@@ -12,7 +12,7 @@ import { notificationsPage } from '../views/notifications.js';
 import { bluetoothPage } from '../views/bluetooth.js';
 import { appVolumePage } from '../views/app-volume.js';
 import { galleryPage } from '../views/gallery.js';
-import { capture, downloadsPage } from '../views/deck.js';
+import { capture, downloadsPage, healthPage } from '../views/deck.js';
 import { chooseDialog, confirmDialog } from './overlay.js';
 import { sound } from '../sound.js';
 import { t, fmtNumber, fmtPercent, fmtTime, fmtDate } from '../core/i18n.js';
@@ -172,6 +172,7 @@ function rows() {
   list.push({ kind: 'action', icon: '📸', label: t('quick.screenshot'), detail: s ? t('quick.screenshotOf', { name: s.name }) : t('quick.screenshotScreen'), run: () => capture('screenshot') });
   if (s) list.push({ kind: 'action', icon: '⏺', label: t('quick.clip'), detail: t('quick.clipDetail'), run: () => capture('clip') });
   list.push({ kind: 'action', icon: '▣', label: t('quick.captures'), detail: t('quick.capturesDetail'), run: () => openPage(galleryPage()) });
+  list.push({ kind: 'action', icon: '♥', label: t('health.title'), detail: t('health.quickDetail'), run: () => openPage(healthPage()) });
   list.push({ kind: 'action', icon: '⬇', label: t('quick.downloads'), detail: t('quick.downloadsDetail'), run: () => openPage(downloadsPage()) });
   list.push({ kind: 'action', icon: 'ᛒ', label: t('quick.bluetooth'), detail: t('quick.bluetoothDetail'), run: () => openPage(bluetoothPage()) });
   list.push({ kind: 'action', icon: '▤', label: t('quick.tasks'), run: () => openPage(tasksPage()) });

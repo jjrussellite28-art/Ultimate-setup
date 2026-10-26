@@ -5,7 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Version>0.4.1</Version>
     <Authors>kewe87</Authors>
-    <Copyright>Copyright © 2026 kewe87</Copyright>
+    <Copyright>MegaHub by jjrussellite28 · based on CouchHUD, Copyright © 2026 kewe87</Copyright>
+    <Company>jjrussellite28</Company>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <Product>MegaHub</Product>
   </PropertyGroup>
