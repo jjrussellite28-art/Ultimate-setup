@@ -26,7 +26,7 @@ export const homeView = {
     const rest = recent(14).filter((i) => i.id !== running?.id);
     // Collections the user pinned sit at the end of the shelf, before the "All games" tile.
     const shelves = state.collections.filter((c) => c.onHome).map((c) => ({ id: `__col:${c.id}`, name: c.name, special: true, collection: c, members: collectionItems(c) }));
-    return [...(running ? [{ ...running, running: true }] : []), ...rest, ...shelves, { id: '__all', name: t('home.allGames'), special: true }];
+    return [...(running ? [{ ...running, running: true }] : []), ...rest, ...shelves];
   },
   build(root) {
     this.list = this.items();

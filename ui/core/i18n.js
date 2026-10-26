@@ -9,16 +9,15 @@
 import { api } from './api.js';
 import { dictionaries } from '../i18n/index.js';
 
-const SUPPORTED = ['de', 'en'];
 
 /** "auto" follows the browser/Windows display language: de-* is German, everything else English. */
-export function resolveLanguage(setting, navigatorLanguage = globalThis.navigator?.language) {
-  if (SUPPORTED.includes(setting)) return setting;
-  return String(navigatorLanguage || 'de').toLowerCase().startsWith('de') ? 'de' : 'en';
+export function resolveLanguage() {
+  // This fork is English-only: the German dictionaries stay for reference, but are never selected.
+  return 'en';
 }
 
-let active = 'de';
-let activeLocale = 'de-DE';
+let active = 'en';
+let activeLocale = 'en-GB';
 
 export function setLang(setting) {
   active = resolveLanguage(setting);

@@ -1,3 +1,4 @@
+// i18n-used: settings.language.title settings.language.desc settings.language.auto settings.language.autoDetail (language picker removed in this English-only fork)
 // Settings center: categories on the left, their settings on the right.
 //
 // Two levels. Simple mode shows what one needs day to day, and a single button that sets up
@@ -1114,24 +1115,6 @@ function categories() {
       icon: 'info',
       name: t('settings.cat.info'),
       items: [
-        {
-          kind: 'choice',
-          label: t('settings.language.title'),
-          desc: t('settings.language.desc'),
-          value: () => ({ auto: t('settings.language.auto'), de: 'Deutsch', en: 'English' })[s.language ?? 'auto'] ?? t('settings.language.auto'),
-          run: async () => {
-            const current = s.language ?? 'auto';
-            const v = await chooseDialog(t('settings.language.title'), [
-              { label: t('settings.language.auto'), detail: t('settings.language.autoDetail'), value: 'auto' },
-              { label: 'Deutsch', value: 'de' },
-              { label: 'English', value: 'en' }
-            ], current);
-            if (v === undefined || v === current) return;
-            if ((await saveSetting('language', v)) === undefined) return;
-            try { sessionStorage.setItem('couchhud.resume', 'settings:info'); } catch { /* storage blocked: reload lands on Home */ }
-            location.reload();
-          }
-        },
         action(t('settings.info.wizard'), t('settings.info.wizardDesc'), openSetupWizard, '✦'),
         action(t('settings.info.disclaimer'), t('settings.info.disclaimerDesc'), () => openPage(disclaimerPage(), t('settings.cat.info'))),
         action(t('settings.info.privacy'), t('settings.info.privacyDesc'), () => openPage(privacyPage(), t('settings.cat.info'))),

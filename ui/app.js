@@ -63,7 +63,7 @@ export function updateTabs() {
   setTabs(tabList());
 }
 
-const tabList = () => [homeView, gamesView, appsView, newsView, browserView, ...(state.info.homeAssistant ? [smartHomeView] : []), ...(state.info.assistant ? [assistantView] : []), settingsView];
+const tabList = () => [homeView, appsView, newsView, browserView, ...(state.info.homeAssistant ? [smartHomeView] : []), ...(state.info.assistant ? [assistantView] : []), settingsView];
 const tabsIndexOf = (view) => tabList().indexOf(view);
 
 updateTabs();
