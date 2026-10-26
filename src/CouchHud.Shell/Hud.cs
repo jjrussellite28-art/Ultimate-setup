@@ -3782,6 +3782,13 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
     /// (shell, lock, services) the way "Light" does it. Refused while parental controls are on or the couch is locked,
     /// otherwise a reset would be a way around them. Games and files on the PC are not touched.
     /// </summary>
+    /// <summary>A test notification: shows the same card and bell count as a real one from the PC.</summary>
+    public object TestNotification()
+    {
+        PostNotification("MegaHub", Strings.Ref("hud.testNotification"), Strings.Ref("hud.testNotification.body"));
+        return new { ok = true };
+    }
+
     public object FactoryReset()
     {
         if (config.Current.Parental.Enabled) throw new InvalidOperationException(Strings.Get("hud.turnOffParentalFirst"));

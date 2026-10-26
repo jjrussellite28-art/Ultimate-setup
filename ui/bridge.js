@@ -151,6 +151,7 @@ window.couchhud = {
   confirmAssistant: (id, ok) => call('confirmAssistant', id, ok),
   resetAssistant: () => call('resetAssistant'),
   factoryReset: () => call('factoryReset'),
+  testNotification: () => call('testNotification'),
   getUpdates: () => call('getUpdates'),
   checkUpdates: () => call('checkUpdates'),
   getSelfUpdate: () => call('getSelfUpdate'),

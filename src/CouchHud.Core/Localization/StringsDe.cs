@@ -297,6 +297,8 @@ public static partial class Strings
         ["hud.updatesAvailable.one"] = "{0} Update verfügbar",
         ["hud.updatesAvailable.other"] = "{0} Updates verfügbar",
         ["hud.xboxButton"] = "Guide-Taste",
+        ["hud.testNotification"] = "Testmitteilung",
+        ["hud.testNotification.body"] = "Wenn du das liest, funktionieren Mitteilungen auf diesem PC.",
         ["hud.xboxButton.body"] = "Antippen im Spiel holt jetzt CouchHUD statt der Game Bar. Ändern unter Einstellungen › Controller.",
 
         // library

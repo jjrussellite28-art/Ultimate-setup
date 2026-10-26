@@ -272,6 +272,8 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "resetAssistant":
                 hud.ResetAssistant();
                 return null;
+            case "testNotification":
+                return hud.TestNotification();
             case "factoryReset":
                 return hud.FactoryReset();
             case "setIntegrationMode":

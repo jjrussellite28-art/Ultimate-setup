@@ -1117,6 +1117,7 @@ function categories() {
       name: t('settings.cat.info'),
       items: [
         action(t('settings.info.notifications'), t('settings.info.notificationsDesc'), () => openPage(notificationsPage(), t('settings.info.notifications')), '🔔'),
+        action(t('settings.info.testNotify'), t('settings.info.testNotifyDesc'), () => attempt(() => api.testNotification(), t('settings.info.testNotifyFailed')), '🔔'),
         action(t('settings.info.factoryReset'), t('settings.info.factoryResetDesc'), guarded(t('settings.info.factoryReset'), async () => {
           if (!(await confirmDialog(t('settings.info.factoryResetConfirm'), t('settings.info.factoryResetGo'), { danger: true, message: t('settings.info.factoryResetMessage'), focusCancel: true }))) return;
           if ((await attempt(() => api.factoryReset(), t('settings.info.factoryResetFailed'))) === undefined) return;
