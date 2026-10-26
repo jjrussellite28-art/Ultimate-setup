@@ -114,6 +114,9 @@ public sealed class XInputPoller : IDisposable
     /// <summary>Left stick and right stick Y of the pad that moves most, -1..1 (for the mouse mode).</summary>
     public (double X, double Y, double ScrollY) Sticks() => _merger.Sticks();
 
+    /// <summary>Right stick and triggers (mouse mode: fine pointer and scrolling).</summary>
+    public (double RX, double RY, double LT, double RT) Extras() => _merger.Extras();
+
     public bool IsPressed(string button) => _merger.IsPressed(button);
 
     private static GetStateFn? Probe()

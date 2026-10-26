@@ -165,7 +165,7 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
         });
         pad.ConnectionChanged += (index, connected) => Ui(() => Emit("pad", new { index, connected }));
         optional.Run("controller", pad.Start);
-        optional.Run("controller mouse", () => _mouse = new ControllerMouse(pad.Sticks));
+        optional.Run("controller mouse", () => _mouse = new ControllerMouse(pad.Sticks, pad.Extras));
 
         // The UI mutes its background music whenever something else is in front.
         window.Activated += (_, _) =>
@@ -3777,6 +3777,29 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
     /// Switches the integration level. Going back to "light" undoes everything "full"
     /// did that CouchHud can undo by itself; the list tells the UI what happened.
     /// </summary>
+    /// <summary>
+    /// Everything back to the defaults: settings, favorites, bookmarks, added apps, collections. Full mode is undone first
+    /// (shell, lock, services) the way "Light" does it. Refused while parental controls are on or the couch is locked,
+    /// otherwise a reset would be a way around them. Games and files on the PC are not touched.
+    /// </summary>
+    public object FactoryReset()
+    {
+        if (config.Current.Parental.Enabled) throw new InvalidOperationException(Strings.Get("hud.turnOffParentalFirst"));
+        RequireUnlocked();
+        if (Full) SetIntegrationMode("light");
+        var fresh = new AppConfig();
+        config.UpdateOrThrow(c =>
+        {
+            foreach (var property in typeof(AppConfig).GetProperties())
+            {
+                if (!property.CanWrite || property.GetIndexParameters().Length > 0) continue;
+                if (property.IsDefined(typeof(System.Text.Json.Serialization.JsonIgnoreAttribute), true)) continue;
+                property.SetValue(c, property.GetValue(fresh));
+            }
+        });
+        return new { ok = true };
+    }
+
     public object SetIntegrationMode(string mode)
     {
         if (mode is not ("light" or "full")) throw new ArgumentException(Strings.Get("hud.integrationInvalid"));

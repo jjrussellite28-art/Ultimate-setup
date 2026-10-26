@@ -1115,6 +1115,11 @@ function categories() {
       icon: 'info',
       name: t('settings.cat.info'),
       items: [
+        action(t('settings.info.factoryReset'), t('settings.info.factoryResetDesc'), guarded(t('settings.info.factoryReset'), async () => {
+          if (!(await confirmDialog(t('settings.info.factoryResetConfirm'), t('settings.info.factoryResetGo'), { danger: true, message: t('settings.info.factoryResetMessage'), focusCancel: true }))) return;
+          if ((await attempt(() => api.factoryReset(), t('settings.info.factoryResetFailed'))) === undefined) return;
+          location.reload();
+        }), '↺'),
         action(t('settings.info.wizard'), t('settings.info.wizardDesc'), openSetupWizard, '✦'),
         action(t('settings.info.disclaimer'), t('settings.info.disclaimerDesc'), () => openPage(disclaimerPage(), t('settings.cat.info'))),
         action(t('settings.info.privacy'), t('settings.info.privacyDesc'), () => openPage(privacyPage(), t('settings.cat.info'))),

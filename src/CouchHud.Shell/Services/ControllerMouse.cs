@@ -11,12 +11,15 @@ public sealed class ControllerMouse : IDisposable
 {
     private const double DeadZone = 0.18;
     private readonly Func<(double X, double Y, double ScrollY)> _sticks;
+    private readonly Func<(double RX, double RY, double LT, double RT)>? _extras;
     private readonly Timer _timer;
     private double _carryX, _carryY, _carryScroll;
 
-    public ControllerMouse(Func<(double X, double Y, double ScrollY)> sticks)
+    /// <param name="extras">Right stick and triggers. Given: the right stick is a slow, precise pointer and the triggers scroll (LT up, RT down). Without: the right stick scrolls.</param>
+    public ControllerMouse(Func<(double X, double Y, double ScrollY)> sticks, Func<(double RX, double RY, double LT, double RT)>? extras = null)
     {
         _sticks = sticks;
+        _extras = extras;
         _timer = new Timer(_ => Tick(), null, Timeout.Infinite, Timeout.Infinite);
     }
 
@@ -66,7 +69,18 @@ public sealed class ControllerMouse : IDisposable
         // Fast across the screen with the stick pushed, precise near the centre.
         _carryX += dx * 28;
         _carryY += dy * 28;
-        _carryScroll += Curve(scroll) * 40;
+        if (_extras is not null)
+        {
+            // Right stick: the same pointer, slower for small targets. Triggers: scroll (LT up, RT down).
+            var (rx, ry, lt, rt) = _extras();
+            _carryX += Curve(rx) * 9;
+            _carryY += Curve(-ry) * 9;
+            _carryScroll += (Curve(lt) - Curve(rt)) * 40;
+        }
+        else
+        {
+            _carryScroll += Curve(scroll) * 40;
+        }
         var mx = (int)_carryX;
         var my = (int)_carryY;
         var wheel = (int)_carryScroll;

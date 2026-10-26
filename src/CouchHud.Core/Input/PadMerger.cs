@@ -48,6 +48,20 @@ public sealed class PadMerger
         return best is { } b ? (b.LX / 32768.0, b.LY / 32768.0, b.RY / 32768.0) : (0, 0, 0);
     }
 
+    /// <summary>Right stick and both triggers of the pad that moves them most, -1..1 and 0..1 (for the mouse mode).</summary>
+    public (double RX, double RY, double LT, double RT) Extras()
+    {
+        PadSample? best = null;
+        var bestScore = -1;
+        foreach (var s in _samples)
+        {
+            if (s is not { } p) continue;
+            var score = Math.Abs((int)p.RX) + Math.Abs((int)p.RY) + p.LeftTrigger * 128 + p.RightTrigger * 128;
+            if (score > bestScore) { bestScore = score; best = p; }
+        }
+        return best is { } b ? (b.RX / 32768.0, b.RY / 32768.0, b.LeftTrigger / 255.0, b.RightTrigger / 255.0) : (0, 0, 0, 0);
+    }
+
     /// <summary>Feeds one poll (index = slot, null = disconnected) and returns the Down/Up events of the merged pad.</summary>
     public IReadOnlyList<(string Button, bool Down)> Update(IReadOnlyList<PadSample?> slots)
     {

@@ -792,6 +792,7 @@ window.couchhud = {
   onSettings: noop,
   assistantInfo: async () => ({ configured: !!settings.aiProvider, provider: settings.aiProvider, model: settings.aiModel || settings.aiModels[settings.aiProvider]?.[0] }),
   resetAssistant: async () => null,
+  factoryReset: async () => ({ ok: true }),
   confirmAssistant: async (id, ok) => pendingConfirm?.(ok),
   askAssistant: async (text) => {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
