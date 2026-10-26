@@ -880,6 +880,8 @@ window.couchhud = {
       emit('browserui', 'closed');
     }
   },
+  getBrowserField: async () => null,
+  setBrowserField: async () => null,
   setBrowserZoom: async (zoom) => ((browser.zoom = zoom), structuredClone(browser)),
   addBookmark: async (name, url) => (browser.bookmarks.push({ name, url }), structuredClone(browser)),
   removeBookmark: async (url) => ((browser.bookmarks = browser.bookmarks.filter((b) => b.url !== url)), structuredClone(browser)),

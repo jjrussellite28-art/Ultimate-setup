@@ -34,12 +34,28 @@ function loadRecent() {
   }
 }
 
-function remember(url, title) {
-  if (!/^https?:/i.test(url ?? '')) return;
-  recent = [{ url, title: title || host(url) }, ...recent.filter((r) => r.url !== url)].slice(0, 6);
+function saveRecent() {
   try {
     localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
   } catch { /* storage blocked: the list lives until the next start */ }
+}
+
+function remember(url, title) {
+  if (!/^https?:/i.test(url ?? '')) return;
+  recent = [{ url, title: title || host(url) }, ...recent.filter((r) => r.url !== url)].slice(0, 6);
+  saveRecent();
+}
+
+/** X on the page: type into the text box that was clicked, with CouchHUD's own keyboard. */
+async function typeIntoPage() {
+  const field = await attempt(() => api.getBrowserField());
+  if (!field) return api.browserFocus(true);
+  const text = await openKeyboard({ title: field.label || t('browser.typeTitle'), value: field.value, secret: field.secret });
+  if (text !== null && text !== undefined) {
+    await attempt(() => api.setBrowserField(text, field.search && !field.multiline && !field.secret));
+  } else {
+    api.browserFocus(true);
+  }
 }
 
 /** With the couch lock on, websites need the code: their upload and print dialogs lead into Windows. */
@@ -211,6 +227,13 @@ export const browserView = {
         sound.select();
         return row?.run();
       case 'y': {
+        if (row?.recent) {
+          // A history entry: forget it (no question, it is not saved anywhere else).
+          recent = recent.filter((r) => r.url !== row.recent.url);
+          saveRecent();
+          sound.back();
+          return render();
+        }
         const site = row?.bookmark;
         if (!site) return sound.bump();
         if (!(await confirmDialog(t('browser.removeConfirm', { name: site.name }), t('browser.remove')))) return;
@@ -270,10 +293,11 @@ export const browserView = {
       return this.focus === 'page'
         ? (state.inputSource === 'keyboard'
           ? [['F6', t('browser.hintBar')], ['F11', t('browser.hintFullscreen')], ['Y', t('browser.hintAddress')]]
-          : [['A', t('browser.hintClick')], ['B', t('browser.hintBack')], ['Y', t('browser.hintAddress')], ['LB', t('browser.hintZoomOut')], ['RB', t('browser.hintZoomIn')], ['View', t('browser.hintBar')]])
+          : [['A', t('browser.hintClick')], ['X', t('browser.hintType')], ['B', t('browser.hintBack')], ['Y', t('browser.hintAddress')], ['LB', t('browser.hintZoomOut')], ['RB', t('browser.hintZoomIn')], ['View', t('browser.hintBar')]])
         : [['←→', t('browser.hintPick')], ['A', t('browser.hintPress')], ['Y', t('browser.hintAddress')], ['B', t('browser.hintToPage')], ['LB', t('browser.hintTabs')]];
     }
-    return this.list?.[this.index]?.bookmark ? [['A', t('browser.hintOpen')], ['Y', t('browser.hintRemove')], ['B', t('browser.hintBack')]] : [['A', t('browser.hintOpen')], ['B', t('browser.hintBack')]];
+    const removable = this.list?.[this.index]?.bookmark || this.list?.[this.index]?.recent;
+    return removable ? [['A', t('browser.hintOpen')], ['Y', t('browser.hintRemove')], ['B', t('browser.hintBack')]] : [['A', t('browser.hintOpen')], ['B', t('browser.hintBack')]];
   }
 };
 
@@ -331,6 +355,8 @@ api.onBrowserUi?.((what) => {
     case 'address':
       browserView.setFocus('bar');
       return openAddress();
+    case 'type':
+      return typeIntoPage();
     case 'exit':
       return leaveToOrigin();
   }

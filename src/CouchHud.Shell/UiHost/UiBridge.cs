@@ -288,6 +288,11 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "browserCommand":
                 hud.BrowserCommand(StringArg(0));
                 return null;
+            case "getBrowserField":
+                return await hud.BrowserField();
+            case "setBrowserField":
+                await hud.BrowserSetField(StringArg(0), Arg(1).ValueKind == JsonValueKind.True);
+                return null;
             case "setBrowserZoom":
                 return hud.SetBrowserZoom(Arg(0).GetInt32());
             case "addBookmark":

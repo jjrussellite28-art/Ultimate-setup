@@ -4131,9 +4131,39 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
             case "rb":
                 SetBrowserZoom(browser.Zoom + 10);
                 return true;
+            case "x":
+                // Type into the text box the pointer clicked: CouchHUD's own keyboard, not the Windows touch keyboard.
+                _ = BrowserTypeAsync(browser);
+                return true;
             default:
                 return false;
         }
+    }
+
+    private async Task BrowserTypeAsync(BrowserPane browser)
+    {
+        var field = await browser.GetFocusedFieldAsync();
+        if (field is null)
+        {
+            Emit("toast", Strings.Get("browser.noField"));
+            return;
+        }
+        SetBrowserFocus(false);
+        Emit("browserui", "type");
+    }
+
+    /// <summary>The text box in the page that has the focus (for the on-screen keyboard), or null.</summary>
+    public async Task<object?> BrowserField()
+    {
+        var field = _browser is null ? null : await _browser.GetFocusedFieldAsync();
+        return field is null ? null : new { value = field.Value, secret = field.Secret, multiline = field.Multiline, search = field.Search, label = field.Label };
+    }
+
+    /// <summary>The typed text goes into the page's text box and the controller goes back to the page.</summary>
+    public async Task BrowserSetField(string text, bool submit)
+    {
+        if (_browser is not null) await _browser.SetFocusedTextAsync(text, submit);
+        SetBrowserFocus(true);
     }
 
     public object SetBrowserZoom(int zoom)

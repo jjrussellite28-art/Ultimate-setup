@@ -77,6 +77,8 @@ export default {
   'browser.zoomTitle': 'Zoom for the TV',
   'browser.percent': '{value}%',
   'browser.startHelp': 'Opening needs the code while the couch is locked. The page closes as soon as the couch is locked again',
+  'browser.hintType': 'Type',
+  'browser.typeTitle': 'Type into the page',
   'browser.hintClick': 'Click',
   'browser.hintAddress': 'Address',
   'browser.hintZoomOut': 'Zoom −',

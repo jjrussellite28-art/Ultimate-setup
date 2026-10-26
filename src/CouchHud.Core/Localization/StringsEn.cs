@@ -315,6 +315,7 @@ public static partial class Strings
         ["lock.noPassword"] = "The Windows sign-in as the lock needs an account with a password: without one the Windows lock screen lets everybody back in. Please set a password in Windows or use the controller code as the lock",
         ["autologon.notNeeded"] = "The Windows account has no password, so Windows signs in by itself anyway. Automatic sign-in does not have to be set up",
         ["browser.closesWhenLocked"] = "The browser closes as soon as the couch is locked again",
+        ["browser.noField"] = "Click a text box first, then press X",
         ["browser.fullscreenHint"] = "Leave full screen: Esc, F11 or the mouse at the top edge",
         ["browser.closesSoon"] = "The browser is about to close, the unlock is running out",
         ["browser.loading"] = "Loading …",

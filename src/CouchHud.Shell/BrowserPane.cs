@@ -361,6 +361,80 @@ public sealed class BrowserPane : Grid
         }
     }
 
+    /// <summary>The text box that has the focus in the page (what the user clicked), or null when none has.</summary>
+    public sealed record PageField(string Value, bool Secret, bool Multiline, bool Search, string Label);
+
+    private const string FieldScript = """
+        (function () {
+          var e = document.activeElement;
+          while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
+          if (!e) return null;
+          var type = (e.type || 'text').toLowerCase();
+          var plain = ['checkbox', 'radio', 'button', 'submit', 'file', 'range', 'color', 'image', 'reset', 'hidden'];
+          var input = e.tagName === 'INPUT' && plain.indexOf(type) < 0;
+          var area = e.tagName === 'TEXTAREA';
+          if (!input && !area && !e.isContentEditable) return null;
+          var label = e.getAttribute('aria-label') || e.placeholder || e.name || '';
+          return {
+            value: e.isContentEditable ? e.innerText : (e.value || ''),
+            secret: type === 'password',
+            multiline: area || (e.isContentEditable && e.getAttribute('role') !== 'searchbox' && e.getAttribute('role') !== 'textbox'),
+            search: type === 'search' || e.getAttribute('role') === 'searchbox' || /search/i.test(label + ' ' + (e.id || '')),
+            label: String(label).slice(0, 80)
+          };
+        })()
+        """;
+
+    private const string SetFieldScript = """
+        (function (text) {
+          var e = document.activeElement;
+          while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
+          if (!e) return;
+          if (e.isContentEditable) {
+            e.focus();
+            document.execCommand('selectAll');
+            document.execCommand('insertText', false, text);
+            return;
+          }
+          var proto = e.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+          var setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+          setter.call(e, text);
+          e.dispatchEvent(new Event('input', { bubbles: true }));
+          e.dispatchEvent(new Event('change', { bubbles: true }));
+        })
+        """;
+
+    /// <summary>Which text box has the focus, with what in it (the on-screen keyboard starts from that).</summary>
+    public async Task<PageField?> GetFocusedFieldAsync()
+    {
+        try
+        {
+            if (_web.CoreWebView2 is null) return null;
+            var json = await _web.CoreWebView2.ExecuteScriptAsync(FieldScript);
+            if (string.IsNullOrEmpty(json) || json == "null") return null;
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var r = doc.RootElement;
+            return new PageField(
+                r.GetProperty("value").GetString() ?? "",
+                r.GetProperty("secret").GetBoolean(),
+                r.GetProperty("multiline").GetBoolean(),
+                r.GetProperty("search").GetBoolean(),
+                r.GetProperty("label").GetString() ?? "");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or ObjectDisposedException or System.Text.Json.JsonException or KeyNotFoundException)
+        {
+            Console.Error.WriteLine($"[browser] field: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>Puts the typed text into the text box that has the focus; Enter afterwards for a search box.</summary>
+    public async Task SetFocusedTextAsync(string text, bool submit)
+    {
+        await RunScriptAsync(SetFieldScript + "(" + System.Text.Json.JsonSerializer.Serialize(text) + ")");
+        if (submit) await SendKeyAsync("Enter", 0x0D);
+    }
+
     /// <summary>Ends the page: the web view disposed (its process goes with it).</summary>
     public void Dispose()
     {

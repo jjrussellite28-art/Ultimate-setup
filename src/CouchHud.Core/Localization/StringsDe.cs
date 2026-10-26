@@ -315,6 +315,7 @@ public static partial class Strings
         ["lock.noPassword"] = "Die Windows-Anmeldung als Sperre braucht ein Konto mit Kennwort: Ohne Kennwort lässt der Windows-Sperrbildschirm jeden wieder herein. Bitte unter Windows ein Kennwort setzen oder den Controller-Code als Sperre nehmen",
         ["autologon.notNeeded"] = "Das Windows-Konto hat kein Kennwort, deshalb meldet Windows ohnehin von selbst an. Die automatische Anmeldung muss nicht eingerichtet werden",
         ["browser.closesWhenLocked"] = "Der Browser schließt sich, sobald die Couch wieder gesperrt ist",
+        ["browser.noField"] = "Zuerst ein Textfeld anklicken, dann X drücken",
         ["browser.fullscreenHint"] = "Vollbild beenden: Esc, F11 oder die Maus an den oberen Rand",
         ["browser.closesSoon"] = "Der Browser schließt sich gleich, die Entsperrung läuft ab",
         ["browser.loading"] = "Lädt …",

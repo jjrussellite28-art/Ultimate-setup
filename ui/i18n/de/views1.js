@@ -77,6 +77,8 @@ export default {
   'browser.zoomTitle': 'Zoom für den Fernseher',
   'browser.percent': '{value} %',
   'browser.startHelp': 'Öffnen verlangt bei gesperrter Couch den Code. Die Seite schließt sich, sobald die Couch wieder gesperrt ist',
+  'browser.hintType': 'Tippen',
+  'browser.typeTitle': 'In die Seite tippen',
   'browser.hintClick': 'Klick',
   'browser.hintAddress': 'Adresse',
   'browser.hintZoomOut': 'Zoom −',
