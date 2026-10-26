@@ -1,302 +1,302 @@
 # CouchHUD Roadmap
 
-Ziel: Der Wohnzimmer-PC fühlt sich an wie eine Konsole. Einschalten, automatisch anmelden, CouchHUD ist da, und **alles**, was man am TV braucht, geht mit dem Controller und aus dieser Oberfläche heraus. Kein Griff zur Funktastatur, kein Ausflug auf den Desktop, außer man will bewusst in den PC-Modus.
+Goal: the living-room PC feels like a console. Switch on, sign in automatically, CouchHUD is there, and **everything** you need at the TV works with the controller and from this interface. No reaching for a wireless keyboard, no trip to the desktop unless you deliberately want PC mode.
 
-## Leitplanken
+## Guard rails
 
-Diese Regeln gelten für jedes Feature und jedes Plugin:
+These rules apply to every feature and every plugin:
 
-1. **Alles über die GUI.** Was sich konfigurieren lässt, lässt sich in CouchHUD konfigurieren. Die `config.json` ist Speicher, keine Bedienoberfläche.
-2. **Controller zuerst, Maus und Tastatur optional.** Jeder Screen ist komplett per Pad bedienbar. Texteingabe geht über die eigene Bildschirmtastatur.
-3. **Nahtlos und Fullscreen.** Kein Flackern, kein Desktop zwischendurch, keine Fenster-Ränder, keine fremden Dialoge, wo es sich vermeiden lässt.
-4. **Fremdsoftware gehört in Plugins.** FanControl, SignalRGB, CaseHUD, UniGetUI, Kodi … kommen nie in den Kern. Der Kern liefert die Erweiterungspunkte.
-5. **Die Shell läuft nie als Admin.** Was Admin-Rechte braucht, erledigt ein Dienst über eine eng definierte Schnittstelle. UAC gibt's genau einmal, beim Setup.
-6. **Ein kaputtes Plugin darf nie die Shell killen.** CouchHUD ist die Shell, ein Absturz bedeutet sonst schwarzen Bildschirm.
+1. **Everything through the GUI.** What can be configured can be configured in CouchHUD. `config.json` is storage, not a user interface.
+2. **Controller first, mouse and keyboard optional.** Every screen is fully usable with the pad. Text input goes through the built-in on-screen keyboard.
+3. **Seamless and full screen.** No flicker, no desktop in between, no window borders, no foreign dialogs where avoidable.
+4. **Third-party software belongs in plugins.** FanControl, SignalRGB, CaseHUD, UniGetUI, Kodi … never go into the core. The core provides the extension points.
+5. **The shell never runs as admin.** What needs admin rights is done by a service through a narrowly defined interface. UAC appears exactly once, at setup.
+6. **A broken plugin must never kill the shell.** CouchHUD is the shell; a crash would otherwise mean a black screen.
 
-## Zielarchitektur
+## Target architecture
 
 ```
-┌────────────────────────── Benutzer-Sitzung ───────────────────────────┐
+┌────────────────────────── User session ───────────────────────────────┐
 │  CouchHud.Shell (WPF + WebView2)                                      │
-│   ├─ UI (ui/): Screens, Skins, Bildschirmtastatur, Settings-Renderer  │
-│   ├─ Core: Library, Config, Artwork, Skins                            │
-│   └─ Plugin-Host ── Plugins (je eigener Load-Context)                 │
-│        z.B. SignalRGB, CaseHUD, FanControl, RSS, Kodi, winget (User)  │
+│   ├─ UI (ui/): screens, skins, on-screen keyboard, settings renderer  │
+│   ├─ Core: library, config, artwork, skins                            │
+│   └─ Plugin host ── plugins (each in its own load context)            │
+│        e.g. SignalRGB, CaseHUD, FanControl, RSS, Kodi, winget (user)  │
 └───────────────▲───────────────────────────────────────────────────────┘
-                │ Named Pipe, nur für den angemeldeten Benutzer (ACL),
-                │ feste Liste erlaubter Operationen
+                │ Named pipe, only for the signed-in user (ACL),
+                │ fixed list of allowed operations
 ┌───────────────┴──────── CouchHud.Service (LocalSystem) ───────────────┐
-│  Windows Update · winget (Machine-Scope) · Self-Update                │
-│  privilegierte Plugin-Operationen (z.B. FanControl neu laden)         │
+│  Windows Update · winget (machine scope) · self-update                │
+│  privileged plugin operations (e.g. reload FanControl)                │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-### Was ein Plugin können soll (SDK v1)
+### What a plugin should be able to do (SDK v1)
 
-| Erweiterungspunkt | Wofür | Beispiel |
+| Extension point | Purpose | Example |
 |---|---|---|
-| `ILibraryProvider` *(gibt's schon)* | Einträge für die Bibliothek | Kodi-Filme, GOG-Spiele |
-| **Settings-Seite** | Einstellungen, deklarativ beschrieben (Toggle, Slider, Auswahl, Text, Ordner, Button) und von CouchHUD im aktuellen Skin gerendert | SignalRGB: Standard-Effekt |
-| **Widgets** | Kacheln/Karten für Home und Quick-Menü | CPU-/GPU-Temperatur, News-Karussell |
-| **Quick-Actions** | Einträge im Guide-Menü | „Licht aus“, „Lüfter leise“ |
-| **Seiten** | Eigene Vollbild-Screens, deklarativ oder als eigenes HTML-Panel | RSS-Reader, Mediathek |
-| **Events** | Reagieren auf `GameStarted`, `GameStopped`, `PcModeEntered`, `Idle`, `Sleep`, `Wake`, `HeadphonesConnected` | Pro Spiel andere Lüfterkurve |
-| **Benachrichtigungen** | Toasts in CouchHUD | „3 Updates verfügbar“ |
-| **Hintergrund-Tasks** | Periodische Arbeit mit Lebenszyklus | Feeds aktualisieren |
-| **Privilegierte Operationen** | Plugin definiert Operation, Service führt sie aus (vom Nutzer einmal freigegeben) | FanControl-Profil wechseln |
+| `ILibraryProvider` *(exists)* | Entries for the library | Kodi movies, GOG games |
+| **Settings page** | Settings, described declaratively (toggle, slider, choice, text, folder, button) and rendered by CouchHUD in the current skin | SignalRGB: default effect |
+| **Widgets** | Tiles/cards for Home and the quick menu | CPU/GPU temperature, news carousel |
+| **Quick actions** | Entries in the Guide menu | "Lights off", "Quiet fans" |
+| **Pages** | Own full-screen screens, declarative or as a custom HTML panel | RSS reader, media library |
+| **Events** | React to `GameStarted`, `GameStopped`, `PcModeEntered`, `Idle`, `Sleep`, `Wake`, `HeadphonesConnected` | Different fan curve per game |
+| **Notifications** | Toasts in CouchHUD | "3 updates available" |
+| **Background tasks** | Periodic work with a lifecycle | Refresh feeds |
+| **Privileged operations** | Plugin defines an operation, the service executes it (approved once by the user) | Switch FanControl profile |
 
-**Deklarativ vor HTML**: Wenn ein Plugin seine UI als Datenmodell beschreibt (Liste, Karte, Slider …), sieht sie in jedem Skin richtig aus und ist automatisch controllerbedienbar. Eigene HTML-Panels gibt's als Notausgang für Spezialfälle.
+**Declarative before HTML**: when a plugin describes its UI as a data model (list, card, slider …), it looks right in every skin and is automatically controller-operable. Custom HTML panels exist as an escape hatch for special cases.
 
 ---
 
-## Meilensteine
+## Milestones
 
-Die Reihenfolge folgt den Abhängigkeiten: Erst das Fundament, auf dem alles andere aufsetzt (Settings-UI, Tastatur, Maus), dann die Konsolen-Basics, dann das Plugin-SDK (getestet am RSS-Reader), dann der Dienst für alles mit Admin-Rechten und erst danach die Hardware-Plugins, weil z.B. FanControl als Admin läuft.
+The order follows the dependencies: first the foundation everything else builds on (settings UI, keyboard, mouse), then the console basics, then the plugin SDK (tested on the RSS reader), then the service for everything with admin rights, and only after that the hardware plugins, because e.g. FanControl runs as admin.
 
-### Stand (Oktober 2026)
+### Status (October 2026)
 
-| Meilenstein | Erledigt | Offen |
+| Milestone | Done | Open |
 |---|---|---|
-| M1 Fundament | Settings-Center (Einfach/Experte, Ein-Knopf-Einrichtung), Bildschirmtastatur (mit Handy-Eingabe per QR), Datei-Browser, Ordner-Scan und überwachte Spieleordner, Einträge bearbeiten/ausblenden, Suchen/Sortieren/Favoriten-Filter, Maus (Comic-Zeiger), Controller als Maus (für Logins und Dialoge), Boot-Screen mit Logo, Artwork-Auswahl, Sammlungen, Spielstart-Übergang | Import der Steam-Kategorien in Sammlungen |
-| M2 Konsolen-Basics | Guide-Menü, **Guide-Taste antippen holt CouchHUD über das laufende Spiel, Spiel läuft weiter (optional pausiert)**, Spiel beenden und erzwingen, Spielzeit, Audio inkl. Auto-Wechsel, Controller-Akku, Controller-Entdoppelung (virtuelle Pads), Bluetooth, **Lautstärke pro App**, **WLAN** (Einstellungen › Netzwerk), Anzeige (Auflösung, Hz, HDR), Nachtmodus, Spielprofile, Benachrichtigungscenter, Ausschalt-Timer, Task-Manager, **Bildschirmschoner gegen OLED-Einbrennen**, **Vordergrund-Wächter** („CouchHUD bleibt vorne“) | Praxistest auf echter Hardware |
-| M2b Spielstände & Installieren | Steam-Downloads mit Fortschritt, **Spielstände** (Ludusavi-Manifest: Sichern, Wiederherstellen, Sicherheits-Backup, Backup vor dem Deinstallieren) | Registry-Spielstände, ISO/Setup per Controller; nicht installierte Store-Spiele installieren und automatisches Backup nach Spielende: siehe Plan für 0.5 |
-| M2c Design | Clear Logos, Hintergrund-Trailer, **Artwork aus lokalen Quellen mit Cache** (Epic-, Xbox-, Ubisoft-Cache, Steam-Bibliothek, eigener Banner als Notlösung), Farben aus dem Artwork, Übergänge, Boot-Animation, Rumble, Leistungsanzeige, Aufnahmen-Galerie, **Sounds pro Skin, Hintergrundmusik**, **HDR-Modus**, Logo und App-Icon, Parallax/Tilt, „Animationen reduzieren“ | – |
-| M3 Plugins & News | **SDK v1** (Seiten, Settings, Quick-Actions, Tools, Events, Benachrichtigungen, Sprache), Plugin- und Skin-Verwaltung mit .zip-Installation, Wand-Plugin, News-Tab, Doku für die Community, **Plugin-Katalog** (JSON-Index auf GitHub, signiert, SHA-256-Pflicht) mit Installation und Update-Hinweis, **Katalog-Repo `kewe87/CouchHUD-Catalog` mit echten Einträgen (Wand, Synthwave)**, der Beispielindex im Repo spiegelt den echten | Hot-Reload von Plugins (Updates ohne Neustart) |
-| M3b KI & MCP | Assistent (Anthropic, OpenAI), MCP-Server mit Bestätigung am TV, Plugin-Tools | MCP-Ressourcen, Spracheingabe |
-| M4 Updates & Dienste | Windows Update, winget, Couch/PC-Profile für Autostart und Dienste (geplante Aufgabe statt Dienst), Neustart in den PC-Modus, **Spiele-Clients starten leise im Couch-Modus**, **Self-Update** (GitHub-Releases, signierte Prüfsummen, stille Installation) | CouchHud.Service für Windows Update ohne UAC (Plan für 0.5), UniGetUI, Self-Update im Hintergrund vorladen |
-| M6 Medien & Smart Home | Home Assistant, Wetter, Handy als Fernbedienung und Tastatur (auch für Login-Fenster), weitere Spiele-Quellen (GOG, Ubisoft, Xbox) | Kodi/Jellyfin-Plugins, Spiele aus EA app und Battle.net in der Bibliothek (die Clients starten schon mit), Game-Streaming-Status |
-| M7 Release | **Couch-Sperre** (Controller-Code oder Windows Hello), Wächterprozess, Task-Manager-Sperre, automatische Anmeldung (Passwort geprüft, als LSA-Secret von Windows abgelegt), **Notfall-Modus** (Strg+Umschalt oder LB+RB+View, Crash-Zähler; zweistufig: erst Windows-Sperre, Shell und Autologin fallen erst nach der Windows-Anmeldung weg), **Jugendschutz**, **Installer** (Inno Setup, WebView2-Prüfung, Deinstallation setzt Windows-Eingriffe zurück), **Ein-Knopf-Einrichtung**, **Englisch** (Oberfläche, Host, Tray, Installer), signierte Release-Prüfsummen, **Shell ohne Explorer**, **Hilfsaufgaben pro Konto** (auch Standardkonten), **gehärtete Couch-Sperre**, **Audit-Fixes** aus mehreren VM-Tests, **CaseHUD-Integration** | Authenticode-signierte Builds (SmartScreen), Issue-Vorlagen |
+| M1 Foundation | Settings center (simple/expert, one-button setup), on-screen keyboard (with phone input via QR), file browser, folder scan and watched game folders, edit/hide entries, search/sort/favorites filter, mouse (cartoon pointer), controller as mouse (for logins and dialogs), boot screen with logo, artwork selection, collections, game-start transition | Import of Steam categories into collections |
+| M2 Console basics | Guide menu, **tapping the Guide button brings CouchHUD over the running game, game keeps running (optionally paused)**, quit and force-quit game, play time, audio incl. auto switching, controller battery, controller de-duplication (virtual pads), Bluetooth, **per-app volume**, **Wi-Fi** (Settings › Network), display (resolution, Hz, HDR), night mode, game profiles, notification center, power-off timer, task manager, **screensaver against OLED burn-in**, **foreground guard** ("CouchHUD stays in front") | Real-hardware testing |
+| M2b Save games & installing | Steam downloads with progress, **save games** (Ludusavi manifest: back up, restore, safety backup, backup before uninstalling) | Registry saves, ISO/setup by controller; installing not-installed store games and automatic backup after a game ends: see plan for 0.5 |
+| M2c Design | Clear logos, background trailers, **artwork from local sources with cache** (Epic, Xbox, Ubisoft caches, Steam library, own banner as a fallback), colors from artwork, transitions, boot animation, rumble, performance display, captures gallery, **sounds per skin, background music**, **HDR mode**, logo and app icon, parallax/tilt, "Reduce animations" | – |
+| M3 Plugins & news | **SDK v1** (pages, settings, quick actions, tools, events, notifications, language), plugin and skin management with .zip install, Wand plugin, news tab, docs for the community, **plugin catalog** (JSON index on GitHub, signed, mandatory SHA-256) with install and update notice, **catalog repo `kewe87/CouchHUD-Catalog` with real entries (Wand, Synthwave)**, the example index in the repo mirrors the real one | Hot reload of plugins (updates without restart) |
+| M3b AI & MCP | Assistant (Anthropic, OpenAI), MCP server with confirmation on the TV, plugin tools | MCP resources, voice input |
+| M4 Updates & services | Windows Update, winget, couch/PC profiles for autostart and services (scheduled task instead of a service), restart into PC mode, **game clients start quietly in couch mode**, **self-update** (GitHub releases, signed checksums, silent install) | CouchHud.Service for Windows Update without UAC (plan for 0.5), UniGetUI, pre-download self-update in the background |
+| M6 Media & smart home | Home Assistant, weather, phone as remote and keyboard (also for login windows), more game sources (GOG, Ubisoft, Xbox) | Kodi/Jellyfin plugins, games from the EA app and Battle.net in the library (the clients already start along), game-streaming status |
+| M7 Release | **Couch lock** (controller code or Windows Hello), guard process, Task Manager block, automatic sign-in (password checked, stored by Windows as an LSA secret), **emergency mode** (Ctrl+Shift or LB+RB+View, crash counter; two steps: first Windows lock, shell and auto sign-in go away only after Windows sign-in), **parental controls**, **installer** (Inno Setup, WebView2 check, uninstall resets Windows changes), **one-button setup**, **English** (interface, host, tray, installer), signed release checksums, **shell without Explorer**, **helper tasks per account** (also standard accounts), **hardened couch lock**, **audit fixes** from several VM tests, **CaseHUD integration** | Authenticode-signed builds (SmartScreen), issue templates |
 
-### Erledigt seit 0.3 (Release 0.4.0)
+### Done since 0.3 (release 0.4.0)
 
-- ✅ **Katalog-Repo** `kewe87/CouchHUD-Catalog` mit echten Einträgen (Wand, Synthwave), signiert.
-- ✅ **Artwork-Cache**: Bilder aus lokalen Quellen und dem Netz werden einmal geladen und lokal gehalten (`%LOCALAPPDATA%\CouchHudrtwork`, LRU-Begrenzung), die Oberfläche lädt nie selbst aus dem Netz.
-- ✅ **CaseHUD-Integration** (Einstellungen › CaseHUD): Installation aus signierten GitHub-Releases, Start, Steuerung über die lokale API, Spielmeldung an CaseHUD ([CASEHUD.md](CASEHUD.md)). Sie ist eine eingebaute Integration im Host, kein Plugin; CaseHUD selbst bleibt ein eigenes Programm.
-- ✅ **Couch-Sperre gehärtet** (siehe unten, Punkt 11), **Notfall-Modus zweistufig** (erst Windows-Sperre, dann Entfernen von Shell und Autologin).
-- ✅ **Audit-Fixes** aus mehreren Review- und VM-Testrunden (Jugendschutz, Handy-Fernbedienung, Autologin, Wiederherstellung, eigener Firewall-Regelname „CouchHUD Remote (CouchHUD)“, Plugin-Freigabe per Hash).
-- ✅ **Shell ohne Explorer**: CouchHUD startet als Shell, ohne dass der Explorer mitläuft; der Desktop kommt im PC-Modus bzw. nach dem Notfall-Modus.
-- ✅ **Hilfsaufgaben pro Konto**: die einmalige Einrichtung legt feste Aufgaben je Windows-Konto an, auch für Standardkonten.
+- ✅ **Catalog repo** `kewe87/CouchHUD-Catalog` with real entries (Wand, Synthwave), signed.
+- ✅ **Artwork cache**: images from local sources and the web are downloaded once and kept locally (`%LOCALAPPDATA%\CouchHud\artwork`, LRU limit); the interface never loads from the web itself.
+- ✅ **CaseHUD integration** (Settings › CaseHUD): installation from signed GitHub releases, start, control through the local API, game reporting to CaseHUD ([CASEHUD.md](CASEHUD.md)). It is a built-in integration in the host, not a plugin; CaseHUD itself remains a separate program.
+- ✅ **Couch lock hardened** (see below, item 11), **emergency mode in two steps** (first Windows lock, then removal of shell and auto sign-in).
+- ✅ **Audit fixes** from several review and VM test rounds (parental controls, phone remote, auto sign-in, recovery, own firewall rule name "CouchHUD Remote (CouchHUD)", plugin approval by hash).
+- ✅ **Shell without Explorer**: CouchHUD starts as the shell without Explorer running along; the desktop comes in PC mode or after emergency mode.
+- ✅ **Helper tasks per account**: the one-time setup creates fixed tasks per Windows account, also for standard accounts.
 
-### Plan für 0.5
+### Plan for 0.5
 
-In dieser Reihenfolge:
+In this order:
 
-1. **VPN-Dienste**, zuerst **NordVPN**: im Guide und in den Einstellungen VPN ein- und ausschalten, Land bzw. Ort wählen, Status (verbunden, Ort, Server) sehen. Gerade für Streaming interessant. Anbindung über die Kommandozeile bzw. Schnittstelle der installierten VPN-App (kein eigener VPN-Client in CouchHUD, keine Zugangsdaten in CouchHUD); weitere Anbieter (z. B. ProtonVPN, Surfshark, WireGuard-Profile) über dieselbe Schnittstelle bzw. als Plugin.
-2. **Nicht installierte Spiele per Controller installieren.** Nicht installierte Spiele aus Steam/Epic als eigene Reihe zeigen und die Installation anstoßen, Fortschritt anzeigen (siehe M2b). Dazu ein **zentraler Downloads-Reiter** wie auf der PlayStation: alles, was gerade lädt oder installiert, an einer Stelle (Steam, Epic, GOG, EA, Ubisoft, Battle.net, Microsoft Store, Windows-Updates, App-Updates, Updates von CouchHUD, Plugins und CaseHUD), mit Fortschritt und Hinweis, wenn etwas fertig ist. Für Clients ohne offizielle Schnittstelle nur, soweit sich der Fortschritt zuverlässig lokal auslesen lässt.
-3. **TV-Steuerung** über HDMI-CEC bzw. die Netzwerk-API des Fernsehers: ein-/ausschalten, Eingang wählen, Lautstärke.
-4. **Reihe „Weiterspielen“** auf Home mit Spielzeit und Fortschritt, dazu ein **automatisches Spielstand-Backup nach Spielende** (baut auf den Spielständen aus M2b auf).
-5. **Profile pro Person**: eigene Favoriten, Sammlungen, Spielzeit-Regeln und Einstellungen je Person statt nur je Windows-Konto.
-6. **Smart Home nur mit dem, was man braucht.** Nach dem Verbinden zeigt der Tab nicht mehr pauschal alle Entitäten (bei großen Installationen über tausend Sensoren), sondern nur ausgewählte: eine Auswahl-Seite nach Bereichen (HA-Areas), Typ (Licht, Szene, Schalter, Mediaplayer, Klima, Sensor) und Suche, dazu sinnvolle Vorschläge (Szenen, Lichter, Mediaplayer der Bereiche). Leere Auswahl zeigt einen Einstieg in die Auswahl statt einer Liste.
-7. **Home Assistant ohne Token-Abtippen:** „Mit Home Assistant anmelden“ öffnet die HA-Anmeldung im eingebauten Browser (OAuth-Flow von HA), CouchHUD bekommt den Zugang selbst. Bis dahin gibt es bei Tokens und API-Keys „Vom PC einfügen“ (Zwischenablage) und Strg+V.
+1. **VPN services**, first **NordVPN**: switch VPN on and off in the Guide menu and settings, choose country or location, see status (connected, location, server). Particularly interesting for streaming. Integration through the command line or interface of the installed VPN app (no VPN client of our own in CouchHUD, no credentials in CouchHUD); other providers (e.g. ProtonVPN, Surfshark, WireGuard profiles) through the same interface or as a plugin.
+2. **Install not-installed games by controller.** Show not-installed games from Steam/Epic as their own row and trigger installation, show progress (see M2b). Plus a **central Downloads tab** like on PlayStation: everything currently downloading or installing in one place (Steam, Epic, GOG, EA, Ubisoft, Battle.net, Microsoft Store, Windows updates, app updates, CouchHUD updates, plugins and CaseHUD), with progress and a notice when something finishes. For clients without an official interface only as far as progress can be read reliably from local data.
+3. **TV control** via HDMI-CEC or the TV's network API: power on/off, choose input, volume.
+4. **"Continue playing" row** on Home with play time and progress, plus an **automatic save-game backup after a game ends** (builds on the save games from M2b).
+5. **Per-person profiles**: own favorites, collections, play-time rules and settings per person instead of just per Windows account.
+6. **Smart home with only what you need.** After connecting, the tab no longer shows all entities (over a thousand sensors in large installations), only selected ones: a selection page by areas (HA areas), type (light, scene, switch, media player, climate, sensor) and search, plus sensible suggestions (scenes, lights, media players of the areas). An empty selection shows an entry point to the selection instead of a list.
+7. **Home Assistant without typing a token:** "Sign in with Home Assistant" opens the HA sign-in in the built-in browser (HA's OAuth flow), and CouchHUD gets access itself. Until then, tokens and API keys have "Paste from PC" (clipboard) and Ctrl+V.
 
-CouchHud.Service (Windows-Dienst für alle Admin-Operationen) ist vorgezogen und kommt mit 0.4.1.
+CouchHud.Service (Windows service for all admin operations) was brought forward and comes with 0.4.1.
 
-### Als Nächstes
+### Next
 
-Nach Nutzen für den Alltag sortiert. Erledigt ist hier abgehakt, offen steht ehrlich dabei:
+Sorted by everyday usefulness. Done is ticked off, open says so honestly:
 
-1. **Praxistest auf echter Hardware (offen).** Fast alles ab v0.3 ist nur per CI kompiliert, im Browser-Preview und in einer Hyper-V-Test-VM geprüft, nicht auf einem echten Couch-PC am TV. Besonders prüfen: Guide-Tap über Exclusive-Fullscreen-Spielen, Pause (NtSuspendProcess) mit verschiedenen Spielen, Wächter und Sperre, Vordergrund-Wächter mit allen Spiele-Clients, Jugendschutz-Einblendung über Spielen, Display-Aus und Aufwecken per Controller, Autologin-Dialog per Controller-Maus, Controller-Entdoppelung mit echten Steam-Input-Pads.
-2. ✅ **Installer** (Inno Setup, `C:\Program Files\CouchHud`, WebView2-Prüfung, Startmenü, Deinstallation stellt Shell und Autologin zurück).
-3. ✅ **Ersteinrichtung per Controller**: der Konsolen-Knopf *CouchHUD als Konsole einrichten* (Übersicht, Durchlauf, Ergebnisliste, Rückweg).
-4. ✅ **Self-Update** (am TV noch zu testen): GitHub-Releases-API mit ETag, Updates-Seite mit Release-Notes, Download nur von github.com über https, Pflicht-Signatur der Prüfsummen-Datei (`scripts/sign-release.ps1`), stille Installation mit Neustart auch als Shell. Offen: Authenticode-Signatur des Setups, Update im Hintergrund vorladen.
-5. ✅ **Lautstärke pro App** und **WLAN**.
-6. ✅ **Plugin-Katalog** (am TV noch zu testen): signierter JSON-Index auf GitHub, Installation und Updates direkt aus der Plugin-Seite. Das Repo `kewe87/CouchHUD-Catalog` existiert mit echten Einträgen (Wand, Synthwave).
-7. ✅ **Spielstände** (Ludusavi, siehe M2b). Offen: Registry-Spielstände, Cloud-Ordner als Ziel; **nicht installierte Store-Spiele** und das automatische Backup nach Spielende stehen im Plan für 0.5.
-8. ✅ **Jugendschutz** (am TV noch zu testen): Spielzeit-Limit pro Tag (Wochenende getrennt), Zeitfenster, Limit pro Spiel, Warnung 15 und 5 Minuten vorher, „Spielzeit vorbei“ mit Speichern-und-Beenden oder Verlängern per Eltern-Code, gesperrte Spiele und USK-Grenze, Schutz vor verstellter Systemuhr, auch für Spiele, die ohne CouchHUD gestartet wurden. Offen: Spiele ohne erkennbaren Prozess (URL-Start) lassen sich nicht messen; Schutz nur gegen Kinder am Controller (Dateizugriff auf den Benutzerordner umgeht ihn); pro-Kind-Profile.
-9. ✅ **Englische Oberfläche** (am TV noch zu testen): Englisch und Deutsch in UI, Host-Meldungen, Tray und Installer; Steam-Beschreibungen in der UI-Sprache; Einstellungen › Info › Sprache (Automatisch folgt der Windows-Anzeigesprache), sofort wirksam. Texte und Begriffe: [i18n.md](i18n.md), Prüfung `scripts/i18n-check.mjs`. Offen: weitere Sprachen.
-10. **Signierte Builds (offen).** Die Release-Prüfsummen sind signiert, das Setup selbst aber nicht per Authenticode, deshalb warnt SmartScreen. Braucht ein Code-Signing-Zertifikat.
-11. ✅ **Härtung der Couch-Sperre** (in mehreren VM-Tests geprüft, am TV noch zu testen): nur Spiele ohne Entsperrung, Positivliste und Liste klarer Nicht-Spiele für den Vordergrund, Datei- und Druckdialoge zu, Windows-Richtlinien und Eingabehilfe-Kürzel nur bei Sperre und reversibel, Browser nur entsperrt und ohne Dialoge, Kennwort-Pflicht für die Windows-Anmeldung als Sperre (Controller-Code mit Warnung, Autologin entfällt ohne Kennwort). Die Sperre bleibt so stark wie das Windows-Kennwort und schützt nur vor Kindern und Gästen am Controller, nicht vor Dateizugriff, Startmedium oder Admin-Rechten; BitLocker bzw. Geräteverschlüsselung wird empfohlen (Hinweis in der Ein-Knopf-Einrichtung).
-12. ✅ **Steam-Config-Patch („Paket C“, in der VM geprüft, am TV noch zu testen).** Steam kommt CouchHUD im Couch-Modus nicht in die Quere: kein Big-Picture-Start (`HKCU\Software\Valve\Steam › StartupMode` 4 → 7), die Guide-Taste fokussiert Steam nicht (`localconfig.vdf › Controller_CheckGuideButton` = 0), kein Big-Picture-Overlay beim Controller (`system/EnableSCTenFootOverlayCheckNew` = 0), keine Einblendung beim Verbinden eines Controllers (`system/ControllerConnectNotificationToast` = 0). Alle vier Schlüssel wurden in einem Steam-Client einzeln durch eine einzige Einstellung in der Oberfläche und Vergleich der Dateien bestätigt (Details im Quelltext von `SteamGuard.cs`). Umsetzung: `SteamGuard` (Core) mit eigener Sicherung `guard-steam.json` über `GuardSnapshot` (neu: `OnlyIfUnchanged`, zurückgesetzt wird nur, was noch unser Wert ist) und `SteamGuardService` (Shell): Steam schreibt seine Dateien selbst, also nur bei beendetem Steam; läuft es, wird es nur zum Anwenden und nur in einem ruhigen Moment (kein Spiel, kein Steam-Fenster vorn, kein Mausmodus/Login, kein Download, keine offene Anmeldung; vor `-shutdown` erneut geprüft) mit `steam -shutdown` sauber beendet (nie mit Gewalt, nach 45 s ohne Erfolg wird nichts geschrieben und mit Pausen erneut versucht, ein spätes Ende führt trotzdem zum leisen Neustart), geschrieben, nach kurzer Pause verifiziert und leise neu gestartet. Das Zurücksetzen startet Steam nie neu, es wartet, bis Steam nicht läuft (der Run-Eintrag bleibt bis zur verifizierten Rücksetzung; Beenden wartet auf nichts). Setzt der Nutzer einen unserer Werte zurück, wird er in dieser Couch-Sitzung nicht erneut erzwungen. Prüfung und Schreiben laufen unter einem prozessübergreifenden Mutex (`SteamGuardRunner`, mit Fake-Steam getestet). Teil von „CouchHUD bleibt vorne“, keine eigene Einstellung. Zurück bei PC-Modus, Light-Modus, Option aus, Beenden, nach einem Absturz (Run-Eintrag `CouchHudReleaseSteamGuard` und nächster Start); bei der Deinstallation nicht durch den Administrator-Prozess (VDF ist dort bewusst verboten), das erledigt das Beenden von CouchHUD. Bewusst nicht angefasst: „Guide-Tastenkürzel erlauben“ (`SteamController_Enable_Chord`, bestätigt, würde aber Steams Guide-Kürzel in Spielen mit Steam-Eingabe wegnehmen) und das Overlay selbst. Offen: die Guide-Taste selbst ließ sich ohne Controller nicht drücken (geprüft sind Dateien, Registry und die Schalter in Steams Oberfläche); ob Steam Input in einem Spiel mit eigener Steam-Eingabe die Guide-Taste weiterhin abfängt, ist am TV zu prüfen.
-13. **Kodi/Jellyfin, UniGetUI (offen).** Media-Plugins (M6) und UniGetUI als zweite App-Update-Quelle (M4). Der Windows-Dienst CouchHud.Service steht im Plan für 0.5.
-14. **Neue Ideen:** Hot-Reload von Plugins; MCP-Ressourcen; Import der Steam-Kategorien als Sammlungen; Spracheingabe am Handy; Screenshot-Regressionstests für alle Skins in der CI (`scripts/ui-shot.mjs` gibt es schon); weitere Sprachen über Community-Übersetzungen.
+1. **Real-hardware testing (open).** Almost everything since v0.3 has only been compiled by CI, checked in the browser preview and in a Hyper-V test VM, not on a real couch PC at a TV. Especially check: Guide tap over exclusive-fullscreen games, pausing (NtSuspendProcess) with various games, guard and lock, foreground guard with all game clients, parental-control overlay over games, display off and waking by controller, auto sign-in dialog with the controller mouse, controller de-duplication with real Steam Input pads.
+2. ✅ **Installer** (Inno Setup, `C:\Program Files\CouchHud`, WebView2 check, Start menu, uninstall restores shell and auto sign-in).
+3. ✅ **First-time setup by controller**: the console button *Set up CouchHUD as a console* (overview, run, result list, way back).
+4. ✅ **Self-update** (still to be tested at the TV): GitHub releases API with ETag, Updates page with release notes, download only from github.com over https, mandatory signature of the checksum file (`scripts/sign-release.ps1`), silent install with restart also as shell. Open: Authenticode signature of the setup, pre-download the update in the background.
+5. ✅ **Per-app volume** and **Wi-Fi**.
+6. ✅ **Plugin catalog** (still to be tested at the TV): signed JSON index on GitHub, install and updates straight from the plugin page. The repo `kewe87/CouchHUD-Catalog` exists with real entries (Wand, Synthwave).
+7. ✅ **Save games** (Ludusavi, see M2b). Open: registry saves, cloud folder as a target; **not-installed store games** and the automatic backup after a game ends are in the plan for 0.5.
+8. ✅ **Parental controls** (still to be tested at the TV): daily play-time limit (weekend separate), time window, per-game limit, warning 15 and 5 minutes before, "Time is up" with save-and-quit or extension by parent code, blocked games and age limit, protection against a changed system clock, also for games started without CouchHUD. Open: games without a recognizable process (URL start) cannot be measured; protection only against kids at the controller (file access to the user folder bypasses it); per-child profiles.
+9. ✅ **English interface** (still to be tested at the TV): English and German in UI, host messages, tray and installer; Steam descriptions in the UI language; Settings › Info › Language (Automatic follows the Windows display language), takes effect immediately. Texts and terms: [i18n.md](i18n.md), check `scripts/i18n-check.mjs`. Open: more languages.
+10. **Signed builds (open).** The release checksums are signed, but the setup itself is not Authenticode-signed, which is why SmartScreen warns. Needs a code-signing certificate.
+11. ✅ **Hardening of the couch lock** (checked in several VM tests, still to be tested at the TV): only games without unlocking, allow list and list of clear non-games for the foreground, file and print dialogs closed, Windows policies and accessibility shortcuts only while locked and reversible, browser only unlocked and without dialogs, password requirement for Windows sign-in as the lock (controller code with a warning, auto sign-in dropped without a password). The lock stays as strong as the Windows password and protects only against kids and guests at the controller, not against file access, boot media or admin rights; BitLocker or device encryption is recommended (note in the one-button setup).
+12. ✅ **Steam config patch ("package C", checked in the VM, still to be tested at the TV).** Steam does not get in CouchHUD's way in couch mode: no Big Picture start (`HKCU\Software\Valve\Steam › StartupMode` 4 → 7), the Guide button does not focus Steam (`localconfig.vdf › Controller_CheckGuideButton` = 0), no Big Picture overlay on controller (`system/EnableSCTenFootOverlayCheckNew` = 0), no pop-up when a controller connects (`system/ControllerConnectNotificationToast` = 0). All four keys were confirmed individually in a Steam client by changing a single setting in the interface and comparing the files (details in the source of `SteamGuard.cs`). Implementation: `SteamGuard` (Core) with its own backup `guard-steam.json` via `GuardSnapshot` (new: `OnlyIfUnchanged`, only what is still our value is reset) and `SteamGuardService` (Shell): Steam writes its files itself, so only while Steam is not running; if it runs, it is closed cleanly with `steam -shutdown` only to apply and only in a quiet moment (no game, no Steam window in front, no mouse mode/login, no download, no open sign-in; checked again before `-shutdown`), never by force (after 45 s without success nothing is written and it is retried with pauses; a late exit still leads to the quiet restart), written, verified after a short pause and restarted quietly. Resetting never restarts Steam; it waits until Steam is not running (the Run entry stays until the verified reset; quitting waits for nothing). If the user resets one of our values, it is not enforced again in this couch session. Checking and writing run under a cross-process mutex (`SteamGuardRunner`, tested with a fake Steam). Part of "CouchHUD stays in front", not a setting of its own. Reset on PC mode, Light mode, option off, quit, after a crash (Run entry `CouchHudReleaseSteamGuard` and next start); not on uninstall by the administrator process (VDF is deliberately forbidden there), which is handled when CouchHUD quits. Deliberately not touched: "Allow Guide button shortcut" (`SteamController_Enable_Chord`, confirmed, but it would take away Steam's Guide shortcut in games with Steam Input) and the overlay itself. Open: the Guide button itself could not be pressed without a controller (files, registry and the switches in Steam's interface were checked); whether Steam Input in a game with its own Steam input still intercepts the Guide button is to be checked at the TV.
+13. **Kodi/Jellyfin, UniGetUI (open).** Media plugins (M6) and UniGetUI as a second app-update source (M4). The Windows service CouchHud.Service is in the plan for 0.5.
+14. **New ideas:** hot reload of plugins; MCP resources; import Steam categories as collections; voice input on the phone; screenshot regression tests for all skins in CI (`scripts/ui-shot.mjs` already exists); more languages through community translations.
 
-Home Assistant, Wetter und News sind vorerst eingebaute Integrationen. Sobald das SDK v1 eigene Screens und Settings-Seiten kann, werden sie zu Plugins (Leitplanke 4).
+Home Assistant, weather and news are built-in integrations for now. As soon as SDK v1 can do its own screens and settings pages, they become plugins (guard rail 4).
 
-### ✅ M0: Prototyp (v0.2, erledigt)
+### ✅ M0: Prototype (v0.2, done)
 
-- Konsolen-UI mit Home, Spiele, Apps, System
-- Steam, Epic, eigene Einträge, Cover über SteamGridDB/Steam-Store
-- XInput global inkl. Guide-Button, PC-Modus, Shell-Registrierung, Power
-- Skins: CouchHUD, PS4 Classic, Xbox, Cyberpunk, Nova, plus eigene
-- Plugin-Loader mit `ILibraryProvider`
-- Detailseite: Beschreibung (Steam-Store, deutsch), zuletzt gespielt, Größe, Installationsort, Entwickler/Genres, Deinstallieren
-- C#/.NET 10, WebView2, CI auf Windows
+- Console UI with Home, Games, Apps, System
+- Steam, Epic, custom entries, covers via SteamGridDB/Steam store
+- Global XInput incl. Guide button, PC mode, shell registration, power
+- Skins: CouchHUD, PS4 Classic, Xbox, Cyberpunk, Nova, plus custom ones
+- Plugin loader with `ILibraryProvider`
+- Detail page: description (Steam store), last played, size, install location, developer/genres, uninstall
+- C#/.NET 10, WebView2, CI on Windows
 
-### M1: Fundament – „Alles über die GUI“
+### M1: Foundation – "Everything through the GUI"
 
-*Ohne das hier ist jedes spätere Feature halb fertig.*
+*Without this, every later feature is half finished.*
 
-- **Settings-Framework**: Ein Renderer für deklarative Einstellungen (Toggle, Slider, Auswahl, Text, Ordner-Auswahl, Aktion). Alle heutigen `config.json`-Werte bekommen eine Seite. Dasselbe System nutzen später die Plugins.
-- **Bildschirmtastatur** für den Controller: QWERTZ, Großschreibung, Sonderzeichen, Shortcuts (`.de`, `@`, `www.`), Trigger als Cursor, Y = Leerzeichen, X = Löschen.
-- **Ordner-Browser** per Controller (Laufwerke, Ordner, Favoriten), ohne Tastatur.
-- **Bibliotheksverwaltung**:
-  - Spieleverzeichnisse hinzufügen/entfernen, Scan nach `.exe` mit Vorschlägen (ignoriert Installer, Uninstaller, Crash-Reporter, Redistributables)
-  - Einträge umbenennen, ausblenden, als Spiel/App einordnen, Startparameter setzen
-  - **Artwork-Auswahl** (erledigt): Detailseite → „Artwork ändern“, je Raster für Cover, Banner und Logo mit allen Treffern von SteamGridDB und Steam, eigenes Bild aus Datei, „Automatisch“ als Zurücksetzen; gespeichert als Override pro Eintrag in der `config.json`
-  - **Sammlungen** (erledigt): anlegen, umbenennen, löschen, Einträge per Y-Menü oder Detailseite hinzufügen, als Filter in Spiele/Apps, als Kachel an Home anheften. Import der Steam-Kategorien ist offen (das `cloud-storage`-Format von Steam ist nicht dokumentiert und ändert sich)
-- **Maus**:
-  - Bei Bewegung erscheint ein großer, gut sichtbarer Zeiger (skinbar), nach ca. 2 s ohne Bewegung blendet er aus
-  - Hover hebt hervor, verschiebt aber nicht den Controller-Fokus. Ein Klick wählt aus und aktiviert, das Mausrad scrollt.
-  - Sobald wieder der Controller benutzt wird, verschwindet der Zeiger sofort.
-- **Nahtloser Fullscreen**:
-  - Schwarzer Start ohne Flackern: Fenster erst zeigen, wenn die UI gerendert ist, mit Boot-Splash im Skin-Stil
-  - Übergänge beim Spielstart („Spiel startet …“ mit Artwork), bis das Spielfenster da ist
-  - Kein Windows-Explorer-Dialog, wo CouchHUD eine eigene Lösung hat
+- **Settings framework**: one renderer for declarative settings (toggle, slider, choice, text, folder picker, action). All of today's `config.json` values get a page. Plugins use the same system later.
+- **On-screen keyboard** for the controller: QWERTY/QWERTZ, capitalization, special characters, shortcuts (`.com`, `@`, `www.`), triggers as cursor, Y = space, X = delete.
+- **Folder browser** by controller (drives, folders, favorites), without a keyboard.
+- **Library management**:
+  - add/remove game directories, scan for `.exe` with suggestions (ignores installers, uninstallers, crash reporters, redistributables)
+  - rename entries, hide them, classify as game/app, set launch parameters
+  - **Artwork selection** (done): detail page → "Change artwork", a grid each for cover, banner and logo with all matches from SteamGridDB and Steam, own image from a file, "Automatic" as reset; stored as an override per entry in `config.json`
+  - **Collections** (done): create, rename, delete, add entries via the Y menu or detail page, as a filter in Games/Apps, pin as a tile to Home. Import of Steam categories is open (Steam's `cloud-storage` format is undocumented and changes)
+- **Mouse**:
+  - when moved, a large, clearly visible pointer appears (skinnable), fading out after about 2 s without movement
+  - hover highlights but does not move controller focus. A click selects and activates, the mouse wheel scrolls.
+  - as soon as the controller is used again, the pointer disappears immediately.
+- **Seamless full screen**:
+  - black start without flicker: show the window only once the UI is rendered, with a boot splash in the skin's style
+  - transitions at game start ("Starting game …" with artwork) until the game window is there
+  - no Windows Explorer dialog where CouchHUD has its own solution
 
-### M2: Konsolen-Basics
+### M2: Console basics
 
-- **Guide-Overlay / Quick-Menü**: Erkennt das laufende Spiel (Prozessbaum, Fenster im Vordergrund). Bietet „Zurück zum Spiel“, „Spiel beenden“ (mit Bestätigung), Lautstärke, Audio-Ausgang, Uhrzeit, Akku der Controller.
-- **Spielzeit-Tracking**: pro Spiel und Woche, als Anzeige auf der Spielkarte.
+- **Guide overlay / quick menu**: detects the running game (process tree, window in the foreground). Offers "Back to game", "Quit game" (with confirmation), volume, audio output, time, controller battery.
+- **Play-time tracking**: per game and week, shown on the game card.
 - **Audio**:
-  - Lautstärke und Mute systemweit, Lautstärke pro App (Core-Audio-Sessions, laufendes Spiel zuerst) *(gibt's schon)*
-  - Ausgabegerät wählen (TV/HDMI, Kopfhörer, Soundbar, Bluetooth)
-  - **Automatischer Wechsel**, wenn Kopfhörer angeschlossen werden, mit Toast „Ausgabe: Kopfhörer“ und Rückwechsel beim Abziehen
-  - Technik: Windows Core Audio (`IMMDeviceEnumerator`, Gerätewechsel-Events), Standardgerät setzen über `IPolicyConfig`
-- **Anzeige**: Auflösung, Bildwiederholrate, HDR an/aus, Skalierung, Bildschirm/TV wählen
-- **Energie**: Standby, Neustart, Herunterfahren *(gibt's schon)*, dazu Bildschirm aus, Ausschalt-Timer („in 30 Min ausschalten“), Energiesparplan
-- **Netzwerk** *(gibt's schon)*: WLAN-Liste, verbinden (Passwort über Bildschirmtastatur), trennen, Status, IP. Technik: `Windows.Devices.WiFi` (kein Admin, Standortzugriff nötig)
-- **Bluetooth**: Geräte suchen, koppeln, trennen, für Controller und Headsets. Technik: `Windows.Devices.Bluetooth` / `DeviceInformationPairing`.
-- **Benachrichtigungen**: einheitliche Toasts und eine Benachrichtigungsliste im Quick-Menü
-- **Controller-Status**: verbundene Pads, Akkustand (XInput Battery), Zuordnung Spieler 1–4
+  - volume and mute system-wide, per-app volume (Core Audio sessions, running game first) *(exists)*
+  - choose output device (TV/HDMI, headphones, soundbar, Bluetooth)
+  - **automatic switching** when headphones are connected, with a toast "Output: headphones" and switching back on unplugging
+  - technology: Windows Core Audio (`IMMDeviceEnumerator`, device-change events), setting the default device via `IPolicyConfig`
+- **Display**: resolution, refresh rate, HDR on/off, scaling, choose screen/TV
+- **Power**: standby, restart, shut down *(exists)*, plus screen off, power-off timer ("switch off in 30 min"), power plan
+- **Network** *(exists)*: Wi-Fi list, connect (password via on-screen keyboard), disconnect, status, IP. Technology: `Windows.Devices.WiFi` (no admin, location access needed)
+- **Bluetooth**: search, pair, disconnect devices, for controllers and headsets. Technology: `Windows.Devices.Bluetooth` / `DeviceInformationPairing`.
+- **Notifications**: uniform toasts and a notification list in the quick menu
+- **Controller status**: connected pads, battery level (XInput battery), player 1–4 assignment
 
-### M2b: Spielstände und Installieren
+### M2b: Save games and installing
 
-**Spielstände**
-- Speicherorte über das [Ludusavi-Manifest](https://github.com/mtkennerly/ludusavi-manifest) (Community-Datenbank aus dem PCGamingWiki, tausende Spiele, Steam-ID und Name als Schlüssel)
-- Auf der Detailseite: wo liegen die Saves, wie groß, wann zuletzt geändert
-- Backup/Restore per Knopfdruck (ZIP mit Datum), automatisches Backup vor dem Deinstallieren anbieten
-- ✅ Umgesetzt: Manifest wöchentlich per ETag nachgeladen (eigener, streamender YAML-Leser, ~0,5 s für 53.000 Spiele), Zuordnung per Steam-ID, sonst normalisierter Name (inkl. Alias); Platzhalter, Wildcards (`*`, `?`, `**`) und `<storeUserId>` für Windows; Backup als ZIP samt `manifest.json`, Wiederherstellen mit automatischem Sicherheits-Backup, Zip-Slip-Schutz und Beschränkung auf die Speicherorte des Spiels, Rotation, Sperre während das Spiel läuft, Backup-Angebot vor dem Deinstallieren
-- Offen: Registry-Spielstände sichern, Cloud-Ordner als Ziel, automatisches Backup nach Spielende, Wiederherstellen in einen anderen Windows-Benutzer
+**Save games**
+- Save locations via the [Ludusavi manifest](https://github.com/mtkennerly/ludusavi-manifest) (community database from PCGamingWiki, thousands of games, Steam ID and name as keys)
+- On the detail page: where the saves are, how big, when last changed
+- Backup/restore at the press of a button (dated ZIP), offer an automatic backup before uninstalling
+- ✅ Implemented: manifest reloaded weekly via ETag (own streaming YAML reader, ~0.5 s for 53,000 games), matching by Steam ID, otherwise normalized name (incl. alias); placeholders, wildcards (`*`, `?`, `**`) and `<storeUserId>` for Windows; backup as a ZIP with `manifest.json`, restore with an automatic safety backup, zip-slip protection and restriction to the game's save locations, rotation, lock while the game runs, backup offer before uninstalling
+- Open: back up registry saves, cloud folder as a target, automatic backup after a game ends, restore into a different Windows user
 
-**Spiele installieren**
-1. **Store-Spiele** (der häufigste Fall): nicht installierte Spiele aus der Steam-/Epic-Bibliothek als eigene Reihe zeigen und die Installation anstoßen (`steam://install/<id>`). Fortschritt anzeigen, sobald der Launcher ihn preisgibt.
-2. **ISO / Setup**: Datei-Browser per Controller → ISO einhängen (Windows-Bordmittel) → `setup.exe` bzw. `autorun.inf` finden und starten. Danach wird das neue Spiel per Scan des Zielordners als Eintrag vorgeschlagen.
-3. **Portable Spiele / Archive** (z.B. GOG-Offline-Installer, Emulator-Pakete): Ordner wählen, EXE wählen, fertig.
+**Installing games**
+1. **Store games** (the most common case): show not-installed games from the Steam/Epic library as their own row and trigger installation (`steam://install/<id>`). Show progress as soon as the launcher reveals it.
+2. **ISO / setup**: file browser by controller → mount the ISO (Windows built-ins) → find and start `setup.exe` or `autorun.inf`. Afterwards the new game is suggested as an entry by scanning the target folder.
+3. **Portable games / archives** (e.g. GOG offline installers, emulator packages): choose folder, choose EXE, done.
 
-**Die zwei echten Hürden dabei:**
-- **UAC**: Der UAC-Dialog läuft auf dem „sicheren Desktop“, dort funktioniert kein Controller. Lösung über den Dienst aus M4: Er startet das vom Nutzer gewählte Setup erhöht in der Benutzersitzung, ohne dass ein Dialog auftaucht.
-- **Setup-Assistenten sind Maus-Dialoge**: Dafür gibt es einen **„Controller als Maus“**-Modus (linker Stick = Zeiger, A = Klick, B = Rechtsklick, X = Bildschirmtastatur), der sich automatisch einschaltet, solange ein Setup läuft. Das braucht es ohnehin auch für den PC-Modus.
+**The two real hurdles:**
+- **UAC**: the UAC dialog runs on the "secure desktop", where no controller works. Solution via the service from M4: it starts the setup chosen by the user elevated in the user session, without a dialog appearing.
+- **Setup wizards are mouse dialogs**: for this there is a **"controller as mouse"** mode (left stick = pointer, A = click, B = right click, X = on-screen keyboard) that switches on automatically while a setup runs. It is needed for PC mode anyway.
 
-### M2c: Design-Offensive („PC Master Race“)
+### M2c: Design offensive ("PC Master Race")
 
-*Ziel: Man schaltet den TV ein und will gar nicht mehr weg. Läuft parallel zu M1/M2, jeder Punkt einzeln auslieferbar.*
+*Goal: you switch on the TV and never want to leave. Runs in parallel to M1/M2, every item can ship on its own.*
 
-- **Clear Logos statt Text** auf Home und Detailseite *(Grundlage steht)*, dazu Banner, Icons und Hero-Art aus mehreren Quellen (siehe unten)
-- **Trailer-Vorschau**: Bleibt der Fokus kurz auf einem Spiel, läuft der Steam-Trailer stumm im Hintergrund an, wie auf der PS5
-- **Farben aus dem Artwork**: Akzentfarbe, Glow und Hintergrund-Tönung werden live aus dem Cover des fokussierten Spiels gezogen
-- **Tiefe und Bewegung**: Parallax zwischen Hintergrund, Logo und Kacheln, leichter 3D-Tilt mit Lichtreflex auf der fokussierten Kachel, weiche Seitenübergänge (View Transitions), Boot-Animation pro Skin
-- **Haptik**: dezentes Controller-Rumble bei Fokus, Bestätigen und Anschlag (XInput-Vibration, abschaltbar)
-- **Sounddesign pro Skin**: eigene Klangsets statt der heutigen Synth-Töne
-- **Live-Systemleiste**: CPU-/GPU-Temperatur, Auslastung, FPS im laufenden Spiel (Sensoren über CaseHUD/LHM), schick und nur auf Wunsch
-- **„Weiterspielen“-Karte** ganz groß mit Spielzeit und Fortschritt
-- **Performance-Budget**: 60 fps auf 4K, keine Ruckler beim Scrollen durch große Bibliotheken (Virtualisierung ab ~300 Kacheln)
+- **Clear logos instead of text** on Home and the detail page *(groundwork in place)*, plus banners, icons and hero art from several sources (see below)
+- **Trailer preview**: when focus rests on a game for a moment, the Steam trailer starts silently in the background, like on the PS5
+- **Colors from the artwork**: accent color, glow and background tint are pulled live from the focused game's cover
+- **Depth and motion**: parallax between background, logo and tiles, slight 3D tilt with a light reflection on the focused tile, soft page transitions (View Transitions), boot animation per skin
+- **Haptics**: subtle controller rumble on focus, confirm and bump (XInput vibration, can be turned off)
+- **Sound design per skin**: own sound sets instead of today's synth tones
+- **Live system bar**: CPU/GPU temperature, load, FPS in the running game (sensors via CaseHUD/LHM), stylish and on request only
+- **"Continue playing" card** very large with play time and progress
+- **Performance budget**: 60 fps at 4K, no stutter when scrolling through large libraries (virtualization from ~300 tiles)
 
-**Artwork-Quellen (Clear Logos, Banner & Co.)**
+**Artwork sources (clear logos, banners & co.)**
 
-| Quelle | Was es gibt | Zugang | Status |
+| Source | What it offers | Access | Status |
 |---|---|---|---|
-| Steam-CDN | Cover, Hero, Logo, Header für Steam-Spiele | offen | ✅ genutzt |
-| [SteamGridDB](https://www.steamgriddb.com) | Grids (Cover, Banner), Heroes, **Clear Logos**, Icons, auch für Nicht-Steam-Spiele und Apps | kostenloser API-Key, Nutzung per API ausdrücklich vorgesehen | ✅ Cover/Hero/Logo genutzt, Icons offen |
-| [TheGamesDB](https://thegamesdb.net) | Clear Logos, Banner, Fanart, Boxart, Screenshots (stark bei Retro/Emulation) | kostenloser API-Key, Nutzungsbedingungen beachten | geplant (Plugin) |
-| [IGDB](https://www.igdb.com) | Cover, Artworks, Screenshots, Metadaten | Twitch-Developer-App, Bedingungen prüfen | später (Plugin) |
+| Steam CDN | Cover, hero, logo, header for Steam games | open | ✅ used |
+| [SteamGridDB](https://www.steamgriddb.com) | Grids (cover, banner), heroes, **clear logos**, icons, also for non-Steam games and apps | free API key, API use explicitly intended | ✅ cover/hero/logo used, icons open |
+| [TheGamesDB](https://thegamesdb.net) | Clear logos, banners, fanart, box art, screenshots (strong for retro/emulation) | free API key, observe the terms of use | planned (plugin) |
+| [IGDB](https://www.igdb.com) | Cover, artworks, screenshots, metadata | Twitch developer app, check the terms | later (plugin) |
 
-Alle Quellen außer Steam kommen als Plugins, damit Lizenz- und Key-Fragen beim Nutzer bleiben.
+All sources except Steam come as plugins, so that license and key questions stay with the user.
 
-### M3: Plugin-SDK v1, Plugin-Manager, News
+### M3: Plugin SDK v1, plugin manager, news
 
-- **SDK v1** mit den Erweiterungspunkten aus der Tabelle oben, versioniert, dazu ein **Beispiel-Plugin** im Repo
-- **Plugin-Manager in der GUI**: installierte Plugins, an/aus, Einstellungen, Updates. Installation aus einem Katalog (ein JSON-Index auf GitHub, mit SHA-256-Pflichtprüfung und Update-Hinweis) oder als ZIP.
-- **Stabilität**: Plugin-Aufrufe mit Timeout und Fehlerisolation. Ein Plugin, das wiederholt abstürzt, wird deaktiviert und gemeldet.
-- **RSS/News als erstes Plugin** (testet das SDK an einem echten Fall):
-  - News-Karussell als Widget auf Home, eigener Reader-Screen mit großer Schrift und Bildern, per Controller blätterbar
-  - Feeds in der GUI verwalten, vorkonfiguriert: [WinFuture](https://winfuture.de) (`https://static.winfuture.de/feeds/WinFuture-News-rss2.0.xml`), [Caschys Blog](https://stadt-bremerhaven.de) (`https://stadt-bremerhaven.de/feed/`)
-  - Artikel öffnen im eingebetteten Leser (WebView mit Controller-Scrollen), „Gelesen“-Status
-  - Technik: `System.ServiceModel.Syndication` (RSS + Atom), Cache, Abruf im Hintergrund
+- **SDK v1** with the extension points from the table above, versioned, plus an **example plugin** in the repo
+- **Plugin manager in the GUI**: installed plugins, on/off, settings, updates. Installation from a catalog (a JSON index on GitHub, with mandatory SHA-256 check and update notice) or as a ZIP.
+- **Stability**: plugin calls with timeout and fault isolation. A plugin that crashes repeatedly is disabled and reported.
+- **RSS/news as the first plugin** (tests the SDK on a real case):
+  - news carousel as a widget on Home, own reader screen with large type and images, browsable by controller
+  - manage feeds in the GUI, preconfigured: [WinFuture](https://winfuture.de) (`https://static.winfuture.de/feeds/WinFuture-News-rss2.0.xml`), [Caschys Blog](https://stadt-bremerhaven.de) (`https://stadt-bremerhaven.de/feed/`)
+  - open articles in the embedded reader (WebView with controller scrolling), "read" status
+  - technology: `System.ServiceModel.Syndication` (RSS + Atom), cache, background fetching
 
-### M3b: KI-Assistent und MCP
+### M3b: AI assistant and MCP
 
-*Baut auf dem Plugin-SDK auf: KI und Plugins nutzen dieselben Werkzeuge wie die Oberfläche.*
+*Builds on the plugin SDK: AI and plugins use the same tools as the interface.*
 
-- **Anbieter**: Claude (Anthropic) und OpenAI, API-Key in den Einstellungen hinterlegen. Gespeichert wird er mit Windows DPAPI verschlüsselt, nie im Klartext in der `config.json`.
-- **Assistent im Fullscreen**: eigener Screen und Quick-Action im Guide-Menü. Eingabe per Bildschirmtastatur, vorgeschlagene Prompts zum Antippen, Texteingabe vom Handy (M6), optional Spracheingabe.
-- **Was die KI darf**, über eine feste Werkzeugliste (Tool-Use), dieselben typisierten Operationen wie die UI:
-  - Bibliothek durchsuchen, Spiele/Apps anlegen und bearbeiten („Leg mir RetroArch mit diesem Pfad an“), Artwork suchen und setzen
-  - Einstellungen und Skins ändern, Szenen anlegen, Plugins konfigurieren
-  - Spieleverzeichnisse scannen, Updates prüfen, Infos zu Spielen erklären
-- **Bestätigung vor jeder Änderung**: Die KI schlägt vor, CouchHUD zeigt eine Vorschau, du drückst A. Keine Shell-Befehle, kein Dateisystemzugriff außerhalb der Werkzeuge.
-- **MCP-Server** für den Zugriff von außen (z.B. Claude Desktop oder ein anderer MCP-Client auf dem Laptop)
-  - Standardmäßig aus; beim Einschalten Token erzeugen und als QR-Code anzeigen
-  - Streamable HTTP, nur localhost oder im LAN, je nach Einstellung
-  - Dieselben Werkzeuge wie der Assistent, Ressourcen für Bibliothek und Einstellungen, Schreibzugriff einzeln freischaltbar
-- **Plugins können Werkzeuge beisteuern** (z.B. SignalRGB-Plugin: „Effekt setzen“), automatisch für Assistent und MCP verfügbar
+- **Providers**: Claude (Anthropic) and OpenAI, store the API key in settings. It is stored encrypted with Windows DPAPI, never in plain text in `config.json`.
+- **Assistant in full screen**: own screen and quick action in the Guide menu. Input via on-screen keyboard, suggested prompts to tap, text input from the phone (M6), optionally voice input.
+- **What the AI may do**, through a fixed tool list (tool use), the same typed operations as the UI:
+  - search the library, create and edit games/apps ("Add RetroArch with this path"), find and set artwork
+  - change settings and skins, create scenes, configure plugins
+  - scan game directories, check updates, explain info about games
+- **Confirmation before every change**: the AI proposes, CouchHUD shows a preview, you press A. No shell commands, no file-system access outside the tools.
+- **MCP server** for access from outside (e.g. Claude Desktop or another MCP client on the laptop)
+  - off by default; when switching on, generate a token and show it as a QR code
+  - Streamable HTTP, localhost only or LAN, depending on the setting
+  - the same tools as the assistant, resources for library and settings, write access can be enabled individually
+- **Plugins can contribute tools** (e.g. SignalRGB plugin: "set effect"), automatically available to the assistant and MCP
 
-### M4: CouchHud.Service und Updates
+### M4: CouchHud.Service and updates
 
-*Hier wird UAC gelöst: einmal beim Setup, danach nie wieder.*
+*This is where UAC is solved: once at setup, never again.*
 
-- **CouchHud.Service** als Windows-Dienst (LocalSystem), installiert vom Setup
-  - Named Pipe mit ACL nur für den interaktiven Benutzer
-  - **Keine** „führe diesen Befehl aus“-Schnittstelle, sondern eine feste Liste typisierter Operationen mit geprüften Parametern (Update-IDs, Paket-IDs, Profilnamen). Sonst wäre der Dienst ein offenes Scheunentor für Rechteausweitung.
-  - Plugins können privilegierte Operationen anmelden. Die tauchen in den Einstellungen auf und werden einmal vom Nutzer freigegeben.
-- **Windows Update**: suchen, Liste mit Größe und Typ (Sicherheit, Treiber, optional), herunterladen und installieren mit Fortschritt, Hinweis bei nötigem Neustart („Jetzt“ oder „Beim Ausschalten“). Technik: Windows Update Agent API (`IUpdateSession`, `IUpdateSearcher`, `IUpdateInstaller`) im Dienst.
-- **App-Updates** als zwei Plugins, beide in der Updates-Seite zusammengeführt:
-  - **winget**: verfügbare Upgrades anzeigen, einzeln oder alle aktualisieren. Pakete mit User-Scope laufen im Benutzerkontext, Machine-Scope über den Dienst ohne UAC-Popup. Technik: winget-COM-API (`Microsoft.Management.Deployment`), Fallback auf die CLI. *Spike: winget im SYSTEM-Kontext hat Einschränkungen, das prüfen wir früh.*
-  - **UniGetUI**: über dessen lokale IPC-API bzw. die `unigetui`-CLI, für alle, die UniGetUI ohnehin nutzen (deckt auch Scoop, Chocolatey, pip, npm … ab)
-- **CouchHUD-Self-Update** (umgesetzt): Release-Feed auf GitHub, Prüfsummen-Datei mit Signatur (ECDSA wie beim Katalog), stille Installation per Setup mit einer UAC-Abfrage. Offen: Update im Hintergrund vorladen und beim nächsten Start einspielen
-- **Treiber-Hinweise** (optional): NVIDIA/AMD-Treiberversion anzeigen, auf neue Version hinweisen
+- **CouchHud.Service** as a Windows service (LocalSystem), installed by the setup
+  - named pipe with an ACL only for the interactive user
+  - **No** "run this command" interface, but a fixed list of typed operations with checked parameters (update IDs, package IDs, profile names). Otherwise the service would be an open barn door for privilege escalation.
+  - plugins can register privileged operations. They show up in settings and are approved once by the user.
+- **Windows Update**: search, list with size and type (security, driver, optional), download and install with progress, notice when a restart is needed ("Now" or "On shutdown"). Technology: Windows Update Agent API (`IUpdateSession`, `IUpdateSearcher`, `IUpdateInstaller`) in the service.
+- **App updates** as two plugins, merged on the Updates page:
+  - **winget**: show available upgrades, update individually or all. Packages with user scope run in the user context, machine scope through the service without a UAC pop-up. Technology: winget COM API (`Microsoft.Management.Deployment`), fallback to the CLI. *Spike: winget in the SYSTEM context has limitations, we check that early.*
+  - **UniGetUI**: through its local IPC API or the `unigetui` CLI, for everyone who uses UniGetUI anyway (also covers Scoop, Chocolatey, pip, npm …)
+- **CouchHUD self-update** (implemented): release feed on GitHub, checksum file with signature (ECDSA like the catalog), silent installation via the setup with one UAC prompt. Open: pre-download the update in the background and apply it at the next start
+- **Driver hints** (optional): show NVIDIA/AMD driver version, point to a new version
 
-### M5: Hardware-Plugins
+### M5: Hardware plugins
 
-*FanControl und SignalRGB als eigenständige Plugins, keine Zeile davon im Kern. CaseHUD ist als eingebaute Integration umgesetzt (kein CaseHUD-Code im Kern, nur der API-Client).*
+*FanControl and SignalRGB as standalone plugins, not a line of them in the core. CaseHUD is implemented as a built-in integration (no CaseHUD code in the core, only the API client).*
 
-**CaseHUD** (LCDs, dein Projekt)
-- ✅ Umgesetzt in 0.4.0 als eingebaute Integration (nicht als Plugin), Details in [CASEHUD.md](CASEHUD.md): Anbindung über die lokale HTTP-API, Discovery über `%APPDATA%\casehudpi.json` (Port + Token), Displays mit Live-Vorschau, Design, Helligkeit, Drehung, Modus, Szenen, Guide-Menü-Einträge, Spielmeldung an CaseHUD
-- Offen: Sensor-Widgets und Performance-Overlay aus CaseHUDs LHM-Dienst
-- In CouchHUD: Displays mit Live-Vorschau, Design pro Display wählen, Helligkeit, „Lüfter-Set“
-- **Sensoren aus CaseHUDs LHM-Dienst** nutzen wir gleich mit: Temperatur-/Last-Widgets und ein Performance-Overlay im Quick-Menü, ohne zweiten Hardware-Treiber
-- Pro Spiel ein Display-Design (deckt sich mit CaseHUDs eigener 1.2-Roadmap „Profile beim Spielstart“)
+**CaseHUD** (LCDs, your project)
+- ✅ Implemented in 0.4.0 as a built-in integration (not as a plugin), details in [CASEHUD.md](CASEHUD.md): connection through the local HTTP API, discovery via `%APPDATA%\casehud\api.json` (port + token), displays with live preview, design, brightness, rotation, mode, scenes, Guide menu entries, game reporting to CaseHUD
+- Open: sensor widgets and performance overlay from CaseHUD's LHM service
+- In CouchHUD: displays with live preview, choose a design per display, brightness, "fan set"
+- **Sensors from CaseHUD's LHM service** we use right away: temperature/load widgets and a performance overlay in the quick menu, without a second hardware driver
+- One display design per game (matches CaseHUD's own 1.2 roadmap "profiles on game start")
 
-**SignalRGB** (Beleuchtung)
-- Effekte auflisten und anwenden über die lokale REST-API (`http://127.0.0.1:16038/api/v1`), Fallback über das URL-Schema `signalrgb://effect/apply/<Name>` bzw. `SignalRgbLauncher.exe --url=…?-silentlaunch-` (kommt nicht in den Vordergrund, wichtig für den nahtlosen Fullscreen)
-- Effekt-Galerie in der GUI, Favoriten, Effekt pro Spiel, Quick-Actions („Kino-Modus“, „Licht aus“)
-- *Spike: Umfang der REST-API prüfen (Helligkeit? Effektparameter?). Die URL-Schnittstelle ist laut Doku noch „early implementation“.*
+**SignalRGB** (lighting)
+- List and apply effects through the local REST API (`http://127.0.0.1:16038/api/v1`), fallback via the URL scheme `signalrgb://effect/apply/<Name>` or `SignalRgbLauncher.exe --url=…?-silentlaunch-` (does not come to the foreground, important for seamless full screen)
+- Effect gallery in the GUI, favorites, effect per game, quick actions ("Cinema mode", "Lights off")
+- *Spike: check the scope of the REST API (brightness? effect parameters?). The URL interface is still an "early implementation" according to the docs.*
 
-**FanControl** (Lüfter)
-- FanControl ist closed source und läuft als Admin. Die realistischen Wege:
-  1. **Konfigurationen wechseln**: Je Szenario eine FanControl-Config („Leise“, „Gaming“, „Film“), Umschalten per Kommandozeile (`-c`/`--config` mit vollem Pfad, laut Release Notes ab V262). Weil FanControl als Admin läuft, geht das über den Dienst.
-  2. **Brücken-Plugin auf FanControl-Seite**: FanControl hat ein eigenes Plugin-System (C#). Ein kleines „CouchHUD Bridge“-Plugin *innerhalb* von FanControl könnte Werte bereitstellen und Befehle per Pipe entgegennehmen. *Spike: prüfen, was die FanControl-Plugin-API von außen erlaubt.*
-- In CouchHUD: aktuelles Profil, Profil wechseln, Lüfter-RPM und Temperaturen (über CaseHUD/LHM), Profil pro Spiel
+**FanControl** (fans)
+- FanControl is closed source and runs as admin. The realistic ways:
+  1. **Switch configurations**: one FanControl config per scenario ("Quiet", "Gaming", "Movie"), switching via the command line (`-c`/`--config` with full path, per the release notes from V262). Because FanControl runs as admin, this goes through the service.
+  2. **Bridge plugin on the FanControl side**: FanControl has its own plugin system (C#). A small "CouchHUD Bridge" plugin *inside* FanControl could provide values and accept commands via a pipe. *Spike: check what the FanControl plugin API allows from outside.*
+- In CouchHUD: current profile, switch profile, fan RPM and temperatures (via CaseHUD/LHM), profile per game
 
-**Szenen**: Erst wenn alle drei da sind, lohnt das richtig. Eine Szene bündelt Lüfterprofil, RGB-Effekt, LCD-Design und Audio-Ausgang und wird per Quick-Action oder automatisch bei `GameStarted` aktiviert. Beispiele: „Gaming“, „Film“ (Licht gedimmt, Lüfter leise), „Nacht“.
+**Scenes**: only when all three are there does this really pay off. A scene bundles fan profile, RGB effect, LCD design and audio output and is activated by quick action or automatically on `GameStarted`. Examples: "Gaming", "Movie" (lights dimmed, fans quiet), "Night".
 
-### M6: Medien, Smart Home, mehr Quellen
+### M6: Media, smart home, more sources
 
-- **Media Center**: Kodi (JSON-RPC: Bibliothek, Weiterschauen, Start), Jellyfin/Plex (Bibliothek, Weiterschauen als Home-Reihe)
-- **Streaming-Apps** als schicke Einträge: Netflix, Disney+, YouTube TV (Browser im Kiosk-Modus mit Controller-Steuerung)
-- **Weitere Spiele-Quellen**: GOG Galaxy, Xbox/Game Pass, EA App, Ubisoft Connect, Battle.net, Emulatoren (RetroArch-Playlists)
-- **Home Assistant**: Szenen und Lichter aus dem Quick-Menü, Events in beide Richtungen (z.B. Spielstart dimmt das Wohnzimmer)
-- **Handy als Fernbedienung**: Die UI ist ohnehin Web. Eine optionale, per PIN gekoppelte LAN-Seite für Texteingabe vom Handy, Bibliothek durchsuchen, Spiel starten.
-- **Game-Streaming-Status**: Sunshine/Moonlight, wer ist verbunden
-- Wetter, Kalender, „Jetzt läuft“-Karte
+- **Media center**: Kodi (JSON-RPC: library, continue watching, start), Jellyfin/Plex (library, continue watching as a Home row)
+- **Streaming apps** as stylish entries: Netflix, Disney+, YouTube TV (browser in kiosk mode with controller control)
+- **More game sources**: GOG Galaxy, Xbox/Game Pass, EA app, Ubisoft Connect, Battle.net, emulators (RetroArch playlists)
+- **Home Assistant**: scenes and lights from the quick menu, events in both directions (e.g. game start dims the living room)
+- **Phone as remote**: the UI is web anyway. An optional LAN page, paired via PIN, for text input from the phone, browsing the library, starting a game.
+- **Game-streaming status**: Sunshine/Moonlight, who is connected
+- Weather, calendar, "Now playing" card
 
 ### M7: Release
 
-- **Setup** *(erledigt: Inno Setup, WebView2-Prüfung, Deinstallation stellt Windows-Eingriffe zurück; der Dienst kommt mit CouchHud.Service)*: CouchHUD, Dienst, .NET-Runtime-Check, WebView2-Check, optional „als Shell einrichten“
-- **Ersteinrichtung per Controller**: Sprache, Skin, Bibliotheken scannen, Audio-Ausgang, Plugins wählen, **Auto-Login** einrichten *(erledigt: Passwort einmal eingeben, mit LogonUser geprüft, von Windows als LSA-Secret abgelegt; CouchHUD speichert es nicht)*, Shell aktivieren
-- **Notfall-Modus** *(erledigt)*: Strg+Umschalt oder LB+RB+View beim Start (etwa 1,5 s gehalten), oder drei unsaubere Beendigungen in Folge: Windows-Sperre, danach normaler Desktop ohne CouchHUD-Shell.
-- Lokalisierung DE/EN *(erledigt)*, Doku, Beispiel-Plugins und Skin-Vorlage
-- Signierte Builds (SmartScreen, offen: Release-Prüfsummen sind signiert, das Setup noch nicht per Authenticode), Issue-Vorlagen, Lizenz, **Open Source**
+- **Setup** *(done: Inno Setup, WebView2 check, uninstall resets Windows changes; the service comes with CouchHud.Service)*: CouchHUD, service, .NET runtime check, WebView2 check, optional "set up as shell"
+- **First-time setup by controller**: language, skin, scan libraries, audio output, choose plugins, set up **auto sign-in** *(done: enter the password once, checked with LogonUser, stored by Windows as an LSA secret; CouchHUD does not store it)*, activate shell
+- **Emergency mode** *(done)*: Ctrl+Shift or LB+RB+View at start (held about 1.5 s), or three unclean exits in a row: Windows lock, then the normal desktop without the CouchHUD shell.
+- Localization DE/EN *(done)*, docs, example plugins and skin template
+- Signed builds (SmartScreen, open: release checksums are signed, the setup is not yet Authenticode-signed), issue templates, license, **open source**
 
 ---
 
-## Offene Spikes (früh klären)
+## Open spikes (clarify early)
 
-| Thema | Frage | Wann |
+| Topic | Question | When |
 |---|---|---|
-| winget im Dienst | Läuft die COM-API zuverlässig als SYSTEM? Sonst geplanter Task im Benutzerkontext mit höchsten Rechten. | vor M4 |
-| FanControl | Config-Wechsel per CLI im laufenden Betrieb? Was kann ein FanControl-Plugin? | vor M5 |
-| SignalRGB | Umfang und Stabilität der REST-API auf Port 16038 | vor M5 |
-| Audio | `IPolicyConfig` ist undokumentiert, Verhalten auf aktuellem Windows 11 prüfen | M2 |
-| Fokus | Zuverlässiges Zurückholen in den Vordergrund bei Exclusive-Fullscreen-Spielen | M2 |
-| Autostart doppelt | Startet der Explorer im PC-Modus die Run-Einträge ein zweites Mal? Falls ja, Explorers „StartupHasBeenRun“-Markierung setzen | M2 |
-| Setup erhöht starten | Dienst startet Setup mit dem erhöhten Token des Nutzers in dessen Sitzung, ohne UAC-Dialog | M2b/M4 |
+| winget in the service | Does the COM API run reliably as SYSTEM? Otherwise a scheduled task in the user context with highest privileges. | before M4 |
+| FanControl | Config switching via CLI during operation? What can a FanControl plugin do? | before M5 |
+| SignalRGB | Scope and stability of the REST API on port 16038 | before M5 |
+| Audio | `IPolicyConfig` is undocumented, check behavior on current Windows 11 | M2 |
+| Focus | Reliably bringing CouchHUD back to the foreground over exclusive-fullscreen games | M2 |
+| Double autostart | Does Explorer in PC mode run the Run entries a second time? If so, set Explorer's "StartupHasBeenRun" marker | M2 |
+| Start setup elevated | The service starts the setup with the user's elevated token in their session, without a UAC dialog | M2b/M4 |
