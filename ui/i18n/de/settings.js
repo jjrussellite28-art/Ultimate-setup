@@ -428,6 +428,8 @@ export default {
   'settings.info.quitDesc': 'Schließt CouchHUD ganz, danach ist nur noch Windows da',
   'settings.info.guide': 'Im Guide-Menü',
   'settings.info.guideDesc': 'Bluetooth-Geräte, Benachrichtigungen ansehen, Aufnahmen und laufende Programme öffnest du mit der Guide-Taste',
+  'settings.info.app': 'App',
+  'settings.info.madeBy': 'Von',
   'settings.info.version': 'Version',
   'settings.info.license': 'Lizenz',
   'settings.info.mode': 'Modus',

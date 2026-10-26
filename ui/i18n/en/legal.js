@@ -36,7 +36,7 @@ export default {
   'legal.notSaved': 'Not saved',
   'legal.accepted': 'Enjoy the couch!',
   'legal.declinedShell': 'Back to the Windows desktop',
-  'legal.declinedQuit': 'CouchHUD is closing',
+  'legal.declinedQuit': 'MegaHub is closing',
   'legal.hint.read': 'Read',
   'legal.hint.accept': 'Got it, continue',
   'legal.hint.decline': 'Decline and exit',

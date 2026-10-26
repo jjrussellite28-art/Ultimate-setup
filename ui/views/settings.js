@@ -1125,8 +1125,10 @@ function categories() {
         action(t('settings.info.privacy'), t('settings.info.privacyDesc'), () => openPage(privacyPage(), t('settings.cat.info'))),
         ...(state.info.isShell ? [] : [action(t('settings.info.quit'), t('settings.info.quitDesc'), guarded(t('settings.info.quit'), () => attempt(() => api.quit())), '✕', t('settings.hint.quit'))]),
         info(t('settings.info.guide'), t('settings.info.guideDesc')),
+        info(t('settings.info.app'), 'MegaHub'),
+        info(t('settings.info.madeBy'), 'jjrussellite28'),
         info(t('settings.info.version'), state.info.version || '–'),
-        info(t('settings.info.license'), 'GPL-3.0 · © 2026 kewe87'),
+        info(t('settings.info.license'), 'GPL-3.0 · based on CouchHUD © 2026 kewe87'),
         ...expert(
           info(t('settings.info.mode'), state.info.isShell ? t('settings.info.modeShell') : t('settings.info.modeApp')),
           info(t('settings.info.config'), s.configPath || '–'),

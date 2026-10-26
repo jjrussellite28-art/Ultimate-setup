@@ -5,7 +5,7 @@ namespace CouchHud.Shell.Services;
 
 /// <summary>
 /// The controller as mouse and keyboard for windows that aren't made for the couch
-/// (a launcher's login, a setup): left stick moves, right stick scrolls, buttons click.
+/// (a launcher's login, a setup): right stick moves, triggers scroll, buttons click.
 /// </summary>
 public sealed class ControllerMouse : IDisposable
 {
@@ -65,16 +65,13 @@ public sealed class ControllerMouse : IDisposable
     {
         if (Paused) return;
         var (x, y, scroll) = _sticks();
-        var (dx, dy) = (Curve(x), Curve(-y));
-        // Fast across the screen with the stick pushed, precise near the centre.
-        _carryX += dx * 28;
-        _carryY += dy * 28;
+        // The left stick does not move the cursor (MegaHub: right stick only).
         if (_extras is not null)
         {
             // Right stick: the same pointer, slower for small targets. Triggers: scroll (LT up, RT down).
             var (rx, ry, lt, rt) = _extras();
-            _carryX += Curve(rx) * 9;
-            _carryY += Curve(-ry) * 9;
+            _carryX += Curve(rx) * 22;
+            _carryY += Curve(-ry) * 22;
             _carryScroll += (Curve(lt) - Curve(rt)) * 40;
         }
         else

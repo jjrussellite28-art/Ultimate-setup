@@ -214,20 +214,20 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
         {
             var reconcile = shell.Reconcile(config.Current.IntegrationMode);
             if (reconcile.ForceFull) config.Update(c => c.IntegrationMode = "full");
-            foreach (var note in reconcile.Notes) PostNotification("CouchHUD", Strings.Ref("hud.shellEntry"), note, security: true);
+            foreach (var note in reconcile.Notes) PostNotification("MegaHub", Strings.Ref("hud.shellEntry"), note, security: true);
         });
         if (config.Current.ShellRemovedReason.Length > 0)
         {
             optional.Run("shell removed notice", () =>
             {
-                PostNotification("CouchHUD", Strings.Ref("hud.shellRemoved"), Strings.Ref("hud.shellRemoved.body", config.Current.ShellRemovedReason), security: true);
+                PostNotification("MegaHub", Strings.Ref("hud.shellRemoved"), Strings.Ref("hud.shellRemoved.body", config.Current.ShellRemovedReason), security: true);
                 config.Update(c => c.ShellRemovedReason = "");
             });
         }
         if (config.Fault is { } fault)
         {
             // config.json is there but unusable: the couch runs locked and nothing is saved until the file is fixed (or removed).
-            optional.Run("config fault notice", () => PostNotification("CouchHUD", Strings.Ref("hud.configFault"), Strings.Ref(fault == ConfigFault.Invalid ? "hud.configFault.invalid" : "hud.configFault.unreadable"), security: true));
+            optional.Run("config fault notice", () => PostNotification("MegaHub", Strings.Ref("hud.configFault"), Strings.Ref(fault == ConfigFault.Invalid ? "hud.configFault.invalid" : "hud.configFault.unreadable"), security: true));
         }
         optional.Run("service watch", StartServiceWatch);
         Console.WriteLine($"[hud] started: asShell {_asShell}, integration {config.Current.IntegrationMode}, lock {config.Current.CouchLock}");
@@ -475,7 +475,7 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
                 Console.WriteLine($"[session] {item.Name}: {minutes:0.0} min");
                 if (minutes >= 1)
                 {
-                    PostNotification("CouchHUD", item.Name, Strings.Ref("hud.played", MinutesRef(minutes), MinutesRef(item.PlaytimeMinutes)));
+                    PostNotification("MegaHub", item.Name, Strings.Ref("hud.played", MinutesRef(minutes), MinutesRef(item.PlaytimeMinutes)));
                 }
             }
             catch (KeyNotFoundException)
@@ -592,7 +592,7 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
     private void OnClientNeedsAttention(string family, string process)
     {
         var name = ClientName(family) is { Length: > 0 } known ? known : process;
-        PostNotification("CouchHUD", Strings.Ref("hud.needsAttention", name),
+        PostNotification("MegaHub", Strings.Ref("hud.needsAttention", name),
             Strings.Ref("hud.needsAttention.body"));
     }
 
@@ -641,7 +641,7 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
             if (wasOpening && errors.Count == 0 && !config.Current.GameBarHintShown)
             {
                 config.Update(c => c.GameBarHintShown = true);
-                PostNotification("CouchHUD", Strings.Ref("hud.xboxButton"), Strings.Ref("hud.xboxButton.body"));
+                PostNotification("MegaHub", Strings.Ref("hud.xboxButton"), Strings.Ref("hud.xboxButton.body"));
             }
         }
         catch (Exception ex)
@@ -2364,12 +2364,12 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
                         break;
                     case CloseDecision.Downloading:
                         Console.WriteLine($"[launchers] {l.Name} is downloading, left open");
-                        if (pcMode) PostNotification("CouchHUD", Strings.Ref("hud.clientBusy", l.Name), Strings.Ref("hud.clientBusy.body"));
+                        if (pcMode) PostNotification("MegaHub", Strings.Ref("hud.clientBusy", l.Name), Strings.Ref("hud.clientBusy.body"));
                         break;
                     case CloseDecision.GameRunning:
                     case CloseDecision.Unsafe:
                         Console.WriteLine($"[launchers] {l.Name} left open");
-                        if (pcMode) PostNotification("CouchHUD", Strings.Ref("hud.clientKept", l.Name), Strings.Ref("hud.clientKept.body"));
+                        if (pcMode) PostNotification("MegaHub", Strings.Ref("hud.clientKept", l.Name), Strings.Ref("hud.clientKept.body"));
                         break;
                     default:
                         if (!running) _clients.NoteEnded(id);
@@ -2449,12 +2449,12 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
                 if (shown)
                 {
                     _window?.Hide();
-                    PostNotification("CouchHUD", Strings.Ref("hud.launcherOpen", l.Name), Strings.Ref("hud.launcherOpen.body"));
+                    PostNotification("MegaHub", Strings.Ref("hud.launcherOpen", l.Name), Strings.Ref("hud.launcherOpen.body"));
                 }
                 else
                 {
                     EndMouseMode();
-                    PostNotification("CouchHUD", Strings.Ref("hud.launcherNoWindow", l.Name), Strings.Ref("hud.launcherNoWindow.body"));
+                    PostNotification("MegaHub", Strings.Ref("hud.launcherNoWindow", l.Name), Strings.Ref("hud.launcherNoWindow.body"));
                 }
             });
         });
@@ -3023,7 +3023,7 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
             var names = Firewall.BlockingRuleNames();
             if (names.Count == 0) return;
             Console.Error.WriteLine($"[remote] Windows blocks CouchHud.exe with its own firewall rules: {string.Join(", ", names)}");
-            Ui(() => PostNotification("CouchHUD", Strings.Ref("remote.firewallBlocked"), Strings.Ref("remote.firewallBlocked.body")));
+            Ui(() => PostNotification("MegaHub", Strings.Ref("remote.firewallBlocked"), Strings.Ref("remote.firewallBlocked.body")));
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -3186,12 +3186,12 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
             {
                 case LockWatchAction.Warn:
                     Console.Error.WriteLine($"[service] the couch lock needs the service ({status.Name}, policies failing: {PolicyHelper.FailingSince is not null}): the Windows policies are not active");
-                    Ui(() => PostNotification("CouchHUD", Strings.Ref("service.warn.title"), Strings.Ref("service.warn.body", Strings.Get(ServiceTexts.StateKey(status.State))), security: true));
+                    Ui(() => PostNotification("MegaHub", Strings.Ref("service.warn.title"), Strings.Ref("service.warn.body", Strings.Get(ServiceTexts.StateKey(status.State))), security: true));
                     break;
                 case LockWatchAction.LockWindows:
                     Console.Error.WriteLine($"[service] the couch lock has no working service ({status.Name}, policies failing: {PolicyHelper.FailingSince is not null}): locking Windows (fail-closed)");
                     WindowsLock.LockIfConfigured(dataDir);
-                    Ui(() => PostNotification("CouchHUD", Strings.Ref("service.alarm.title"), Strings.Ref(status.Health == ServiceHealth.Alarm ? "service.alarm.squatted" : "service.alarm.gone"), security: true));
+                    Ui(() => PostNotification("MegaHub", Strings.Ref("service.alarm.title"), Strings.Ref(status.Health == ServiceHealth.Alarm ? "service.alarm.squatted" : "service.alarm.gone"), security: true));
                     break;
             }
         }
@@ -3363,7 +3363,7 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
             PolicyHelper.WaitIdle(TimeSpan.FromSeconds(30));
             if (StuckPolicyGroups().Count == 0) return;
             Console.Error.WriteLine("[lock] policies with the lock's values are stuck: no lock, no mark, no state");
-            Ui(() => PostNotification("CouchHUD", Strings.Ref("stuck.title"), Strings.Ref("stuck.body"), security: true));
+            Ui(() => PostNotification("MegaHub", Strings.Ref("stuck.title"), Strings.Ref("stuck.body"), security: true));
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -4617,7 +4617,7 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
         AutoLogon.OpenDialog();
         _mouse?.Start();
         _window?.Hide();
-        PostNotification("CouchHUD", Strings.Ref("hud.autoLogonTitle"),
+        PostNotification("MegaHub", Strings.Ref("hud.autoLogonTitle"),
             Strings.Ref("hud.autoLogonHelp"));
     }
 
