@@ -1801,6 +1801,13 @@ body.quick-open #top {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+#battery {
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+#battery.low { color: #ff6b6b; }
 
 .smarthome {
   height: 100%;

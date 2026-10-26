@@ -2679,6 +2679,85 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Batteries and drives (header, guide menu, health check)
+
+    public sealed record PcBattery(int Percent, bool Charging);
+    public sealed record DriveSpace(string Name, long FreeBytes, long TotalBytes);
+    public sealed record DiskHealth(string Name, string Health);
+
+    /// <summary>The laptop battery (null on a desktop PC) and the battery levels Bluetooth devices report.</summary>
+    public async Task<object> GetBatteriesAsync()
+    {
+        PcBattery? pc = null;
+        try
+        {
+            var ps = System.Windows.Forms.SystemInformation.PowerStatus;
+            var none = ps.BatteryChargeStatus.HasFlag(System.Windows.Forms.BatteryChargeStatus.NoSystemBattery)
+                || ps.BatteryChargeStatus == System.Windows.Forms.BatteryChargeStatus.Unknown;
+            if (!none && ps.BatteryLifePercent is >= 0f and <= 1f)
+                pc = new PcBattery((int)Math.Round(ps.BatteryLifePercent * 100), ps.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Console.Error.WriteLine($"[battery] {ex.Message}");
+        }
+        IReadOnlyList<BluetoothBatteryInfo> devices = [];
+        try
+        {
+            devices = await _bluetooth.BatteriesAsync().WaitAsync(TimeSpan.FromSeconds(4));
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Console.Error.WriteLine($"[battery] bluetooth: {ex.Message}");
+        }
+        return new { pc, devices };
+    }
+
+    /// <summary>Free space of the fixed drives, and what Windows itself says about the health of the physical disks.</summary>
+    public Task<object> GetDrivesAsync() => Task.Run<object>(() =>
+    {
+        var drives = new List<DriveSpace>();
+        var disks = new List<DiskHealth>();
+        try
+        {
+            foreach (var d in DriveInfo.GetDrives())
+                if (d.DriveType == DriveType.Fixed && d.IsReady) drives.Add(new DriveSpace(d.Name.TrimEnd('\\'), d.AvailableFreeSpace, d.TotalSize));
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Console.Error.WriteLine($"[drives] {ex.Message}");
+        }
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe",
+                "-NoProfile -NonInteractive -Command \"Get-PhysicalDisk | ForEach-Object { $_.FriendlyName + '|' + $_.HealthStatus }\"")
+            { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
+            using var process = System.Diagnostics.Process.Start(psi);
+            if (process is not null)
+            {
+                var text = process.StandardOutput.ReadToEndAsync();
+                if (process.WaitForExit(8000))
+                {
+                    foreach (var line in text.Result.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        var parts = line.Split('|');
+                        if (parts.Length == 2 && parts[0].Length > 0) disks.Add(new DiskHealth(parts[0], parts[1]));
+                    }
+                }
+                else
+                {
+                    try { process.Kill(true); } catch (Exception) { /* gone already */ }
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Console.Error.WriteLine($"[drives] disk health: {ex.Message}");
+        }
+        return new { drives, disks };
+    });
+
     public Task<IReadOnlyList<SteamDownload>> GetDownloadsAsync() =>
         Task.Run(() => new SteamScanner(new WindowsRegistry()).Downloads());
 

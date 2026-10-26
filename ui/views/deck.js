@@ -176,9 +176,9 @@ export function healthPage() {
   const load = (self) => {
     if (loading) return;
     loading = true;
-    Promise.all([quiet(() => api.getPerformance()), quiet(() => api.getPads()), quiet(() => api.getServiceStatus())]).then(([perf, pads, service]) => {
+    Promise.all([quiet(() => api.getPerformance()), quiet(() => api.getPads()), quiet(() => api.getServiceStatus()), quiet(() => api.getDrives())]).then(([perf, pads, service, drives]) => {
       loading = false;
-      data = { perf, pads, service };
+      data = { perf, pads, service, drives };
       if (currentView() === self) render();
     });
   };
@@ -196,7 +196,7 @@ export function healthPage() {
       }
       clearTimeout(timer);
       timer = setTimeout(() => currentView() === self && load(self), 5000);
-      const { perf, pads, service } = data;
+      const { perf, pads, service, drives } = data;
       const rows = [];
       if (perf) {
         rows.push(perf.cpu >= 90 ? warn(t('health.cpu'), t('health.busy', { n: perf.cpu })) : ok(t('health.cpu'), t('health.load', { n: perf.cpu })));
@@ -204,6 +204,16 @@ export function healthPage() {
         const pct = perf.ramTotalGb ? (perf.ramUsedGb / perf.ramTotalGb) * 100 : 0;
         const mem = t('health.ramDetail', { used: perf.ramUsedGb.toFixed(1), total: perf.ramTotalGb.toFixed(1) });
         rows.push(pct >= 90 ? warn(t('health.ram'), mem) : ok(t('health.ram'), mem));
+      }
+      for (const d of drives?.drives ?? []) {
+        const free = d.totalBytes ? d.freeBytes / d.totalBytes : 1;
+        const text = t('health.driveFree', { name: d.name, free: formatSize(d.freeBytes) ?? '?', total: formatSize(d.totalBytes) ?? '?' });
+        rows.push(free < 0.1 ? warn(t('health.drive'), text) : ok(t('health.drive'), text));
+      }
+      const disks = drives?.disks ?? [];
+      if (disks.length) {
+        const bad = disks.filter((x) => x.health !== 'Healthy');
+        rows.push(bad.length ? warn(t('health.disks'), t('health.disksBad', { names: bad.map((x) => x.name).join(', ') })) : ok(t('health.disks'), t('health.disksOk')));
       }
       const waiting = updateCount();
       if (!state.updates) rows.push(note(t('health.updates'), t('health.updatesUnknown')));
@@ -216,7 +226,7 @@ export function healthPage() {
       const c = state.caseHud;
       if (c) {
         if (!c.installed) rows.push(note(t('health.case'), t('health.caseNone')));
-        else rows.push(c.running ? ok(t('health.case'), t('health.caseOk')) : warn(t('health.case'), t('health.caseStopped')));
+        else rows.push({ ...(c.running ? ok(t('health.case'), t('health.caseOk')) : warn(t('health.case'), t('health.caseStopped'))), run: () => import('./casehud.js').then((m) => push(m.caseHudPage())) });
       }
       return rows;
     }

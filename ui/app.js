@@ -34,6 +34,7 @@ import { startNotifications } from './views/notifications.js';
 import './views/deck.js';
 import { assistantView, startAssistant } from './views/assistant.js';
 import { startWeather } from './core/weather.js';
+import { startBattery } from './core/battery.js';
 import { loadCollections } from './core/collections.js';
 import './components/collections.js';
 import { collectionPage } from './views/collection.js';
@@ -127,6 +128,7 @@ async function init() {
   applySkin(state.skins.find((s) => s.id === state.info.skin) || BUILTIN_SKINS[0]);
   updateTabs();
   startWeather();
+  startBattery();
   startUpdates();
   startParental({ detailPage, closeQuickMenu, redrawQuick: () => quick.open && renderQuick() });
   startAssistant();

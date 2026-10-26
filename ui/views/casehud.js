@@ -15,6 +15,7 @@ import { chooseDialog, confirmDialog } from '../components/overlay.js';
 import { addQuickRows } from '../components/quick-menu.js';
 import { ensureUnlocked } from '../components/passcode.js';
 import { sound } from '../sound.js';
+import { healthPage } from './deck.js';
 import { t } from '../core/i18n.js';
 import { settler } from './casehud-settle.js';
 import { lightingPage } from './casehud-lighting.js';
@@ -656,13 +657,15 @@ export function caseHudPage() {
     },
     rows() {
       const s = state.caseHud;
-      if (!s) return [{ section: t('casehud.title') }, { items: [{ icon: '⟳', label: t('casehud.loading') }] }];
+      // The health check sits on top, whatever state CaseHUD is in: PC, drives, fans and lights in one place.
+      const health = { items: [{ icon: '♥', label: t('health.title'), detail: t('health.quickDetail'), run: () => push(healthPage()) }] };
+      if (!s) return [health, { section: t('casehud.title') }, { items: [{ icon: '⟳', label: t('casehud.loading') }] }];
       // While something is installing or starting the page shows nothing but that.
       if (s.busy) return [{ section: t('casehud.title') }, { items: [{ icon: '⟳', label: s.busy, detail: t('casehud.installWait') }] }];
-      if (!s.installed) return installRows(s);
-      if (s.needsUpdate) return needsUpdateRows(s);
-      if (!s.running || !s.status) return stoppedRows(s);
-      return runningRows(s);
+      if (!s.installed) return [health, ...installRows(s)];
+      if (s.needsUpdate) return [health, ...needsUpdateRows(s)];
+      if (!s.running || !s.status) return [health, ...stoppedRows(s)];
+      return [health, ...runningRows(s)];
     },
     extraKeys(action, item) {
       // X on a display: find it (its screen flashes).

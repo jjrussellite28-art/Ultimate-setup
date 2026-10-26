@@ -378,6 +378,10 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "capture":
                 await hud.CaptureAsync(StringArg(0));
                 return null;
+            case "getBatteries":
+                return await hud.GetBatteriesAsync();
+            case "getDrives":
+                return await hud.GetDrivesAsync();
             case "getInstallers":
                 return await hud.GetInstallersAsync();
             case "openInstaller":

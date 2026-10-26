@@ -6,6 +6,8 @@ namespace CouchHud.Shell.Services;
 
 public sealed record BluetoothDeviceInfo(string Id, string Name, bool Paired, bool Connected, bool LowEnergy, string Kind);
 
+public sealed record BluetoothBatteryInfo(string Name, string Kind, int Percent);
+
 /// <summary>
 /// Bluetooth from the couch: list, pair and remove headsets and controllers, and turn
 /// the radio on or off. Pairing accepts confirm-only and PIN-display requests, which
@@ -25,6 +27,44 @@ public sealed class BluetoothService(Func<string, Task<bool>> confirm)
         "System.Devices.Aep.Category",
         "System.Devices.Aep.ProtocolId"
     ];
+
+    // The battery level Windows keeps for a Bluetooth device (what Settings › Bluetooth shows).
+    private const string BatteryProperty = "{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2";
+
+    /// <summary>
+    /// Battery percent of paired, connected Bluetooth devices that report it to Windows (most headsets, and Xbox or PlayStation
+    /// controllers over Bluetooth). Devices that report nothing are left out.
+    /// </summary>
+    public async Task<IReadOnlyList<BluetoothBatteryInfo>> BatteriesAsync()
+    {
+        var found = new Dictionary<string, BluetoothBatteryInfo>();
+        string[] selectors =
+        [
+            Windows.Devices.Bluetooth.BluetoothDevice.GetDeviceSelectorFromPairingState(true),
+            Windows.Devices.Bluetooth.BluetoothLEDevice.GetDeviceSelectorFromPairingState(true)
+        ];
+        foreach (var selector in selectors)
+        {
+            try
+            {
+                var devices = await DeviceInformation.FindAllAsync(selector, [BatteryProperty, "System.Devices.Connected"]);
+                foreach (var d in devices)
+                {
+                    if (string.IsNullOrWhiteSpace(d.Name)) continue;
+                    if (!d.Properties.TryGetValue(BatteryProperty, out var raw) || raw is null) continue;
+                    if (d.Properties.TryGetValue("System.Devices.Connected", out var c) && c is bool connected && !connected) continue;
+                    var percent = Convert.ToInt32(raw);
+                    if (percent is < 0 or > 100) continue;
+                    found[d.Name] = new BluetoothBatteryInfo(d.Name, Kind(d.Name), percent);
+                }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                Console.Error.WriteLine($"[bluetooth] battery: {ex.Message}");
+            }
+        }
+        return found.Values.OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+    }
 
     public async Task<object> StateAsync()
     {

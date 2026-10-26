@@ -12,7 +12,8 @@ import { notificationsPage } from '../views/notifications.js';
 import { bluetoothPage } from '../views/bluetooth.js';
 import { appVolumePage } from '../views/app-volume.js';
 import { galleryPage } from '../views/gallery.js';
-import { capture, downloadsPage, healthPage } from '../views/deck.js';
+import { capture, downloadsPage } from '../views/deck.js';
+import { deviceIcon, refreshBatteries } from '../core/battery.js';
 import { chooseDialog, confirmDialog } from './overlay.js';
 import { sound } from '../sound.js';
 import { t, fmtNumber, fmtPercent, fmtTime, fmtDate } from '../core/i18n.js';
@@ -54,12 +55,14 @@ export async function openQuickMenu() {
   quick.index = 0;
   sound.open();
   renderQuick();
-  const [audio, pads, session, actions] = await Promise.all([
+  const [audio, pads, session, actions, batteries] = await Promise.all([
     attempt(() => api.getAudio(), t('quick.audioUnavailable')),
     attempt(() => api.getPads()),
     attempt(() => api.getSession()),
-    api.getQuickActions ? attempt(() => api.getQuickActions()) : []
+    api.getQuickActions ? attempt(() => api.getQuickActions()) : [],
+    refreshBatteries()
   ]);
+  quick.batteries = batteries ?? { pc: null, devices: [] };
   quick.audio = audio ?? null;
   quick.pads = pads ?? [];
   quick.pluginActions = actions ?? [];
@@ -172,7 +175,6 @@ function rows() {
   list.push({ kind: 'action', icon: '📸', label: t('quick.screenshot'), detail: s ? t('quick.screenshotOf', { name: s.name }) : t('quick.screenshotScreen'), run: () => capture('screenshot') });
   if (s) list.push({ kind: 'action', icon: '⏺', label: t('quick.clip'), detail: t('quick.clipDetail'), run: () => capture('clip') });
   list.push({ kind: 'action', icon: '▣', label: t('quick.captures'), detail: t('quick.capturesDetail'), run: () => openPage(galleryPage()) });
-  list.push({ kind: 'action', icon: '♥', label: t('health.title'), detail: t('health.quickDetail'), run: () => openPage(healthPage()) });
   list.push({ kind: 'action', icon: '⬇', label: t('quick.downloads'), detail: t('quick.downloadsDetail'), run: () => openPage(downloadsPage()) });
   list.push({ kind: 'action', icon: 'ᛒ', label: t('quick.bluetooth'), detail: t('quick.bluetoothDetail'), run: () => openPage(bluetoothPage()) });
   list.push({ kind: 'action', icon: '▤', label: t('quick.tasks'), run: () => openPage(tasksPage()) });
@@ -229,7 +231,11 @@ export function renderQuick() {
       el('div', { className: 'quick-status' },
         quick.weather ? el('span', { textContent: quick.weather }) : null,
         remainingLabel() ? el('span', { className: 'quick-parental', textContent: `⏳ ${remainingLabel()}` }) : null,
-        quick.pads.map((p) => el('span', { className: 'quick-pad', textContent: `🎮 ${p.index + 1} ${BATTERY[p.battery] ?? ''}` }))),
+        quick.batteries?.pc ? el('span', { className: 'quick-pad', textContent: `${quick.batteries.pc.charging ? '⚡' : '🔋'} ${quick.batteries.pc.percent}%` }) : null,
+        // Bluetooth devices with their real percent; a controller that reports one replaces its rough bars.
+        (quick.batteries?.devices ?? []).map((d) => el('span', { className: 'quick-pad', title: d.name, textContent: `${deviceIcon(d.kind)} ${d.percent}%` })),
+        (quick.batteries?.devices ?? []).some((d) => d.kind === 'controller') ? null
+          : quick.pads.map((p) => el('span', { className: 'quick-pad', textContent: `🎮 ${p.index + 1} ${BATTERY[p.battery] ?? ''}` }))),
       // Space is reserved from the first frame, so the list does not jump once the numbers arrive.
       api.getPerformance ? el('div', { className: 'quick-perf' },
         el('span', {}, el('b', { textContent: quick.perf ? fmtPercent(quick.perf.cpu) : '–' }), 'CPU'),
