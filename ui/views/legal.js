@@ -37,7 +37,8 @@ export const PRIVACY = () => [
 
 function textPage({ id, title, sections, firstRun, onBack }) {
   // Only the German texts are binding; say so in the other language.
-  const prevails = () => (lang() === 'de' ? null : el('p', { className: 'legal-intro', textContent: t('legal.germanPrevails') }));
+  const prevails = () => null; // English-only fork: no "German prevails" note
+  // i18n-used: legal.germanPrevails
   return {
     id,
     name: title,

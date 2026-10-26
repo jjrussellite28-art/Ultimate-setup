@@ -1,3 +1,4 @@
+// i18n-used: wizard.welcome.de (German option removed in this English-only fork)
 // First-run setup assistant: a few questions, one per screen, big cards instead of prose.
 //
 // It is only a guided front end. Every choice goes through the setting or flow it belongs to, the same call the settings make:
@@ -95,7 +96,7 @@ function steps(page) {
       lead: () => t('wizard.welcome.lead'),
       later: () => where('settings.cat.info', 'settings.language.title'),
       hero: true,
-      options: () => [['en', 'English', t('wizard.welcome.en')], ['de', 'Deutsch', t('wizard.welcome.de')]].map(([id, title, bullet]) => ({
+      options: () => [['en', 'English', t('wizard.welcome.en')]].map(([id, title, bullet]) => ({
         id, title, icon: '🌐', bullets: [bullet], current: lang() === id, compact: true,
         run: async () => {
           if (id === lang()) return 'next';
