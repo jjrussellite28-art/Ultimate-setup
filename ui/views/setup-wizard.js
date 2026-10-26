@@ -74,7 +74,7 @@ async function loadEnv() {
 const isFull = (env) => env.settings.integrationMode === 'full';
 const lockOn = (env) => !!env.security.couchLock && env.security.couchLock !== 'off';
 const pointerMode = (s) => (s.pointer === 'system' || (s.pointer === 'mouse' && s.mouseUnlocked) ? s.pointer : 'skin');
-// i18n-used: wizard.sound.off wizard.sound.ui wizard.sound.music wizard.clients.standby wizard.clients.demand wizard.clients.off
+// i18n-used: wizard.done.clients wizard.clients.title wizard.clients.lead wizard.sound.off wizard.sound.ui wizard.sound.music wizard.clients.standby wizard.clients.demand wizard.clients.off
 const AUDIO = ['off', 'ui', 'music'];
 const audioMode = (s) => (AUDIO.includes(s.audioMode) ? s.audioMode : s.sounds === false ? 'off' : 'ui');
 const soundKey = (mode) => 'wizard.sound.' + mode;
@@ -284,7 +284,6 @@ function wizardPage({ firstRun = false, startAt = null } = {}) {
         'mode',
         'look',
         'sound',
-        full && this.env.launchers.length ? 'clients' : null,
         // The console setup enrolls the code itself; this step is only for an install already in Full without a lock.
         full && !this.intent && !lockOn(this.env) ? 'lock' : null,
         'done'
@@ -426,7 +425,7 @@ function wizardPage({ firstRun = false, startAt = null } = {}) {
         dots,
         el('header', { className: 'wizard-head' },
           def.hero
-            ? el('div', { className: 'wizard-logo' }, el('img', { src: 'assets/icon.svg', alt: '' }), el('span', { className: 'wizard-brand' }, 'Couch', el('b', { textContent: 'HUD' })))
+            ? el('div', { className: 'wizard-logo' }, el('img', { src: 'assets/icon.svg', alt: '' }), el('span', { className: 'wizard-brand' }, 'Mega', el('b', { textContent: 'Hub' })))
             : el('span', { className: 'wizard-icon' }, def.glyph ? iconEl(def.glyph) : categoryIcon(def.icon)),
           el('h2', { textContent: def.title() }),
           el('p', { className: 'wizard-lead', textContent: def.lead() })),
@@ -439,7 +438,6 @@ function wizardPage({ firstRun = false, startAt = null } = {}) {
 
     summary() {
       const env = this.env;
-      const clients = env.launchers.filter((l) => l.mode === 'standby').length;
       // As chosen: Full that is still to be set up counts as Full, the way back as Light.
       const full = this.intent === 'full' || (isFull(env) && this.intent !== 'light');
       const lock = this.intent === 'full' && !lockOn(env)
@@ -450,7 +448,6 @@ function wizardPage({ firstRun = false, startAt = null } = {}) {
         [full ? '📺' : '▭', full ? t('wizard.mode.full') : t('wizard.mode.light')],
         ['🎨', this.savedSkin.name],
         ['🔊', t(soundKey(audioMode(env.settings)))],
-        ...(full && env.launchers.length ? [['🎮', t('wizard.done.clients', { count: clients })]] : []),
         ...(full ? [lock] : [])
       ];
       return el('ul', { className: 'wizard-summary' }, chips.map(([icon, text]) => el('li', { className: 'wizard-chip' }, el('span', { className: 'wizard-chip-icon' }, iconEl(icon)), text)));

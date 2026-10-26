@@ -5,7 +5,7 @@ import { api } from '../core/api.js';
 import { $, el, keepInView, setFocused } from '../core/dom.js';
 import { attempt } from '../core/feedback.js';
 import { hue } from '../core/art.js';
-import { currentView, move, render } from '../core/nav.js';
+import { currentView, move, push, render } from '../core/nav.js';
 import { state } from '../core/state.js';
 import { sound } from '../sound.js';
 import { timeAgo } from './news.js';
@@ -18,7 +18,9 @@ let stackEl;
 function bell() {
   let node = $('#notify-bell');
   if (!node) {
-    node = el('span', { id: 'notify-bell' });
+    node = el('span', { id: 'notify-bell', title: 'Notifications' });
+    node.style.cursor = 'pointer';
+    node.addEventListener('click', () => push(notificationsPage()));
     $('#status')?.prepend(node);
   }
   const n = state.notifications.unread;

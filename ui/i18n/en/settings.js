@@ -428,6 +428,8 @@ export default {
   'settings.info.quitDesc': 'Closes MegaHub completely, leaving only Windows',
   'settings.info.guide': 'In the Guide menu',
   'settings.info.guideDesc': 'Bluetooth devices, notifications, captures and running programs open with the Guide button',
+  'settings.info.notifications': 'Notifications',
+  'settings.info.notificationsDesc': 'See your notifications. Same as the Guide button.',
   'settings.info.app': 'App',
   'settings.info.madeBy': 'Made by',
   'settings.info.version': 'Version',
