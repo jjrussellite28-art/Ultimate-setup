@@ -108,7 +108,7 @@ export default {
   'quick.captures': 'Captures',
   'quick.capturesDetail': 'Screenshots and clips',
   'quick.downloads': 'Downloads',
-  'quick.downloadsDetail': 'Steam installs and updates',
+  'quick.downloadsDetail': 'Downloaded programs and updates',
   'quick.bluetooth': 'Bluetooth',
   'quick.bluetoothDetail': 'Pair headphones and controllers',
   'quick.tasks': 'Running programs',

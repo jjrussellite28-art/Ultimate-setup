@@ -124,15 +124,17 @@ const downloadState = (state) => (state === 'downloading' ? t('deck.stateDownloa
 export function downloadsPage() {
   let data = null;
   let loading = false;
-  let timer;
   const load = (self) => {
     if (loading) return;
     loading = true;
-    attempt(() => api.getDownloads(), t('deck.downloadsLoadFailed')).then((d) => {
+    attempt(() => api.getInstallers(), t('deck.downloadsLoadFailed')).then((d) => {
       loading = false;
       data = d ?? data ?? [];
       if (currentView() === self) render();
     });
+  };
+  const open = (kind) => async () => {
+    if ((await attempt(() => api.openSystemUpdates(kind), t('deck.updatesFailed'))) !== undefined) toast(t(kind === 'windows' ? 'deck.windowsUpdate' : 'deck.appUpdates'), 3500);
   };
   return listPage({
     id: 'downloads',
@@ -143,19 +145,20 @@ export function downloadsPage() {
         load(self);
         return null;
       }
-      // Progress moves while the page is open; refresh quietly, keeping the list on screen.
-      clearTimeout(timer);
-      timer = setTimeout(() => currentView() === self && load(self), 3000);
-      if (!data.length) return [{ icon: '✓', label: t('deck.noDownloads'), detail: t('deck.allUpToDate') }];
-      return data.map((d) => ({
-        icon: d.state === 'downloading' ? '⬇' : d.state === 'paused' ? '⏸' : '⋯',
-        label: d.name,
-        detail: d.bytesTotal
-          ? t('deck.downloadDetailSize', { kind: d.isUpdate ? t('deck.update') : t('deck.install'), state: downloadState(d.state), done: formatSize(d.bytesDone) ?? '0 MB', total: formatSize(d.bytesTotal) })
-          : t('deck.downloadDetail', { kind: d.isUpdate ? t('deck.update') : t('deck.install'), state: downloadState(d.state) }),
-        progress: d.bytesTotal ? d.progress : null,
-        highlight: d.state === 'downloading'
-      }));
+      return [
+        { icon: '⟳', label: t('deck.windowsUpdate'), detail: t('deck.windowsUpdateDetail'), value: t('deck.open'), run: open('windows') },
+        { icon: '⬆', label: t('deck.appUpdates'), detail: t('deck.appUpdatesDetail'), value: t('deck.open'), run: open('apps') },
+        ...data.map((f) => ({
+          icon: '⬇',
+          label: f.name,
+          detail: formatSize(f.bytes) ?? '',
+          value: t('deck.run'),
+          run: async () => {
+            if ((await attempt(() => api.openInstaller(f.path), t('deck.installerFailed'))) !== undefined) toast(f.name, 3500);
+          }
+        })),
+        ...(data.length ? [] : [{ icon: '✓', label: t('deck.noInstallers'), detail: t('deck.noInstallersDetail') }])
+      ];
     }
   });
 }

@@ -14,6 +14,7 @@ public sealed class MediaKeys : IDisposable
     private const int WhKeyboardLl = 13;
     private const int WmKeyDown = 0x0100, WmSysKeyDown = 0x0104, WmQuit = 0x0012;
     private const int VkVolumeMute = 0xAD, VkVolumeDown = 0xAE, VkVolumeUp = 0xAF;
+    private const int VkSnapshot = 0x2C;
     private const uint PmNoRemove = 0;
 
     private delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
@@ -56,15 +57,18 @@ public sealed class MediaKeys : IDisposable
     // Kept in a field: the hook would call into a collected delegate otherwise.
     private readonly HookProc _proc;
     private readonly Action<int> _onKey;
+    private readonly Action? _onSnip;
     private readonly ManualResetEventSlim _ready = new();
     private Thread? _thread;
     private uint _threadId;
     private IntPtr _hook;
 
     /// <param name="onKey">Called on the hook thread with +2 / -2 for volume up / down and 0 for mute; hand over to the UI thread there.</param>
-    public MediaKeys(Action<int> onKey)
+    /// <param name="onSnip">Called on the hook thread when Print Screen goes down (the key is taken, Windows' own snipping does not start).</param>
+    public MediaKeys(Action<int> onKey, Action? onSnip = null)
     {
         _onKey = onKey;
+        _onSnip = onSnip;
         _proc = Callback;
     }
 
@@ -109,6 +113,15 @@ public sealed class MediaKeys : IDisposable
         {
             // KBDLLHOOKSTRUCT starts with the virtual key code.
             var vk = Marshal.ReadInt32(lParam);
+            if (vk == VkSnapshot && _onSnip is not null)
+            {
+                if ((int)wParam is WmKeyDown or WmSysKeyDown)
+                {
+                    try { _onSnip(); }
+                    catch (Exception ex) { Console.Error.WriteLine($"[keys] {ex.Message}"); }
+                }
+                return 1;
+            }
             if (vk is VkVolumeMute or VkVolumeDown or VkVolumeUp && !ShellManager.IsDesktopShellRunning())
             {
                 if ((int)wParam is WmKeyDown or WmSysKeyDown)

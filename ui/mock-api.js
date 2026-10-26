@@ -684,6 +684,12 @@ window.couchhud = {
   getProfile: async (id) => ({ profile: structuredClone(profiles[id] ?? {}), modes: structuredClone(display.modes), hdrSupported: true, devices: structuredClone(audio.devices) }),
   setProfile: async (id, p) => ((profiles[id] = p), { profile: structuredClone(p), modes: structuredClone(display.modes), hdrSupported: true, devices: structuredClone(audio.devices) }),
   capture: async (kind) => log('capture', kind),
+  getInstallers: async () => [
+    { name: '7z2409-x64.exe', path: 'C:\\Users\\you\\Downloads\\7z2409-x64.exe', bytes: 1_600_000, modified: new Date().toISOString() },
+    { name: 'Playnite10.exe', path: 'C:\\Users\\you\\Downloads\\Playnite10.exe', bytes: 95_000_000, modified: new Date().toISOString() }
+  ],
+  openInstaller: async (path) => log('openInstaller', path),
+  openSystemUpdates: async (kind) => log('openSystemUpdates', kind),
   getDownloads: async () => {
     dl = Math.min(1, dl + 0.07);
     return [

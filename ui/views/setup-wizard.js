@@ -193,6 +193,26 @@ function steps(page) {
         }
       }))
     },
+    guide: {
+      glyph: '🎮',
+      title: () => t('wizard.guide.title'),
+      lead: () => t('wizard.guide.lead'),
+      later: () => where('settings.cat.controller'),
+      options: () => [
+        { id: 'tap', icon: '🎮', title: t('wizard.guide.tap'), bullets: [t('wizard.guide.tap1'), t('wizard.guide.tap2')] },
+        { id: 'hold', icon: '✋', title: t('wizard.guide.hold'), bullets: [t('wizard.guide.hold1'), t('wizard.guide.hold2')] }
+      ].map((o) => ({
+        ...o, current: (o.id === 'tap') === (env.settings.guideTapInGame !== false && !env.settings.gameBarButton),
+        run: async () => {
+          // Either way the Windows Game Bar gives up the Guide button; the host couples the two switches.
+          if (!(await save('guideTapInGame', o.id === 'tap'))) return;
+          if (!(await save('gameBarButton', false))) return;
+          env.settings.guideTapInGame = o.id === 'tap';
+          env.settings.gameBarButton = false;
+          return 'next';
+        }
+      }))
+    },
     clients: {
       glyph: '🎮',
       title: () => t('wizard.clients.title'),
@@ -284,6 +304,7 @@ function wizardPage({ firstRun = false, startAt = null } = {}) {
         'mode',
         'look',
         'sound',
+        'guide',
         // The console setup enrolls the code itself; this step is only for an install already in Full without a lock.
         full && !this.intent && !lockOn(this.env) ? 'lock' : null,
         'done'
@@ -591,7 +612,7 @@ async function checkIntent(intent) {
 // ---------------------------------------------------------------------------
 // Entry points
 
-const STEP_IDS = ['welcome', 'terms', 'mode', 'look', 'sound', 'clients', 'lock', 'done'];
+const STEP_IDS = ['welcome', 'terms', 'mode', 'look', 'sound', 'guide', 'clients', 'lock', 'done'];
 
 /** Locked, or not known: the start-up decision fails closed (isLocked() answers "open" when the read fails, for its other callers). */
 async function lockedOrUnknown() {

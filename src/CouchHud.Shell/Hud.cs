@@ -250,15 +250,12 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
             _foreground = new ForegroundGuard(ForegroundNow, _fgState, () => _window?.BringToFront(), OnClientNeedsAttention, Console.Error.WriteLine, GamePids, EndMouseModeWhenLocked);
             _foreground.Start();
         });
-        // Without explorer nobody answers the volume keys.
-        if (_asShell && _audio is not null)
+        // Without explorer nobody answers the volume keys; Print Screen saves a screenshot everywhere.
+        optional.Run("volume and print screen keys", () =>
         {
-            optional.Run("volume keys", () =>
-            {
-                _mediaKeys = new MediaKeys(step => Ui(() => OnVolumeKey(step)));
-                _mediaKeys.Start();
-            });
-        }
+            _mediaKeys = new MediaKeys(step => Ui(() => OnVolumeKey(step)), () => _ = Task.Run(SnipScreen));
+            _mediaKeys.Start();
+        });
         if (!Full && config.Current.CloseExplorerInLight) optional.Run("taskbar hiding", HideTaskbar);
         if (_asShell && Full)
         {
@@ -299,6 +296,31 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
     private MediaKeys? _mediaKeys;
 
     /// <summary>Volume key without explorer: step is +2 / -2, 0 toggles mute.</summary>
+    /// <summary>Print Screen: the whole screen as a PNG in Pictures\Screenshots and on the clipboard.</summary>
+    private void SnipScreen()
+    {
+        try
+        {
+            var bounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? new System.Drawing.Rectangle(0, 0, 1920, 1080);
+            using var bitmap = new System.Drawing.Bitmap(bounds.Width, bounds.Height);
+            using (var g = System.Drawing.Graphics.FromImage(bitmap))
+                g.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bounds.Size);
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Screenshots");
+            Directory.CreateDirectory(dir);
+            bitmap.Save(Path.Combine(dir, $"MegaHub {DateTime.Now:yyyy-MM-dd HH.mm.ss}.png"), System.Drawing.Imaging.ImageFormat.Png);
+            var copy = new System.Drawing.Bitmap(bitmap);
+            Ui(() =>
+            {
+                try { System.Windows.Forms.Clipboard.SetImage(copy); } catch { /* clipboard busy: the file is saved anyway */ }
+                Emit("toast", Strings.Get("toast.snip"));
+            });
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Console.Error.WriteLine($"[snip] {ex.Message}");
+        }
+    }
+
     private void OnVolumeKey(int step)
     {
         if (_audio is null) return;
@@ -2659,6 +2681,58 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
 
     public Task<IReadOnlyList<SteamDownload>> GetDownloadsAsync() =>
         Task.Run(() => new SteamScanner(new WindowsRegistry()).Downloads());
+
+    // -----------------------------------------------------------------------
+    // App downloads and system updates (the guide menu's "Downloads")
+
+    public sealed record InstallerFile(string Name, string Path, long Bytes, DateTime Modified);
+
+    private static readonly string[] InstallerExtensions = [".exe", ".msi", ".msix", ".msixbundle", ".appx", ".appxbundle", ".zip", ".7z", ".rar", ".iso"];
+
+    private static string DownloadsFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+
+    /// <summary>The newest installers and archives in the Downloads folder (what a browser just downloaded).</summary>
+    public Task<IReadOnlyList<InstallerFile>> GetInstallersAsync() => Task.Run<IReadOnlyList<InstallerFile>>(() =>
+    {
+        try
+        {
+            var dir = new DirectoryInfo(DownloadsFolder);
+            if (!dir.Exists) return [];
+            return dir.EnumerateFiles()
+                .Where(f => InstallerExtensions.Contains(f.Extension, StringComparer.OrdinalIgnoreCase))
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .Take(20)
+                .Select(f => new InstallerFile(f.Name, f.FullName, f.Length, f.LastWriteTime))
+                .ToList();
+        }
+        catch { return []; }
+    });
+
+    /// <summary>Opens (runs) a file from the Downloads folder. Only files in that folder with an installer or archive type.</summary>
+    public object OpenInstaller(string path)
+    {
+        RequireUnlocked();
+        var full = Path.GetFullPath(path ?? "");
+        var root = Path.GetFullPath(DownloadsFolder) + Path.DirectorySeparatorChar;
+        if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+            || !InstallerExtensions.Contains(Path.GetExtension(full), StringComparer.OrdinalIgnoreCase)
+            || !File.Exists(full))
+            throw new InvalidOperationException("Not a file in the Downloads folder");
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(full) { UseShellExecute = true });
+        return new { ok = true };
+    }
+
+    /// <summary>"windows" opens Windows Update; "apps" updates every app winget knows, in a window that stays open to show the result.</summary>
+    public object OpenSystemUpdates(string kind)
+    {
+        RequireUnlocked();
+        if (kind == "windows")
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:windowsupdate") { UseShellExecute = true });
+        else if (kind == "apps")
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", "/k winget upgrade --all --accept-source-agreements --accept-package-agreements") { UseShellExecute = true });
+        else throw new InvalidOperationException("Unknown update kind");
+        return new { ok = true };
+    }
 
     // -----------------------------------------------------------------------
     // Display, performance, captures
