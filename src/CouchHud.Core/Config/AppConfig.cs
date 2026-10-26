@@ -281,7 +281,8 @@ public sealed class AppConfig
     public bool CatalogUpdateCheck { get; set; } = true;
 
     /// <summary>Look on GitHub for a newer CouchHUD in the background (never while a game runs). Installing always needs a confirmation.</summary>
-    public bool SelfUpdateCheck { get; set; } = true;
+    // MegaHub: off until MegaHub has releases of its own. The built-in updater still looks at the original CouchHUD project.
+    public bool SelfUpdateCheck { get; set; } = false;
 
     /// <summary>Install CaseHUD with its autostart entry (setup task "autostart").</summary>
     public bool CaseHudInstallAutostart { get; set; } = true;
