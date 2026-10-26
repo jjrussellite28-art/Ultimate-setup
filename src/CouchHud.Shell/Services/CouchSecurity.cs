@@ -657,8 +657,8 @@ public static class Recovery
             // Anything that wants the foreground is allowed to take it (this box included): the recovery may start while another program owns it.
             NativeMethods.AllowSetForegroundWindow(-1);
             using var done = new CancellationTokenSource();
-            var pusher = Task.Run(() => KeepBoxInFront("CouchHUD", done.Token));
-            MessageBoxW(IntPtr.Zero, text, "CouchHUD", flags);
+            var pusher = Task.Run(() => KeepBoxInFront("MegaHub", done.Token));
+            MessageBoxW(IntPtr.Zero, text, "MegaHub", flags);
             done.Cancel();
             pusher.Wait(TimeSpan.FromSeconds(2));
         }

@@ -255,17 +255,17 @@ public sealed class LockedDesktop(string dataDir)
             Strings.Use(new CouchHud.Core.Config.ConfigStore(dir).Current.Language);
             if (PolicyHelper.StuckGroups(dir, [], HasPendingState(dir)).Count == 0) return;
             Console.Error.WriteLine("[lock] Windows restrictions of the lock are stuck, offering the cleanup");
-            var answer = MessageBoxW(IntPtr.Zero, Strings.Get("stuck.ask"), "CouchHUD", 0x4 | 0x30 | 0x10000 | 0x40000);
+            var answer = MessageBoxW(IntPtr.Zero, Strings.Get("stuck.ask"), "MegaHub", 0x4 | 0x30 | 0x10000 | 0x40000);
             // IDYES
             if (answer != 6) return;
             // Off the UI context: a sync wait on the dispatcher thread would never see the continuation.
             Task.Run(() => AdminService.CleanupStuckPoliciesAsync(dir)).GetAwaiter().GetResult();
-            MessageBoxW(IntPtr.Zero, Strings.Get("stuck.done"), "CouchHUD", 0x0 | 0x40 | 0x10000 | 0x40000);
+            MessageBoxW(IntPtr.Zero, Strings.Get("stuck.done"), "MegaHub", 0x0 | 0x40 | 0x10000 | 0x40000);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             Console.Error.WriteLine($"[lock] cleanup: {ex.Message}");
-            MessageBoxW(IntPtr.Zero, Strings.Get("stuck.failed", ex.Message), "CouchHUD", 0x0 | 0x10 | 0x10000 | 0x40000);
+            MessageBoxW(IntPtr.Zero, Strings.Get("stuck.failed", ex.Message), "MegaHub", 0x0 | 0x10 | 0x10000 | 0x40000);
         }
     }
 

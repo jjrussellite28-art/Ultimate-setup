@@ -4816,7 +4816,7 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
             var tray = new System.Windows.Forms.NotifyIcon
             {
                 Icon = (Environment.ProcessPath is { } exe ? System.Drawing.Icon.ExtractAssociatedIcon(exe) : null) ?? System.Drawing.SystemIcons.Application,
-                Text = "CouchHUD",
+                Text = "MegaHub",
                 ContextMenuStrip = menu,
                 Visible = true
             };
