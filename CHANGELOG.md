@@ -1,33 +1,10 @@
-# Changelog / Änderungen
+# Changelog
 
-Ein Abschnitt je Version, gegliedert nach Bereichen, erst Deutsch, dann Englisch. / One section per version, grouped by area, German first, then English.
+One section per version, grouped by area.
 
 ## 0.4.1 (2026-10-21)
 
-Erste öffentliche Version. Was CouchHUD alles kann, steht in der [README](README.md) und im [Handbuch](docs/GUIDE.md); hier die Schwerpunkte dieser Version. / First public release. What CouchHUD can do is in the [README](README.md) and the [guide](docs/GUIDE.en.md); below are the highlights of this version.
-
-### Deutsch
-
-**Sicherheit**
-- Neuer Windows-Dienst **CouchHud.Service** (LocalSystem, in `{app}\service`, nur nach Program Files installiert): gehärtete Dienstkonfiguration (nur nötige Privilegien, eingeschränkte Dienst-DACL, Neustart nach Absturz), native Pipe nur für lokale, interaktive Konten ab mittlerer Integrität (kein Netzwerk, kein Low-IL, kein AppContainer), Konto immer aus dem Token, feste Operationsliste mit strenger Prüfung jeder Anfrage, Ratenlimits, begrenzte gleichzeitige Arbeit, Ereignisprotokoll ohne Kennwörter, Codes und Freigaben. Ein ungeschützter Installationsort lässt den Dienst untätig.
-- Administrator-Funktionen nur noch über den CouchHUD-Dienst: Sperr-Richtlinien, Gaming-Dienste pausieren, automatische Anmeldung, Windows-Updates, Firewall-Regel, CouchHUD- und CaseHUD-Updates. CouchHud.exe startet sich nie mehr mit Administratorrechten, die geplanten Aufgaben früherer Versionen ersetzt der Dienst (die Reserve-Aufgabe „Autologon aus“ bleibt für die Wiederherstellung). Ausnahmen sind nur „Dienst reparieren“ und „Hängengebliebene Einschränkungen entfernen“ mit Windows-Bestätigung und Windows-eigenen Programmen sowie die CaseHUD-Erstinstallation.
-- Codes, Sperrmodus und Freigaben im Dienst: Couch- und Eltern-Code prüft der Dienst selbst, mit getrenntem Fehlversuchszähler je Code (über Neustarts von Dienst und PC hinweg, höchstens 15 Minuten Wartezeit); er kennt auch den Sperrmodus jedes Kontos (aus, Windows-Anmeldung, Code), abschwächen geht nur mit Nachweis. Ein richtiger Couch-Code ergibt eine Freigabe für 2 Minuten, gebunden an Konto, Windows-Anmeldung und Sitzung (nie an einen Prozess), die beim Sperren, Trennen oder Abmelden endet und in einer gesperrten Sitzung nicht zählt; Freigaben liegen im Dienst nur als Hash. Das Entsperren der eigenen Sitzung zählt nur im Modus „Windows-Anmeldung“ und nur bei einem Konto mit Kennwort, eine bloße Anmeldung nie. Eltern-Aktionen (automatische Anmeldung, Codes ändern oder entfernen, Sperre abschwächen mit Eltern-Code) brauchen den Eltern-Code, dessen Freigabe nur für genau diese Aktion einmal gilt, oder als Ausweg die Bestätigung eines Administrators über die Benutzerkontensteuerung (sc.exe control, das Kennwort geht nie durch CouchHUD). Sperre bzw. Jugendschutz aus nimmt den Code aus dem Dienst; die Einstellungen zeigen, welche Codes der Dienst hält. Code-Hash und Sperrmodus werden einmal aus der Konfiguration übernommen; danach hält die Konfiguration keinen Hash mehr.
-- CouchHUD- und CaseHUD-Updates über den Dienst: Das Setup kommt als Bytes über die Pipe, Signatur, Prüfsumme und Version (nur neuer) prüft der Dienst und startet es aus seinem geschützten Ordner mit sauberer Umgebung; die eigene Sitzung bleibt bei einem Update nur mit entsperrter Couch verbunden. Windows-Updates mit Fortschritt, Gaming-Dienste pausieren mit Referenzzählung über Konten (feste Liste, harte Sperrliste), Firewall-Regel mit festem Namen und Programm.
-- Datenordner des Dienstes `{app}\service\data`: nur SYSTEM und Administratoren, auch kein Lesen für Benutzer. Die Deinstallation gibt zuerst über den Dienst alle Konten frei (auch abgemeldete), dann wird der Dienst entfernt. „Dienst reparieren“ richtet ihn per UAC mit Windows-eigenen Programmen neu ein.
-- Vor jedem Kontakt prüft CouchHUD, dass die Pipe wirklich dem Dienst gehört (Server-Prozess = Prozess des Dienstes laut Dienststeuerung); ein fremdes Programm unter dem Namen bekommt nichts, auch kein Kennwort.
-- Fail-closed: Fehlt der Dienst, ist er blockiert oder antwortet widersprüchlich, bleibt die Couch-Sperre zu (kein Entsperren per Code, keine Freigabe der Richtlinien, kein Rückweg), Windows wird nach 30 Sekunden gesperrt (bei Blockade sofort). Der Zustand des Dienstes steht in „Was CouchHUD ändert“ und in den Einstellungen, dort auch „Dienst reparieren“.
-
-**Einrichtung**
-- Einrichtungsassistent beim ersten Start: Sprache, Bedingungen, Light oder Voll, Skin mit Live-Vorschau, Sound, Spiele-Clients, Couch-Sperre und Zusammenfassung; die Konsolen-Einrichtung läuft am Ende.
-
-**Integrationen**
-- CaseHUD 1.0: Hinweis beim ersten Start (Karte „CaseHUD einmal öffnen und Hinweis bestätigen“, Displays und Sensoren bis dahin „noch nicht verfügbar“), neue Seite *Beleuchtung* (an/aus, Helligkeit, Effekt mit Parametern, Geräte; Hinweise bei 409 `ack_required` und 403 `gui_only`, jede Änderung vom Host gegen den letzten Stand geprüft). Helligkeit und Drehung der Displays sowie Beleuchtungswerte gehen erst nach 700 ms Ruhe oder mit A raus, nicht bei jedem Schritt. Ältere CaseHUD-Builds ohne diese Felder bleiben wie bisher.
-- CaseHUD-Beleuchtung nach CaseHUDs Zusammenführungs-Regeln: es geht nur raus, was sich ändert (ein Parameter, ein Gerät als Objekt nach Id, beim Effektwechsel nur der Effekt), die PATCH-Antwort ist der neue Zustand. Beschriftungen auf Deutsch (`labelDe`), Schrittweite aus `step`, Gerätezustand (Konflikt, Fehler) zur Ansicht, lesbare Meldungen für 400, 413, 500, 401/403 und 405; Hinweise nennen den Reiter „Beleuchtung“ im CaseHUD-Fenster.
-- CaseHUD: „steuerbar“ hängt nicht mehr an der Versionsnummer. Ob ein installiertes CaseHUD `--background` kennt und die API anbietet, wird beim Start ausprobiert (Exit-Code 2 = zu alt: „Diese CaseHUD-Version ist zu alt – bitte aktualisieren“) und je Exe-Build gemerkt; der Autostart-Eintrag folgt demselben Ergebnis (nicht sondierte Builds behalten `--minimized`, „zu alt“ gilt 7 Tage).
-- CaseHUD-Releases: angeboten wird nur ein signiertes Release ab 1.0.0, das neuer ist als das installierte; die Signatur wird schon vor dem Bestätigungsdialog geprüft. Ersetzt „CaseHUD 1.1 ist noch nicht veröffentlicht“ durch „Noch keine signierte CaseHUD-Version verfügbar“.
-- Ist das CaseHUD-Repository privat oder nicht erreichbar (404, 401, 403): „Downloads derzeit nicht verfügbar“, ein Logeintrag je Abfrage, automatisch frühestens nach 12 Stunden wieder (403 ohne Rate-Limit: 15 Minuten), per *Erneut prüfen* sofort.
-
-### English
+First public release. What CouchHUD can do is in the [README](README.md) and the [guide](docs/GUIDE.md); below are the highlights of this version.
 
 **Security**
 - New Windows service **CouchHud.Service** (LocalSystem, in `{app}\service`, installed below Program Files only): hardened service configuration (only the privileges it needs, restricted service DACL, restart after a crash), native pipe for local, interactive accounts at medium integrity or above only (no network, no low integrity, no AppContainer), the account always from the token, a fixed list of operations with strict checks of every request, rate limits, bounded concurrent work, an event log without passwords, codes and grants. An unprotected install location leaves the service idle.

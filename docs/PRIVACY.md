@@ -1,68 +1,64 @@
-# Datenschutzhinweis
+# Privacy notice
 
-*Stand: Oktober 2026, gilt für CouchHUD ab Version 0.3*
+*As of October 2026, applies to CouchHUD from version 0.3*
 
-CouchHUD ist eine lokale Anwendung. Es gibt **kein Konto, keine Telemetrie, keine Nutzungsstatistik und keine Werbung**. Die Entwickler von CouchHUD erhalten keine Daten von dir.
+CouchHUD is a local application. There is **no account, no telemetry, no usage statistics and no advertising**. The developers of CouchHUD receive no data from you.
 
-## Was lokal gespeichert wird
+## What is stored locally
 
-| Ort | Inhalt |
+| Location | Content |
 |---|---|
-| `%APPDATA%\CouchHud` | Einstellungen (`config.json`: Favoriten, Sammlungen, Spielzeiten, eigene Einträge, Lesezeichen, Jugendschutz-Regeln), Tageszähler des Jugendschutzes (`playtime.json`), Spielstand-Sicherungen und das heruntergeladene Spielstand-Manifest, Caches für Artwork, Store-Infos und Katalog, die Sicherung der von CouchHUD geänderten Windows-Werte (`guard.json`) und der geänderten Steam-Einstellungen (`guard-steam.json`; die Einstellungen selbst stehen in Steams Datei `userdata\<Konto>\config\localconfig.vdf` und im Registry-Wert `HKCU\Software\Valve\Steam\StartupMode`, nichts davon verlässt den PC und nichts am Steam-Konto wird geändert), installierte Plugins und Skins |
-| `%LOCALAPPDATA%\CouchHud` | Protokolle (`logs`), Bild-Cache für Artwork (`artwork`, höchstens ca. 750 MB, die Bilder aktueller Einträge bleiben immer erhalten), Profil der Oberfläche (WebView2), Profil des Browsers (Verlauf, Cookies, Logins der besuchten Websites) |
+| `%APPDATA%\CouchHud` | Settings (`config.json`: favorites, collections, play times, custom entries, bookmarks, parental-control rules), the parental-control day counter (`playtime.json`), save-game backups and the downloaded save-game manifest, caches for artwork, store info and catalog, the backup of the Windows values CouchHUD changed (`guard.json`) and of the changed Steam settings (`guard-steam.json`; the settings themselves live in Steam's file `userdata\<account>\config\localconfig.vdf` and in the registry value `HKCU\Software\Valve\Steam\StartupMode`, none of it leaves the PC and nothing about the Steam account is changed), installed plugins and skins |
+| `%LOCALAPPDATA%\CouchHud` | Logs (`logs`), image cache for artwork (`artwork`, at most about 750 MB, images of current entries are always kept), profile of the interface (WebView2), profile of the browser (history, cookies, logins of the visited websites) |
 
-API-Keys und Tokens (SteamGridDB, Home Assistant, Anthropic, OpenAI, MCP) werden mit Windows DPAPI für dein Benutzerkonto verschlüsselt gespeichert. Der Controller-Code der Couch-Sperre wird nur als gesalzener Hash gespeichert. Dein Windows-Passwort speichert CouchHUD nie, weder in der Konfiguration noch im Protokoll. Nur wenn du die automatische Anmeldung einrichtest, gibst du es einmal in CouchHUD ein: Es wird mit Windows geprüft und von Windows verschlüsselt als LSA-Secret abgelegt (wie bei Sysinternals Autologon), CouchHUD behält es nicht.
+API keys and tokens (SteamGridDB, Home Assistant, Anthropic, OpenAI, MCP) are stored encrypted with Windows DPAPI for your user account. The couch-lock controller code is stored only as a salted hash. CouchHUD never stores your Windows password, neither in the configuration nor in the log. Only if you set up automatic sign-in do you enter it once in CouchHUD: it is checked with Windows and stored by Windows, encrypted, as an LSA secret (like Sysinternals Autologon); CouchHUD does not keep it.
 
-Alles lässt sich löschen, indem du die beiden Ordner entfernst.
+Everything can be deleted by removing the two folders.
 
-## Welche Verbindungen CouchHUD aufbaut
+## Which connections CouchHUD makes
 
-CouchHUD verbindet sich nur mit diesen Diensten, und nur für den genannten Zweck. Dabei sehen die Anbieter, wie bei jedem Webseitenaufruf, deine IP-Adresse.
+CouchHUD connects only to these services, and only for the stated purpose. As with any web page request, the providers see your IP address.
 
-| Dienst | Wann | Was übertragen wird |
+| Service | When | What is transmitted |
 |---|---|---|
-| Steam Store (Valve; store.steampowered.com) | Beschreibung deiner Spiele (beim Fokussieren, danach auf dem PC gespeichert) und die Suche nach Artwork im Hintergrund | App-IDs deiner Steam-Spiele. Für Spiele und Apps ohne Steam-ID wird der **Name** im Steam-Store gesucht (Suchbegriff); jeder Name höchstens einmal je 90 Tage (Treffer) bzw. 7 Tage (kein Treffer). Die Beschreibung wird in der Sprache der Oberfläche abgefragt (Deutsch bzw. Englisch, mit passendem Ländercode). Höchstens eine Anfrage gleichzeitig, mindestens 1,5 Sekunden Abstand |
-| Steam-CDN (Valve; shared.cloudflare.steamstatic.com, video.*.steamstatic.com) | Cover, Banner, Logos (einmal je Bild, dann lokal gespeichert), Screenshots und Trailer (werden nicht gespeichert) | Nur die Adresse des Bildes bzw. Videos. Wenn Steam die Bilder lokal hat (`appcache\librarycache`), werden sie von dort genommen und nicht geladen |
-| Epic-CDN (cdn1.epicgames.com u. a.) | Cover und Banner deiner Epic-Spiele, einmal je Bild | Nur die Adresse des Bildes. Die Adressen stammen aus dem Katalog-Cache des Epic Launchers auf deinem PC, es gibt keine Anfrage an eine Epic-API und keine Anmeldung |
-| SteamGridDB (www.steamgriddb.com und dessen Bild-CDN) | Nur mit eigenem API-Key, im Hintergrund und im Dialog „Artwork ändern“ | Namen bzw. IDs deiner Spiele und Apps, um Artwork zu finden. Höchstens eine Anfrage gleichzeitig, mindestens 0,6 Sekunden Abstand |
-| GitHub: Self-Update (api.github.com, github.com) | Alle 12 Stunden und bei „Nach Updates suchen“, nie während eines Spiels; abschaltbar unter Einstellungen › Updates | Abfrage der neuesten Version von CouchHUD (ETag), bei „Installieren“ der Download von Setup, Prüfsummen-Datei und Signatur. Es werden keine Daten über dich übertragen |
-| GitHub: Plugin-Katalog (raw.githubusercontent.com, Standard `kewe87/CouchHUD-Catalog`) | Beim Öffnen des Katalogs und im Hintergrund (nach dem Start und alle 12 Stunden, nie im Spiel); abschaltbar | Abruf von `index.json` und `index.json.sig`. Beim Installieren der Download des Plugins bzw. Skins von der im Index angegebenen https-Adresse (meist GitHub). Weitere Katalogquellen kannst du selbst eintragen |
-| GitHub (raw.githubusercontent.com, Ludusavi-Manifest) | Beim ersten Öffnen eines Spiels mit Spielständen, danach höchstens einmal pro Woche | Nur der Abruf der öffentlichen Datenbank (~18 MB) mit einer Versionsangabe (ETag); deine Spiele werden nicht übertragen, die Zuordnung passiert lokal |
-| Open-Meteo | Nur wenn du einen Wetter-Ort festlegst | Suchbegriff des Ortes und dessen ungefähre Koordinaten |
-| RSS-Feeds (vorkonfiguriert: WinFuture, Caschys Blog) | News-Tab | Abruf der Feeds und Bilder |
-| Home Assistant | Nur wenn eingerichtet | Anfragen an deinen eigenen Server |
-| CaseHUD (lokale API, 127.0.0.1) | Nur wenn CaseHUD installiert ist und läuft; die Seite *CaseHUD* ist geöffnet bzw. ein Spiel läuft | Steuerbefehle und Statusabfragen an das lokale CaseHUD (Port und Token stehen in dessen `api.json`), außerdem Name und Prozess-ID des laufenden Spiels, damit die Displays auf die Spiel-Szene wechseln können (abschaltbar im Expertenmodus). Verlässt den PC nicht |
-| GitHub: CaseHUD-Release (api.github.com, github.com, `kewe87/CaseHUD`) | Nur beim Öffnen der Seite *CaseHUD* (höchstens alle 10 Minuten) und bei „Installieren“ bzw. „Aktualisieren“ | Abfrage der neuesten Version; bei „Installieren“ der Download von Setup, `SHA256SUMS.txt` und `SHA256SUMS.txt.sig`. Die Signatur wird mit dem fest eingebauten CaseHUD-Release-Schlüssel (SHA-256-Fingerprint `cfb6863f23c892a53c93786dd1ee78478618aed680c5603fbc3955c1dde4abaf`) geprüft; ohne gültige Signatur und Prüfsummen wird nichts installiert. Es werden keine Daten über dich übertragen |
-| Anthropic oder OpenAI | Nur mit eigenem API-Key und nur, wenn du den Assistenten benutzt | Deine Fragen und die Informationen, die der Assistent dafür aus CouchHUD liest (z.B. Namen und Spielzeiten deiner Spiele, Einstellungen). Es gelten die Datenschutzbestimmungen des jeweiligen Anbieters. |
-| Microsoft (Windows Update), winget-Quellen | Update-Prüfung und Installation | Wie bei Windows Update bzw. winget üblich |
-| Microsoft (www.microsoft.com) | Nur bei eingeschaltetem Jugendschutz, wenn CouchHUD einen Sprung der Systemuhr bemerkt | Eine HTTPS-Anfrage (HEAD) nur auf das Datum in der Antwort, um die Uhr zu prüfen. Es werden keine Daten übertragen |
-| Microsoft (WebView2-Runtime) | Nur bei der Installation, wenn die Runtime fehlt | Das Setup bringt den WebView2-Bootstrapper mit, der die Runtime bei Microsoft herunterlädt. Später aktualisiert Windows die Runtime selbst |
-| Websites im Browser | Nur was du aufrufst (auch Links aus Nachrichten und Plugins: sie öffnen im eingebauten Browser, nicht im Windows-Standardbrowser) | Wie in jedem Browser, im eigenen Profil (Verlauf, Cookies); Suchen gehen an DuckDuckGo. Website-Einträge für Streaming mit Kopierschutz öffnen auf Wunsch im Edge, dessen Daten bleiben bei Edge |
-| Spiele-Clients (Steam, Epic, …) | Startet CouchHUD nur, die Clients verbinden sich selbst | Liegt bei den jeweiligen Anbietern |
+| Steam Store (Valve; store.steampowered.com) | Description of your games (on focus, then stored on the PC) and the background search for artwork | App IDs of your Steam games. For games and apps without a Steam ID the **name** is searched in the Steam store (search term); each name at most once per 90 days (hit) or 7 days (no hit). The description is requested in the interface language (English or German, with the matching country code). At most one request at a time, at least 1.5 seconds apart |
+| Steam CDN (Valve; shared.cloudflare.steamstatic.com, video.*.steamstatic.com) | Covers, banners, logos (once per image, then stored locally), screenshots and trailers (not stored) | Only the address of the image or video. If Steam has the images locally (`appcache\librarycache`), they are taken from there and not downloaded |
+| Epic CDN (cdn1.epicgames.com and others) | Covers and banners of your Epic games, once per image | Only the address of the image. The addresses come from the Epic launcher's catalog cache on your PC; there is no request to an Epic API and no sign-in |
+| SteamGridDB (www.steamgriddb.com and its image CDN) | Only with your own API key, in the background and in the "Change artwork" dialog | Names or IDs of your games and apps, to find artwork. At most one request at a time, at least 0.6 seconds apart |
+| GitHub: self-update (api.github.com, github.com) | Every 12 hours and on "Check for updates", never during a game; can be switched off under Settings › Updates | Query for the latest CouchHUD version (ETag); on "Install" the download of setup, checksum file and signature. No data about you is transmitted |
+| GitHub: plugin catalog (raw.githubusercontent.com, default `kewe87/CouchHUD-Catalog`) | When opening the catalog and in the background (after start and every 12 hours, never in a game); can be switched off | Fetching `index.json` and `index.json.sig`. On install, the download of the plugin or skin from the https address given in the index (usually GitHub). You can add further catalog sources yourself |
+| GitHub (raw.githubusercontent.com, Ludusavi manifest) | When first opening a game with save games, then at most once a week | Only the fetch of the public database (~18 MB) with a version marker (ETag); your games are not transmitted, matching happens locally |
+| Open-Meteo | Only if you set a weather location | Search term of the place and its approximate coordinates |
+| RSS feeds (preconfigured: WinFuture, Caschys Blog) | News tab | Fetching the feeds and images |
+| Home Assistant | Only if set up | Requests to your own server |
+| CaseHUD (local API, 127.0.0.1) | Only if CaseHUD is installed and running; the *CaseHUD* page is open or a game is running | Control commands and status queries to the local CaseHUD (port and token are in its `api.json`), plus name and process ID of the running game so the displays can switch to the game scene (can be turned off in expert mode). Does not leave the PC |
+| GitHub: CaseHUD release (api.github.com, github.com, `kewe87/CaseHUD`) | Only when opening the *CaseHUD* page (at most every 10 minutes) and on "Install" or "Update" | Query for the latest version; on "Install" the download of setup, `SHA256SUMS.txt` and `SHA256SUMS.txt.sig`. The signature is checked with the built-in CaseHUD release key (SHA-256 fingerprint `cfb6863f23c892a53c93786dd1ee78478618aed680c5603fbc3955c1dde4abaf`); without a valid signature and checksums nothing is installed. No data about you is transmitted |
+| Anthropic or OpenAI | Only with your own API key and only when you use the assistant | Your questions and the information the assistant reads from CouchHUD for them (e.g. names and play times of your games, settings). The privacy terms of the respective provider apply. |
+| Microsoft (Windows Update), winget sources | Update check and installation | As usual for Windows Update or winget |
+| Microsoft (www.microsoft.com) | Only with parental controls on, when CouchHUD notices a jump in the system clock | One HTTPS request (HEAD) used only for the date in the response, to check the clock. No data is transmitted |
+| Microsoft (WebView2 runtime) | Only at installation, if the runtime is missing | The setup brings the WebView2 bootstrapper, which downloads the runtime from Microsoft. Later, Windows updates the runtime itself |
+| Websites in the browser | Only what you open (including links from news and plugins: they open in the built-in browser, not in the Windows default browser) | As in any browser, in its own profile (history, cookies); searches go to DuckDuckGo. Website entries for DRM streaming open in Edge on request, whose data stays with Edge |
+| Game clients (Steam, Epic, …) | CouchHUD only starts them, the clients connect by themselves | Lies with the respective providers |
 
-## Artwork: lokal gespeichert, nur im Hintergrund, nur mit Rücksicht
+## Artwork: stored locally, background only, with consideration
 
-- Jedes Bild wird **einmal** heruntergeladen und liegt danach in `%LOCALAPPDATA%\CouchHudrtwork`. Die Oberfläche lädt Artwork nie selbst aus dem Internet, sondern nur von dort. Gefundene Adressen und Fehlschläge (7 Tage) werden ebenfalls gespeichert.
-- Bilder werden nur im Hintergrund nach dem Einlesen der Bibliothek geladen, **nie während ein Spiel läuft**. Pro Host gibt es eine Ratenbegrenzung, bei „zu viele Anfragen“ (HTTP 429/503) wird die Wartezeit des Servers (Retry-After) eingehalten, danach folgt exponentielles Warten. Antwortet ein Host wiederholt mit Fehlern, pausiert CouchHUD ihn für mehrere Minuten bis zu einer Stunde.
-- Anfragen tragen den Namen `CouchHUD/<Version>` als User-Agent.
-- Akzeptiert werden nur vollständige png-, jpeg-, webp- und gif-Dateien bis 12 MB; geprüft wird der Inhalt, nicht die Angabe des Servers.
-- Lokale Quellen kommen vor jeder Anfrage: Steams `librarycache`, der Katalog-Cache des Epic Launchers, Paket-Logos von Microsoft-Store-Spielen, Symbole der Programmdateien. Fehlt Artwork ganz, zeichnet CouchHUD selbst ein Banner (Name, Farbe), ohne Netzwerk.
-- Unter Einstellungen › Bibliothek (Expertenmodus) schaltest du „Artwork online suchen“ aus (dann nur noch vorhandene Bilder) und leerst den Artwork-Cache. Der Schalter gilt nur für Bilder: Beschreibungen und Altersfreigaben aus dem Steam-Store (nötig für den Jugendschutz) werden beim Fokussieren weiter geladen und gespeichert, Trailer lassen sich unter Darstellung getrennt abschalten.
-- Heruntergeladen wird nur von den oben genannten Hosts (Steam, Epic, SteamGridDB und deren CDNs); jede Weiterleitung wird geprüft, höchstens 3. Verbindungen zu Adressen im eigenen Netz oder auf diesem PC werden abgelehnt, auch wenn ein Name dorthin zeigt. Dafür nutzt CouchHUD für Artwork und Store-Abfragen nicht den Windows-Proxy.
+- Every image is downloaded **once** and then lives in `%LOCALAPPDATA%\CouchHud\artwork`. The interface never loads artwork from the internet itself, only from there. Found addresses and failures (7 days) are stored too.
+- Images are loaded only in the background after the library is read, **never while a game runs**. There is a rate limit per host; on "too many requests" (HTTP 429/503) the server's wait time (Retry-After) is honored, followed by exponential waiting. If a host answers repeatedly with errors, CouchHUD pauses it for several minutes up to an hour.
+- Requests carry the name `CouchHUD/<version>` as user agent.
+- Only complete png, jpeg, webp and gif files up to 12 MB are accepted; the content is checked, not the server's claim.
+- Local sources come before any request: Steam's `librarycache`, the Epic launcher's catalog cache, package logos of Microsoft Store games, icons of the program files. If artwork is missing entirely, CouchHUD draws a banner itself (name, color), without network.
+- Under Settings › Library (expert mode) you turn "Search artwork online" off (then only existing images remain) and clear the artwork cache. The switch applies to images only: descriptions and age ratings from the Steam store (needed for parental controls) are still loaded and stored on focus; trailers can be switched off separately under Appearance.
+- Downloads come only from the hosts named above (Steam, Epic, SteamGridDB and their CDNs); every redirect is checked, at most 3. Connections to addresses in your own network or on this PC are rejected, even if a name points there. For this, CouchHUD does not use the Windows proxy for artwork and store queries.
 
-## Dienste im Heimnetz
+## Services on the home network
 
-- **Handy-Fernbedienung** (standardmäßig aus): ein kleiner Webserver auf Port 8766 im lokalen Netz. Nur per QR-Code gekoppelte Geräte dürfen tippen und steuern.
-- **MCP-Server** (standardmäßig aus): Port 8765, nur auf diesem PC oder auf Wunsch im Heimnetz, mit Token. Jede Änderung muss am TV bestätigt werden.
+- **Phone remote** (off by default): a small web server on port 8766 in the local network. Only devices paired via QR code may type and control.
+- **MCP server** (off by default): port 8765, only on this PC or, on request, on the home network, with a token. Every change must be confirmed on the TV.
 
-## Benachrichtigungen
+## Notifications
 
-Wenn du „Benachrichtigungen spiegeln“ einschaltest und Windows den Zugriff erlaubst, liest CouchHUD die Windows-Benachrichtigungen (z.B. WhatsApp, Discord), um sie am TV anzuzeigen. Sie bleiben auf dem PC und werden nicht gespeichert.
+If you switch on "Mirror notifications" and allow Windows access, CouchHUD reads the Windows notifications (e.g. WhatsApp, Discord) to show them on the TV. They stay on the PC and are not stored.
 
 ## Plugins
 
-Plugins von Dritten können eigene Verbindungen aufbauen und eigene Daten speichern. Dafür sind die jeweiligen Plugin-Autoren verantwortlich.
-
-## Summary in English (artwork)
-
-CouchHUD downloads each cover/banner image once and serves it from `%LOCALAPPDATA%\CouchHudrtwork` afterwards; the UI never loads artwork from the internet itself. Hosts contacted: `store.steampowered.com` (game names and app IDs, one request at a time, at least 1.5 s apart, answers cached 90/7 days), the Steam CDN (`*.steamstatic.com`, only if Steam has no local copy), Epic's CDN (`cdn1.epicgames.com`, URLs taken from the Epic Launcher's local catalog cache, no API call, no login) and, only with your own key, `www.steamgriddb.com` (game names, one request at a time, at least 0.6 s apart). Requests are sent as `CouchHUD/<version>`, only in the background and never while a game is running; HTTP 429/503 `Retry-After` is honored and a failing host is paused. Only complete png/jpeg/webp/gif files up to 12 MB are kept. Settings > Library (expert mode) has a switch to turn online artwork off and a button to clear the cache.
+Third-party plugins can make their own connections and store their own data. The respective plugin authors are responsible for that.

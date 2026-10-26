@@ -1,30 +1,30 @@
-# Haftungsausschluss
+# Disclaimer
 
-*Stand: Oktober 2026, gilt für CouchHUD ab Version 0.3*
+*As of October 2026, applies to CouchHUD from version 0.3*
 
-CouchHUD ist freie Software unter der [GNU General Public License v3.0](../LICENSE). Sie wird kostenlos und **ohne jede Gewährleistung** bereitgestellt, im gesetzlich zulässigen Umfang (Abschnitte 15 und 16 der GPL-3.0). Die Nutzung erfolgt auf eigenes Risiko.
+CouchHUD is free software under the [GNU General Public License v3.0](../LICENSE). It is provided free of charge and **without any warranty**, to the extent permitted by law (sections 15 and 16 of the GPL-3.0). Use is at your own risk.
 
-## Eingriffe in Windows
+## Changes to Windows
 
-CouchHUD kann, je nach gewählter Integrationsstufe und den Funktionen, die du einschaltest, Einstellungen von Windows verändern. In der Stufe **Light** verhält sich CouchHUD wie eine normale Anwendung. In der Stufe **Voll** kann CouchHUD unter anderem:
+Depending on the integration level you choose and the features you switch on, CouchHUD can change Windows settings. At the **Light** level CouchHUD behaves like a normal application. At the **Full** level CouchHUD can, among other things:
 
-- sich für dein Benutzerkonto als Windows-Shell eintragen (statt des Desktops),
-- die Anmeldung beeinflussen (Couch-Sperre, Wächterprozess, automatische Windows-Anmeldung: das Passwort wird einmal eingegeben, geprüft und von Windows verschlüsselt als LSA-Secret abgelegt),
-- den Task-Manager im Couch-Modus sperren,
-- ausgewählte Windows-Dienste pausieren und Autostart-Programme selbst starten,
-- auf Wunsch **CaseHUD** (ein eigenes Programm für die Gehäuse-Displays) herunterladen, prüfen und mit Administrator-Bestätigung installieren (das Setup richtet einen Sensor-Dienst und einen Treiber ein) und es im Hintergrund starten,
-- Fenster von Spiele-Clients und Update-Popups minimieren und der Xbox Game Bar die Guide-Taste abnehmen („CouchHUD bleibt vorne“, im PC-Modus und beim Beenden wieder zurückgesetzt).
+- register itself as the Windows shell for your user account (instead of the desktop),
+- affect sign-in (couch lock, guard process, automatic Windows sign-in: the password is entered once, checked, and stored encrypted by Windows as an LSA secret),
+- block Task Manager in couch mode,
+- pause selected Windows services and start autostart programs itself,
+- on request, download **CaseHUD** (a separate program for case displays), verify it, install it with administrator confirmation (the setup installs a sensor service and a driver) and start it in the background,
+- minimize windows of game clients and update pop-ups and take the Guide button away from the Xbox Game Bar ("CouchHUD stays in front", reset in PC mode and on quit).
 
-Jeder Eingriff ist einzeln beschrieben, mit Ort, Admin-Bedarf und Weg zum Rückgängigmachen, in CouchHUD unter **Einstellungen › Konsole › Was CouchHUD an Windows ändert**. Für den Notfall gibt es den Wiederherstellungsmodus: **Strg + Umschalt** oder **LB + RB + View** beim Start etwa 1,5 Sekunden halten.
+Each change is described individually, with location, admin need and the way to undo it, in CouchHUD under **Settings › Console › What CouchHUD changes in Windows**. For emergencies there is recovery mode: hold **Ctrl + Shift** or **LB + RB + View** for about 1.5 seconds at start.
 
-## Wichtige Hinweise
+## Important notes
 
-- **Automatische Anmeldung** bedeutet, dass jeder mit Zugang zum PC an dein Windows-Konto kommt, wenn keine Couch-Sperre aktiv ist.
-- **Die Couch-Sperre ist nur so stark wie das Windows-Kennwort deines Kontos.** Sie hält Kinder und Gäste am Controller vom Desktop fern, ist aber keine Sicherheitslösung: Wer Tastatur und Zeit hat, den PC von einem anderen Medium startet oder die Festplatte ausbaut, kommt an deine Daten. Bei automatischer Anmeldung liegt das Kennwort (von Windows verschlüsselt) auf dem PC. Aktiviere deshalb die **Geräteverschlüsselung bzw. BitLocker** und nimm ein ordentliches Kennwort. Zudem schützt die Sperre nicht alles, was aus CouchHUD heraus gestartet wird (z.B. Spiele-Clients mit eigenen Browsern oder Datei-Dialogen); CouchHUD hält diese Clients im Couch-Modus im Hintergrund, kann aber nicht jeden Weg schließen. Die Windows-Anmeldung als Sperre verlangt ein Konto mit Kennwort; der Controller-Code geht auch ohne, mit deutlicher Warnung (ohne Kennwort kommt jeder mit Tastatur ans Konto). Die automatische Anmeldung braucht ein Kennwort und entfällt sonst. Bei geschlossener Sperre startet CouchHUD nur Spiele, minimiert klar erkannte Nicht-Spiele (Einstellungen, Explorer, Konsolen, Browser), schließt Datei- und Druckdialoge und setzt reversible Windows-Richtlinien (Details unter *Was CouchHUD an Windows ändert*). Das ist ein Kiosk-Schutz gegen Kinder und Gäste am Controller, keine Absicherung gegen Angriffe mit Tastatur, Startmedium, ausgebautem Laufwerk oder Administratorrechten; dafür sind ein gutes Kennwort und BitLocker bzw. die Geräteverschlüsselung nötig. CouchHUD aktiviert diese nicht selbst.
-- **Der Jugendschutz hat Grenzen.** Er schützt gegen Kinder am Controller, nicht gegen jemanden, der sich im Windows auskennt: Wer Dateizugriff auf den Benutzerordner hat (Einstellungen, Zähler), kann sie verändern oder löschen (eine veränderte Zeitdatei lässt den Tag zwar als verbraucht gelten, die Regeln selbst lassen sich aber ändern). Er wirkt nur als Windows-Shell mit eingeschalteter Couch-Sperre, nicht im Light-Modus und nicht im PC-Modus. Spiele, die nicht über CouchHUD gestartet wurden, werden nur gezählt, solange CouchHUD sie als laufendes Spiel erkennt; Einträge ohne erkennbaren Programmordner (Webseiten, manche Store-Apps) lassen sich nicht messen und starten deshalb nur mit Eltern-Code. Altersgrenzen beruhen auf den Angaben des Steam-Stores und sind keine Altersfreigabe. Der Eltern-Code ist der Code der Couch-Sperre oder das Windows-Kennwort: Wer ihn kennt, kann alles ändern.
-- **Spiel pausieren** hält Prozesse an. Online-Spiele können die Verbindung verlieren, Anti-Cheat-Systeme können darauf reagieren. Die Funktion ist standardmäßig aus.
-- **Plugins** stammen von Dritten. Sie laufen mit denselben Rechten wie CouchHUD. Installiere nur Plugins aus Quellen, denen du vertraust. Für Plugins und deren Folgen sind die jeweiligen Autoren verantwortlich.
-- **Cheats und Mods** (z.B. über das Wand-Plugin) können gegen die Nutzungsbedingungen von Spielen verstoßen und zu Sperren führen, besonders in Online-Spielen.
-- **Markennamen** wie Xbox, PlayStation, Steam, Epic Games, GOG, Ubisoft, EA, Battle.net, Windows, Discord, WhatsApp und andere gehören ihren Inhabern. CouchHUD steht in keiner Verbindung zu ihnen; die Skins „PS4 Classic“ und „Xbox“ sind Nachempfindungen ohne Originalgrafiken.
+- **Automatic sign-in** means that anyone with access to the PC gets into your Windows account if no couch lock is active.
+- **The couch lock is only as strong as your account's Windows password.** It keeps kids and guests at the controller away from the desktop, but it is not a security solution: whoever has a keyboard and time, boots the PC from another medium or removes the hard drive can reach your data. With automatic sign-in the password (encrypted by Windows) is stored on the PC. So enable **device encryption or BitLocker** and use a proper password. The lock also does not protect everything that is started from CouchHUD (e.g. game clients with their own browsers or file dialogs); CouchHUD keeps these clients in the background in couch mode but cannot close every path. Windows sign-in as the lock requires an account with a password; the controller code also works without one, with a clear warning (without a password anyone with a keyboard gets into the account). Automatic sign-in needs a password and is dropped otherwise. With the lock closed, CouchHUD starts only games, minimizes clearly recognized non-games (settings, Explorer, consoles, browsers), closes file and print dialogs and sets reversible Windows policies (details under *What CouchHUD changes in Windows*). This is kiosk protection against kids and guests at the controller, not a safeguard against attacks with a keyboard, boot media, a removed drive or administrator rights; for that a good password and BitLocker or device encryption are needed. CouchHUD does not enable these itself.
+- **Parental controls have limits.** They protect against kids at the controller, not against someone who knows their way around Windows: whoever has file access to the user folder (settings, counters) can change or delete them (a changed time file does count the day as used up, but the rules themselves can be changed). They work only as the Windows shell with the couch lock switched on, not in Light mode and not in PC mode. Games that were not started through CouchHUD are counted only as long as CouchHUD recognizes them as a running game; entries without a recognizable program folder (web pages, some Store apps) cannot be measured and therefore start only with the parent code. Age limits are based on the Steam store's information and are not an official age rating. The parent code is the couch-lock code or the Windows password: whoever knows it can change everything.
+- **Pausing a game** suspends processes. Online games can lose the connection, and anti-cheat systems may react. The feature is off by default.
+- **Plugins** come from third parties. They run with the same rights as CouchHUD. Install plugins only from sources you trust. The respective authors are responsible for plugins and their consequences.
+- **Cheats and mods** (e.g. via the Wand plugin) can violate games' terms of use and lead to bans, especially in online games.
+- **Brand names** such as Xbox, PlayStation, Steam, Epic Games, GOG, Ubisoft, EA, Battle.net, Windows, Discord, WhatsApp and others belong to their owners. CouchHUD is not affiliated with them; the skins "PS4 Classic" and "Xbox" are imitations without original artwork.
 
-Mit dem Bestätigen beim ersten Start erklärst du, diese Hinweise gelesen zu haben.
+By confirming on first start you declare that you have read these notes.
