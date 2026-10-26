@@ -1108,6 +1108,8 @@ function categories() {
         restart,
         ...expert(restartPc),
         shutdown,
+        // Quit is safe as the shell too: the host starts the normal Windows desktop before it closes.
+        action(t('settings.info.quit'), t('settings.info.quitDesc'), guarded(t('settings.info.quit'), () => attempt(() => api.quit())), '✕', t('settings.hint.quit')),
         { kind: 'choice', label: t('settings.power.timer'), desc: t('settings.power.timerDesc'), value: () => sleepTimerDetail(), run: chooseSleepTimer }
       ]
     },
@@ -1126,7 +1128,6 @@ function categories() {
         action(t('settings.info.wizard'), t('settings.info.wizardDesc'), openSetupWizard, '✦'),
         action(t('settings.info.disclaimer'), t('settings.info.disclaimerDesc'), () => openPage(disclaimerPage(), t('settings.cat.info'))),
         action(t('settings.info.privacy'), t('settings.info.privacyDesc'), () => openPage(privacyPage(), t('settings.cat.info'))),
-        ...(state.info.isShell ? [] : [action(t('settings.info.quit'), t('settings.info.quitDesc'), guarded(t('settings.info.quit'), () => attempt(() => api.quit())), '✕', t('settings.hint.quit'))]),
         info(t('settings.info.guide'), t('settings.info.guideDesc')),
         info(t('settings.info.app'), 'MegaHub'),
         info(t('settings.info.madeBy'), 'jjrussellite28'),

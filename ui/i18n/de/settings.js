@@ -425,7 +425,7 @@ export default {
   'settings.info.privacy': 'Datenschutz',
   'settings.info.privacyDesc': 'Keine Telemetrie. Was lokal liegt und welche Dienste CouchHUD wann kontaktiert',
   'settings.info.quit': 'CouchHUD beenden',
-  'settings.info.quitDesc': 'Schließt CouchHUD ganz, danach ist nur noch Windows da',
+  'settings.info.quitDesc': 'Schließt MegaHub ganz und zeigt den normalen Windows-Desktop',
   'settings.info.guide': 'Im Guide-Menü',
   'settings.info.guideDesc': 'Bluetooth-Geräte, Benachrichtigungen ansehen, Aufnahmen und laufende Programme öffnest du mit der Guide-Taste',
   'settings.info.notifications': 'Mitteilungen',

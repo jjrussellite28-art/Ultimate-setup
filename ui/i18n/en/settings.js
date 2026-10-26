@@ -425,7 +425,7 @@ export default {
   'settings.info.privacy': 'Privacy',
   'settings.info.privacyDesc': 'No telemetry. What is stored locally and which services MegaHub contacts and when',
   'settings.info.quit': 'Quit MegaHub',
-  'settings.info.quitDesc': 'Closes MegaHub completely, leaving only Windows',
+  'settings.info.quitDesc': 'Closes MegaHub completely and gives you the normal Windows desktop',
   'settings.info.guide': 'In the Guide menu',
   'settings.info.guideDesc': 'Bluetooth devices, notifications, captures and running programs open with the Guide button',
   'settings.info.notifications': 'Notifications',
