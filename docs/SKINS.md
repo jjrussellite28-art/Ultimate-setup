@@ -1,14 +1,14 @@
-# Skins für CouchHUD
+# Skins for CouchHUD
 
-Ein Skin ist ein Stylesheet plus optional eigene Button-Symbole. Er ändert Farben, Schriften, Formen, Abstände, Animationen, wie du willst.
+A skin is a stylesheet plus optional custom button glyphs. It changes colors, fonts, shapes, spacing and animations however you like.
 
-## Aufbau
+## Structure
 
 ```
 %APPDATA%\CouchHud\skins\synthwave\
   skin.json
   skin.css
-  (Schriften, Bilder …)
+  (fonts, images …)
 ```
 
 **skin.json**
@@ -16,15 +16,15 @@ Ein Skin ist ein Stylesheet plus optional eigene Button-Symbole. Er ändert Farb
 ```json
 {
   "name": "Synthwave",
-  "description": "Neon, Sonnenuntergang, 1986",
+  "description": "Neon, sunset, 1986",
   "glyphs": { "A": "✕", "B": "○", "X": "□", "Y": "△", "LB": "L1", "RB": "R1" },
   "sounds": { "move": "move.ogg", "select": "select.ogg", "back": "back.ogg", "notify": "notify.ogg" }
 }
 ```
 
-`sounds` ist optional. Mögliche Ereignisse: `move`, `tab`, `select`, `back`, `bump`, `open`, `close`, `notify`, `toggle`, `boot` und `music`. `music` ist ein Hintergrund-Track, der in Schleife läuft, wenn der Nutzer „UI-Sounds und Musik“ gewählt hat; ohne ihn spielt die eingebaute Musik des Skins. Erlaubt sind `.wav`, `.ogg` und `.mp3` aus dem Skin-Ordner. Für fehlende Ereignisse spielt CouchHUD das eingebaute Klangset.
+`sounds` is optional. Possible events: `move`, `tab`, `select`, `back`, `bump`, `open`, `close`, `notify`, `toggle`, `boot` and `music`. `music` is a background track that loops when the user has chosen "UI sounds and music"; without it the skin's built-in music plays. `.wav`, `.ogg` and `.mp3` files from the skin folder are allowed. For missing events CouchHUD plays the built-in sound set.
 
-**HDR**: Ist der HDR-Modus aktiv, steht `data-hdr="on"` am Root-Element. Dort kannst du kräftigere Farben setzen, am besten in Display-P3:
+**HDR**: when HDR mode is active, `data-hdr="on"` is set on the root element. There you can set more vivid colors, preferably in Display-P3:
 
 ```css
 @supports (color: color(display-p3 1 1 1)) {
@@ -34,7 +34,7 @@ Ein Skin ist ein Stylesheet plus optional eigene Button-Symbole. Er ändert Farb
 }
 ```
 
-**skin.css**: Alle Regeln gelten nur, wenn dein Skin aktiv ist:
+**skin.css**: all rules apply only when your skin is active:
 
 ```css
 :root[data-skin="user:synthwave"] {
@@ -55,50 +55,50 @@ Ein Skin ist ein Stylesheet plus optional eigene Button-Symbole. Er ändert Farb
 }
 ```
 
-Eigene Schriften und Bilder legst du in den Skin-Ordner und bindest sie relativ ein (`url("orbitron.woff2")`).
+Put your own fonts and images in the skin folder and reference them relatively (`url("orbitron.woff2")`).
 
-**Nur lokale Dateien:** CouchHUD ersetzt Internet-Adressen (`http://`, `https://`, `//host/…`) in `skin.css` durch `about:blank`, bevor es das Stylesheet ausliefert. Ein Skin soll nicht bei jedem Bild bei einem fremden Server anfragen können und ihm so verraten, wann jemand auf der Couch sitzt. Bilder, Schriften und Klänge gehören deshalb in den Skin-Ordner (oder als `data:`-Adresse ins CSS). Der Skin-Ordner darf nur auf lokale Laufwerke zeigen, nie auf Netzlaufwerke oder Freigaben (`\\server\…`). Beim Installieren per `.zip` weist CouchHUD darauf hin, dass ein Skin Inhalte laden kann.
+**Local files only:** CouchHUD replaces internet addresses (`http://`, `https://`, `//host/…`) in `skin.css` with `about:blank` before it serves the stylesheet. A skin should not be able to ask a foreign server for every image and thereby reveal when someone is sitting on the couch. Images, fonts and sounds therefore belong in the skin folder (or as a `data:` address in the CSS). The skin folder may only point to local drives, never to network drives or shares (`\\server\…`). When installing from a `.zip`, CouchHUD points out that a skin can load content.
 
-## Wichtige Variablen
+## Key variables
 
-| Variable | Wirkung |
+| Variable | Effect |
 |---|---|
-| `--bg`, `--fg`, `--muted` | Hintergrund, Text, gedämpfter Text |
-| `--accent`, `--accent-glow`, `--accent-contrast` | Akzentfarbe, ihr Leuchten, Textfarbe auf dem Akzent |
-| `--panel` | Hintergrund von Karten, Listen, Menüs |
-| `--font` | Schriftfamilie |
-| `--tile-radius`, `--shelf-tile`, `--focus-scale` | Ecken, Kachelgröße auf Home, Zoom des Fokus |
+| `--bg`, `--fg`, `--muted` | Background, text, muted text |
+| `--accent`, `--accent-glow`, `--accent-contrast` | Accent color, its glow, text color on the accent |
+| `--panel` | Background of cards, lists, menus |
+| `--font` | Font family |
+| `--tile-radius`, `--shelf-tile`, `--focus-scale` | Corners, tile size on Home, focus zoom |
 
-Für alles andere kannst du die Selektoren aus `ui/styles.css` überschreiben. Die eingebauten Skins in `ui/skins/` (PS4, Xbox, Cyberpunk, Nova) zeigen, wie weit das geht: Die PS4-Skin dreht z.B. das ganze Home-Layout um.
+For everything else you can override the selectors from `ui/styles.css`. The built-in skins in `ui/skins/` (PS4, Xbox, Cyberpunk, Nova) show how far this goes: the PS4 skin, for example, turns the whole Home layout around.
 
-## Mauszeiger
+## Mouse pointer
 
-Bewegt der Nutzer eine Maus, zeichnet CouchHUD einen eigenen Zeiger. Er kommt aus dem Skin: Jeder Skin darf ihn setzen, ein Skin ohne eigenen Zeiger zeigt automatisch den Standard-Pfeil von CouchHUD. Mit der Einstellung „Echter Mauszeiger“ (Einstellungen › Darstellung) zeigt der Nutzer stattdessen den normalen Windows-Zeiger, dann greift dein Zeiger nicht.
+When the user moves a mouse, CouchHUD draws its own pointer. It comes from the skin: every skin may set it, a skin without its own pointer automatically shows CouchHUD's default arrow. With the setting "Real mouse pointer" (Settings › Appearance) the user shows the normal Windows pointer instead, and then your pointer does not apply.
 
-| Variable | Wirkung |
+| Variable | Effect |
 |---|---|
-| `--pointer` | Bild des Zeigers, am besten ein kleines SVG als `data:`-Adresse: `url("data:image/svg+xml,…")` (`#` als `%23` schreiben) |
-| `--pointer-size` | Kantenlänge des quadratischen Bildes, Standard `4.6rem` |
-| `--pointer-hx`, `--pointer-hy` | Hotspot als Bruchteil der Größe, `0 0` ist die linke obere Ecke, `0.5 0.5` die Mitte. Genau dort sitzt die Mausposition |
+| `--pointer` | Pointer image, ideally a small SVG as a `data:` address: `url("data:image/svg+xml,…")` (write `#` as `%23`) |
+| `--pointer-size` | Edge length of the square image, default `4.6rem` |
+| `--pointer-hx`, `--pointer-hy` | Hotspot as a fraction of the size, `0 0` is the top-left corner, `0.5 0.5` the center. The mouse position sits exactly there |
 
 ```css
 :root[data-skin="user:synthwave"] {
   --pointer: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><path d='M5 3 L5 35 L13 27.5 L19 41 L25.5 38.2 L19.5 25 L31 25 Z' fill='%23ff2bd6' stroke='%2312141c' stroke-width='3.2' stroke-linejoin='round'/></svg>");
-  --pointer-hx: 0.104;  /* Spitze des Pfeils bei (5, 3) von 48 */
+  --pointer-hx: 0.104;  /* arrow tip at (5, 3) of 48 */
   --pointer-hy: 0.0625;
 }
 ```
 
-Tipps: Ein Zeiger muss auf dem Fernseher aus dem Sessel auffallen. Eine dunkle Kontur (hier `#12141c`) hält ihn auf hellem Hintergrund sichtbar, eine helle Füllung auf dunklem. Der Zeiger ruht, solange die Maus still steht, bitte keine Endlos-Animation. Wer den Zeiger per CSS selbst zeichnen will, kann `#cursor .cp` direkt stylen (`.click` am `#cursor` liegt kurz beim Klick an) und bei `:root[data-motion="off"]` auf Bewegung verzichten, das ist die Einstellung „Animationen reduzieren“. Ein relativer Pfad in `--pointer` ist nur zuverlässig, wenn du ihn direkt als `background-image` von `#cursor .cp` setzt.
+Tips: a pointer must stand out on the TV from the armchair. A dark outline (here `#12141c`) keeps it visible on a light background, a light fill on a dark one. The pointer rests while the mouse is still, so please no endless animation. If you want to draw the pointer yourself in CSS, you can style `#cursor .cp` directly (`.click` is set on `#cursor` briefly during a click) and drop motion under `:root[data-motion="off"]`, which is the "Reduce animations" setting. A relative path in `--pointer` is only reliable if you set it directly as the `background-image` of `#cursor .cp`.
 
-Das ist nur der Zeiger innerhalb von CouchHUD. In anderen Fenstern bleibt es der Windows-Zeiger.
+This is only the pointer inside CouchHUD. In other windows it stays the Windows pointer.
 
-## Ausprobieren
+## Trying it out
 
-CouchHUD mit `--dev` starten, unter *Einstellungen › Darstellung › Skin* deinen Skin wählen. Änderungen an der CSS siehst du nach erneutem Auswählen.
+Start CouchHUD with `--dev` and choose your skin under *Settings › Appearance › Skin*. You see changes to the CSS after selecting it again.
 
-Ohne Windows geht es auch: `node scripts/preview-server.js` startet die Oberfläche mit Beispieldaten im Browser. Eigene Skins dort einfach als weitere Datei in `ui/skins/` anlegen und in `ui/skins/index.js` eintragen.
+It also works without Windows: `node scripts/preview-server.js` starts the interface with sample data in the browser. Just add your own skins there as another file in `ui/skins/` and register it in `ui/skins/index.js`.
 
-## Teilen
+## Sharing
 
-Ordner als `.zip` packen (mit oder ohne übergeordneten Ordner), auf GitHub mit dem Topic `couchhud-skin` veröffentlichen. Andere installieren ihn in CouchHUD unter *Einstellungen › Darstellung › Neue Skins installieren*.
+Pack the folder as a `.zip` (with or without a parent folder) and publish it on GitHub with the topic `couchhud-skin`. Others install it in CouchHUD under *Settings › Appearance › Install new skins*.
