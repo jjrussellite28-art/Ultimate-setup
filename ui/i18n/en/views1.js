@@ -95,6 +95,8 @@ export default {
   'browser.bar.zoomOut': 'Zoom out',
   'browser.bar.zoomIn': 'Zoom in',
   'browser.bar.fullscreen': 'Full screen',
+  'browser.bar.lockMouse': 'Lock mouse',
+  'browser.hintMouseLock': 'Mouse lock',
   'browser.bar.close': 'Close page',
   'browser.removeConfirm': 'Remove bookmark “{name}”?',
   'browser.remove': 'Remove',

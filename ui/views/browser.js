@@ -94,7 +94,7 @@ async function bookmarkThis() {
   render();
 }
 
-// i18n-used: browser.bar.back browser.bar.forward browser.bar.reload browser.bar.zoomOut browser.bar.zoomIn browser.bar.fullscreen browser.bar.close browser.bookmarkThis
+// i18n-used: browser.bar.back browser.bar.forward browser.bar.reload browser.bar.zoomOut browser.bar.zoomIn browser.bar.fullscreen browser.bar.close browser.bar.lockMouse browser.bookmarkThis
 // Bar buttons: Segoe Fluent Icons (Windows 11; Segoe MDL2 Assets before).
 const BAR = [
   { id: 'back', icon: '', label: 'browser.bar.back', run: () => api.browserCommand('back'), enabled: (s) => s.canGoBack },
@@ -105,6 +105,8 @@ const BAR = [
   { id: 'zoomOut', icon: '', label: 'browser.bar.zoomOut', run: () => api.browserCommand('zoomOut') },
   { id: 'zoomIn', icon: '', label: 'browser.bar.zoomIn', run: () => api.browserCommand('zoomIn') },
   { id: 'fullscreen', icon: '', label: 'browser.bar.fullscreen', run: () => { focusPage(); return api.browserCommand('fullscreen'); } },
+  { id: 'lock', icon: '', label: 'browser.bar.lockMouse', run: () => api.browserCommand('lockMouse') },
+  { id: 'lock', icon: '', label: 'browser.bar.lockMouse', run: () => api.browserCommand('lockMouse') },
   { id: 'close', icon: '', label: 'browser.bar.close', run: () => api.browserCommand('close') }
 ];
 
@@ -293,7 +295,7 @@ export const browserView = {
       return this.focus === 'page'
         ? (state.inputSource === 'keyboard'
           ? [['F6', t('browser.hintBar')], ['F11', t('browser.hintFullscreen')], ['Y', t('browser.hintAddress')]]
-          : [['A', t('browser.hintClick')], ['X', t('browser.hintType')], ['B', t('browser.hintBack')], ['Y', t('browser.hintAddress')], ['LB', t('browser.hintZoomOut')], ['RB', t('browser.hintZoomIn')], ['View', t('browser.hintBar')]])
+          : [['A', t('browser.hintClick')], ['X', t('browser.hintType')], ['Start', t('browser.hintMouseLock')], ['B', t('browser.hintBack')], ['Y', t('browser.hintAddress')], ['LB', t('browser.hintZoomOut')], ['RB', t('browser.hintZoomIn')], ['View', t('browser.hintBar')]])
         : [['←→', t('browser.hintPick')], ['A', t('browser.hintPress')], ['Y', t('browser.hintAddress')], ['B', t('browser.hintToPage')], ['LB', t('browser.hintTabs')]];
     }
     const removable = this.list?.[this.index]?.bookmark || this.list?.[this.index]?.recent;

@@ -435,11 +435,63 @@ public sealed class BrowserPane : Grid
         if (submit) await SendKeyAsync("Enter", 0x0D);
     }
 
+    // ---- Keeping the mouse inside the page: the sticks move the real Windows cursor, which must not wander off to other windows.
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "ClipCursor")]
+    private static extern bool ClipCursorTo(ref CouchHud.Shell.Native.NativeMethods.Rect rect);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "ClipCursor")]
+    private static extern bool ClipCursorFree(IntPtr none);
+
+    private bool _confine;
+    private bool _confineHooked;
+
+    /// <summary>The cursor can't leave the page area while on (and the CouchHUD window is in front); off lets it go.</summary>
+    public void ConfineCursor(bool on)
+    {
+        _confine = on;
+        try
+        {
+            if (on && !_confineHooked && Window.GetWindow(this) is { } window)
+            {
+                _confineHooked = true;
+                // Never keep the cursor caught while another window is in front.
+                window.Deactivated += (_, _) => ClipCursorFree(IntPtr.Zero);
+                window.Activated += (_, _) => ApplyConfine();
+            }
+            ApplyConfine();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.Error.WriteLine($"[browser] confine: {ex.Message}");
+        }
+    }
+
+    private void ApplyConfine()
+    {
+        if (!_confine || !IsVisible || ActualWidth < 8 || ActualHeight < 8)
+        {
+            ClipCursorFree(IntPtr.Zero);
+            return;
+        }
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var p = PointToScreen(new System.Windows.Point(0, 0));
+        var rect = new CouchHud.Shell.Native.NativeMethods.Rect
+        {
+            Left = (int)p.X,
+            Top = (int)p.Y,
+            Right = (int)(p.X + ActualWidth * dpi.DpiScaleX),
+            Bottom = (int)(p.Y + ActualHeight * dpi.DpiScaleY)
+        };
+        ClipCursorTo(ref rect);
+    }
+
     /// <summary>Ends the page: the web view disposed (its process goes with it).</summary>
     public void Dispose()
     {
         try
         {
+            ClipCursorFree(IntPtr.Zero);
             _web.Dispose();
         }
         catch (InvalidOperationException ex)

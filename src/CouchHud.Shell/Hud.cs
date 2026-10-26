@@ -3884,6 +3884,7 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
             _window?.SetBrowserFullScreen(pane.FullScreen);
             if (pane.FullScreen) SetBrowserFocus(true);
             if (pane.ManualFullScreen) Emit("toast", Strings.Get("browser.fullscreenHint"));
+            ApplyMouseLock();
             Emit("browser", BrowserState());
         };
         // F6 / Alt+Up on a keyboard: the way back to the bar.
@@ -3926,6 +3927,7 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
         }
         _browserShown = true;
         _window?.PlaceBrowser(_browser, x, y, width, height);
+        if (_browsing) ApplyMouseLock();
     }
 
     private void HideBrowserPane()
@@ -3936,6 +3938,18 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
         // Like a tab in the background: what plays stops.
         _browser.PauseMedia();
         _window?.HideBrowser();
+    }
+
+    /// <summary>The mouse stays inside the page while the controller steers it (on by default; the Start button or the bar's lock button switches it).</summary>
+    private bool _mouseLock = true;
+
+    private void ApplyMouseLock() => _browser?.ConfineCursor(_mouseLock && _browsing && _browserShown);
+
+    private void ToggleMouseLock()
+    {
+        _mouseLock = !_mouseLock;
+        ApplyMouseLock();
+        Emit("toast", Strings.Get(_mouseLock ? "browser.mouseLocked" : "browser.mouseFree"));
     }
 
     /// <summary>Who gets the controller: the page (sticks are the mouse, buttons are browser keys) or the HUD's bar.</summary>
@@ -3958,6 +3972,7 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
             _mouse?.Stop();
             _window?.FocusHud();
         }
+        ApplyMouseLock();
     }
 
     /// <summary>The HUD bar's buttons.</summary>
@@ -3985,6 +4000,9 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
                 break;
             case "fullscreen":
                 browser.SetManualFullScreen(true);
+                break;
+            case "lockMouse":
+                ToggleMouseLock();
                 break;
             case "close":
                 CloseBrowser(false);
@@ -4118,9 +4136,12 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
                     Emit("browserui", "exit");
                 }
                 return true;
+            case "start":
+                // Start: keep the mouse inside the page, or let it go.
+                ToggleMouseLock();
+                return true;
             case "up":
             case "back":
-            case "start":
                 // Up from the page (or the View button): the controller goes to the HUD's bar above it.
                 SetBrowserFocus(false);
                 Emit("browserui", "bar");
@@ -4185,6 +4206,7 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
         failed = _browser?.Failed == true,
         tv = _browser?.TvMode == true,
         zoom = config.Current.BrowserZoom,
+        mouseLock = _mouseLock,
         bookmarks = config.Current.Bookmarks
     };
 

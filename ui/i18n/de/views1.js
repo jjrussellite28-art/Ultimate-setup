@@ -95,6 +95,8 @@ export default {
   'browser.bar.zoomOut': 'Verkleinern',
   'browser.bar.zoomIn': 'Vergrößern',
   'browser.bar.fullscreen': 'Vollbild',
+  'browser.bar.lockMouse': 'Maus sperren',
+  'browser.hintMouseLock': 'Mausfang',
   'browser.bar.close': 'Seite schließen',
   'browser.removeConfirm': 'Lesezeichen „{name}“ entfernen?',
   'browser.remove': 'Entfernen',
