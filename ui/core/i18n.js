@@ -5,20 +5,19 @@
 //   t('area.key', { name: 'Zelda' })   "{name}" placeholders
 //   t('area.key', { count: 3 })        value { one, other } picks by count; {count} is filled in too
 //
-// Fallback: active language, then German, then the key itself (so a missing text is visible, not blank).
+// Fallback: active language, then English, then the key itself (so a missing text is visible, not blank).
 import { api } from './api.js';
 import { dictionaries } from '../i18n/index.js';
 
 const SUPPORTED = ['de', 'en'];
 
-/** "auto" follows the browser/Windows display language: de-* is German, everything else English. */
-export function resolveLanguage(setting, navigatorLanguage = globalThis.navigator?.language) {
-  if (SUPPORTED.includes(setting)) return setting;
-  return String(navigatorLanguage || 'de').toLowerCase().startsWith('de') ? 'de' : 'en';
+/** English is the default: "auto" means English. German is used only when it is chosen in the settings. */
+export function resolveLanguage(setting) {
+  return SUPPORTED.includes(setting) ? setting : 'en';
 }
 
-let active = 'de';
-let activeLocale = 'de-DE';
+let active = 'en';
+let activeLocale = 'en-GB';
 
 export function setLang(setting) {
   active = resolveLanguage(setting);
@@ -36,7 +35,7 @@ function lookup(key, language) {
 }
 
 export function t(key, params = {}) {
-  let text = lookup(key, active) ?? lookup(key, 'de');
+  let text = lookup(key, active) ?? lookup(key, 'en');
   if (text === undefined) {
     console.warn(`[i18n] missing key ${key}`);
     return key;

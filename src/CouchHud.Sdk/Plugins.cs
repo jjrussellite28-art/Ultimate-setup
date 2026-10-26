@@ -38,9 +38,9 @@ public interface IPluginContext
     /// <summary>
     /// The language CouchHud shows right now: "de" or "en". Texts registered once (settings, pages, quick actions)
     /// are written in this language; <see cref="IPluginEvents.LanguageChanged"/> says when to register them again.
-    /// Hosts older than this member answer "de" (the default implementation), so plugins keep working.
+    /// Hosts older than this member answer "en" (the default implementation), so plugins keep working.
     /// </summary>
-    string Language => "de";
+    string Language => "en";
 
     // ---- SDK v2 ----
 

@@ -199,7 +199,7 @@ public sealed class AppConfig
     /// <summary>Settings view: false shows only everyday settings, true adds the expert sections.</summary>
     public bool ExpertMode { get; set; }
 
-    /// <summary>Language of the interface: "auto" (Windows display language), "de" or "en".</summary>
+    /// <summary>Language of the interface: "auto" (English), "de" or "en".</summary>
     public string Language { get; set; } = "auto";
 
     /// <summary>

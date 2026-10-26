@@ -189,7 +189,7 @@
         pasteHint: 'Long-press the field and choose "Paste"'
       }
     };
-    const LANG = /^de/i.test(navigator.language || 'de') ? 'de' : 'en';
+    const LANG = 'en';
     const tr = (key, params = {}) => R[LANG][key].replace(/\{(\w+)\}/g, (m, n) => (n in params ? params[n] : m));
     document.documentElement.lang = LANG;
     for (const n of document.querySelectorAll('[data-r]')) n.textContent = tr(n.dataset.r);

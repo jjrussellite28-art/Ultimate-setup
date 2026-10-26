@@ -95,7 +95,7 @@ function steps(page) {
       lead: () => t('wizard.welcome.lead'),
       later: () => where('settings.cat.info', 'settings.language.title'),
       hero: true,
-      options: () => [['de', 'Deutsch', t('wizard.welcome.de')], ['en', 'English', t('wizard.welcome.en')]].map(([id, title, bullet]) => ({
+      options: () => [['en', 'English', t('wizard.welcome.en')], ['de', 'Deutsch', t('wizard.welcome.de')]].map(([id, title, bullet]) => ({
         id, title, icon: '🌐', bullets: [bullet], current: lang() === id, compact: true,
         run: async () => {
           if (id === lang()) return 'next';

@@ -117,7 +117,7 @@ public static class CatalogParser
 
     /// <param name="allowLocal">Developer switch: also accept http://127.0.0.1, localhost and file: URLs.</param>
     /// <param name="language">"de" or "en"; falls back to the other language.</param>
-    public static IReadOnlyList<CatalogEntry> Parse(string json, string source, string language = "de", bool allowLocal = false)
+    public static IReadOnlyList<CatalogEntry> Parse(string json, string source, string language = "en", bool allowLocal = false)
     {
         JsonDocument doc;
         try

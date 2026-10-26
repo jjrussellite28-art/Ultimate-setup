@@ -5,21 +5,21 @@ namespace CouchHud.Core.Localization;
 
 /// <summary>
 /// Texts the host shows itself (notifications, error messages that reach the UI, tray menu,
-/// message boxes). German is the default and the fallback; the UI has its own files in ui/i18n.
+/// message boxes). English is the default and the fallback; the UI has its own files in ui/i18n.
 /// The language comes from the config ("auto", "de" or "en") and can change while running.
 /// </summary>
 public static partial class Strings
 {
     /// <summary>The active language, "de" or "en".</summary>
-    public static string Language { get; private set; } = "de";
+    public static string Language { get; private set; } = "en";
 
-    /// <summary>Maps the config value to "de" or "en". "auto" follows the Windows display language.</summary>
+    /// <summary>Maps the config value to "de" or "en". "auto" means English.</summary>
     public static string Resolve(string? setting, CultureInfo? ui = null)
     {
         if (string.Equals(setting, "de", StringComparison.OrdinalIgnoreCase)) return "de";
         if (string.Equals(setting, "en", StringComparison.OrdinalIgnoreCase)) return "en";
-        var culture = ui ?? CultureInfo.CurrentUICulture;
-        return culture.TwoLetterISOLanguageName.Equals("de", StringComparison.OrdinalIgnoreCase) ? "de" : "en";
+        // English is the default for everyone; German only when chosen in the settings.
+        return "en";
     }
 
     public static void Use(string? setting) => Language = Resolve(setting);
@@ -27,14 +27,14 @@ public static partial class Strings
     internal static IReadOnlyDictionary<string, string> German => De;
     internal static IReadOnlyDictionary<string, string> English => En;
 
-    /// <summary>The text for a key in the active language; falls back to German, then to the key itself.</summary>
+    /// <summary>The text for a key in the active language; falls back to English, then to the key itself.</summary>
     public static string Get(string key, params object?[] args) => GetIn(Language, key, args);
 
     /// <summary>Like <see cref="Get"/> for a given language, independent of the active one (tests).</summary>
     internal static string GetIn(string language, string key, params object?[] args)
     {
-        var table = language == "en" ? En : De;
-        if (!table.TryGetValue(key, out var text) && !De.TryGetValue(key, out text)) return key;
+        var table = language == "de" ? De : En;
+        if (!table.TryGetValue(key, out var text) && !En.TryGetValue(key, out text)) return key;
         if (args.Length == 0) return text;
         try
         {

@@ -83,11 +83,10 @@ SolidCompression=yes
 ; The self-update starts a helper that restarts CouchHUD after the setup (SelfUpdateManager.StartRestarter).
 CloseApplications=yes
 RestartApplications=no
-; The setup language follows the Windows display language: German for German, English for anything else
-; (the first language below is the fallback). No language dialog, no "same language as last time".
+; The setup is always English (the first language below). No language dialog, no "same language as last time".
 ShowLanguageDialog=no
 UsePreviousLanguage=no
-LanguageDetectionMethod=uilanguage
+LanguageDetectionMethod=none
 
 [Languages]
 Name: "en"; MessagesFile: "compiler:Default.isl"; InfoBeforeFile: "info-en.txt"
