@@ -1,19 +1,19 @@
-# Plugins für CouchHUD
+# Plugins for CouchHUD
 
-Plugins erweitern CouchHUD um neue Spiele-Quellen, Seiten, Einstellungen, Einträge im Guide-Menü und Werkzeuge für den KI-Assistenten. Sie sind normale .NET-Klassenbibliotheken gegen `CouchHud.Sdk`.
+Plugins extend CouchHUD with new game sources, pages, settings, entries in the Guide menu and tools for the AI assistant. They are normal .NET class libraries against `CouchHud.Sdk`.
 
-Das Beispiel im Repository ist **[plugins/CouchHud.Plugin.Wand](../plugins/CouchHud.Plugin.Wand/WandPlugin.cs)**: eine Datei, die Einstellungen, eine Seite, eine Quick-Action, ein Tool und Events nutzt.
+The example in the repository is **[plugins/CouchHud.Plugin.Wand](../plugins/CouchHud.Plugin.Wand/WandPlugin.cs)**: one file that uses settings, a page, a quick action, a tool and events.
 
-## In fünf Minuten zum eigenen Plugin
+## Your own plugin in five minutes
 
 ```powershell
-dotnet new classlib -n CouchHud.Plugin.Hallo -f net10.0
-cd CouchHud.Plugin.Hallo
-# Referenz auf das SDK (aus dem CouchHUD-Repo oder der CouchHud.Sdk.dll neben der CouchHud.exe)
+dotnet new classlib -n CouchHud.Plugin.Hello -f net10.0
+cd CouchHud.Plugin.Hello
+# Reference the SDK (from the CouchHUD repo or the CouchHud.Sdk.dll next to CouchHud.exe)
 dotnet add reference ..\couchhud\src\CouchHud.Sdk\CouchHud.Sdk.csproj
 ```
 
-In der `.csproj` das SDK nicht mitkopieren, CouchHUD bringt es selbst mit:
+In the `.csproj`, do not copy the SDK along; CouchHUD brings it itself:
 
 ```xml
 <ProjectReference Include="..\couchhud\src\CouchHud.Sdk\CouchHud.Sdk.csproj" Private="false" ExcludeAssets="runtime" />
@@ -23,9 +23,9 @@ In der `.csproj` das SDK nicht mitkopieren, CouchHUD bringt es selbst mit:
 ```csharp
 using CouchHud.Sdk;
 
-public sealed class HalloPlugin : IPlugin
+public sealed class HelloPlugin : IPlugin
 {
-    public string Id => "hallo";
+    public string Id => "hello";
 
     public void Initialize(IPluginContext context)
     {
@@ -33,63 +33,63 @@ public sealed class HalloPlugin : IPlugin
         {
             Id = "wave",
             Icon = "👋",
-            Label = "Hallo sagen",
-            Run = _ => Task.FromResult<string?>("Hallo vom Plugin!")
+            Label = "Say hello",
+            Run = _ => Task.FromResult<string?>("Hello from the plugin!")
         });
 
-        context.Events.GameStarted += game => context.Notify("Viel Spaß", game.Name);
+        context.Events.GameStarted += game => context.Notify("Have fun", game.Name);
     }
 }
 ```
 
-Bauen und nach `%APPDATA%\CouchHud\plugins\CouchHud.Plugin.Hallo\` kopieren (Ordnername = Name der DLL). CouchHUD neu starten, fertig. Alternativ den Ordner als `.zip` packen und in CouchHUD unter *Einstellungen › Expertenmodus › Plugins & Skins › Plugin installieren* auswählen.
+Build it and copy it to `%APPDATA%\CouchHud\plugins\CouchHud.Plugin.Hello\` (folder name = name of the DLL). Restart CouchHUD, done. Alternatively pack the folder as a `.zip` and pick it in CouchHUD under *Settings › Expert mode › Plugins & skins › Install plugin*.
 
-## Was ein Plugin kann (SDK v2)
+## What a plugin can do (SDK v2)
 
-| Methode | Wofür |
+| Method | Purpose |
 |---|---|
-| `RegisterLibraryProvider(ILibraryProvider)` | Spiele oder Apps für die Bibliothek (Kodi, GOG, Emulatoren …) |
-| `RegisterSettings(params PluginSetting[])` | Einstellungen (Toggle, Text, Geheim, Auswahl). CouchHUD zeigt und speichert sie, lesen über `context.Settings` |
-| `RegisterPage(PluginPage)` | Eine Listen-Seite mit Zeilen (`PluginRow`), A auf einer Zeile ruft `Activate` auf |
-| `RegisterQuickAction(QuickAction)` | Eintrag im Guide-Menü, z.B. „Licht aus“ |
-| `RegisterTool(PluginTool)` | Werkzeug für den KI-Assistenten und MCP-Clients. Der Name wird zu `plugin_<plugin>_<werkzeug>`; ein Name, den es schon gibt, wird abgelehnt. Mit `Writes = true` bestätigt der Nutzer vorher am TV (Assistent); über MCP wird **jedes** Plugin-Werkzeug bestätigt, die Frage zeigt die Argumente. Bei gesperrter Couch laufen Plugin-Werkzeuge nicht |
-| `Notify(title, body)` | Hinweis auf dem TV und in der Benachrichtigungsliste |
-| `OpenUrl(url)` | Öffnet eine http(s)-Adresse im eingebauten CouchHUD-Browser (nie im Windows-Standardbrowser), nur bei entsperrter Couch; `false`, wenn abgelehnt |
-| `Events` | `GameStarted`, `GameEnded` (mit Spielzeit), `PcModeEntered`, `CouchModeEntered`, `LanguageChanged`, `LockChanged` (SDK 2) |
-| `Locked` | **SDK 2:** `true`, solange die Couch gesperrt ist (ein Gast oder Kind am Controller). Dann nichts auf eigene Faust starten oder umschalten, z.B. keinen Autostart bei `GameStarted`. Ältere CouchHUD-Versionen antworten `false` |
-| `Language` | Die Sprache von CouchHUD jetzt: `"de"` oder `"en"` |
-| `Settings` | Gespeicherte Werte, `Get`, `GetBool`, `Set` |
-| `DataDirectory` | Eigener, beschreibbarer Ordner für Cache und Dateien |
+| `RegisterLibraryProvider(ILibraryProvider)` | Games or apps for the library (Kodi, GOG, emulators …) |
+| `RegisterSettings(params PluginSetting[])` | Settings (toggle, text, secret, choice). CouchHUD shows and stores them, read them via `context.Settings` |
+| `RegisterPage(PluginPage)` | A list page with rows (`PluginRow`); A on a row calls `Activate` |
+| `RegisterQuickAction(QuickAction)` | Entry in the Guide menu, e.g. "Lights off" |
+| `RegisterTool(PluginTool)` | Tool for the AI assistant and MCP clients. The name becomes `plugin_<plugin>_<tool>`; a name that already exists is rejected. With `Writes = true` the user confirms on the TV first (assistant); over MCP **every** plugin tool is confirmed, and the question shows the arguments. Plugin tools do not run while the couch is locked |
+| `Notify(title, body)` | Notice on the TV and in the notification list |
+| `OpenUrl(url)` | Opens an http(s) address in CouchHUD's built-in browser (never in the Windows default browser), only when the couch is unlocked; `false` if refused |
+| `Events` | `GameStarted`, `GameEnded` (with play time), `PcModeEntered`, `CouchModeEntered`, `LanguageChanged`, `LockChanged` (SDK 2) |
+| `Locked` | **SDK 2:** `true` while the couch is locked (a guest or child at the controller). Then do not start or switch anything on your own, e.g. no autostart on `GameStarted`. Older CouchHUD versions answer `false` |
+| `Language` | CouchHUD's language right now: `"de"` or `"en"` |
+| `Settings` | Stored values, `Get`, `GetBool`, `Set` |
+| `DataDirectory` | Your own writable folder for cache and files |
 
-**Deklarativ statt HTML**: Plugins beschreiben Seiten als Daten. CouchHUD rendert sie im aktiven Skin, mit Controller, Maus und Tastatur. Dein Plugin sieht in jedem Skin richtig aus, ohne eine Zeile CSS.
+**Declarative instead of HTML**: plugins describe pages as data. CouchHUD renders them in the active skin, with controller, mouse and keyboard. Your plugin looks right in every skin without a line of CSS.
 
 ## plugin.json
 
-Optional, aber empfohlen, liegt neben der DLL:
+Optional but recommended, lies next to the DLL:
 
 ```json
 {
-  "name": "Hallo",
+  "name": "Hello",
   "version": "1.0.0",
-  "author": "dein-name",
-  "description": "Sagt Hallo",
-  "homepage": "https://github.com/dein-name/couchhud-hallo",
+  "author": "your-name",
+  "description": "Says hello",
+  "homepage": "https://github.com/your-name/couchhud-hello",
   "sdk": 1
 }
 ```
 
-`description` ist ein Text oder pro Sprache `{ "de": "Sagt Hallo", "en": "Says hello" }`. CouchHUD zeigt die Beschreibung in der eingestellten Sprache und fällt auf die andere zurück.
+`description` is a text or per language `{ "de": "Sagt Hallo", "en": "Says hello" }`. CouchHUD shows the description in the chosen language and falls back to the other.
 
-`sdk` ist die SDK-Version, die das Plugin braucht. Ältere CouchHUD-Versionen laden es dann gar nicht erst, statt abzustürzen. SDK 2 ist abwärtskompatibel: Plugins für SDK 1 laufen unverändert weiter, `Locked` und `LockChanged` sind nur Zusätze (mit Standardimplementierung, ein Plugin, das sie nutzt, läuft auch auf einem älteren CouchHUD, dort ist `Locked` immer `false`). Wer sie braucht, schreibt `"sdk": 2` nur, wenn das Plugin ohne sie nicht sicher ist.
+`sdk` is the SDK version the plugin needs. Older CouchHUD versions then do not load it at all instead of crashing. SDK 2 is backward compatible: plugins for SDK 1 keep running unchanged, `Locked` and `LockChanged` are only additions (with a default implementation; a plugin that uses them also runs on an older CouchHUD, where `Locked` is always `false`). Write `"sdk": 2` only if the plugin is not safe without them.
 
-## Zwei Sprachen
+## Two languages
 
-CouchHUD gibt es auf Deutsch und Englisch, und die Sprache lässt sich zur Laufzeit umstellen. Dein Plugin liest sie mit `context.Language` (`"de"` oder `"en"`; ältere CouchHUD-Versionen melden immer `"de"`, das Plugin läuft also weiter).
+CouchHUD comes in German and English, and the language can be switched at runtime. Your plugin reads it with `context.Language` (`"de"` or `"en"`; older CouchHUD versions always report `"de"`, so the plugin keeps running).
 
-- Texte, die du **auf Abruf** baust (Zeilen einer Seite, `Detail` einer Quick-Action, Rückgabe von `Activate`), fragst du bei jedem Aufruf neu: `context.Language == "en" ? "Open" : "Öffnen"`.
-- Texte, die du **einmal registrierst** (`PluginSetting.Label`/`Description`, `PluginPage.Title`/`Description`, `QuickAction.Label`), gelten für die Sprache zum Zeitpunkt der Registrierung. Registriere sie bei `Events.LanguageChanged` noch einmal: eine Registrierung mit derselben Id (`Key`, `Id`) ersetzt die frühere.
-- Die Beschreibung der `PluginTool`s bleibt Englisch, das verstehen die Modelle am besten.
-- `description` in `plugin.json` und im Katalog gibt es pro Sprache (siehe oben und [Format](#format)).
+- Texts you build **on demand** (rows of a page, `Detail` of a quick action, the return value of `Activate`) you ask for anew on every call: `context.Language == "en" ? "Open" : "Öffnen"`.
+- Texts you **register once** (`PluginSetting.Label`/`Description`, `PluginPage.Title`/`Description`, `QuickAction.Label`) apply to the language at the time of registration. Register them again on `Events.LanguageChanged`: a registration with the same id (`Key`, `Id`) replaces the earlier one.
+- The description of the `PluginTool`s stays English, which models understand best.
+- `description` in `plugin.json` and in the catalog exists per language (see above and [Format](#format)).
 
 ```csharp
 public void Initialize(IPluginContext context)
@@ -109,37 +109,37 @@ private void Register() => _context.RegisterQuickAction(new QuickAction
 });
 ```
 
-Das Wand-Plugin (`plugins/CouchHud.Plugin.Wand`) macht genau das.
+The Wand plugin (`plugins/CouchHud.Plugin.Wand`) does exactly this.
 
-## Regeln, damit CouchHUD stabil bleibt
+## Rules to keep CouchHUD stable
 
-- Jeder Aufruf in ein Plugin (Seiten, Aktionen, Tools) hat ein Timeout von 15 Sekunden. Langsame Arbeit gehört in `Task.Run` oder einen Hintergrund-Task.
-- `QuickAction.Detail` (die zweite Zeile im Guide-Menü) wird auf einem Hintergrund-Thread mit 2 Sekunden Timeout abgefragt, nie auf dem UI-Thread. Antwortet es nicht, hat der Eintrag keine zweite Zeile; solange ein Aufruf hängt, wird kein neuer gestartet. Der Takt von Sperre und Jugendschutz hängt davon nicht ab.
-- Exceptions werden abgefangen und als Meldung angezeigt. Ein kaputtes Plugin legt nie die Shell lahm.
-- Event-Handler laufen im Hintergrund, nie auf dem UI-Thread.
-- Jedes Plugin hat einen eigenen Load-Context: eigene NuGet-Abhängigkeiten in eigenen Versionen sind erlaubt.
-- Plugins laufen mit den Rechten des Benutzers. Bitte nichts tun, was der Nutzer nicht erwartet, und Secrets nur über `SettingKind.Secret` speichern.
-- **Freigabe:** CouchHUD merkt sich beim Installieren (Katalog, `.zip`) einen Hash der Dateien jedes Plugins. Ein Ordner in `%APPDATA%\CouchHud\plugins`, den niemand über CouchHUD installiert hat, oder dessen Dateien sich geändert haben (auch von Hand kopiert!), lädt erst nach einer Freigabe (*Plugins & Skins* › Plugin › *Plugin freigeben*, mit dem Code der Dateien, nur entsperrt). Wer sein Plugin beim Entwickeln direkt in den Ordner baut, gibt es nach jeder Änderung neu frei, oder installiert es als `.zip`. Plugins, die schon vor dieser Funktion dort lagen, gelten beim ersten Start als freigegeben. Ein vorgemerktes Katalog-Update wird vor dem Einspielen erneut gegen die Prüfsumme geprüft. In den Hash gehen alle Dateien des Ordners ein, außer `desktop.ini`, `Thumbs.db` und `*.tmp` (die legen Windows und Programme von allein an). Die Liste der freigegebenen Plugins (`plugin-trust.json`) trägt eine Signatur (HMAC, derselbe Schlüssel wie bei `playtime.json`, mit DPAPI an das Windows-Konto gebunden). **Wogegen das schützt:** gegen ein Programm oder Skript, das nur Dateien schreibt, einen fremden Ordner ablegt und die Liste von Hand ergänzt oder ersetzt, und gegen eine hineinkopierte Liste. **Wogegen nicht:** ein Programm, das als dasselbe Konto läuft, kann den Schlüssel auch lesen; die Freigabe ersetzt keinen Virenschutz. Passt die Signatur nicht oder ist die Liste unlesbar, meldet CouchHUD einen Fehler an den Plugins, lädt nichts Unbekanntes und überschreibt die Datei nicht; zum Neubeginnen `plugin-trust.json` löschen. Danach gilt, was dann im Plugin-Ordner liegt, beim nächsten Start als freigegeben (wie beim allerersten Start): vorher prüfen, dass dort nur Plugins liegen, die du kennst.
+- Every call into a plugin (pages, actions, tools) has a timeout of 15 seconds. Slow work belongs in `Task.Run` or a background task.
+- `QuickAction.Detail` (the second line in the Guide menu) is queried on a background thread with a 2-second timeout, never on the UI thread. If it does not answer, the entry has no second line; while a call hangs, no new one is started. The tick of the lock and parental controls does not depend on it.
+- Exceptions are caught and shown as a message. A broken plugin never cripples the shell.
+- Event handlers run in the background, never on the UI thread.
+- Every plugin has its own load context: your own NuGet dependencies in your own versions are allowed.
+- Plugins run with the user's rights. Please do nothing the user does not expect, and store secrets only via `SettingKind.Secret`.
+- **Approval:** when installing (catalog, `.zip`), CouchHUD remembers a hash of each plugin's files. A folder in `%APPDATA%\CouchHud\plugins` that nobody installed through CouchHUD, or whose files have changed (also if copied by hand!), loads only after approval (*Plugins & skins* › plugin › *Approve plugin*, with the code of the files, only when unlocked). If you build your plugin directly into the folder while developing, approve it again after every change, or install it as a `.zip`. Plugins that were already there before this feature count as approved on first start. A queued catalog update is checked against the checksum again before being applied. All files of the folder go into the hash, except `desktop.ini`, `Thumbs.db` and `*.tmp` (which Windows and programs create by themselves). The list of approved plugins (`plugin-trust.json`) carries a signature (HMAC, the same key as for `playtime.json`, bound to the Windows account with DPAPI). **What this protects against:** a program or script that only writes files, drops a foreign folder and adds to or replaces the list by hand, and against a list copied in. **What it does not:** a program running as the same account can also read the key; the approval is no substitute for antivirus. If the signature does not match or the list is unreadable, CouchHUD reports an error on the plugins, loads nothing unknown and does not overwrite the file; to start over, delete `plugin-trust.json`. After that, whatever is then in the plugin folder counts as approved at the next start (as on the very first start): check beforehand that only plugins you know are there.
 
-## Plugin teilen
+## Sharing a plugin
 
-Repository auf GitHub mit dem Topic `couchhud-plugin` anlegen und ein Release mit dem `.zip` (Ordner mit DLL, Abhängigkeiten und `plugin.json`) hochladen. So finden andere es. Wer will, dass es direkt in CouchHUD erscheint, trägt es im [Katalog](#katalog) ein.
+Create a repository on GitHub with the topic `couchhud-plugin` and upload a release with the `.zip` (folder with DLL, dependencies and `plugin.json`). That is how others find it. If you want it to appear directly in CouchHUD, add it to the [catalog](#catalog).
 
-## Katalog
+## Catalog
 
-CouchHUD kann Plugins und Skins aus einem **Katalog** installieren und aktualisieren: *Einstellungen › Darstellung › Neue Skins installieren* (oder im Expertenmodus *Plugins & Skins*, dort *Katalog*) (mit LB/RB zwischen *Installiert* und *Katalog* wechseln). Ein Katalog ist eine einzelne `index.json` irgendwo im Netz. Beispiel: [catalog/index.json](../catalog/index.json).
+CouchHUD can install and update plugins and skins from a **catalog**: *Settings › Appearance › Install new skins* (or in expert mode *Plugins & skins*, there *Catalog*) (switch between *Installed* and *Catalog* with LB/RB). A catalog is a single `index.json` somewhere on the web. Example: [catalog/index.json](../catalog/index.json).
 
-Der Standard-Katalog liegt unter `https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/index.json`. Eigene Quellen stehen in `%APPDATA%\CouchHud\config.json`:
+The default catalog is at `https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/index.json`. Your own sources go in `%APPDATA%\CouchHud\config.json`:
 
 ```json
 "CatalogSources": [
   "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/index.json",
-  "https://example.com/mein-katalog/index.json"
+  "https://example.com/my-catalog/index.json"
 ],
 "CatalogUpdateCheck": true
 ```
 
-Mehrere Quellen werden zusammengeführt, bei gleicher `id` gewinnt die erste.
+Several sources are merged; with the same `id` the first wins.
 
 ### Format
 
@@ -165,60 +165,60 @@ Mehrere Quellen werden zusammengeführt, bei gleicher `id` gewinnt die erste.
 }
 ```
 
-| Feld | Pflicht | Bedeutung |
+| Field | Required | Meaning |
 |---|---|---|
-| `id` | ja | Eindeutige Kennung, `A-Z a-z 0-9 . _ -`, bis 64 Zeichen |
-| `name` | ja | Anzeigename |
-| `type` | ja | `plugin` oder `skin` |
-| `version` | ja | SemVer (`1.2.3`, `1.3.0-beta.1`). Der Katalog zeigt „Update“, sobald sie höher ist als die installierte |
-| `download` | ja | **https**-Adresse eines `.zip` (Aufbau wie bei der manuellen Installation, siehe oben und [SKINS.md](SKINS.md)) |
-| `sha256` | ja | SHA-256 des `.zip`, 64 Hex-Zeichen. Ohne passende Prüfsumme wird nichts installiert |
-| `description` | nein | Text oder `{ "de": …, "en": … }` |
-| `author`, `homepage`, `icon` | nein | `homepage` und `icon` nur als https |
-| `minCouchHud` | nein | Kleinste CouchHUD-Version. Ist die laufende kleiner, bleibt der Eintrag sichtbar, ist aber nicht installierbar |
-| `folder` | nein | Ordnername des Pakets, Standard ist die `id`. Bei Plugins der Name der DLL und des Ordners (`CouchHud.Plugin.Wand`) |
+| `id` | yes | Unique identifier, `A-Z a-z 0-9 . _ -`, up to 64 characters |
+| `name` | yes | Display name |
+| `type` | yes | `plugin` or `skin` |
+| `version` | yes | SemVer (`1.2.3`, `1.3.0-beta.1`). The catalog shows "Update" as soon as it is higher than the installed one |
+| `download` | yes | **https** address of a `.zip` (structure as for manual installation, see above and [SKINS.md](SKINS.md)) |
+| `sha256` | yes | SHA-256 of the `.zip`, 64 hex characters. Without a matching checksum nothing is installed |
+| `description` | no | Text or `{ "de": …, "en": … }` |
+| `author`, `homepage`, `icon` | no | `homepage` and `icon` only as https |
+| `minCouchHud` | no | Lowest CouchHUD version. If the running one is lower, the entry stays visible but cannot be installed |
+| `folder` | no | Folder name of the package, default is the `id`. For plugins the name of the DLL and folder (`CouchHud.Plugin.Wand`) |
 
-Einträge ohne `id`, `name`, gültigen `type` oder gültige `version` werden übersprungen. Einträge ohne gültige Prüfsumme oder mit einer Adresse ohne https werden angezeigt, lassen sich aber nicht installieren. Ein kaputter Index (kein JSON) ist ein Fehler der Quelle; CouchHUD zeigt dann den zuletzt gespeicherten Stand.
+Entries without `id`, `name`, a valid `type` or a valid `version` are skipped. Entries without a valid checksum or with an address without https are shown but cannot be installed. A broken index (not JSON) is an error of the source; CouchHUD then shows the last stored state.
 
-Das `.zip` muss genau einen Ordner namens `folder` enthalten (oder die Dateien direkt, dann wird `folder` als Name genommen). Die Hilfe `scripts\catalog-entry.ps1 -Folder <Ordner> -Version 1.0.0` packt den Ordner richtig und gibt die Prüfsumme für den Eintrag aus.
+The `.zip` must contain exactly one folder named `folder` (or the files directly, in which case `folder` is used as the name). The helper `scripts\catalog-entry.ps1 -Folder <folder> -Version 1.0.0` packs the folder correctly and prints the checksum for the entry.
 
-### Vertrauen: Prüfsumme und Signatur
+### Trust: checksum and signature
 
-Zwei Schutzschichten mit verschiedenen Aufgaben:
+Two layers of protection with different jobs:
 
-- Die **Prüfsumme** (`sha256` im Eintrag) schützt gegen beschädigte oder ausgetauschte **Downloads**: Das `.zip` muss genau dem Hash im Index entsprechen.
-- Die **Signatur** schützt gegen einen manipulierten **Index**. Wer nur `index.json` ändern kann (z.B. mit einem gekaperten GitHub-Konto), könnte sonst Download-URL und Hash zusammen austauschen. Der Standard-Katalog liefert deshalb neben `index.json` eine `index.json.sig`: Base64 einer ECDSA-P-256-Signatur (SHA-256, IEEE P1363) über die **exakten Bytes** der `index.json`. Den öffentlichen Schlüssel bringt CouchHUD mit (`CatalogSignature.PublicKeyPem`). Ohne gültige Signatur ist die Standardquelle „nicht vertrauenswürdig“, und nichts daraus ist installierbar. Bei einer kaputten Signatur zeigt CouchHUD den zuletzt geprüften gespeicherten Stand.
-- **Eigene Quellen** dürfen unsigniert sein. Sie sind mit „⚠ unsignierte Quelle“ markiert, und der Installationsdialog weist darauf hin. Eine Signatur mit dem Schlüssel des Projekts ist dort nicht nötig.
+- The **checksum** (`sha256` in the entry) protects against damaged or swapped **downloads**: the `.zip` must match the hash in the index exactly.
+- The **signature** protects against a tampered **index**. Whoever can only change `index.json` (e.g. with a hijacked GitHub account) could otherwise swap download URL and hash together. The default catalog therefore delivers an `index.json.sig` next to `index.json`: Base64 of an ECDSA P-256 signature (SHA-256, IEEE P1363) over the **exact bytes** of `index.json`. CouchHUD ships the public key (`CatalogSignature.PublicKeyPem`). Without a valid signature the default source is "not trusted" and nothing from it can be installed. With a broken signature CouchHUD shows the last verified stored state.
+- **Your own sources** may be unsigned. They are marked "⚠ unsigned source", and the install dialog points this out. A signature with the project's key is not needed there.
 
-Grenzen: Die Signatur beweist, dass der Index vom Schlüsselinhaber stammt, nicht dass das Plugin harmlos ist. Wer den privaten Schlüssel hat, kann alles freigeben. Er liegt nur im Benutzerprofil des Maintainers (DPAPI-geschützt, `%USERPROFILE%\.couchhud\catalog-signing.key`), nie im Repository. Zusätzlich empfohlen: Branch-Protection auf `main` im Katalog-Repo (Pull Requests mit Review, keine Force-Pushes).
+Limits: the signature proves that the index comes from the key holder, not that the plugin is harmless. Whoever has the private key can approve anything. It lives only in the maintainer's user profile (DPAPI-protected, `%USERPROFILE%\.couchhud\catalog-signing.key`), never in the repository. Also recommended: branch protection on `main` in the catalog repo (pull requests with review, no force pushes).
 
-Index signieren (PowerShell 7), nachdem er endgültig ist, ohne spätere Änderung von Bytes oder Zeilenenden (im Katalog-Repo `catalog/* -text` in `.gitattributes`):
+Sign the index (PowerShell 7) once it is final, without later changes to bytes or line endings (in the catalog repo `catalog/* -text` in `.gitattributes`):
 
 ```powershell
-.\scripts\catalog-sign.ps1 -Index .\catalog\index.json   # erzeugt index.json.sig; legt den Schlüssel beim ersten Mal an (die Umsetzung steckt in sign-file.ps1, das auch die Release-Prüfsummen signiert). Signiert werden `couchhud-catalog-v1` + Zeilenumbruch + die Bytes der Datei; dieselbe Signatur gilt weder für Release-Prüfsummen noch umgekehrt (Domain-Trennung). Signaturen im alten Format (nur die Bytes) werden nicht mehr akzeptiert: ältere CouchHUD-Versionen lehnen den neu signierten Index ab
+.\scripts\catalog-sign.ps1 -Index .\catalog\index.json   # produces index.json.sig; creates the key the first time (the implementation lives in sign-file.ps1, which also signs the release checksums). What is signed is `couchhud-catalog-v1` + newline + the bytes of the file; the same signature counts neither for release checksums nor the other way round (domain separation). Signatures in the old format (bytes only) are no longer accepted: older CouchHUD versions reject the newly signed index
 ```
 
-### Ablauf und Sicherheit
+### Flow and security
 
-- **Laden**: 10 Sekunden Zeitlimit, höchstens 1 MB. Der letzte erfolgreiche Index jeder Quelle liegt in `%APPDATA%\CouchHud\catalog-cache.json`; ohne Netz zeigt der Katalog diesen Stand („Offline“).
-- **Installieren** (A auf einem Eintrag): erst ein Hinweis, dass **Plugins mit deinen Rechten laufen** und nur aus vertrauenswürdigen Quellen kommen sollen, bestätigt mit A. Dann Download (höchstens 200 MB, Abbruch, wenn 60 Sekunden lang keine Daten kommen), **SHA-256-Pflichtprüfung**, danach der gewöhnliche Installer. Der Installer prüft alle Pfade im Archiv (kein `../`, keine absoluten Pfade oder Laufwerke), Größe und Dateianzahl und packt erst in einen Temp-Ordner neben dem Ziel. Die alte Version wird nur beiseite geschoben und kommt bei einem Fehler zurück. Ein Archiv, das weniger Größe angibt, als es enthält, wird abgelehnt.
-- **Offline installieren**: Ist die Quelle nicht erreichbar, zeigt der Katalog den gespeicherten Stand. Installieren ist trotzdem möglich, sobald der Download selbst erreichbar ist. Die Signatur des gespeicherten Standes wird beim Laden erneut geprüft.
-- **Nur https**. Katalog, Downloads und Bilder werden über http, UNC-Pfade (`file://server/…`) oder lokale Pfade abgelehnt (außer mit dem Entwickler-Schalter, dann nur lokale Laufwerke und Loopback).
-- **Quellen**: Updates kommen nur aus der Quelle, aus der ein Paket installiert wurde. Mitgelieferte und von Hand installierte Plugins sind nur aus der Standardquelle aktualisierbar. Gleiche Ordner in mehreren Quellen: die erste Quelle gewinnt. Dieselbe `id` mit anderem Ordner in einer späteren Quelle ist ein Konflikt und nicht installierbar.
-- **Mitgelieferte Plugins**: Eine Kopie in `%APPDATA%\CouchHud\plugins` ersetzt das mitgelieferte Plugin nur, wenn sie eine DLL enthält und ihre Version in `plugin.json` nicht älter ist. Sonst lädt das mitgelieferte, und das Log sagt warum.
-- **Neustart**: Plugin-DLLs lassen sich bei laufendem CouchHUD weder entladen noch ersetzen. Neue Plugins werden sofort entpackt und beim nächsten Start geladen. Ein **Update** wird abgelegt (`%APPDATA%\CouchHud\pending`) und beim nächsten Start eingespielt, bevor Plugins geladen werden. Skins sind sofort nutzbar. Ein Update eines mitgelieferten Plugins (z.B. Wand) legt eine Kopie in `%APPDATA%\CouchHud\plugins` an, die dann die mitgelieferte ersetzt.
-- **Update-Hinweis**: Fünf Minuten nach dem Start und dann alle 12 Stunden prüft CouchHUD im Hintergrund die Kataloge, nie während ein Spiel läuft. Neue Updates erscheinen einmalig in den Benachrichtigungen und als Abschnitt *Plugins & Skins* auf der Updates-Seite. Abschalten: `"CatalogUpdateCheck": false`.
-- Installiert wurde was? `%APPDATA%\CouchHud\catalog-installed.json` merkt sich Version und Ordner (Skins haben keine eigene Versionsangabe).
+- **Loading**: 10-second time limit, at most 1 MB. The last successful index of each source lies in `%APPDATA%\CouchHud\catalog-cache.json`; without a network the catalog shows that state ("Offline").
+- **Installing** (A on an entry): first a notice that **plugins run with your rights** and should come only from trusted sources, confirmed with A. Then download (at most 200 MB, abort if no data arrives for 60 seconds), **mandatory SHA-256 check**, then the usual installer. The installer checks all paths in the archive (no `../`, no absolute paths or drives), size and file count, and unpacks into a temp folder next to the target first. The old version is only moved aside and comes back on an error. An archive that states less size than it contains is rejected.
+- **Installing offline**: if the source is unreachable, the catalog shows the stored state. Installing is still possible as soon as the download itself is reachable. The signature of the stored state is checked again on loading.
+- **https only**. Catalog, downloads and images over http, UNC paths (`file://server/…`) or local paths are rejected (except with the developer switch, then only local drives and loopback).
+- **Sources**: updates come only from the source a package was installed from. Bundled and hand-installed plugins can be updated only from the default source. Same folders in several sources: the first source wins. The same `id` with a different folder in a later source is a conflict and not installable.
+- **Bundled plugins**: a copy in `%APPDATA%\CouchHud\plugins` replaces the bundled plugin only if it contains a DLL and its version in `plugin.json` is not older. Otherwise the bundled one loads, and the log says why.
+- **Restart**: plugin DLLs can be neither unloaded nor replaced while CouchHUD runs. New plugins are unpacked immediately and loaded at the next start. An **update** is put aside (`%APPDATA%\CouchHud\pending`) and applied at the next start, before plugins are loaded. Skins are usable immediately. An update of a bundled plugin (e.g. Wand) creates a copy in `%APPDATA%\CouchHud\plugins`, which then replaces the bundled one.
+- **Update notice**: five minutes after start and then every 12 hours CouchHUD checks the catalogs in the background, never while a game runs. New updates appear once in the notifications and as the *Plugins & skins* section on the Updates page. Turn off: `"CatalogUpdateCheck": false`.
+- What was installed? `%APPDATA%\CouchHud\catalog-installed.json` remembers version and folder (skins have no version of their own).
 
-### Katalog testen (Entwickler-Schalter)
+### Testing the catalog (developer switch)
 
-Mit `"CatalogAllowLocal": true` in der `config.json` akzeptiert CouchHUD zusätzlich `file:///…`-Quellen und `http://127.0.0.1`/`localhost` für Katalog und Downloads. Die Prüfsumme bleibt Pflicht. Nur zum Testen einschalten, Standard ist `false`:
+With `"CatalogAllowLocal": true` in `config.json`, CouchHUD additionally accepts `file:///…` sources and `http://127.0.0.1`/`localhost` for catalog and downloads. The checksum stays mandatory. Switch it on only for testing; the default is `false`:
 
 ```json
 "CatalogAllowLocal": true,
-"CatalogSources": [ "file:///C:/Temp/katalog/index.json" ]
+"CatalogSources": [ "file:///C:/Temp/catalog/index.json" ]
 ```
 
-### Eigenen Katalog betreiben
+### Running your own catalog
 
-Ein GitHub-Repository mit einer `index.json` reicht (`raw.githubusercontent.com`). Die `.zip`-Dateien hängen als Release-Assets daran. Pull Requests für den Standard-Katalog sind willkommen: Eintrag in `index.json`, Quellcode des Plugins öffentlich verlinken.
+A GitHub repository with an `index.json` is enough (`raw.githubusercontent.com`). The `.zip` files hang on it as release assets. Pull requests for the default catalog are welcome: an entry in `index.json`, with the plugin's source code linked publicly.

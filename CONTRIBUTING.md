@@ -1,119 +1,119 @@
-# Mitmachen bei CouchHUD
+# Contributing to CouchHUD
 
-Schön, dass du da bist! CouchHUD soll ein freies, richtig gutes Wohnzimmer-Frontend für Windows werden, und das geht am besten gemeinsam.
+Glad you're here! CouchHUD should become a free, really good living-room front end for Windows, and that works best together.
 
-## Wege, beizutragen
+## Ways to contribute
 
-- **Skins**: Anleitung in [docs/SKINS.md](docs/SKINS.md)
-- **Plugins**: Anleitung in [docs/PLUGINS.md](docs/PLUGINS.md), Beispiel in `plugins/CouchHud.Plugin.Wand`
-- **Übersetzungen und Texte**: [docs/i18n.md](docs/i18n.md)
-- **Fehler melden**: Issue mit Windows-Version, was du gemacht hast und den Logs aus `%LOCALAPPDATA%\CouchHud\logs`
-- **Code**: Pull Requests sind willkommen. Bei größeren Dingen vorher kurz ein Issue aufmachen, damit wir die Richtung abstimmen.
+- **Skins**: guide in [docs/SKINS.md](docs/SKINS.md)
+- **Plugins**: guide in [docs/PLUGINS.md](docs/PLUGINS.md), example in `plugins/CouchHud.Plugin.Wand`
+- **Translations and texts**: [docs/i18n.md](docs/i18n.md)
+- **Report bugs**: an issue with your Windows version, what you did and the logs from `%LOCALAPPDATA%\CouchHud\logs`
+- **Code**: pull requests are welcome. For bigger things, open an issue first so we can agree on the direction.
 
-## Entwickeln
+## Development
 
-Voraussetzungen: .NET 10 SDK, Node.js (für UI-Vorschau und Prüfungen), unter Windows zum Ausprobieren WebView2.
+Requirements: .NET 10 SDK, Node.js (for the UI preview and checks), and on Windows WebView2 for trying things out.
 
 ```powershell
 dotnet build CouchHud.slnx
 dotnet test CouchHud.slnx
-dotnet run --project src/CouchHud.Shell -- --dev   # Fenstermodus mit DevTools
+dotnet run --project src/CouchHud.Shell -- --dev   # windowed mode with DevTools
 ```
 
-Die Oberfläche (`ui/`) ist Vanilla JS als ES-Module ohne Build-Schritt. Plattformneutrale Logik gehört nach `CouchHud.Core` (mit Tests in `tests/`), Windows-spezifisches nach `CouchHud.Shell`.
+The interface (`ui/`) is vanilla JS as ES modules with no build step. Platform-neutral logic belongs in `CouchHud.Core` (with tests in `tests/`), Windows-specific code in `CouchHud.Shell`.
 
-### Vor jedem Push: `scripts/check.sh`
+### Before every push: `scripts/check.sh`
 
 ```bash
 ./scripts/check.sh
 ```
 
-Das Skript läuft unter Windows (Git Bash), Linux und macOS und macht der Reihe nach:
+The script runs on Windows (Git Bash), Linux and macOS and does, in order:
 
-1. `dotnet build` der ganzen Solution (auch die Windows-Projekte, außerhalb von Windows über `EnableWindowsTargeting`),
-2. `dotnet test` aller Tests,
-3. **UI-Syntax**: jede `.js`/`.mjs`-Datei in `ui/` und `scripts/` wird als **ES-Modul** geprüft (`node --input-type=module --check`; ein einfaches `node --check` lässt Modulfehler durch),
-4. **i18n-Prüfung** (`scripts/i18n-check.mjs`): jeder Schlüssel in Deutsch und Englisch mit gleichen Platzhaltern, jeder benutzte Schlüssel existiert, keine verwaisten Schlüssel, kein deutscher Text im Code.
+1. `dotnet build` of the whole solution (including the Windows projects, outside Windows via `EnableWindowsTargeting`),
+2. `dotnet test` of all tests,
+3. **UI syntax**: every `.js`/`.mjs` file in `ui/` and `scripts/` is checked as an **ES module** (`node --input-type=module --check`; a plain `node --check` lets module errors through),
+4. **i18n check** (`scripts/i18n-check.mjs`): every key in German and English with the same placeholders, every used key exists, no orphaned keys, no hard-coded user-facing text in the code.
 
-Es ist mindestens so streng wie die CI (die baut und testet auf Windows). Rot bleibt lokal, nicht im Postfach der anderen.
+It is at least as strict as CI (which builds and tests on Windows). Red stays local, not in everyone else's inbox.
 
-### UI ohne Windows: Vorschau und Screenshots
+### UI without Windows: preview and screenshots
 
 ```bash
-node scripts/preview-server.js          # http://localhost:5173, komplette UI mit Mock-Daten (?lang=en für Englisch)
+node scripts/preview-server.js          # http://localhost:5173, complete UI with mock data (?lang=en for English)
 ```
 
-`scripts/ui-shot.mjs` steuert die Vorschau in einem Edge ohne Fenster (über das DevTools-Protokoll), drückt Tasten, wechselt Skins, macht Screenshots und prüft Kontraste. Gut für UI-Änderungen und als Beleg im Pull Request:
+`scripts/ui-shot.mjs` drives the preview in a windowless Edge (via the DevTools protocol), presses keys, switches skins, takes screenshots and checks contrast. Good for UI changes and as evidence in a pull request:
 
 ```bash
 node scripts/ui-shot.mjs --out shots skin:ps4 wait:300 shot:home key:ArrowRight shot:next
 node scripts/ui-shot.mjs --out shots --size 3840x2160 --query lang=en shot:home4k
 ```
 
-Schritte: `skin:<id>`, `key:<Taste>`, `keys:ArrowDown*3`, `wait:<ms>`, `shot:<name>`, `eval:<js>`, `contrast:<label>`, `text:<text>`. Tasten: Pfeile, `Enter` = A, `Escape` = B, `q`/`e` = LB/RB, `x`, `y`, `m` = Start, `Home` = Guide. Der Pfad zu Edge lässt sich über die Umgebungsvariable `EDGE` setzen.
+Steps: `skin:<id>`, `key:<key>`, `keys:ArrowDown*3`, `wait:<ms>`, `shot:<name>`, `eval:<js>`, `contrast:<label>`, `text:<text>`. Keys: arrows, `Enter` = A, `Escape` = B, `q`/`e` = LB/RB, `x`, `y`, `m` = Start, `Home` = Guide. The path to Edge can be set with the environment variable `EDGE`.
 
-**Screenshots für README und Doku** immer mit `--query demo`: Die Vorschau zeigt dann ausgedachte Spiele mit selbst erzeugten Covern (`ui/mock-demo.js`) statt echter Store-Cover, und keine eingeblendete Nachricht. Die Bilder unter `docs/` sind so entstanden (1920×1080, verkleinert auf 1280×720).
+**Screenshots for the README and docs** always with `--query demo`: the preview then shows made-up games with self-generated covers (`ui/mock-demo.js`) instead of real store covers, and no pop-up message. The images under `docs/` were made this way (1920×1080, scaled down to 1280×720).
 
-**Logo und Icon**: Quellen sind `docs/logo.svg` (ab 48 px) und `assets/branding/icon-small.svg` (16–32 px), dazu `docs/banner.svg` und `docs/social-preview.svg`. `node scripts/brand-render.mjs` rendert daraus mit Edge alle PNGs und baut `src/CouchHud.Shell/couchhud.ico` neu. `ui/assets/icon.svg` ist eine Kopie von `docs/logo.svg`.
+**Logo and icon**: the sources are `docs/logo.svg` (from 48 px) and `assets/branding/icon-small.svg` (16–32 px), plus `docs/banner.svg` and `docs/social-preview.svg`. `node scripts/brand-render.mjs` renders all PNGs from them with Edge and rebuilds `src/CouchHud.Shell/couchhud.ico`. `ui/assets/icon.svg` is a copy of `docs/logo.svg`.
 
-### Test-VM (Hyper-V)
+### Test VM (Hyper-V)
 
-Windows-Funktionen (Shell-Ersatz, Autologin, Guide-Taste, UAC) testest du am besten in einer Hyper-V-VM, nicht auf deinem Arbeits-PC. Die Skripte laufen auf dem Host über PowerShell Direct und brauchen die Mitgliedschaft in „Hyper-V-Administratoren“. Die VM heißt standardmäßig `Win11-Test` (`-VMName` ändert das). Einmalig das VM-Kennwort ablegen:
+Test Windows features (shell replacement, auto sign-in, Guide button, UAC) best in a Hyper-V VM, not on your work PC. The scripts run on the host through PowerShell Direct and need membership in "Hyper-V Administrators". The VM is called `Win11-Test` by default (`-VMName` changes that). Store the VM password once:
 
 ```powershell
 Get-Credential | Export-Clixml "$env:USERPROFILE\couchhud-vm.cred"
 ```
 
-| Skript | Zweck |
+| Script | Purpose |
 |---|---|
-| `scripts\deploy-vm.ps1` | Veröffentlicht CouchHUD (self-contained), kopiert es nach `C:\Program Files\CouchHud` in der VM und startet es in der angemeldeten Sitzung. `-NoBuild` kopiert den letzten Publish erneut, `-NoStart` startet nicht, `-Arguments --dev` reicht Schalter durch. |
-| `scripts\vm-cdp.ps1` | Spricht über das Chrome DevTools Protocol mit der UI in der VM: `-Eval 'document.title'`, `-Screenshot shot.png`, `-Keys ArrowRight,Enter`, `-Console` (Fehler seit dem letzten Aufruf), `-Reload`. Braucht in der VM die Umgebungsvariable `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` für den Benutzer. |
-| `scripts\vm-screenshot.ps1` | Speichert den Konsolen-Bildschirm der VM als PNG (`-Path shot.png`), auch am Anmeldebildschirm, wo die UI nicht erreichbar ist. |
-| `scripts\vm-uac.ps1` | Bestätigt (oder mit `-Decline` verneint) eine UAC-Abfrage in der VM über die virtuelle Tastatur, die auch den sicheren Desktop erreicht. |
+| `scripts\deploy-vm.ps1` | Publishes CouchHUD (self-contained), copies it to `C:\Program Files\CouchHud` in the VM and starts it in the signed-in session. `-NoBuild` copies the last publish again, `-NoStart` does not start, `-Arguments --dev` passes switches through. |
+| `scripts\vm-cdp.ps1` | Talks to the UI in the VM over the Chrome DevTools Protocol: `-Eval 'document.title'`, `-Screenshot shot.png`, `-Keys ArrowRight,Enter`, `-Console` (errors since the last call), `-Reload`. Needs the environment variable `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` for the user in the VM. |
+| `scripts\vm-screenshot.ps1` | Saves the VM's console screen as a PNG (`-Path shot.png`), also at the sign-in screen where the UI is not reachable. |
+| `scripts\vm-uac.ps1` | Confirms (or with `-Decline` declines) a UAC prompt in the VM via the virtual keyboard, which also reaches the secure desktop. |
 
-Typischer Ablauf: `deploy-vm.ps1`, dann mit `vm-cdp.ps1 -Keys …` durch die Oberfläche gehen, mit `-Screenshot` und `-Console` prüfen, bei UAC-Dialogen `vm-uac.ps1`, bei schwarzem Bild `vm-screenshot.ps1`.
+Typical flow: `deploy-vm.ps1`, then go through the interface with `vm-cdp.ps1 -Keys …`, check with `-Screenshot` and `-Console`, use `vm-uac.ps1` for UAC dialogs and `vm-screenshot.ps1` for a black screen.
 
-## Texte und Sprachen (i18n)
+## Texts and languages (i18n)
 
-Die Oberfläche gibt es auf Deutsch und Englisch. Regeln (Details und Begriffstabelle in [docs/i18n.md](docs/i18n.md)):
+The interface comes in German and English. Rules (details and terminology table in [docs/i18n.md](docs/i18n.md)):
 
-- **Jeder neue Text kommt immer in Deutsch und Englisch.** UI: `ui/i18n/de/*.js` und `ui/i18n/en/*.js` (gleiche Dateinamen, gleiche Schlüssel), Zugriff mit `t('bereich.schluessel', { name })`. Host (C#): `Strings.Get("key", args)` in `src/CouchHud.Core/Localization/`. Installer: `[CustomMessages]` in `installer/CouchHud.iss`.
-- Keine fertigen deutschen Sätze aus dem Host an die UI schicken, die die UI vergleicht oder speichert: Zustände als **Code** (`errorCode`), Benachrichtigungen als Schlüssel plus Argumente (`Strings.Ref`).
-- `t()` erst beim Bauen des Textes aufrufen, nie in einer Konstante auf oberster Ebene. Datum, Zeit und Zahlen mit `fmtDate`, `fmtTime`, `fmtNumber`.
-- Begriffe wie in der Tabelle (z.B. „Guide-Taste“, „Skin“, „Ausschalt-Timer“); Pfade in den Einstellungen mit `›`.
-- `scripts/i18n-check.mjs` (Teil von `check.sh`) muss grün sein.
-- Code und Kommentare auf Englisch.
+- **Every new text always comes in German and English.** UI: `ui/i18n/de/*.js` and `ui/i18n/en/*.js` (same file names, same keys), accessed with `t('area.key', { name })`. Host (C#): `Strings.Get("key", args)` in `src/CouchHud.Core/Localization/`. Installer: `[CustomMessages]` in `installer/CouchHud.iss`.
+- Do not send finished sentences from the host to the UI if the UI compares or stores them: send states as a **code** (`errorCode`), notifications as a key plus arguments (`Strings.Ref`).
+- Call `t()` only when building the text, never in a top-level constant. Dates, times and numbers with `fmtDate`, `fmtTime`, `fmtNumber`.
+- Terms as in the table (e.g. "Guide button", "skin", "power-off timer"); paths in the settings with `›`.
+- `scripts/i18n-check.mjs` (part of `check.sh`) must be green.
+- Code and comments in English.
 
-## Leitplanken
+## Guard rails
 
-Die Grundsätze stehen in [docs/ROADMAP.md](docs/ROADMAP.md#leitplanken): alles über die GUI, Controller zuerst, nahtloser Fullscreen, Fremdsoftware in Plugins, ein kaputtes Plugin darf nie die Shell killen.
+The principles are in [docs/ROADMAP.md](docs/ROADMAP.md#guard-rails): everything through the GUI, controller first, seamless full screen, third-party software in plugins, a broken plugin must never kill the shell.
 
-- Jede Einstellung nur an einer Stelle, im Einfach-Modus keine Fachbegriffe.
-- Jeder Eingriff in Windows ist umkehrbar und steht in der Transparenz-Seite („Was CouchHUD an Windows ändert“).
+- Each setting in only one place, no technical terms in simple mode.
+- Every change to Windows is reversible and listed on the transparency page ("What CouchHUD changes in Windows").
 
 ## Release
 
-Nur für Maintainer. Der private Signaturschlüssel liegt nicht im Repository und nicht in der CI, sondern im Benutzerprofil des Maintainers (`%USERPROFILE%\.couchhud\catalog-signing.key`, DPAPI-geschützt).
+Maintainers only. The private signing key is not in the repository and not in CI, but in the maintainer's user profile (`%USERPROFILE%\.couchhud\catalog-signing.key`, DPAPI-protected).
 
-1. Version in `Directory.Build.props` anheben, mergen, Tag setzen und pushen: `git tag v0.4.0 && git push origin v0.4.0`. Die CI baut das Setup mit dieser Version (bricht ab, wenn Tag und Version nicht zusammenpassen), erzeugt die Build-Attestierung und hängt `CouchHud-Setup-<v>.exe` und `CouchHud-Setup-<v>.exe.sha256` an ein GitHub-Release.
-2. `.\scripts\sign-release.ps1 -Tag v0.4.0` (PowerShell 7, `gh` angemeldet): prüft Commit und Version, lädt das Setup und vergleicht den Hash mit GitHub und der `.sha256`, prüft die Attestierung und signiert erst dann die `.sha256` (Kontext `couchhud-release-v1`). Lädt `.sha256.sig` hoch. **Erst damit bieten installierte CouchHUDs das Update an.**
-3. Release-Notes nach Bedarf im GitHub-Release nachbearbeiten (sie erscheinen gekürzt auf dem TV).
+1. Raise the version in `Directory.Build.props`, merge, tag and push: `git tag v0.4.0 && git push origin v0.4.0`. CI builds the setup with that version (aborts if tag and version do not match), creates the build attestation and attaches `CouchHud-Setup-<v>.exe` and `CouchHud-Setup-<v>.exe.sha256` to a GitHub release.
+2. `.\scripts\sign-release.ps1 -Tag v0.4.0` (PowerShell 7, `gh` signed in): checks commit and version, downloads the setup and compares its hash with GitHub and the `.sha256`, checks the attestation and only then signs the `.sha256` (context `couchhud-release-v1`). Uploads `.sha256.sig`. **Only with this do installed CouchHUDs offer the update.**
+3. Edit the release notes in the GitHub release as needed (they appear shortened on the TV).
 
-Signier-Skripte (PowerShell 7):
+Signing scripts (PowerShell 7):
 
-| Skript | Zweck |
+| Script | Purpose |
 |---|---|
-| `scripts\sign-file.ps1` | Signiert eine Datei mit ECDSA P-256 (SHA-256) und schreibt `<Datei>.sig`. `-GenerateKey` legt das Schlüsselpaar beim ersten Mal an und zeigt den öffentlichen Schlüssel (der im Code als `CatalogSignature.PublicKeyPem` steht). `-Context catalog` (Standard) oder `release` trennt die Verwendungszwecke. |
-| `scripts\catalog-sign.ps1` | Signiert den Plugin-Katalog: `-Index .\catalog\index.json` schreibt `index.json.sig`. Die Datei vor dem Signieren nicht mehr ändern (auch keine Zeilenenden). |
-| `scripts\sign-release.ps1` | Der Release-Schritt oben. |
-| `scripts\catalog-entry.ps1` | Packt ein Plugin- oder Skin-Verzeichnis als `<Name>-<Version>.zip` und gibt die SHA-256 für den Katalogeintrag aus. |
+| `scripts\sign-file.ps1` | Signs a file with ECDSA P-256 (SHA-256) and writes `<file>.sig`. `-GenerateKey` creates the key pair the first time and shows the public key (the one in the code as `CatalogSignature.PublicKeyPem`). `-Context catalog` (default) or `release` separates the purposes. |
+| `scripts\catalog-sign.ps1` | Signs the plugin catalog: `-Index .\catalog\index.json` writes `index.json.sig`. Do not change the file after signing (not even line endings). |
+| `scripts\sign-release.ps1` | The release step above. |
+| `scripts\catalog-entry.ps1` | Packs a plugin or skin directory as `<name>-<version>.zip` and prints the SHA-256 for the catalog entry. |
 
-Katalogeinträge ändern: `catalog-entry.ps1`, Eintrag in der `index.json` des Katalog-Repos anpassen, mit `catalog-sign.ps1` signieren, beides committen. Format und Sicherheit: [docs/PLUGINS.md](docs/PLUGINS.md#katalog).
+Changing catalog entries: `catalog-entry.ps1`, adjust the entry in the catalog repo's `index.json`, sign with `catalog-sign.ps1`, commit both. Format and security: [docs/PLUGINS.md](docs/PLUGINS.md#catalog).
 
-## Pull Requests
+## Pull requests
 
-Dieses Repo veröffentlicht nur Release-Stände als einzelne Commits. Gute Vorschläge werden deshalb lokal übernommen und erscheinen mit dem nächsten Release; der PR wird dann mit Dank geschlossen statt gemergt. Sicherheitslücken bitte nicht als Issue oder PR melden, sondern wie in [SECURITY.md](SECURITY.md) beschrieben.
+This repo only publishes release snapshots as single commits. Good proposals are therefore taken over locally and appear with the next release; the PR is then closed with thanks instead of merged. Please do not report vulnerabilities as an issue or PR, but as described in [SECURITY.md](SECURITY.md).
 
-## Lizenz
+## License
 
-Mit einem Beitrag stimmst du zu, dass er unter der GPL-3.0 steht wie der Rest des Projekts.
+By contributing you agree that your contribution is under the GPL-3.0 like the rest of the project.
