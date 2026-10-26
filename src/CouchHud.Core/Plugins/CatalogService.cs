@@ -16,7 +16,7 @@ public sealed record InstallOutcome(string Message, bool RestartNeeded);
 /// sources the user added may be unsigned and are marked as such. Only https is accepted; local sources exist
 /// for development behind <paramref name="allowLocal"/>.
 /// </summary>
-public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOnlyList<string>> sources, Func<bool> allowLocal, string language = "en", string? publicKeyPem = null, Func<string>? languageNow = null)
+public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOnlyList<string>> sources, Func<bool> allowLocal, string language = "de", string? publicKeyPem = null, Func<string>? languageNow = null)
 {
     private string Language => languageNow?.Invoke() ?? language;
 

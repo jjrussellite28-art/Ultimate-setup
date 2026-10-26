@@ -199,8 +199,8 @@ public sealed class AppConfig
     /// <summary>Settings view: false shows only everyday settings, true adds the expert sections.</summary>
     public bool ExpertMode { get; set; }
 
-    /// <summary>Language of the interface: "auto" (English), "de" or "en".</summary>
-    public string Language { get; set; } = "auto";
+    /// <summary>Language of the interface: "en" (default), "de", or "auto" (follow the Windows display language).</summary>
+    public string Language { get; set; } = "en";
 
     /// <summary>
     /// How deep CouchHud reaches into Windows. "light": an ordinary full-screen app.

@@ -45,10 +45,10 @@ public sealed partial class StoreInfoService
     private readonly Func<string> _language;
     private readonly SteamAppIds _ids;
 
-    /// <param name="language">"de" or "en" (the store texts come in that language); English when not given.</param>
+    /// <param name="language">"de" or "en" (the store texts come in that language); German when not given.</param>
     public StoreInfoService(HttpClient http, string cacheFile, Func<string>? language = null, SteamAppIds? ids = null)
     {
-        _language = language ?? (() => "en");
+        _language = language ?? (() => "de");
         _http = http;
         _ids = ids ?? new SteamAppIds(http, Path.ChangeExtension(cacheFile, ".steamids.json"));
         _cacheFile = cacheFile;
