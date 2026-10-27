@@ -8,7 +8,7 @@ namespace CouchHud.Core.Tests;
 
 public class SelfUpdateTests : IDisposable
 {
-    private const string Base = "https://github.com/kewe87/CouchHUD/releases/download/v0.4.0/";
+    private const string Base = "https://github.com/jjrussellite28-art/Ultimate-setup/releases/download/v0.4.0/";
     private const string Setup = "CouchHud-Setup-0.4.0.exe";
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "couchhud-selfupdate-" + Guid.NewGuid().ToString("N"));
     private readonly ECDsa _key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -39,7 +39,7 @@ public class SelfUpdateTests : IDisposable
         var list = string.Join(",", names.Select(n => $$"""{ "name": "{{n}}", "size": 23, "browser_download_url": "{{host}}{{n}}" }"""));
         return $$"""
             { "tag_name": "{{tag}}", "draft": {{draft.ToString().ToLowerInvariant()}}, "prerelease": {{prerelease.ToString().ToLowerInvariant()}},
-              "html_url": "https://github.com/kewe87/CouchHUD/releases/tag/{{tag}}", "published_at": "2026-10-01T10:00:00Z",
+              "html_url": "https://github.com/jjrussellite28-art/Ultimate-setup/releases/tag/{{tag}}", "published_at": "2026-10-01T10:00:00Z",
               "body": {{System.Text.Json.JsonSerializer.Serialize(body)}}, "assets": [{{list}}] }
             """;
     }
@@ -57,7 +57,7 @@ public class SelfUpdateTests : IDisposable
         Assert.Equal(Base + Setup + ".sha256.sig", r.SignatureUrl);
         Assert.True(r.Installable);
         Assert.Null(r.Problem);
-        Assert.Equal("https://github.com/kewe87/CouchHUD/releases/tag/v0.4.0", r.PageUrl);
+        Assert.Equal("https://github.com/jjrussellite28-art/Ultimate-setup/releases/tag/v0.4.0", r.PageUrl);
         Assert.Equal("Neu\n• Self-Update", r.Notes);
     }
 
@@ -98,9 +98,9 @@ public class SelfUpdateTests : IDisposable
     [Fact]
     public void Assets_from_other_hosts_or_repositories_are_dropped()
     {
-        Assert.False(ReleaseParser.Parse(ReleaseJson(host: "https://evil.example/kewe87/CouchHUD/releases/download/v0.4.0/"))!.Installable);
+        Assert.False(ReleaseParser.Parse(ReleaseJson(host: "https://evil.example/jjrussellite28-art/Ultimate-setup/releases/download/v0.4.0/"))!.Installable);
         Assert.False(ReleaseParser.Parse(ReleaseJson(host: "https://github.com/someone/else/releases/download/v0.4.0/"))!.Installable);
-        Assert.False(ReleaseParser.Parse(ReleaseJson(host: "http://github.com/kewe87/CouchHUD/releases/download/v0.4.0/"))!.Installable);
+        Assert.False(ReleaseParser.Parse(ReleaseJson(host: "http://github.com/jjrussellite28-art/Ultimate-setup/releases/download/v0.4.0/"))!.Installable);
     }
 
     [Fact]
@@ -137,15 +137,15 @@ public class SelfUpdateTests : IDisposable
     // ---- hosts
 
     [Theory]
-    [InlineData("https://github.com/kewe87/CouchHUD/releases/download/v1/x.exe", true)]
-    [InlineData("https://GitHub.com/kewe87/CouchHUD/releases/download/v1/x.exe", true)]
+    [InlineData("https://github.com/jjrussellite28-art/Ultimate-setup/releases/download/v1/x.exe", true)]
+    [InlineData("https://GitHub.com/jjrussellite28-art/Ultimate-setup/releases/download/v1/x.exe", true)]
     [InlineData("https://objects.githubusercontent.com/github-production-release-asset/1/2?x=y", true)]
     [InlineData("https://release-assets.githubusercontent.com/github-production-release-asset/1/2?x=y", true)]
-    [InlineData("http://github.com/kewe87/CouchHUD/releases/download/v1/x.exe", false)]
+    [InlineData("http://github.com/jjrussellite28-art/Ultimate-setup/releases/download/v1/x.exe", false)]
     [InlineData("https://github.com.evil.example/x.exe", false)]
     [InlineData("https://evilgithub.com/x.exe", false)]
     [InlineData("https://githubusercontent.com/x.exe", false)]
-    [InlineData("https://raw.githubusercontent.com/kewe87/CouchHUD/main/x.exe", false)]
+    [InlineData("https://raw.githubusercontent.com/jjrussellite28-art/Ultimate-setup/main/x.exe", false)]
     [InlineData("https://user:pw@github.com/x.exe", false)]
     [InlineData("https://github.com:8443/x.exe", false)]
     [InlineData("file:///C:/x.exe", false)]
@@ -153,10 +153,10 @@ public class SelfUpdateTests : IDisposable
         Assert.Equal(allowed, SelfUpdateRules.IsAllowedHost(new Uri(url)));
 
     [Theory]
-    [InlineData("https://github.com/kewe87/CouchHUD/releases/download/v1/x.exe", true)]
+    [InlineData("https://github.com/jjrussellite28-art/Ultimate-setup/releases/download/v1/x.exe", true)]
     [InlineData("https://github.com/someone/else/releases/download/v1/x.exe", false)]
-    [InlineData("https://github.com/kewe87/CouchHUD/archive/main.zip", false)]
-    [InlineData("https://objects.githubusercontent.com/kewe87/CouchHUD/releases/download/v1/x.exe", false)]
+    [InlineData("https://github.com/jjrussellite28-art/Ultimate-setup/archive/main.zip", false)]
+    [InlineData("https://objects.githubusercontent.com/jjrussellite28-art/Ultimate-setup/releases/download/v1/x.exe", false)]
     [InlineData(null, false)]
     [InlineData("kein url", false)]
     public void The_first_download_url_must_be_a_release_file_of_this_repository(string? url, bool allowed) =>
