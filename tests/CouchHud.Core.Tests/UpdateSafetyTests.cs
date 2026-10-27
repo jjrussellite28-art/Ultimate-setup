@@ -273,7 +273,7 @@ public class UpdateSafetyTests : IDisposable
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         const string setup = "CouchHud-Setup-0.4.0.exe";
-        const string baseUrl = "https://github.com/kewe87/CouchHUD/releases/download/v0.4.0/";
+        const string baseUrl = "https://github.com/jjrussellite28-art/Ultimate-setup/releases/download/v0.4.0/";
         var sum = $"{new string('a', 64)}  {setup}\n";
         var sig = Convert.ToBase64String(key.SignData(CatalogSignature.WithContext(CatalogSignature.ReleaseContext, Encoding.UTF8.GetBytes(sum)), HashAlgorithmName.SHA256));
         var handler = new FakeHandler(r => r.RequestUri!.AbsoluteUri switch
