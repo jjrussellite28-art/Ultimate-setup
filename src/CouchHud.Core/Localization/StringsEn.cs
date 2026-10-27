@@ -298,6 +298,7 @@ public static partial class Strings
         ["hud.updatesAvailable.other"] = "{0} updates available",
         ["hud.xboxButton"] = "Guide button",
         ["toast.snip"] = "Screenshot saved",
+        ["toast.snipFailed"] = "Screenshot failed: {0}",
         ["hud.testNotification"] = "Test notification",
         ["hud.testNotification.body"] = "If you can read this, notifications work on this PC.",
         ["hud.xboxButton.body"] = "Tapping it in a game now brings up MegaHub instead of the Game Bar. Change it under Settings › Controller.",

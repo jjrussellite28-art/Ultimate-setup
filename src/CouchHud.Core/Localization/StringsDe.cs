@@ -298,6 +298,7 @@ public static partial class Strings
         ["hud.updatesAvailable.other"] = "{0} Updates verfügbar",
         ["hud.xboxButton"] = "Guide-Taste",
         ["toast.snip"] = "Screenshot gespeichert",
+        ["toast.snipFailed"] = "Screenshot fehlgeschlagen: {0}",
         ["hud.testNotification"] = "Testmitteilung",
         ["hud.testNotification.body"] = "Wenn du das liest, funktionieren Mitteilungen auf diesem PC.",
         ["hud.xboxButton.body"] = "Antippen im Spiel holt jetzt CouchHUD statt der Game Bar. Ändern unter Einstellungen › Controller.",

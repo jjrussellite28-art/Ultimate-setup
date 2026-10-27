@@ -301,7 +301,10 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
     {
         try
         {
-            var bounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? new System.Drawing.Rectangle(0, 0, 1920, 1080);
+            Console.Error.WriteLine("[snip] Print Screen pressed");
+            // The whole desktop (all monitors), in physical pixels.
+            var bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
+            if (bounds.Width <= 0 || bounds.Height <= 0) bounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? new System.Drawing.Rectangle(0, 0, 1920, 1080);
             using var bitmap = new System.Drawing.Bitmap(bounds.Width, bounds.Height);
             using (var g = System.Drawing.Graphics.FromImage(bitmap))
                 g.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bounds.Size);
@@ -314,10 +317,12 @@ public sealed class Hud(ConfigStore config, LibraryService library, ArtworkResol
                 try { System.Windows.Forms.Clipboard.SetImage(copy); } catch { /* clipboard busy: the file is saved anyway */ }
                 Emit("toast", Strings.Get("toast.snip"));
             });
+            Console.Error.WriteLine("[snip] saved");
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            Console.Error.WriteLine($"[snip] {ex.Message}");
+            Console.Error.WriteLine($"[snip] failed: {ex}");
+            Ui(() => Emit("toast", Strings.Get("toast.snipFailed", ex.Message)));
         }
     }
 
