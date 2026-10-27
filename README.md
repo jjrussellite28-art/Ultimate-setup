@@ -14,6 +14,10 @@
 
 <sub>The games in the screenshots are made up, their covers drawn by the preview.</sub>
 
+> **MegaHub** is an independent fork of [CouchHUD](https://github.com/kewe87/CouchHUD) by kewe87 (Copyright © 2026 kewe87), used under the GPL-3.0 licence. It is not made or endorsed by the CouchHUD project. Changes by jjrussellite28-art include a new name, English-only text and other edits; the full history is in this repository. The source code of this version is available here under the same licence.
+>
+> If you are credited here and would like something changed or removed, please open an issue; it will be handled promptly.
+
 ---
 
 > **Version 0.4.1** – the first public release. Windows 10/11 x64, an XInput controller.
