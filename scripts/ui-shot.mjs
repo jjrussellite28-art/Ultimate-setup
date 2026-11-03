@@ -35,7 +35,8 @@ mkdirSync(opt.out, { recursive: true });
 const edge = process.env.EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const server = spawn(process.execPath, [join(here, 'preview-server.js')], { env: { ...process.env, PORT: opt.port, ...(opt.catalog ? { CATALOG_SKINS: opt.catalog } : {}) }, stdio: 'ignore' });
 const profile = mkdtempSync(join(tmpdir(), 'couchhud-edge-'));
-const browser = spawn(edge, [`--remote-debugging-port=${opt.debug}`, '--headless=new', '--mute-audio', '--disable-gpu', '--disable-extensions', '--force-color-profile=srgb', `--user-data-dir=${profile}`,
+const browser = spawn(edge, [`--remote-debugging-port=${opt.debug}`, '--headless=new', '--mute-audio', '--disable-gpu', '--disable-extensions', '--force-color-profile=srgb',
+  '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update', '--disable-sync', '--disable-default-apps', '--disable-features=Translate,MediaRouter,OptimizationHints', `--user-data-dir=${profile}`,
   `--window-size=${W},${H}`, '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
 const browserGone = new Promise((r) => browser.once('exit', r));
 // Edge runs as a process tree; on Windows only taskkill /T ends the children that hold the profile folder (only while Edge runs: a finished PID may be reused).
@@ -100,6 +101,16 @@ async function settle(arg) {
   console.log('settle: still changing after 15 s');
 }
 
+// A drawn frame is waited for, not guessed at: the fonts are loaded, no finite animation or transition runs any more, and two frames were painted after that
+// (a slow runner draws a menu that is still opening, or a bar behind it, later than a fast machine). A page that never gets quiet is read after 8 s anyway.
+const IDLE_JS = `(async () => {
+  await document.fonts.ready;
+  if (document.getAnimations().some((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity)) return false;
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  return !document.getAnimations().some((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity);
+})()`;
+const idle = async () => { try { await poll(IDLE_JS, 8000, 'idle'); } catch { /* read anyway */ } };
+
 const CODES = { Enter: 'Enter', Escape: 'Escape', Home: 'Home', Backspace: 'Backspace', ' ': 'Space' };
 const VK = { Enter: 13, Escape: 27, Home: 36, Backspace: 8, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, ' ': 32 };
 async function key(k) {
@@ -159,6 +170,7 @@ try {
       await evaluate(`(async()=>{const {applySkin}=await import('/core/skins.js');const {state}=await import('/core/state.js');const {reloadSkins}=await import('/components/skin-menu.js');await reloadSkins();const skin=state.skins.find(s=>s.id==='${arg}');if(!skin)throw new Error('no skin ${arg}');applySkin(skin);})()`);
       await sleep(500);
     } else if (cmd === 'shot') {
+      await idle();
       await sleep(450);
       const r = await send('Page.captureScreenshot', { format: 'png' });
       writeFileSync(join(opt.out, `${arg}.png`), Buffer.from(r.result.data, 'base64'));
@@ -171,11 +183,22 @@ try {
     } else if (cmd === 'ink') {
       // ink:name reads window[name] = [{ name, x, y, w, h }, ...] (rectangles in page pixels), takes a screenshot and prints how much of each
       // rectangle differs from its ground (see png.mjs): letters that are drawn give some, a covered or ground-coloured label gives none.
+      await idle();
       await sleep(450);
+      await idle();
       const rects = (await evaluate(`JSON.stringify(window[${JSON.stringify(arg)}] || [])`)) || '[]';
-      const r = await send('Page.captureScreenshot', { format: 'png' });
-      const png = decodePng(Buffer.from(r.result.data, 'base64'));
-      console.log('ink ->', JSON.stringify(JSON.parse(rects).map((q) => ({ name: q.name, ink: Math.round(ink(png, q) * 1000) / 1000, contrast: Math.round(inkContrast(png, q) * 10) / 10 }))));
+      // A heavy page (a skin with a 3D layer over the bar) can be captured before the compositor has drawn the letters: a capture that shows none is taken again
+      // until they appear (at most 6 s). Letters that never appear still end as ink 0, so a skin that really hides them fails as before.
+      const list = JSON.parse(rects);
+      let readings = [];
+      for (let attempt = 0; attempt < 24; attempt++) {
+        const r = await send('Page.captureScreenshot', { format: 'png' });
+        const png = decodePng(Buffer.from(r.result.data, 'base64'));
+        readings = list.map((q) => ({ name: q.name, ink: Math.round(ink(png, q) * 1000) / 1000, contrast: Math.round(inkContrast(png, q) * 10) / 10 }));
+        if (readings.every((q) => q.ink >= 0.012)) break;
+        await sleep(250);
+      }
+      console.log('ink ->', JSON.stringify(readings));
     } else if (cmd === 'contrast') {
       await sleep(600); // let focus transitions settle
       const bad = await evaluate(CONTRAST_JS);

@@ -85,7 +85,7 @@ jobs:
       # missing Edge fails in CI. The catalog skins are not in this repository, the lint of them runs where they are.
       - name: Tab bar check
         shell: bash
-        timeout-minutes: 20
+        timeout-minutes: 40
         run: node scripts/tabs-check.mjs
 
       - name: Publish
