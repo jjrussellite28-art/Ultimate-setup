@@ -21,7 +21,7 @@
 //
 // Needs Edge (env EDGE or the usual places) and runs only headless (--headless=new --mute-audio, no window, no sound; no app is started).
 // Part of scripts/check.sh and the CI. Without an Edge it says "skipped" and exits 0; in CI (CI=true) the same is a failure. Free ports.
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -88,23 +88,49 @@ const CHECK_FN = `() => {
   const sh = lis.find((l) => l.textContent === 'Smart Home');
   return JSON.stringify({ skin: document.documentElement.dataset.skin, active: act && act.textContent, probs, hints: arrows.length, scrolls, smartHomeReadable: !!sh && sh.scrollWidth <= sh.clientWidth + 1, widths: lis.map((l) => l.textContent + ':' + Math.round(l.getBoundingClientRect().width)), lefts: lis.map((l) => l.getBoundingClientRect().left) });
 }`.replace(/\s*\n\s*/g, ' ');
-const CHECK = `(${CHECK_FN})()`;
+// Waiting is by condition, never by the clock: a slow runner (the CI machine needed twice the time of a developer's PC and then more) must get as long as it needs,
+// a fast one must not wait. READY: the bar is built and both plugin tabs of the preview are in it. SETTLED: skin, positions and widths of the tabs and the
+// scroll position stay the same for a while (the skin is read, the transitions are over).
+const READY = `(() => { const b = window.__couchhudTabBar; if (!b) return false; const t = b.root.querySelector('.list').textContent; return t.includes('Smart Home') && t.includes('Lumen'); })()`;
+const SIG_FN = `() => { const b = window.__couchhudTabBar; if (!b) return null; const l = b.root.querySelector('.list'); return document.documentElement.dataset.skin + '|' + Math.round(l.scrollLeft) + '|' + [...l.children].map((x) => { const r = x.getBoundingClientRect(); return x.className + ',' + Math.round(r.left * 4) + ',' + Math.round(r.width * 4) + ',' + (x.style.clipPath || ''); }).join(';'); }`;
+// Put on the page once and called by name (a Windows command line holds 32767 characters, and a walk reads the bar ten times).
+const DEFS = `eval:(window.__sig = ${SIG_FN}, 1)`;
+const settled = (ms) => `settle:${ms}:window.__sig()`;
+const wait = (js) => `waitfor:${js}`;
 
+const WIZARD_READY = "document.body.dataset.view === 'setup-wizard' && !!window.__couchhudTabBar";
 const WIZARD = `(() => { ${ROOT} return JSON.stringify({ view: document.body.dataset.view, shown: [...root.querySelectorAll('li')].filter((x) => getComputedStyle(x).visibility !== 'hidden').length, arrows: [...root.querySelectorAll('.more')].filter((n) => getComputedStyle(n).visibility !== 'hidden' && getComputedStyle(n).display !== 'none').length }); })()`;
 
 let failed = 0;
 let n = 0;
-const run = (extra, size, steps) => spawnSync(process.execPath, [join(here, 'ui-shot.mjs'), '--out', opt.out, '--port', String(extra.port), '--debug', String(extra.debug), '--size', size, '--catalog', extra.catalog, '--query', extra.query ?? 'hatab=1', ...steps], { encoding: 'utf8', timeout: 240000 });
+// A run that printed no reading at all (Edge did not start, a port was taken, the page threw before the first reading) is started once more on new ports.
+// A run that read the bar and found a problem is never repeated.
+const spawnShot = (extra, size, steps) => new Promise((res) => {
+  const child = spawn(process.execPath, [join(here, 'ui-shot.mjs'), '--out', opt.out, '--port', String(extra.port), '--debug', String(extra.debug), '--size', size, '--catalog', extra.catalog, '--query', extra.query ?? 'hatab=1', '--ready', extra.ready ?? READY, ...steps], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = ''; let stderr = '';
+  child.stdout.setEncoding('utf8').on('data', (d) => (stdout += d));
+  child.stderr.setEncoding('utf8').on('data', (d) => (stderr += d));
+  const timer = setTimeout(() => child.kill(), 240000);
+  child.once('close', (status) => { clearTimeout(timer); res({ status, stdout, stderr }); });
+});
+const run = async (extra, size, steps) => {
+  const r = await spawnShot(extra, size, steps);
+  return /^(eval|ink) -> /m.test(r.stdout) ? r : spawnShot({ ...extra, ...(await ports()) }, size, steps);
+};
 const lines = (run, prefix, twice = true) => (run.stdout || '').split('\n').filter((l) => l.startsWith(prefix)).map((l) => { const v = JSON.parse(l.slice(prefix.length)); return twice ? (typeof v === 'string' ? JSON.parse(v) : null) : v; }).filter((v) => v !== null);
 const ports = async () => ({ port: await freePort(), debug: await freePort() });
+// Every check is a task with its own Edge and its own ports; its lines are collected and printed in the order of the tasks, however many run at once
+// (--jobs N, else TABS_JOBS, else 3 in CI and 1 elsewhere: a developer's machine is also used for other things, and the order of the work stays easy to follow).
+const tasks = [];
+const task = (fn) => tasks.push(fn);
 
 for (const mode of ['stress', 'normal']) {
   for (const size of ['1280x720', '1920x1080']) {
-    for (const skin of skins) {
+    for (const skin of skins) task(async (console) => {
       const shot = `tabs4-${mode === 'normal' ? 'normal-' : ''}${skin}-${size}`;
-      const steps = [`wait:2000`, ...(skin === 'default' ? [] : [`skin:user:${skin}`]), 'wait:1200', `eval:${mode === 'stress' ? SHOW_STATUS : NORMAL_STATUS}`, 'wait:900', `eval:${CHECK}`];
-      for (let i = 0; i < 9; i++) steps.push('key:e', 'wait:150', `eval:${CHECK}`, ...(i === 5 ? ['wait:1400', `shot:${shot}`] : []));
-      const results = lines(run({ ...(await ports()), catalog: opt.catalog }, size, steps), 'eval -> ');
+      const steps = [DEFS, `eval:(window.__check = ${CHECK_FN}, 1)`, ...(skin === 'default' ? [] : [`skin:user:${skin}`]), settled(700), `eval:${mode === 'stress' ? SHOW_STATUS : NORMAL_STATUS}`, settled(500), 'eval:window.__check()'];
+      for (let i = 0; i < 9; i++) steps.push('key:e', settled(250), 'eval:window.__check()', ...(i === 5 ? [settled(600), `shot:${shot}`] : []));
+      const results = lines(await run({ ...(await ports()), catalog: opt.catalog }, size, steps), 'eval -> ');
       n++;
       const seen = new Set(results.map((r) => r.active));
       const problems = [...new Set(results.flatMap((r) => r.probs))];
@@ -135,7 +161,7 @@ for (const mode of ['stress', 'normal']) {
       console.log(`${problems.length ? 'FAIL' : 'ok  '} ${mode} ${skin} ${size}: ${first ? `${first.scrolls ? 'scrolls' : 'fits'}, Smart Home ${first.smartHomeReadable ? 'readable' : 'cut'}; jump ${Math.round(jump)}px, others ${Math.round(shifted)}px; ${first.widths.join(' ')}` : '-'}`);
       for (const p of problems) console.log(`     ${p}`);
       if (problems.length) failed++;
-    }
+    });
   }
 }
 
@@ -186,27 +212,29 @@ const READ_FN = `async () => {
   return JSON.stringify({ probs, skin: document.documentElement.dataset.skin, tabs: lis.length, sizes: [...new Set(sizes)], bar: Math.round(hr.left) + ',' + Math.round(hr.top) + ' ' + Math.round(hr.width) + 'x' + Math.round(hr.height), fonts: [...new Set(lis.map((l) => getComputedStyle(l).fontFamily))] });
 }`.replace(/\s*\n\s*/g, ' ');
 const READ = `(${READ_FN})()`;
+const QUICK_OPEN = "document.getElementById('quick')?.classList.contains('open')";
+const OVERLAY_OPEN = "(() => { const o = document.getElementById('overlay'); return !!o && !o.hidden; })()";
 const fixtureNames = existsSync(FIXTURES) ? readdirSync(FIXTURES, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).filter((nm) => !opt.only || opt.only.split(',').includes(nm)) : [];
 const fixtureRun = !opt.skins || opt.skins.split(',').includes('fixtures');
 for (const name of fixtureRun ? fixtureNames : []) {
   const both = name === 'hostile' || name === 'hostile-host' || name === 'hostile-vars';
-  for (const size of both ? ['1280x720', '1920x1080'] : ['1280x720']) {
+  for (const size of both ? ['1280x720', '1920x1080'] : ['1280x720']) task(async (console) => {
     // The status area is only the normal one; the downloads chip is not what these skins are about.
-    const steps = ['wait:2000', `skin:user:${name}`, 'wait:3500', `eval:${NORMAL_STATUS}`, 'wait:600'];
+    const steps = [DEFS, `skin:user:${name}`, wait(`document.documentElement.dataset.skin === 'user:${name}'`), settled(900), `eval:${NORMAL_STATUS}`, settled(400)];
     // A skin that only changes with a media query is looked at after the query turned on while the page runs (the bar must read it again at once).
-    if (name === 'font-media') steps.push('media:prefers-contrast=more', 'wait:700');
+    if (name === 'font-media') steps.push('media:prefers-contrast=more', settled(500));
     // The pointer (in the top layer while the mouse is in use) and the quick menu (while it is open) are looked at where a skin could make them cover the bar.
     // Every skin is looked at three times: as it is (with the mouse pointer in use, so it is in the top layer), with the guide menu open, with a dialog open. The guide
     // menu and the dialog stand under the bar: the bar must be hit and its letters drawn exactly as without them (only dimmed).
-    steps.push('mouse:640,400', 'wait:200');
+    steps.push('mouse:640,400', wait("!!document.getElementById('cursor')"), 'wait:200');
     steps.push(`eval:${READ}`, 'ink:__ink', `shot:fixture-${name}-${size}`);
-    if (opt.open !== '0') steps.push('key:Home', 'wait:900', `eval:${READ}`, 'ink:__ink', `shot:fixture-${name}-quick-${size}`, 'key:Escape', 'wait:900', 'key:m', 'wait:700', `eval:${READ}`, 'ink:__ink', 'key:Escape');
+    if (opt.open !== '0') steps.push('key:Home', wait(QUICK_OPEN), 'wait:300', `eval:${READ}`, 'ink:__ink', `shot:fixture-${name}-quick-${size}`, 'key:Escape', wait(`!(${QUICK_OPEN})`), 'wait:300', 'key:m', wait(OVERLAY_OPEN), 'wait:300', `eval:${READ}`, 'ink:__ink', 'key:Escape');
     if (name === 'hostile') {
       // Both checks are put on the page once and called by name: eighteen copies would not fit on a Windows command line.
-      steps.splice(1, 0, `eval:(window.__read = ${READ_FN}, window.__check = ${CHECK_FN}, 1)`);
-      for (let i = 0; i < 9; i++) steps.push('key:e', 'wait:150', 'eval:window.__read()', 'eval:window.__check()');
+      steps.splice(2, 0, `eval:(window.__read = ${READ_FN}, window.__check = ${CHECK_FN}, 1)`);
+      for (let i = 0; i < 9; i++) steps.push('key:e', settled(250), 'eval:window.__read()', 'eval:window.__check()');
     }
-    const result = run({ ...(await ports()), catalog: FIXTURES }, size, steps);
+    const result = await run({ ...(await ports()), catalog: FIXTURES }, size, steps);
     const evals = lines(result, 'eval -> ');
     const reads = evals.filter((r) => 'tabs' in r);
     const checks = evals.filter((r) => 'smartHomeReadable' in r);
@@ -226,11 +254,11 @@ for (const name of fixtureRun ? fixtureNames : []) {
     console.log(`${problems.length ? 'FAIL' : 'ok  '} fixture ${name} ${size}: ${reads.length} reading(s), ink min ${inks[0]?.length ? Math.min(...inks[0].map((q) => q.ink)) : '-'} contrast min ${inks[0]?.length ? Math.min(...inks[0].map((q) => q.contrast)) : '-'}${reads[0] ? `, tabs ${reads[0].sizes.join(' ')}, bar ${reads[0].bar}` : ''}`);
     for (const p of problems) console.log(`     ${p}`);
     if (problems.length) failed++;
-  }
+  });
 }
 
 // The top layer: the overlays that may stand over the bar do so while they are open, and leave it when shut.
-if (!opt.skins || opt.skins.split(',').includes('layers')) {
+if (!opt.skins || opt.skins.split(',').includes('layers')) task(async (console) => {
   const LAYERS = (what, expect) => `(async () => {
     const L = await import('/core/layers.js'); const { host } = window.__couchhudTabBar;
     const up = L.layersUp(); const at = (x, y) => document.elementFromPoint(x, y);
@@ -244,28 +272,28 @@ if (!opt.skins || opt.skins.split(',').includes('layers')) {
   const open = (id, x, y) => `if (!node || !node.matches(':popover-open') || !up.includes('${id}')) probs.push('${id} is not in the top layer while open'); else if (!inside(node, at(${x}, ${y}))) probs.push('${id} does not stand over the bar at ${x},${y}: ' + (at(${x}, ${y}) || {}).id);`;
   const shut = (id) => `if (node && node.matches(':popover-open')) probs.push('${id} is still in the top layer after it was shut');`;
   const steps = [
-    'wait:2000',
     // Toasts and the notification cards stay below the bar on purpose: the mock shows a card at the start.
+    wait("!!document.getElementById('notify-stack')?.childElementCount"),
     `eval:${LAYERS('notify-stack', `if (!node || !node.childElementCount) probs.push('no notification card to look at'); else if (node.matches(':popover-open') || up.includes('notify-stack')) probs.push('the notification stack is in the top layer');`)}`,
     // Boot screen: made open again for a moment, then done.
     `eval:(() => { document.getElementById('boot').classList.remove('done'); return 1; })()`, 'wait:300', `eval:${LAYERS('boot', open('boot', 600, 40))}`,
-    `eval:(() => { document.getElementById('boot').classList.add('done'); return 1; })()`, 'wait:1500', `eval:${LAYERS('boot', shut('boot'))}`,
+    `eval:(() => { document.getElementById('boot').classList.add('done'); return 1; })()`, wait("!document.getElementById('boot').matches(':popover-open')"), 'wait:200', `eval:${LAYERS('boot', shut('boot'))}`,
     // Quick menu: over the right of the bar, the tabs beside it stay hit by the bar; gone when shut.
     // The guide menu and the dialog stand UNDER the bar (never in the top layer): the bar is hit everywhere on its line while they are open, the menu starts below it.
-    'key:Home', 'wait:900', `eval:${LAYERS('quick', `if (!node || !node.classList.contains('open')) probs.push('the quick menu did not open'); if (node && node.matches(':popover-open')) probs.push('quick is in the top layer'); if (at(1850, 40) !== host || at(300, 40) !== host) probs.push('the bar is not hit at its line while the quick menu is open'); if (node && node.getBoundingClientRect().top < host.getBoundingClientRect().bottom - 2) probs.push('the quick menu starts above the bottom of the bar');`)}`,
-    'key:Escape', 'wait:1600', `eval:${LAYERS('quick', `if (node && node.matches(':popover-open')) probs.push('quick is in the top layer')`)}`,
+    'key:Home', wait(QUICK_OPEN), 'wait:300', `eval:${LAYERS('quick', `if (!node || !node.classList.contains('open')) probs.push('the quick menu did not open'); if (node && node.matches(':popover-open')) probs.push('quick is in the top layer'); if (at(1850, 40) !== host || at(300, 40) !== host) probs.push('the bar is not hit at its line while the quick menu is open'); if (node && node.getBoundingClientRect().top < host.getBoundingClientRect().bottom - 2) probs.push('the quick menu starts above the bottom of the bar');`)}`,
+    'key:Escape', wait(`!(${QUICK_OPEN})`), 'wait:600', `eval:${LAYERS('quick', `if (node && node.matches(':popover-open')) probs.push('quick is in the top layer')`)}`,
     // The power menu (the Start button): a dialog over the whole screen.
-    'key:m', 'wait:700', `eval:${LAYERS('overlay', `if (!node || node.hidden) probs.push('the dialog did not open'); if (node && node.matches(':popover-open')) probs.push('overlay is in the top layer'); if (at(600, 40) !== host) probs.push('the bar is not hit at its line while the dialog is open');`)}`,
-    'key:Escape', 'wait:1500', `eval:${LAYERS('overlay', `if (node && node.matches(':popover-open')) probs.push('overlay is in the top layer')`)}`,
+    'key:m', wait(OVERLAY_OPEN), 'wait:300', `eval:${LAYERS('overlay', `if (!node || node.hidden) probs.push('the dialog did not open'); if (node && node.matches(':popover-open')) probs.push('overlay is in the top layer'); if (at(600, 40) !== host) probs.push('the bar is not hit at its line while the dialog is open');`)}`,
+    'key:Escape', wait(`!(${OVERLAY_OPEN})`), 'wait:600', `eval:${LAYERS('overlay', `if (node && node.matches(':popover-open')) probs.push('overlay is in the top layer')`)}`,
     // Screensaver.
-    `eval:import('/core/screensaver.js').then((m) => { m.startScreensaver('black'); return 1; })`, 'wait:700', `eval:${LAYERS('screensaver', open('screensaver', 600, 40))}`,
-    `eval:import('/core/screensaver.js').then((m) => { m.stopScreensaver(); return 1; })`, 'wait:2500', `eval:${LAYERS('screensaver', `if (document.getElementById('screensaver')) probs.push('the screensaver is still there')`)}`,
+    `eval:import('/core/screensaver.js').then((m) => { m.startScreensaver('black'); return 1; })`, wait("!!document.getElementById('screensaver')?.matches(':popover-open')"), 'wait:200', `eval:${LAYERS('screensaver', open('screensaver', 600, 40))}`,
+    `eval:import('/core/screensaver.js').then((m) => { m.stopScreensaver(); return 1; })`, wait("!document.getElementById('screensaver')"), 'wait:300', `eval:${LAYERS('screensaver', `if (document.getElementById('screensaver')) probs.push('the screensaver is still there')`)}`,
     // Toasts and the notification cards stay below the bar on purpose (the mock shows a card): never in the top layer, the bar is hit at its tabs while they show.
-    `eval:import('/core/feedback.js').then((m) => { m.toast('A toast over the bar', 3000); return 1; })`, 'wait:400', `eval:${LAYERS('toast', `if (!node || node.hidden || node.matches(':popover-open') || up.includes('toast') || at(600, 40) !== host) probs.push('the toast is over the bar or in the top layer');`)}`,
+    `eval:import('/core/feedback.js').then((m) => { m.toast('A toast over the bar', 3000); return 1; })`, wait("!!document.getElementById('toast') && !document.getElementById('toast').hidden"), 'wait:200', `eval:${LAYERS('toast', `if (!node || node.hidden || node.matches(':popover-open') || up.includes('toast') || at(600, 40) !== host) probs.push('the toast is over the bar or in the top layer');`)}`,
     // The pointer is the highest of the core's layers.
-    'mouse:700,40', 'wait:300', `eval:${LAYERS('cursor', `if (!node || !node.matches(':popover-open')) probs.push('the pointer is not in the top layer'); if (up.at(-1) !== 'cursor' && !up.includes('screensaver')) probs.push('the pointer is not the last of ' + up.join(','));`)}`
+    'mouse:700,40', wait("!!document.getElementById('cursor')?.matches(':popover-open')"), 'wait:200', `eval:${LAYERS('cursor', `if (!node || !node.matches(':popover-open')) probs.push('the pointer is not in the top layer'); if (up.at(-1) !== 'cursor' && !up.includes('screensaver')) probs.push('the pointer is not the last of ' + up.join(','));`)}`
   ];
-  const result = run({ ...(await ports()), catalog: opt.catalog }, '1920x1080', steps);
+  const result = await run({ ...(await ports()), catalog: opt.catalog }, '1920x1080', steps);
   const reads = lines(result, 'eval -> ').filter((r) => r.what);
   n++;
   const problems = [...new Set(reads.flatMap((r) => r.probs))];
@@ -278,11 +306,11 @@ if (!opt.skins || opt.skins.split(',').includes('layers')) {
   console.log(`${problems.length ? 'FAIL' : 'ok  '} layers: ${reads.length} readings (${reads.map((r) => `${r.what}[${r.up.join(',')}]`).join(' ').slice(0, 200)})`);
   for (const p of problems) console.log(`     ${p}`);
   if (problems.length) failed++;
-}
+});
 
 // The skin stylesheet sanitizer against a real parser: every output (the shared cases and a fixed-seed fuzz corpus of 2400 token soups) is parsed by Edge as a
 // stylesheet, and no @layer or @import rule may be left. A raw @layer sheet is the control: the oracle has to see it, or it sees nothing.
-if (!opt.skins || opt.skins.split(',').includes('sanitizer')) {
+if (!opt.skins || opt.skins.split(',').includes('sanitizer')) task(async (console) => {
   const require = createRequire(import.meta.url);
   const { sanitize } = require('./skin-css.js');
   const { fuzz } = await import('./gen-skin-css-cases.mjs');
@@ -303,7 +331,7 @@ if (!opt.skins || opt.skins.split(',').includes('sanitizer')) {
   writeFileSync(join(dir, 'oracle', 'skin.json'), '{"name":{"de":"o","en":"o"},"description":{"de":"o","en":"o"}}');
   const ORACLE = `(async () => { const d = await (await fetch('/__catalog-skins/oracle/cases.json')).json(); const bad = []; const walk = (rules) => { for (const r of rules) { if (/Layer|Import/.test(r.constructor.name)) return true; if (r.cssRules && walk(r.cssRules)) return true; } return false; }; for (const [k, v] of Object.entries(d)) { const s = document.createElement('style'); s.textContent = v; document.head.append(s); if (walk(s.sheet.cssRules)) bad.push(k); s.remove(); } return JSON.stringify({ n: Object.keys(d).length, bad }); })()`;
   const HEADER = `(async () => { const walk = (rules) => [...rules].some((r) => /Layer|Import/.test(r.constructor.name) || (r.cssRules && walk(r.cssRules))); const load = (href) => new Promise((res) => { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; l.onload = () => res(l); l.onerror = () => res(l); document.head.append(l); }); const served = await load('/__catalog-skins/oracle/raw-iso.css'); const control = await load('/__catalog-skins/oracle/raw-iso.nocharset.css'); const hdr = (await fetch('/__catalog-skins/oracle/raw-iso.css')).headers.get('content-type'); return JSON.stringify({ hdr, served: walk(served.sheet.cssRules), control: walk(control.sheet.cssRules) }); })()`;
-  const result = run({ ...(await ports()), catalog: dir }, '800x600', ['wait:1500', `eval:${ORACLE}`, `eval:${HEADER}`]);
+  const result = await run({ ...(await ports()), catalog: dir, ready: 'document.readyState === "complete"' }, '800x600', [`eval:${ORACLE}`, `eval:${HEADER}`]);
   rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   const r = lines(result, 'eval -> ')[0] ?? null;
   const h = lines(result, 'eval -> ')[1] ?? null;
@@ -324,17 +352,32 @@ if (!opt.skins || opt.skins.split(',').includes('sanitizer')) {
   console.log(`${problems.length ? 'FAIL' : 'ok  '} sanitizer: ${r ? r.n : 0} sheets parsed by Edge, ${r ? r.bad.filter((x) => x !== 'control').length : '-'} with a layer or import rule left; header ${h ? `${h.hdr}: served ${h.served ? 'LAYER' : 'no rule'}, control without charset ${h.control ? 'layer rule (attack reproduced)' : 'no rule'}` : '-'}`);
   for (const p of problems) console.log(`     ${p}`);
   if (problems.length) failed++;
-}
+});
 
 // The setup assistant hides the tabs itself: no tab may show on it, in any skin.
-for (const skin of skins) {
-  const steps = ['wait:2500', ...(skin === 'default' ? [] : [`skin:user:${skin}`]), 'wait:1500', `eval:${WIZARD}`];
-  const result = run({ ...(await ports()), catalog: opt.catalog, query: 'terms&fresh&hatab=1' }, '1280x720', steps);
+for (const skin of skins)  task(async (console) => {
+  const steps = [DEFS, ...(skin === 'default' ? [] : [`skin:user:${skin}`]), settled(700), `eval:${WIZARD}`];
+  const result = await run({ ...(await ports()), catalog: opt.catalog, query: 'terms&fresh&hatab=1', ready: WIZARD_READY }, '1280x720', steps);
   const r = lines(result, 'eval -> ')[0] ?? null;
   n++;
   const bad = !r || r.view !== 'setup-wizard' || r.shown !== 0 || r.arrows !== 0;
   console.log(`${bad ? 'FAIL' : 'ok  '} wizard ${skin}: ${r ? `view ${r.view}, tabs shown ${r.shown}, arrows ${r.arrows}` : 'no reading'}`);
   if (bad) failed++;
-}
+});
+const jobs = Math.max(1, Number(opt.jobs ?? process.env.TABS_JOBS ?? (/^(1|true)$/i.test(process.env.CI ?? '') ? 3 : 1)) || 1);
+const outputs = tasks.map(() => null);
+let next = 0;
+let printed = 0;
+const flush = () => { while (printed < outputs.length && outputs[printed]) { for (const l of outputs[printed]) console.log(l); printed++; } };
+await Promise.all(Array.from({ length: Math.min(jobs, tasks.length) }, async () => {
+  while (next < tasks.length) {
+    const i = next++;
+    const buffer = [];
+    const log = (...a) => buffer.push(a.join(' '));
+    try { await tasks[i]({ log }); } catch (e) { log(`FAIL task ${i}: ${e?.stack ?? e}`); failed++; }
+    outputs[i] = buffer;
+    flush();
+  }
+}));
 console.log(failed ? `tabs: ${failed} of ${n} runs failed` : `tabs: ok (${n} runs)`);
 process.exit(failed ? 1 : 0);

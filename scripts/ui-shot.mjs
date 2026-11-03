@@ -5,11 +5,13 @@
 //
 // Steps:  skin:deepsea   key:ArrowDown   key:Enter   keys:ArrowDown*3   wait:300
 //         (skin:user:<folder> shows a skin from the folder given with --catalog, see below)
+//         waitfor:js (poll the page until js is truthy, at most 30 s, else the run fails)   settle:ms:js (poll until js returns the same value for ms, at most 15 s)
 //         mouse:x,y (move the mouse: shows the pointer)  shot:name  eval:<js>       contrast:label   text:abc (type into page)
 // Keys: Arrow*, Enter=A, Escape=B, q/e=LB/RB, x, y, m=Start, Home=Guide.
 // Options: --path remote/index.html (another page of ui/, e.g. the phone page against the preview server's pretend PC; add --mobile 1
 //          for a phone viewport; its language follows Edge's), --query lang=en (URL query of the preview page), --catalog DIR (a folder with skin folders, served like installed skins,
 //          for skins from the catalog: skin:user:<folder>).
+// --ready js: instead of the fixed 3.5 s after the page loaded, poll until js is truthy (at most 30 s). A failing step ends the run with an error on stderr and status 1.
 // Env: EDGE (path to msedge.exe).
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
@@ -75,6 +77,29 @@ const evaluate = async (expression) => {
   return r.result?.result?.value;
 };
 
+// Polls the page for a condition instead of sleeping for what a fast machine needs: a slow one just takes longer.
+async function poll(js, limit, what) {
+  const until = Date.now() + limit;
+  let last = '';
+  while (Date.now() < until) {
+    try { if (await evaluate(js)) return; } catch (e) { last = String(e.message ?? e).slice(0, 300); }
+    await sleep(100);
+  }
+  throw new Error(`${what} not reached in ${limit / 1000} s${last ? ` (last error: ${last})` : ''}: ${js.slice(0, 200)}`);
+}
+async function settle(arg) {
+  const at = arg.indexOf(':');
+  const quiet = +arg.slice(0, at); const js = arg.slice(at + 1);
+  const until = Date.now() + 15000;
+  let prev; let since = Date.now();
+  while (Date.now() < until) {
+    let v; try { v = JSON.stringify(await evaluate(js)); } catch { v = undefined; }
+    if (v !== undefined && v === prev) { if (Date.now() - since >= quiet) return; } else { prev = v; since = Date.now(); }
+    await sleep(50);
+  }
+  console.log('settle: still changing after 15 s');
+}
+
 const CODES = { Enter: 'Enter', Escape: 'Escape', Home: 'Home', Backspace: 'Backspace', ' ': 'Space' };
 const VK = { Enter: 13, Escape: 27, Home: 36, Backspace: 8, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, ' ': 32 };
 async function key(k) {
@@ -114,10 +139,10 @@ const CONTRAST_JS = `(() => {
 await send('Page.enable');
 await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: +opt.dpr || 1, mobile: opt.mobile === '1' });
 await send('Page.navigate', { url: `http://127.0.0.1:${opt.port}/${opt.path ?? ''}${opt.query ? `?${opt.query}` : ""}` });
-await sleep(3500);
-await evaluate('document.querySelector("#boot")?.classList.add("done")');
 
 try {
+  if (opt.ready) await poll(opt.ready, 30000, 'ready'); else await sleep(3500);
+  await evaluate('document.querySelector("#boot")?.classList.add("done")');
   for (const step of steps) {
     const at = step.indexOf(':');
     const cmd = at < 0 ? step : step.slice(0, at);
@@ -127,6 +152,8 @@ try {
     else if (cmd === 'text') for (const ch of arg) await key(ch);
     else if (cmd === 'mouse') { const [x, y] = arg.split(',').map(Number); await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x - 20, y: y - 20 }); await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y }); await sleep(100); }
     else if (cmd === 'wait') await sleep(+arg);
+    else if (cmd === 'waitfor') await poll(arg, 30000, 'waitfor');
+    else if (cmd === 'settle') await settle(arg);
     else if (cmd === 'eval') console.log('eval ->', JSON.stringify(await evaluate(arg)));
     else if (cmd === 'skin') {
       await evaluate(`(async()=>{const {applySkin}=await import('/core/skins.js');const {state}=await import('/core/state.js');const {reloadSkins}=await import('/components/skin-menu.js');await reloadSkins();const skin=state.skins.find(s=>s.id==='${arg}');if(!skin)throw new Error('no skin ${arg}');applySkin(skin);})()`);
@@ -156,7 +183,10 @@ try {
       for (const b of bad) console.log('  ', JSON.stringify(b));
     } else console.log('unbekannter Schritt', step);
   }
+} catch (e) {
+  console.error('ui-shot:', e.message ?? e);
+  process.exitCode = 1;
 } finally {
   await removeProfile();
-  process.exit(0);
+  process.exit(process.exitCode ?? 0);
 }

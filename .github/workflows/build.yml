@@ -79,11 +79,12 @@ jobs:
         timeout-minutes: 5
         run: node scripts/browser-ui-check.mjs
 
-      # The tab bar in the default skin at 1280 and 1920 with the plugin tabs (headless, muted, free ports); like the check above a
+      # The tab bar in the default skin at 1280 and 1920 with the plugin tabs, 131 fixture skins, the layers (headless, muted, free ports, three Edges at a time
+      # in CI, every wait is for a condition); like the check above a
       # missing Edge fails in CI. The catalog skins are not in this repository, the lint of them runs where they are.
       - name: Tab bar check
         shell: bash
-        timeout-minutes: 10
+        timeout-minutes: 20
         run: node scripts/tabs-check.mjs
 
       - name: Publish
