@@ -1,0 +1,5 @@
+:root[data-skin="user:anchor-vis"]{--x:1}
+
+body{anchor-name:--a}
+#top{position-anchor:--a; position-visibility:no-overflow;}
+#top-gap{anchor-name:--b; position:absolute; top:-9999px}

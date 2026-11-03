@@ -137,3 +137,9 @@ export function createStepShow({ apply, beat = 250, wait = (ms) => new Promise((
     }
   };
 }
+
+/**
+ * Whether the run must not start: parental controls are on and the run still has to take the step "light" (back to the app mode), which the
+ * host refuses while they are on (Hud.SetIntegrationMode). Only a look before the run, the host keeps its own check.
+ */
+export const parentalBlocksRun = (rows, parentalOn) => !!parentalOn && rows.some((r) => r.step.id === 'light' && !SATISFIED.has(r.status));

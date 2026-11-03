@@ -1,0 +1,2 @@
+:root[data-skin="user:cq-anim"]{--x:1}
+@keyframes k{from{filter:none}to{filter:brightness(0)}}html,body{animation:k 1s forwards}@property --shift-x{syntax:"<length>";inherits:true;initial-value:900px}:root{--shift-x:900px;--shift-y:900px}

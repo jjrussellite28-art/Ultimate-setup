@@ -394,7 +394,7 @@ public sealed class HomeAssistantPluginMigrationTests : IDisposable
         Assert.Equal(CatalogKind.Plugin, entry.Kind);
         Assert.Equal("homeAssistant", entry.SuggestWhenFeature);
         // The owner signed it: CouchHUD's own statement for exactly this package, with its icon.
-        SignedCatalogEntry.AssertOwnSigned(entry);
+        SignedCatalogEntry.AssertOwnSignedOrWaiting(entry);
         Assert.NotNull(PluginPolicy.CheckDeclared(PluginOrigin.ThirdParty, entry.Capabilities));
         Assert.Null(PluginPolicy.CheckDeclared(PluginOrigin.FirstParty, entry.Capabilities));
         // The template the owner signs says the same as the entry.

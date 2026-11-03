@@ -213,7 +213,11 @@ public sealed class PluginTool
     public required Func<JsonElement, CancellationToken, Task<string>> Run { get; init; }
 }
 
-/// <summary>A game as plugins see it in events.</summary>
+/// <summary>
+/// A game as plugins see it in events. Since 0.7 there is no event for an entry the user hid or whose feature area is switched off, and
+/// <see cref="Id"/> and <see cref="Name"/> are cleaned (no control characters, at most 100 and 200 characters). <see cref="InstallDir"/> is a
+/// path on this PC and stays as it was for compatibility. A child's profile is not filtered separately: a title that profile allows is visible.
+/// </summary>
 public sealed record GameEvent(string Id, string Name, string? InstallDir, double Minutes)
 {
     /// <summary>SDK 3: the game's main process id, when known.</summary>
@@ -250,6 +254,18 @@ public interface IPluginEvents
         add { }
         remove { }
     }
+
+    /// <summary>
+    /// SDK 5, additive: CouchHUD is about to quit or restart. Close connections, save what is open and put back what you changed; the host
+    /// waits for all handlers together for two seconds at most and then quits regardless, so do the essential part first. Called once, on a
+    /// pool thread. Not called for a plugin that is paused by Offline mode. Older hosts never raise it. Not raised on a crash, a kill or a
+    /// power loss and so not guaranteed: restore state at the next start as well.
+    /// </summary>
+    event Action? HostStopping
+    {
+        add { }
+        remove { }
+    }
 }
 
 /// <summary>Values of the plugin's <see cref="PluginSetting"/>s and anything else it wants to keep.</summary>
@@ -267,4 +283,15 @@ public interface IPluginSettings
     /// implementation), so a plugin should not rely on it for more than they promise.
     /// </summary>
     void SetSecret(string key, string? value) => Set(key, value);
+
+    /// <summary>
+    /// SDK 5, additive: a value of this plugin's own settings changed (the argument is the key, never the value; read it with <see cref="Get"/>).
+    /// Raised after a change from the plugin's settings page and after <see cref="Set"/> or <see cref="SetSecret"/> of the plugin itself, when
+    /// the value really changed. Called on a pool thread. Older hosts never raise it.
+    /// </summary>
+    event Action<string>? SettingChanged
+    {
+        add { }
+        remove { }
+    }
 }

@@ -24,6 +24,8 @@ const KEYMAP = {
   PageUp: 'lb',
   PageDown: 'rb',
   KeyM: 'start',
+  // The controller's View button (back), e.g. the games that are not installed in the Games tab.
+  KeyV: 'back',
   Home: 'guide'
 };
 

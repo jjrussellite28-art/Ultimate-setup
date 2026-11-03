@@ -397,17 +397,24 @@ internal sealed class OpsHarness : IDisposable
         Store = ServiceStateStore.Open(stateFolder ? StateFolder : null, OpsLog, () => BootTime, OnServiceList);
         var tasks = Tasks;
         Operations = new OperationsA(new OperationsAParts(Store, Hives, Scm, Firewall, AutoLogon, Accounts, Logon, tasks,
-            new PolicyInstaller(tasks, OpsLog, AppDir), AppDir, OpsLog, null, OnServiceList, () => Now, TimeSpan.FromSeconds(1), Sessions));
+            new PolicyInstaller(tasks, OpsLog, AppDir), AppDir, OpsLog, null, OnServiceList, () => Now, TimeSpan.FromSeconds(1), Sessions, () => ShellRuns));
         Operations.Start();
         // As the service: the account's lock view knows a lock taken over from 0.4.0 (CodeHandlers.View).
         Harness = new Harness(grants: grants?.Create(), codeEnrolled: codeEnrolled, onServiceList: OnServiceList,
             extraHandlers: Operations.AddHandlers, extraChecks: Operations.AddChecks,
-            lockViews: sid => LockView.Closed with { Legacy = Operations.IsLegacyLocked(sid) });
+            lockViews: sid => LockView.Closed with { Legacy = Operations.IsLegacyLocked(sid) },
+            sessions: new SessionFacts(() => ConsoleSession, callerSession => Sessions.SignedInSids(callerSession)));
         Harness.State.MigrationLookup = Operations.MigrationOf;
         Harness.State.ReleaseLookup = () => Operations.ReleaseStatus;
     }
 
     public FakeSessions Sessions { get; } = new();
+
+    /// <summary>Whether a CouchHUD of the installation runs (the watch's liveness check).</summary>
+    public bool ShellRuns { get; set; } = true;
+
+    /// <summary>The session on the console (the caller of <see cref="Callers.User"/> is in session 1).</summary>
+    public int? ConsoleSession { get; set; } = 1;
 
 
     public Task<Response> Call(CallerInfo caller, Operation op, object? args = null, string? grant = null)

@@ -213,6 +213,113 @@ public class CodeFlowTests
         Assert.Equal(CodeFlow.TogetherOutcome.Refused, CodeFlow.ClassifyTogether(new OpResult(FailureKind.Refused, ErrorCodes.Denied), damaged));
     }
 
+    [Fact]
+    public void An_administrator_opens_the_code_lock_only_while_the_service_holds_no_couch_code()
+    {
+        // After the reset of a damaged file: no couch code, not damaged. The parents' code does not matter for the couch lock.
+        Assert.True(CodeFlow.AdminOpensCodeLock(new HeldCodes(false, false, LockModes.Code)));
+        Assert.True(CodeFlow.AdminOpensCodeLock(new HeldCodes(false, true, LockModes.Code)));
+        // Negative: a couch code there (also one whose state is unknown), a damaged file (only the reset), a lock of 0.4.0 not confirmed yet,
+        // and no answer from the service: the code stays the only way.
+        Assert.False(CodeFlow.AdminOpensCodeLock(new HeldCodes(true, false, LockModes.Code)));
+        Assert.False(CodeFlow.AdminOpensCodeLock(new HeldCodes(null, null, LockModes.Code)));
+        Assert.False(CodeFlow.AdminOpensCodeLock(new HeldCodes(false, false, LockModes.Code, Damaged: true)));
+        Assert.False(CodeFlow.AdminOpensCodeLock(new HeldCodes(false, false, LockModes.Code, LegacyLock: true)));
+        Assert.False(CodeFlow.AdminOpensCodeLock(null));
+    }
+
+    /// <summary>The service's code file as the shell asks for it: damaged until the reset ran, empty afterwards, and optionally a code appearing.</summary>
+    private sealed class ResetService
+    {
+        public HeldCodes? Held { get; set; } = new HeldCodes(false, false, LockModes.Code, Damaged: true);
+        public bool Approve { get; set; } = true;
+        public int Resets { get; private set; }
+        public int Approvals { get; private set; }
+
+        public Task<HeldCodes?> Fresh() => Task.FromResult(Held);
+
+        public Task Reset()
+        {
+            if (!Approve) throw new InvalidOperationException("declined");
+            Resets++;
+            Held = new HeldCodes(false, false, LockModes.Code);
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> Prompt()
+        {
+            Approvals++;
+            return Task.FromResult(Approve);
+        }
+    }
+
+    [Fact]
+    public async Task A_damaged_store_is_reset_with_the_approval_and_the_couch_opens_for_a_new_code()
+    {
+        var service = new ResetService();
+        var outcome = await CodeFlow.ResetDamagedStoreAsync(service.Fresh, service.Reset, () => service.Held, codeLock: true);
+        Assert.Equal(new CodeFlow.ResetOutcome(true, true, true, true), outcome);
+        Assert.Equal(1, service.Resets);
+        // Not a code lock (the Windows lock, off): the codes are gone, nothing opens.
+        var windows = new ResetService();
+        Assert.False((await CodeFlow.ResetDamagedStoreAsync(windows.Fresh, windows.Reset, () => windows.Held, codeLock: false)).OpensLock);
+    }
+
+    [Fact]
+    public async Task A_declined_approval_resets_nothing_and_opens_nothing()
+    {
+        var service = new ResetService { Approve = false };
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CodeFlow.ResetDamagedStoreAsync(service.Fresh, service.Reset, () => service.Held, codeLock: true));
+        Assert.Equal(0, service.Resets);
+        Assert.True(service.Held is { Damaged: true });
+    }
+
+    [Fact]
+    public async Task The_reset_runs_only_for_a_file_the_service_reports_as_damaged()
+    {
+        foreach (var held in new HeldCodes?[] { new HeldCodes(true, true, LockModes.Code), new HeldCodes(false, false, LockModes.Code), null })
+        {
+            var service = new ResetService { Held = held };
+            var outcome = await CodeFlow.ResetDamagedStoreAsync(service.Fresh, service.Reset, () => service.Held, codeLock: true);
+            Assert.False(outcome.Reset);
+            Assert.False(outcome.OpensLock);
+            Assert.Equal(0, service.Resets);
+        }
+        // The file was valid again when the reset read it (the code is still there): nothing is reported gone and nothing opens.
+        var loaded = new ResetService();
+        var after = new HeldCodes(true, true, LockModes.Code);
+        var kept = await CodeFlow.ResetDamagedStoreAsync(loaded.Fresh, async () => { await loaded.Reset(); loaded.Held = after; }, () => loaded.Held, codeLock: true);
+        Assert.Equal(new CodeFlow.ResetOutcome(true, false, false, false), kept);
+    }
+
+    [Fact]
+    public async Task The_administrator_opens_a_code_lock_without_a_code_after_the_reset_and_only_then()
+    {
+        // Damaged: refused before any prompt (the reset is the way there).
+        var damaged = new ResetService();
+        Assert.Equal(CodeFlow.AdminUnlockOutcome.Refused, await CodeFlow.UnlockByAdminAsync(damaged.Fresh, damaged.Prompt));
+        Assert.Equal(0, damaged.Approvals);
+        // Reset approved, then the approval of the unlock: opened.
+        await damaged.Reset();
+        Assert.Equal(CodeFlow.AdminUnlockOutcome.Opened, await CodeFlow.UnlockByAdminAsync(damaged.Fresh, damaged.Prompt));
+        Assert.Equal(1, damaged.Approvals);
+        // A declined prompt: still locked.
+        var declined = new ResetService { Held = new HeldCodes(false, false, LockModes.Code), Approve = false };
+        Assert.Equal(CodeFlow.AdminUnlockOutcome.Declined, await CodeFlow.UnlockByAdminAsync(declined.Fresh, declined.Prompt));
+        // The service gains a code between the two checks (the prompt is open meanwhile): refused, the code is the way.
+        var race = new ResetService { Held = new HeldCodes(false, false, LockModes.Code) };
+        var raced = await CodeFlow.UnlockByAdminAsync(race.Fresh, () =>
+        {
+            race.Held = new HeldCodes(true, false, LockModes.Code);
+            return Task.FromResult(true);
+        });
+        Assert.Equal(CodeFlow.AdminUnlockOutcome.Refused, raced);
+        // No answer from the service: refused without a prompt.
+        var silent = new ResetService { Held = null };
+        Assert.Equal(CodeFlow.AdminUnlockOutcome.Refused, await CodeFlow.UnlockByAdminAsync(silent.Fresh, silent.Prompt));
+        Assert.Equal(0, silent.Approvals);
+    }
+
     /// <summary>The service as the shell sees it around storing a code and raising the mode; the raise drops what was enrolled at the open couch.</summary>
     private sealed class StoreRaiseFake
     {

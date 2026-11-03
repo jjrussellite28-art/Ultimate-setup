@@ -83,7 +83,7 @@ public sealed class BrowserRecentContractTests
         var resets = Members(@"\b_browserRecentShown\s*=\s*false\b").Distinct().Order(StringComparer.Ordinal).ToList();
         Assert.Contains("Hud.cs: ForgetUnlock", resets);
         Assert.Contains("Hud.cs: SyncLockState", resets);
-        Assert.Contains("Hud.cs: SetParental", resets);
+        Assert.Contains("Hud.cs: SetParentalCore", resets);
         Assert.Contains("if (Locked) _browserRecentShown = false;", Body("    private void SyncLockState()"));
         Assert.Contains("SyncBrowserRecent();", Body("    private void SyncLockState()"));
     }

@@ -374,7 +374,7 @@ public sealed class SaveGameService(
         run ??= work => Task.Run(work);
         var gate = _locks.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
         // A backup or restore by hand is under way: that one counts.
-        if (!await gate.WaitAsync(0)) return new AutoBackupResult(AutoBackupOutcome.Skipped);
+        if (!await gate.WaitAsync(0, CancellationToken.None)) return new AutoBackupResult(AutoBackupOutcome.Skipped);
         var one = false;
         try
         {

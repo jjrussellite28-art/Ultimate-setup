@@ -1,0 +1,33 @@
+{
+  "id": "anthropic",
+  "folder": "CouchHud.Plugin.Anthropic",
+  "version": "1.0.0",
+  "sha256": "",
+  "sdk": 5,
+  "minCouchHud": "0.7.0",
+  "capabilities": [
+    "assistant.provider",
+    "network:internet"
+  ],
+  "services": [
+    {
+      "id": "api",
+      "name": {
+        "de": "Anthropic-API (Assistent)",
+        "en": "Anthropic API (assistant)"
+      },
+      "hosts": [
+        "api.anthropic.com"
+      ]
+    }
+  ],
+  "publisherKey": "",
+  "license": "GPL-3.0-only",
+  "author": "kewe87",
+  "name": "Anthropic",
+  "summary": "Anthropic's Claude models as a provider for the assistant",
+  "icon": {
+    "sha256": "8eb0a074850228fc8ee3805d6baddf9de5e81e8dfeae81f06001c4b820b248db",
+    "bytes": 37982
+  }
+}

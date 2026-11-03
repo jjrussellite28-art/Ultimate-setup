@@ -127,6 +127,14 @@ public class SelfUpdateTests : IDisposable
     [InlineData("v0.4.0-beta.2", true, "0.4.0-beta.1", true)]
     [InlineData("v0.4.0-beta.1", true, "0.4.0-beta.2", false)]
     [InlineData("v0.10.0", false, "0.9.0", true)]
+    [InlineData("v0.6.4", false, "0.6.4-dev+f627fe74", true)]   // a development build is offered the real release of its number
+    [InlineData("v0.6.4", false, "0.6.4-dev", true)]
+    [InlineData("v0.6.4", false, "0.6.4+f627fe74", false)]      // build metadata is ignored: the release is not an update for itself
+    [InlineData("v0.6.4", false, "0.6.4", false)]
+    [InlineData("v0.6.5", false, "0.6.4-dev+f627fe74", true)]
+    [InlineData("v0.6.3", false, "0.6.4-dev+f627fe74", false)] // the dev build of 0.6.4 is newer than the 0.6.3 release
+    [InlineData("v0.6.4-dev", true, "0.6.4-dev+f627fe74", false)] // never an update for itself, whatever follows the plus
+    [InlineData("v0.6.4-dev", true, "0.6.4", false)]
     public void Update_decision(string tag, bool prerelease, string app, bool expected)
     {
         var release = ReleaseParser.Parse(ReleaseJson(tag: tag, prerelease: prerelease))!;

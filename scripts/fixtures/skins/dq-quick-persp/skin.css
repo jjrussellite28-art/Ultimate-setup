@@ -1,0 +1,2 @@
+:root[data-skin="user:dq-quick-persp"]{--x:1}
+#quick{perspective:1px!important;transform-style:preserve-3d;backface-visibility:hidden;rotate:y 80deg}#quick *{transform:translateZ(0.9px) scale(100)}

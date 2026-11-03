@@ -68,7 +68,7 @@ if (new URLSearchParams(location.search).get('favs') === 'demo') {
 }
 // Preview: ?demo shows made-up games with generated artwork (README screenshots, no store covers).
 if (demoMode) applyDemo(library);
-// Square pictures (SteamGridDB) for a few entries; the others have none and show their cover cropped on square tiles.
+// Square pictures (SteamGridDB) for a few entries; the others have none and show their whole cover, centred, on square tiles.
 const squareArt = (name, hue) => `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="100%" height="100%" fill="hsl(${hue} 60% 32%)"/><circle cx="256" cy="210" r="120" fill="hsl(${hue} 70% 55%)"/><text x="50%" y="440" fill="white" font-family="sans-serif" font-size="46" font-weight="700" text-anchor="middle">${name}</text></svg>`)}`;
 for (const [id, hue] of [['steam:1245620', 40], ['steam:1091500', 55], ['steam:1145360', 350], ['custom:youtube', 0]]) {
   const item = library.find((i) => i.id === id);
@@ -78,6 +78,9 @@ for (const [id, hue] of [['steam:1245620', 40], ['steam:1091500', 55], ['steam:1
 for (let i = 0, n = +(new URLSearchParams(location.search).get('many') || 0); i < n; i++) {
   library.push(lz({ id: `gen:${i}`, source: i % 2 ? 'epic' : 'gog', type: 'game', lastPlayed: Date.now() - (i + 5) * day, favorite: false, art: { cover: [], hero: [], logo: [] } }, { name: () => t('mock.generated', { n: i + 1 }) }));
 }
+
+/** Records of the ignore list no entry matches any more (Settings › Library › Hidden entries). */
+const ignoredOrphans = [{ key: 'id:steam:480', name: 'Spacewar', source: 'steam' }];
 
 const collections = [
   lz({ id: 'koop', items: ['steam:1091500', 'steam:632360', 'steam:504230', 'steam:367520', 'custom:kodi'], onHome: true }, { name: () => t('mock.collCoop') }),
@@ -303,7 +306,10 @@ const plugins = [
 // Preview catalog: every state the page has (update, installed, new, third-party, withdrawn, needs a newer CouchHUD, the official catalog first,
 // unlisted, no hash).
 const shots = (hue) => [png(hue, '1', 320, 180), png(hue + 40, '2', 320, 180), png(hue + 80, '3', 320, 180)];
-const cat = (o, f) => lz({ restartPending: false, reason: null, reasonCode: null, addsCapabilities: false, installedVersion: null, unsigned: false, extra: false, origin: 'firstParty', publisher: null, thirdParty: false, license: 'GPL-3.0-only', capabilities: [], size: null, minCouchHud: null, homepage: null, ...o }, f);
+// i18n-used: mock.category.smartHome mock.category.streaming mock.category.hardware mock.category.media mock.category.ai mock.category.information mock.category.hud mock.category.skins mock.category.other
+const MOCK_CATEGORY_KEYS = Object.fromEntries(['smartHome', 'streaming', 'hardware', 'media', 'ai', 'information', 'hud', 'skins', 'other'].map((id) => [id, `mock.category.${id}`]));
+const mockCategories = { wand: 'hud', lumen: 'smartHome', casehud: 'streaming', kodi: 'media', glowbar: 'hardware', nightsky: 'information', signalrgb: 'hardware', tidepool: 'ai' };
+const cat = (o, f) => lz({ category: mockCategories[o.id] ?? (o.kind === 'skin' ? 'skins' : 'other'), restartPending: false, reason: null, reasonCode: null, addsCapabilities: false, installedVersion: null, unsigned: false, extra: false, origin: 'firstParty', publisher: null, thirdParty: false, license: 'GPL-3.0-only', capabilities: [], services: [], size: null, minCouchHud: null, homepage: null, ...o }, { categoryLabel: () => t(MOCK_CATEGORY_KEYS[mockCategories[o.id] ?? (o.kind === 'skin' ? 'skins' : 'other')]), ...f });
 const catalog = [
   cat({ id: 'wand', name: 'Wand', author: 'kewe87', kind: 'plugin', version: '1.1.0', installedVersion: '1.0.0', status: 'update', size: 3_200_000, icon: png(265, 'W'), capabilities: ['pages', 'quickActions', 'assistant', 'process'] }, { description: () => t('mock.wandDesc') }),
   cat({ id: 'lumen', name: 'Lumen', author: 'kewe87', kind: 'plugin', version: '1.2.0', installedVersion: '1.2.0', status: 'installed', size: 480_000, icon: png(45, 'L'), license: 'MIT', capabilities: ['pages', 'notify'] }, { description: () => t('mock.plug.lumenDesc') }),
@@ -361,6 +367,17 @@ const wandRows = () => [
   { id: 'open', label: t('mock.wandOpen'), detail: session ? t('mock.wandCheatsFor', { name: session.name }) : t('mock.wandStartsOrFront'), icon: '🪄' }
 ];
 const gameFolders = ['D:\\Games'];
+// Companion apps and the Guide menu's apps (the preview keeps them in memory, like the host keeps them in the config).
+const companionRules = [];
+const guideAppIds = [];
+const companionView = () => ({
+  max: 12,
+  maxGames: 50,
+  rules: companionRules.map((r) => ({ appId: r.appId, name: library.find((i) => i.id === r.appId)?.name ?? r.appId, mode: r.mode, games: r.gameIds.map((id) => ({ id, name: library.find((i) => i.id === id)?.name ?? id })), closeWithGame: r.closeWithGame, minimized: r.minimized, whenLocked: r.whenLocked, problem: null })),
+  candidates: library.filter((i) => i.type === 'app' && i.source === 'custom' && !companionRules.some((r) => r.appId === i.id) && !['custom:youtube', 'custom:netflix'].includes(i.id) && !/^https?:/.test(i.launch?.target ?? '')).map((i) => ({ id: i.id, name: i.name })),
+  games: library.filter((i) => i.type === 'game').map((i) => ({ id: i.id, name: i.name })),
+  wand: { pluginInstalled: true, found: true, verified: true, path: 'C:\\Users\\kewe87\\AppData\\Local\\Wand\\Wand.exe', appId: null, hasRule: companionRules.some((r) => r.appId === 'custom:wand') }
+});
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const saveBackups = [
   { id: '2026-10-20_22-15_auto.zip', created: Date.now() - 2 * 3600_000, sizeBytes: 1_190_000, fileCount: 14, safety: false, complete: true, auto: true },
@@ -440,7 +457,7 @@ const startup = [
   { id: 'Run:Spotify', name: 'Spotify', source: 'user', command: 'Spotify.exe /minimized', disabled: true, mode: 'couch', suggested: 'pc' }
 ];
 startup.forEach((e) => { const kind = e.source; lz(e, { source: () => (kind === 'user' ? t('mock.srcUser') : t('mock.srcAllUsers32')) }); });
-const services = { taskInstalled: false, policyHelper: false, policiesSet: false, stuckPolicies: false, services: [
+const services = { taskInstalled: false, policyHelper: false, policiesSet: false, stuckPolicies: false, installed: [], services: [
   { name: 'WSearch', displayName: '', status: 'running', automatic: true, suggested: true, selected: true },
   { name: 'SysMain', displayName: 'SysMain (Superfetch)', status: 'running', automatic: true, suggested: true, selected: false },
   { name: 'Spooler', displayName: '', status: 'running', automatic: true, suggested: true, selected: false },
@@ -477,11 +494,11 @@ let selfUpdate = {
 };
 const setSelfUpdate = (u) => emit('selfUpdate', (selfUpdate = { ...selfUpdate, ...u }));
 const setUpdates = (u) => emit('updates', (updates = { ...updates, ...u }));
-const settings = { padGlyphs: new URLSearchParams(location.search).get('glyphs') ?? 'auto', areas: new URLSearchParams(location.search).get('areas')?.split(',') ?? ['games', 'apps', 'browser', 'news'], language: ['auto', 'de', 'en'].includes(previewLanguage()) ? previewLanguage() : 'auto', weatherPlace: lz({ name: 'Berlin', latitude: 52.52, longitude: 13.41 }, { region: () => t('mock.regionBerlin') }), sounds: true, audioMode: 'music', musicVolume: 35, maximizeBrowser: true, browserHistory: true, favoritesMode: new URLSearchParams(location.search).get('favmode') ?? 'combined', favoritesRecentDays: Number(new URLSearchParams(location.search).get('favdays') ?? 30), favoritesSites: new URLSearchParams(location.search).has('favsites'), guideTapInGame: true, integrationMode: 'full', closeExplorerInLight: false, selfUpdateCheck: true, onlineArtwork: true, offline: new URLSearchParams(location.search).has('offline'), netCatalog: true, netSystemUpdates: true, netSaves: true, netWeather: true, netNews: true, netAssistant: true, catalogUpdateCheck: true, pluginAutoUpdate: false, artworkCacheBytes: 42_000_000, tvInGuide: true, tvOnWithCouchHud: false, tvOffWithPc: false, bluetoothAutoOn: true, reduceMotion: new URLSearchParams(location.search).has("calm"), pointer: new URLSearchParams(location.search).get('pointer') ?? 'skin', mouseUnlocked: new URLSearchParams(location.search).has('mouse'), acceptedTerms: new URLSearchParams(location.search).has('terms') ? 0 : 99, setupWizardDone: ['terms', 'wizard'].some((k) => new URLSearchParams(location.search).has(k)) ? 0 : 99, screensaverMinutes: 5, screensaverStyle: 'art', displayOffMinutes: 0, pixelShift: true, pauseGameInMenu: new URLSearchParams(location.search).has('pauseInMenu'), screenshotCombo: true, gameBarButton: false, suppressCompetitors: true, rumble: true, autoSwitchHeadphones: true, trailerPreviews: true, returnHoldMs: 1000, runStartupApps: true, killExplorerOnReturn: false, steamGridDbKeySet: false,
-  aiProvider: 'anthropic', aiModel: '', anthropicKeySet: true, openAiKeySet: false,
-  aiModels: { anthropic: ['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-haiku-5-5'], openai: ['gpt-5', 'gpt-5-mini'] },
+const settings = { padGlyphs: new URLSearchParams(location.search).get('glyphs') ?? 'auto', areas: new URLSearchParams(location.search).get('areas')?.split(',') ?? ['games', 'apps', 'browser', 'news'], language: ['auto', 'de', 'en'].includes(previewLanguage()) ? previewLanguage() : 'auto', weatherPlace: lz({ name: 'Berlin', latitude: 52.52, longitude: 13.41 }, { region: () => t('mock.regionBerlin') }), sounds: true, audioMode: 'music', musicVolume: 35, maximizeBrowser: true, browserHistory: true, favoritesMode: new URLSearchParams(location.search).get('favmode') ?? 'combined', favoritesRecentDays: Number(new URLSearchParams(location.search).get('favdays') ?? 30), favoritesSites: new URLSearchParams(location.search).has('favsites'), guideTapInGame: true, integrationMode: 'full', closeExplorerInLight: false, selfUpdateCheck: true, onlineArtwork: true, offline: new URLSearchParams(location.search).has('offline'), netCatalog: true, netSystemUpdates: true, netSaves: true, pluginServices: [{ plugin: 'weather', pluginName: 'Wetter', id: 'open-meteo', name: 'Open-Meteo', anyHost: false, hosts: ['api.open-meteo.com', 'geocoding-api.open-meteo.com'], on: true }, { plugin: 'news', pluginName: 'Nachrichten', id: 'feeds', name: 'Feeds', anyHost: true, hosts: [], on: true }, { plugin: 'anthropic', pluginName: 'Anthropic', id: 'api', name: 'API', anyHost: false, hosts: ['api.anthropic.com'], on: true }, { plugin: 'homeassistant', pluginName: 'Home Assistant', id: 'hub', name: 'Home Assistant', anyHost: false, lan: true, hosts: [], on: true }], weatherAvailable: !new URLSearchParams(location.search).has('noplugins'), newsAvailable: !new URLSearchParams(location.search).has('noplugins'), catalogUpdateCheck: true, pluginAutoUpdate: false, artworkCacheBytes: 42_000_000, tvInGuide: true, tvOnWithCouchHud: false, tvOffWithPc: false, bluetoothAutoOn: true, reduceMotion: new URLSearchParams(location.search).has("calm"), pointer: new URLSearchParams(location.search).get('pointer') ?? 'skin', mouseUnlocked: new URLSearchParams(location.search).has('mouse'), acceptedTerms: new URLSearchParams(location.search).has('terms') ? 0 : 99, setupWizardDone: ['terms', 'wizard'].some((k) => new URLSearchParams(location.search).has(k)) ? 0 : 99, screensaverMinutes: 5, screensaverStyle: 'art', displayOffMinutes: 0, pixelShift: true, pauseGameInMenu: new URLSearchParams(location.search).has('pauseInMenu'), screenshotCombo: true, gameBarButton: false, suppressCompetitors: true, suppressBySetup: false, rumble: true, autoSwitchHeadphones: true, trailerPreviews: true, returnHoldMs: 1000, runStartupApps: true, killExplorerOnReturn: false, steamGridDbKeySet: false,
+  aiProvider: 'anthropic', aiModel: '',
+  aiProviders: [{ id: 'anthropic', name: 'Anthropic (Claude)', models: ['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-haiku-5-5'], keySet: true }, { id: 'openai', name: 'OpenAI (GPT)', models: ['gpt-5', 'gpt-5-mini'], keySet: false }],
   mcpEnabled: true, mcpLan: true, mcpPort: 8765, mcpToken: '3f9c1e7a5b2d48e6a0c4f1b7d9e2a6c8b5f0e3d1a7c9b2e4',
-  mcpUrls: ['http://localhost:8765/mcp', 'http://192.168.178.42:8765/mcp'], remoteEnabled: true,
+  mcpUrls: ['http://localhost:8765/mcp', 'http://192.168.178.42:8765/mcp'], remoteEnabled: true, remotePower: true,
   mirrorNotifications: true, notificationStatus: 'allowed', nightMode: 'evening', nightModeStrength: 50, soundVolume: 70, soundSet: '', uiHdr: 'auto' };
 
 // A small fake file system for the file browser and folder scan.
@@ -603,11 +620,20 @@ window.couchhudMockBrowser = (name, payload) => {
 const launchOverrides = {};
 const infoOverrides = {};
 const storeMatches = {};
+// "Search artwork": the pinned game per entry.
+const artworkMatches = {};
 
 window.couchhud = {
   getLibrary: async () => library.map((i) => ({ ...i })),
-  launch: async (id) => {
+  launch: async (id, from) => {
     const item = library.find((i) => i.id === id);
+    if (item.type === 'game' && session && session.id !== id) {
+      // Like the host: another game needs the yes for exactly the running one.
+      if (from !== session.id) throw new Error(t('switch.title', { name: session.name }));
+      log('switch', from, '->', id);
+      session = null;
+      emit('session', null);
+    }
     item.lastPlayed = Date.now();
     log('launch', id);
     if (item.type === 'game') {
@@ -656,6 +682,11 @@ window.couchhud = {
       { date: '2026-10-21', min: 3.9, max: 12.5, code: 0 }
     ]
   } : null),
+  setPluginService: async (plugin, service, on) => {
+    const svc = settings.pluginServices.find((s) => s.plugin === plugin && s.id === service);
+    if (svc) svc.on = !!on;
+    return settings.pluginServices;
+  },
   searchPlaces: async (q) => [
     { name: q, region: t('mock.regionBavaria'), latitude: 48.1, longitude: 11.6 },
     { name: t('mock.placeEast', { name: q }), region: t('mock.regionSaxony'), latitude: 51.0, longitude: 13.7 }
@@ -725,6 +756,29 @@ window.couchhud = {
     log('setStoreMatch', id, match, name);
     return window.couchhud.getItemInfo(id);
   },
+  getArtworkMatch: async (id) => {
+    const pin = artworkMatches[id];
+    return pin ? { mode: 'pinned', match: pin.match, name: pin.name } : { mode: 'auto', match: null, name: null };
+  },
+  searchArtwork: async (id, query) => {
+    await sleep(500);
+    log('searchArtwork', id, query);
+    return {
+      hits: [
+        { match: 'steam:1145350', name: 'Hades II', source: 'Steam', year: null, platforms: ['Steam'], thumb: null, best: true },
+        { match: 'sgdb:5321', name: `${query}`, source: 'SteamGridDB', year: '2023', platforms: ['Steam', 'Epic'], thumb: null, best: false },
+        { match: 'sgdb:5322', name: `${query} Arcade Kollection`, source: 'SteamGridDB', year: '2011', platforms: ['Steam'], thumb: null, best: false }
+      ],
+      note: null,
+      hasKey: true
+    };
+  },
+  setArtworkMatch: async (id, match, name) => {
+    if (match) artworkMatches[id] = { match, name };
+    else delete artworkMatches[id];
+    log('setArtworkMatch', id, match, name);
+    return window.couchhud.getArtworkMatch(id);
+  },
   uninstall: async (id) => (log('uninstall', id), null),
   getSaveInfo: async (id) => {
     await sleep(250);
@@ -770,14 +824,16 @@ window.couchhud = {
   setSetting: async (key, value) => {
     if (key === 'steamGridDbApiKey') settings.steamGridDbKeySet = !!value;
     else if (key === 'weatherLocation') settings.weatherPlace = value;
-    else if (key === 'anthropicApiKey') settings.anthropicKeySet = !!value;
-    else if (key === 'openAiApiKey') settings.openAiKeySet = !!value;
+    else if (key === 'aiApiKey') { const p = settings.aiProviders.find((x) => x.id === settings.aiProvider); if (p) p.keySet = !!value; }
     else settings[key] = value;
     // The host drops the automatic plugin update with the plugin update search (ConfigStore.NormalizeNet).
     if ((key === 'catalogUpdateCheck' || key === 'netCatalog') && !value) settings.pluginAutoUpdate = false;
     if (key === 'language') { try { localStorage.setItem('couchhud-preview-language', value); } catch { /* storage unavailable */ } }
     // The host couples these two: only one of them may own the Xbox button.
     if (key === 'guideTapInGame' && value) settings.gameBarButton = false;
+    // Like the host: any change of the setting clears the setup's mark, the mark only stands while the setting is on.
+    if (key === 'suppressCompetitors') settings.suppressBySetup = false;
+    if (key === 'suppressBySetup') settings.suppressBySetup = !!value && !!settings.suppressCompetitors;
     if (key === 'gameBarButton' && value) settings.guideTapInGame = false;
     if (key === 'bluetoothAutoOn') btAutoOn = !!value;
     log('setSetting', key, value);
@@ -965,6 +1021,22 @@ window.couchhud = {
     collections.find((c) => c.id === id).onHome = onHome;
     return collections.map((c) => ({ ...c, items: [...c.items] }));
   },
+  hideEntry: async (id) => {
+    const item = library.find((i) => i.id === id);
+    item.hidden = true;
+    return { ...item };
+  },
+  showEntry: async (id) => {
+    const item = library.find((i) => i.id === id);
+    item.hidden = false;
+    return { ...item };
+  },
+  getIgnoredOrphans: async () => [...ignoredOrphans],
+  removeIgnoredOrphan: async (key) => {
+    const i = ignoredOrphans.findIndex((o) => o.key === key);
+    if (i >= 0) ignoredOrphans.splice(i, 1);
+    return [...ignoredOrphans];
+  },
   removeEntry: async (id) => {
     const i = library.findIndex((x) => x.id === id);
     if (i >= 0) library.splice(i, 1);
@@ -1013,7 +1085,7 @@ window.couchhud = {
     }
     return { mode, sites: !!settings.favoritesSites && areas.includes('browser'), entries, blocked: [] };
   },
-  systemInfo: async () => ({ platform: 'browser', version: 'preview', dev: true, nativeInput: false, padKind: ['ps', 'playstation'].includes(new URLSearchParams(location.search).get('pad')) ? 'playstation' : 'xbox', padGlyphs: settings.padGlyphs, isShell, sounds: true, skin, skinRestore: new URLSearchParams(location.search).get('skinRestore') ? { skin, state: new URLSearchParams(location.search).get('skinRestore') } : null, language: settings.language, weather: true, trailerPreviews: true, assistant: !!settings.aiProvider, uiHdr: settings.uiHdr, hdrOn: new URLSearchParams(location.search).has('hdr'), soundVolume: settings.soundVolume, soundSet: settings.soundSet, audioMode: settings.audioMode, musicVolume: settings.musicVolume, integrationMode: settings.integrationMode, acceptedTerms: settings.acceptedTerms, setupWizardDone: settings.setupWizardDone, areas: [...settings.areas], screensaverMinutes: settings.screensaverMinutes, screensaverStyle: settings.screensaverStyle, displayOffMinutes: settings.displayOffMinutes, pixelShift: settings.pixelShift, reduceMotion: settings.reduceMotion, pointer: settings.pointer, mouseUnlocked: settings.mouseUnlocked }),
+  systemInfo: async () => ({ platform: 'browser', version: 'preview', dev: true, nativeInput: false, padKind: ['ps', 'playstation'].includes(new URLSearchParams(location.search).get('pad')) ? 'playstation' : 'xbox', padGlyphs: settings.padGlyphs, isShell, sounds: true, skin, skinRestore: new URLSearchParams(location.search).get('skinRestore') ? { skin, state: new URLSearchParams(location.search).get('skinRestore') } : null, language: settings.language, weather: settings.weatherAvailable && !!settings.weatherPlace, news: settings.newsAvailable, trailerPreviews: true, assistant: !!settings.aiProvider, uiHdr: settings.uiHdr, hdrOn: new URLSearchParams(location.search).has('hdr'), soundVolume: settings.soundVolume, soundSet: settings.soundSet, audioMode: settings.audioMode, musicVolume: settings.musicVolume, integrationMode: settings.integrationMode, acceptedTerms: settings.acceptedTerms, setupWizardDone: settings.setupWizardDone, areas: [...settings.areas], screensaverMinutes: settings.screensaverMinutes, screensaverStyle: settings.screensaverStyle, displayOffMinutes: settings.displayOffMinutes, pixelShift: settings.pixelShift, reduceMotion: settings.reduceMotion, pointer: settings.pointer, mouseUnlocked: settings.mouseUnlocked }),
   // Skins the preview server serves from CATALOG_SKINS (scripts/preview-server.js), shaped like the host's list; none without it.
   listSkins: async () => {
     try {
@@ -1043,6 +1115,9 @@ window.couchhud = {
   },
   enterPcMode: async () => log('enterPcMode'),
   power: async (action) => log('power', action),
+  // The preview has no game in front: the HUD's own question is enough.
+  sleepTimerWarning: async (action) => (log('sleepTimerWarning', action), false),
+  sleepTimerArm: async (action, seconds) => (log('sleepTimerArm', action, seconds), null),
   restartCouchHud: async () => {
     log('restartCouchHud');
     emit('toast', t('mock.previewRestart'));
@@ -1170,6 +1245,7 @@ window.couchhud = {
   },
   approvePlugin: async (folder, _hash) => ((plugins.find((p) => p.folder === folder).needsApproval = false), structuredClone(plugins)),
   setPluginEnabled: async (folder, enabled) => ((plugins.find((p) => p.folder === folder).enabled = enabled), structuredClone(plugins)),
+  checkPluginSetting: async () => true,
   setPluginSetting: async (id, key, value) => ((plugins.find((p) => p.id === id).settings.find((s) => s.key === key).value = value), structuredClone(plugins)),
   uninstallPlugin: async (folder) => {
     const at = plugins.findIndex((p) => p.folder === folder);
@@ -1179,7 +1255,7 @@ window.couchhud = {
     const entry = catalog.find((c) => c.id === gone.id);
     if (entry) Object.assign(entry, { status: 'notInstalled', installedVersion: null });
     emit('catalogUpdates', catalogUpdates());
-    return { gone: true, plugins: structuredClone(plugins) };
+    return { gone: true, stoppedNow: true, plugins: structuredClone(plugins) };
   },
   acceptRevokedPlugin: async (folder) => ((plugins.find((p) => p.folder === folder).revoked = false), structuredClone(plugins)),
   // One plugin tab (Lumen, capability "tabs"): ?notab leaves it out, ?tabglyph shows a built-in glyph instead of the PNG.
@@ -1246,7 +1322,7 @@ window.couchhud = {
   },
   getQuickActions: async () => [{ plugin: 'wand', id: 'open', label: t('mock.wandQuickLabel'), icon: '🪄', detail: session ? t('mock.wandQuickFor', { name: session.name }) : t('mock.wandQuickOpens') }],
   runQuickAction: async () => t('mock.wandOpening'),
-  installPackage: async (path) => path.split('\\').pop().replace('.zip', ''),
+  installPackage: async (path) => ({ name: path.split('\\').pop().replace('.zip', ''), started: true }),
   getCatalog: async () => (await new Promise((r) => setTimeout(r, 600)), catalogState()),
   getCatalogUpdates: async () => catalogUpdates(),
   getCatalogDetail: async (id, kind) => {
@@ -1287,18 +1363,48 @@ window.couchhud = {
     await new Promise((r) => setTimeout(r, 1200));
     const c = catalog.find((x) => x.id === id && x.kind === kind);
     if (!c || c.status === 'unavailable') throw new Error(c?.reason ?? t('mock.notInCatalog'));
-    Object.assign(c, { status: 'installed', installedVersion: c.version, restartPending: c.kind === 'plugin' });
+    const wasUpdate = c.status === 'update';
+    Object.assign(c, { status: 'installed', installedVersion: c.version, restartPending: c.kind === 'plugin' && wasUpdate });
     if (c.kind === 'plugin') {
       const have = plugins.find((p) => p.id === c.id);
       if (have) have.version = c.version;
-      else plugins.push(lz({ folder: c.name, id: c.id, name: c.name, version: c.version, author: c.author, homepage: null, enabled: true, loaded: false, error: null, userInstalled: true, origin: c.origin, publisher: c.publisher, revoked: false, revokedReason: null, capabilities: [...c.capabilities], pages: [], settings: [], tools: [] }, { description: () => c.description }));
+      else plugins.push(lz({ folder: c.name, id: c.id, name: c.name, version: c.version, author: c.author, homepage: null, enabled: true, loaded: !wasUpdate, error: null, userInstalled: true, origin: c.origin, publisher: c.publisher, revoked: false, revokedReason: null, capabilities: [...c.capabilities], pages: [], settings: [], tools: [] }, { description: () => c.description }));
     }
     emit('catalogUpdates', catalogUpdates());
     return {
-      message: c.kind === 'skin' ? t('mock.skinInstalled', { name: c.name, version: c.version }) : t('mock.pluginInstalled', { name: c.name, version: c.version }),
-      restartNeeded: c.kind === 'plugin',
+      message: c.kind === 'skin' ? t('mock.skinInstalled', { name: c.name, version: c.version }) : (wasUpdate ? t('mock.pluginInstalled', { name: c.name, version: c.version }) : t('mock.pluginStarted', { name: c.name, version: c.version })),
+      // A new plugin starts at once; only an update waits for the restart.
+      restartNeeded: c.kind === 'plugin' && wasUpdate,
       state: catalogState()
     };
+  },
+  getCompanions: async () => companionView(),
+  setCompanion: async (appId, change) => {
+    log('setCompanion', appId, change);
+    let rule = companionRules.find((r) => r.appId === appId);
+    if (!rule) companionRules.push((rule = { appId, mode: 'games', gameIds: [], closeWithGame: false, minimized: true, whenLocked: false }));
+    Object.assign(rule, change);
+    return companionView();
+  },
+  removeCompanion: async (appId) => {
+    log('removeCompanion', appId);
+    companionRules.splice(0, companionRules.length, ...companionRules.filter((r) => r.appId !== appId));
+    return companionView();
+  },
+  setupWand: async (all, acceptUnverified) => {
+    log('setupWand', all, acceptUnverified);
+    if (!library.some((i) => i.id === 'custom:wand')) library.push(custom('Wand', 'app', { launch: { kind: 'exe', target: 'C:\\Users\\kewe87\\AppData\\Local\\Wand\\Wand.exe', args: [] } }));
+    companionRules.push({ appId: 'custom:wand', mode: all ? 'all' : 'games', gameIds: [], closeWithGame: false, minimized: true, whenLocked: false });
+    if (!guideAppIds.includes('custom:wand')) guideAppIds.push('custom:wand');
+    return companionView();
+  },
+  getGuideApps: async () => ({ max: 12, ids: [...guideAppIds], items: guideAppIds.map((id) => library.find((i) => i.id === id)).filter(Boolean).map((i) => ({ id: i.id, name: i.name })) }),
+  setGuideApp: async (id, on) => {
+    log('setGuideApp', id, on);
+    const at = guideAppIds.indexOf(id);
+    if (on && at < 0) guideAppIds.push(id);
+    if (!on && at >= 0) guideAppIds.splice(at, 1);
+    return { max: 12, ids: [...guideAppIds], items: guideAppIds.map((g) => library.find((i) => i.id === g)).filter(Boolean).map((i) => ({ id: i.id, name: i.name })) };
   },
   getGameFolders: async () => [...gameFolders],
   addGameFolder: async (path) => (gameFolders.includes(path) || gameFolders.push(path), [...gameFolders]),
@@ -1366,13 +1472,26 @@ window.couchhud = {
     enabled: settings.remoteEnabled,
     running: settings.remoteEnabled,
     address: 'http://192.168.178.42:8766',
-    url: 'http://192.168.178.42:8766/#pair=K7MX42QP',
-    code: newCode ? 'P3Q9TZ4R' : 'K7MX42QP',
+    url: `http://192.168.178.42:8766/#k=${newCode ? 'mockSecretB' : 'mockSecretA'}`,
     qr: settings.remoteEnabled ? fakeQr() : null,
-    devices: [{ name: 'Pixel 9', paired: Date.now() - 86_400_000 }]
+    devices: [
+      { id: 'p1', name: 'Pixel 9', paired: Date.now() - 86_400_000, level: 'library', channel: true, child: false },
+      { id: 'p2', name: 'iPhone', paired: Date.now() - 40 * 86_400_000, level: 'control', channel: false, child: false }
+    ]
   }),
   revokeRemote: async () => null,
   revokeRemoteDevice: async () => null,
+  setRemoteDeviceLevel: async () => null,
+  // The second factor (0.7): in the preview it is off and nothing asks.
+  setSecondFactorHandler: noop,
+  getSecondFactor: async () => ({ on: false, canEnable: 'None', phones: 1 }),
+  setSecondFactor: async (on) => ({ on: !!on, canEnable: 'None', phones: 1 }),
+  twoFactorState: async () => null,
+  twoFactorCancel: async () => null,
+  twoFactorAdmin: async () => ({ ok: false }),
+  onTwoFactor: noop,
+  sleepTimerState: async () => null,
+  onCollections: noop,
   allowFirewall: async () => null,
   onSkin: noop,
   onSkinRestore: noop,
@@ -1384,7 +1503,7 @@ window.couchhud = {
     settings.areas = ['games', 'apps', 'browser', 'news'].filter((a) => enabled.includes(a));
     return { areas: [...settings.areas] };
   },
-  assistantInfo: async () => ({ configured: !!settings.aiProvider, provider: settings.aiProvider, model: settings.aiModel || settings.aiModels[settings.aiProvider]?.[0] }),
+  assistantInfo: async () => ({ configured: !!settings.aiProvider, provider: settings.aiProvider, model: settings.aiModel || settings.aiProviders.find((p) => p.id === settings.aiProvider)?.models[0] }),
   resetAssistant: async () => null,
   confirmAssistant: async (id, ok) => pendingConfirm?.(ok),
   askAssistant: async (text) => {
@@ -1401,7 +1520,7 @@ window.couchhud = {
       return ok ? t('mock.assistantLaunching') : t('mock.assistantCancelled');
     }
     if (/wetter|weather/i.test(text)) {
-      tool('get_weather');
+      tool('plugin_weather_get_weather');
       await wait(500);
       return t('mock.assistantWeather');
     }
@@ -1565,7 +1684,15 @@ window.couchhud = {
   resetCodeStore: async () => {
     if (!security.serviceCodes?.damaged) throw new Error(t('mock.codesNotDamaged'));
     security.serviceCodes = { ...security.serviceCodes, couch: false, parent: false, damaged: false };
-    return { ...security };
+    // Like the host: a code lock without any code opens for the unlock's two minutes after the administrator's reset.
+    if (security.couchLock === 'code') unlockedUntil = Date.now() + 120_000;
+    return { ...security, unlocked: security.couchLock === 'off' || !security.asShell || Date.now() < unlockedUntil };
+  },
+  // Like the host: only with a service; afterwards the service runs with a fresh state.
+  resetServiceState: async () => {
+    if (!security.service?.expected) throw new Error(t('mock.noService'));
+    security.service = { ...security.service, state: 'running', label: 'running', healthy: true, alarm: false, problem: false, repair: false };
+    return security.service;
   },
   unlock: async (code, _asNewCode = false) => {
     if (security.couchLock === 'windows') {
@@ -1625,6 +1752,8 @@ window.couchhud = {
     if (!policies) services.policiesSet = false;
     security.policies = policies ? 'helper' : 'none';
     services.taskInstalled = services.services.some((s) => s.selected) && policies;
+    if (!policies) services.services.forEach((s) => { s.selected = false; });
+    services.installed = services.services.filter((s) => s.selected).map((s) => s.name);
     services.pending = false;
     return structuredClone(services);
   },

@@ -1,0 +1,2 @@
+:root[data-skin="user:cq-media"]{--x:1}
+@media (prefers-color-scheme:dark){:root{--tab-min-width:30rem;--tab-font-size:9rem}}@media (hover:hover){:root{--tab-max-width:0rem}}@media (forced-colors:active){html{zoom:.01}}@media (width>1px){#quick{width:100vw!important}}

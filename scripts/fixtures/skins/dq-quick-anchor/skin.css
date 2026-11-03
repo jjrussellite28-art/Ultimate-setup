@@ -1,0 +1,2 @@
+:root[data-skin="user:dq-quick-anchor"]{--x:1}
+#quick{anchor-name:--a}#quick::before{content:"";position:fixed;position-anchor:--a;position-area:bottom;width:100vw;height:100vh;background:#000}

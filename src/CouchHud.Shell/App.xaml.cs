@@ -148,7 +148,7 @@ public partial class App : Application
             {
                 var restoring = new ShellManager(new WindowsRegistry());
                 restoring.LogDiagnostics("restore-shell");
-                restoring.InstallAsShell();
+                PutShellEntryBack(restoring);
                 new ConfigStore(DataDir).Update(c => c.PendingShellRestore = false);
             }
             catch (InvalidOperationException ex)
@@ -215,7 +215,17 @@ public partial class App : Application
 
         _activate = new EventWaitHandle(false, EventResetMode.AutoReset, ActivateEventName);
         ThreadPool.RegisterWaitForSingleObject(_activate,
-            (_, _) => Dispatcher.InvokeAsync(() => _hud?.LeavePcModeAsync()),
+            (_, _) => Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    if (_hud is not null) await _hud.LeavePcModeAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[app] leaving PC mode failed: {ex}");
+                }
+            }),
             null, Timeout.Infinite, executeOnlyOnce: false);
 
         // Logging off or shutting down is not a crash, and the window must not hold it up.
@@ -308,7 +318,11 @@ public partial class App : Application
     {
         // Five minutes up and running: this start counts as healthy, earlier unclean ends
         // don't add up to a "crash loop" anymore.
-        Task.Delay(TimeSpan.FromMinutes(5)).ContinueWith(_ => Recovery.MarkHealthy(DataDir), TaskScheduler.Default);
+        Task.Delay(TimeSpan.FromMinutes(5)).ContinueWith(_ =>
+        {
+            try { Recovery.MarkHealthy(DataDir); }
+            catch (Exception ex) { Console.Error.WriteLine($"[app] marking the start healthy failed: {ex.GetType().Name}: {ex.Message}"); }
+        }, TaskScheduler.Default);
         // A controller may only show up in the first seconds: keep watching for the combination.
         // The recovery waits for the Windows sign-in (see Recovery.Run): off the UI thread, so the HUD behind the lock screen stays alive.
         Recovery.WatchStart(held => Task.Run(() =>
@@ -420,11 +434,15 @@ public partial class App : Application
             // What the core kept for CaseHUD, Home Assistant and the VPN before they became plugins (one-time seed); a secret is encrypted again for the plugin.
             SettingSeeds = id => seedsGiven[id] = PluginSettingSeeds.For(config.Current, id, (plugin, stored) => Secrets.Protect(Secrets.Unprotect(stored), plugin)),
             // The seed is in the plugin's settings file: the encrypted legacy token fields go, so no second copy stays behind (not on failure).
+            // The same for the weather place, the news feeds and the AI keys (0.7).
             SeedApplied = id =>
             {
-                if (id.Equals(PluginSettingSeeds.HomeAssistantId, StringComparison.OrdinalIgnoreCase) && seedsGiven.TryGetValue(id, out var given))
-                    config.Update(c => PluginSettingSeeds.ClearLegacyHomeAssistantSecrets(c, given));
+                if (seedsGiven.TryGetValue(id, out var given))
+                    config.Update(c => PluginSettingSeeds.ClearLegacy(c, id, given));
             },
+            // SDK 5: a plugin's declared network services (Http) go through the privacy settings: Offline, and one switch per service.
+            Net = net,
+            ServiceAllowed = (plugin, service) => Hud.ServiceSwitchedOn(config.Current, plugin, service),
             // A plugin's secrets (SetSecret, settings of the kind Secret) are encrypted for the Windows user, apart for every plugin.
             ProtectSecret = (plugin, plain) => Secrets.Protect(plain, plugin),
             UnprotectSecret = (plugin, stored) => Secrets.Unprotect(stored, plugin),
@@ -440,10 +458,13 @@ public partial class App : Application
         // Loading can take seconds on a cold start: the HUD shows first, plugins join in when ready.
         _ = plugins.StartLoading();
 
+        var folderGames = new FolderGamesProvider(() => config.Current.GameFolders.ToList());
+        // A watched game whose start program is another one than before keeps its settings, locks and play time (new id, same entry).
+        folderGames.IdsMoved += moves => FolderIdMigration.Apply(config, moves);
         var library = new LibraryService(config, artwork,
             [
                 new SteamScanner(registry), new EpicScanner(), new GogScanner(registry), new UbisoftScanner(registry), new XboxScanner(),
-                new FolderGamesProvider(() => config.Current.GameFolders.ToList()),
+                folderGames,
                 new PluginLibraryProvider(plugins)
             ]);
         // The store match: the user's pick, else the scanned name (a rename never changes the age rating).
@@ -451,10 +472,13 @@ public partial class App : Application
         // An automatic match that loses a known rating keeps it as the floor until the parents confirm.
         storeInfo.RatingDropped = (item, age) => library.KeepAgeFloor(item.Id, age);
         artwork.StoreMatchOf = id => config.Current.Overrides.GetValueOrDefault(id)?.StoreMatch;
+        artwork.ArtworkMatchOf = id => config.Current.Overrides.GetValueOrDefault(id)?.ArtworkMatch;
         // Switched off areas (FeatureAreas): the game stores are not read with Gaming off, unless parental controls need them to see a game
         // started outside CouchHud (the limits never get looser) or an entry of the store was marked as an app; artwork is fetched only
         // for what is shown.
         library.SkipProvider = p => p is IGameStore store && !FeatureAreas.ReadsStore(config.Current, store.Source);
+        // Records of the ignore list count as orphaned only after a scan that saw the plugins: loaded and none paused (Offline mode).
+        library.ScanComplete = () => plugins.Loaded.IsCompleted && !plugins.Plugins.Any(p => p.PausedOffline);
         library.FetchArtFor = item => FeatureAreas.From(config.Current).Shows(item);
 
         _hud = new Hud(config, library, artwork, storeInfo, new ShellManager(registry), new XInputPoller(), net, dataDir, dev, plugins);
@@ -467,16 +491,20 @@ public partial class App : Application
         // Games of plugin providers appear once the plugins are there.
         _ = plugins.Loaded.ContinueWith(_ => { if (plugins.LibraryProviders.Count > 0) _hud.RescanLibraryInBackground(); }, TaskScheduler.Default);
         // Started from autostart or Winlogon: other windows may be up already, the HUD belongs in front.
-        if (!dev) new OptionalSteps(Console.Error.WriteLine).Run("bring to front", window.BringToFront);
+        if (!dev) new OptionalSteps(Console.Error.WriteLine).Run("bring to front", () => window.BringToFront());
         // Lock and automatic sign-in without CouchHud as the shell: a Run entry locks at every sign-in (see SignInLock).
         if (!dev) _ = Task.Run(() => SignInLock.Sync(dataDir));
     }
+
+    [SecondFactorExempt("puts the shell entry back after one boot into PC mode: raises protection, no person acts")]
+    private static void PutShellEntryBack(ShellManager shell) => shell.InstallAsShell();
 
     /// <summary>
     /// Gets the user a working Windows desktop when CouchHud can't run at all: for this session only.
     /// The shell entry stays; the unclean end is counted at the next start, and only the third in a
     /// row makes the recovery remove the entry (a single error must not end the couch for good).
     /// </summary>
+    [SecondFactorExempt("the emergency desktop when the HUD crashed: the lock still holds, nobody can be asked, a screen must not stay without a shell")]
     private static void EmergencyDesktop()
     {
         try
@@ -503,6 +531,8 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        // A quit that did not come through the HUD's own Quit (the session ends, the process is closed): the plugins still hear it, once.
+        try { _hud?.PluginsStopping(); } catch (Exception ex) { Console.Error.WriteLine($"[plugins] stopping: {ex.Message}"); }
         _activate?.Dispose();
         _instance?.Dispose();
         base.OnExit(e);

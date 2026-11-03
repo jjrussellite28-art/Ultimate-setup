@@ -41,7 +41,9 @@ public sealed record AutoUpdateCandidate(
     SemVer App,
     IReadOnlyCollection<string>? InstalledCapabilities,
     IReadOnlyCollection<string>? OfferedCapabilities,
-    bool SkinInUse = false);
+    bool SkinInUse = false,
+    IReadOnlyList<PackageService>? InstalledServices = null,
+    IReadOnlyList<PackageService>? OfferedServices = null);
 
 /// <summary>
 /// The rules of the automatic update of plugins and skins (Settings > Privacy), as pure decisions. Automatic only for what CouchHUD itself
@@ -72,6 +74,7 @@ public static class AutoUpdateRules
         if (c.StatementOrigin != PluginOrigin.FirstParty || c.InstalledOrigin != PluginOrigin.FirstParty) return AutoUpdateVerdict.Ask;
         if (c.OfferedCapabilities is null) return AutoUpdateVerdict.Ask;
         return CapabilityCompare.Added(c.InstalledCapabilities ?? PluginPolicy.Legacy, c.OfferedCapabilities).Count == 0
+            && PluginNetRules.Widened(c.InstalledServices, c.OfferedServices).Count == 0
             ? AutoUpdateVerdict.Apply
             : AutoUpdateVerdict.NeedsPermission;
     }
@@ -111,7 +114,12 @@ public static class AutoUpdateRules
         if (manifest.Id is { Length: > 0 } id && !id.Equals(statement.Id, StringComparison.OrdinalIgnoreCase)) return "id";
         if (manifest.Sdk > statement.Sdk) return "sdk";
         var more = CapabilityCompare.Added(statement.Capabilities, manifest.Capabilities ?? []);
-        return more.Count > 0 ? string.Join(", ", more) : null;
+        if (more.Count > 0) return string.Join(", ", more);
+        // The services in plugin.json must stay within the signed ones (new service, new host or "*" would be a hidden widening).
+        var declared = (manifest.Services ?? []).Where(sv => sv?.Id is not null)
+            .Select(sv => new PackageService(sv.Id!, (sv.Hosts ?? []).Where(h => h is not null).Select(h => h.Trim().ToLowerInvariant()).ToList())).ToList();
+        var widened = PluginNetRules.Widened(statement.Services, declared);
+        return widened.Count > 0 ? "services: " + string.Join(", ", widened) : null;
     }
 
     private const int MaxManifestBytes = 64 * 1024;
@@ -177,6 +185,14 @@ public static class CapabilityCompare
         }
         return added;
     }
+
+    /// <summary>
+    /// Does the offered statement ask for more than the installed entry was approved with: a capability beyond it, or a network service or
+    /// host beyond the recorded ones (<see cref="PluginNetRules.Widened"/>). Such an update is handled like a new install.
+    /// </summary>
+    public static bool AddsRights(PluginTrustEntry? installed, PackageStatement offered) =>
+        Added(installed?.Capabilities ?? (IEnumerable<string>)PluginPolicy.Legacy, offered.Capabilities).Count > 0
+        || PluginNetRules.Widened(installed?.Services, offered.Services).Count > 0;
 }
 
 /// <summary>What one package of an automatic pass came to.</summary>

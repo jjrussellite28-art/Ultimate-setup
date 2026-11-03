@@ -63,6 +63,12 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             Console.WriteLine($"[bridge] {method}: parents' code needed");
             Post(new { id, error = ex.Message, parent = new { action = ex.Action, item = ex.Item, reason = ex.Reason } });
         }
+        catch (SecondFactorNeededException ex)
+        {
+            // Expected: the code was accepted, now a phone confirms (or a Windows administrator); the page shows the question, then repeats the call.
+            Console.WriteLine($"[bridge] {method}: second factor needed");
+            Post(new { id, error = ex.Message, twofa = new { requestId = ex.RequestId, number = ex.Number, action = ex.Action, label = ex.Label, detail = ex.Detail, leftMs = ex.LeftMs, reachable = ex.Reachable, lockedOutSeconds = ex.LockedOutSeconds, throttledSeconds = ex.ThrottledSeconds } });
+        }
         catch (CouchHud.Shell.Services.CodeStoreDamagedException ex)
         {
             // Expected while the service's code file is damaged: the page says so and offers the administrator's reset.
@@ -72,7 +78,8 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
         catch (LockedException ex)
         {
             // Expected while the couch is locked: one line, no stack trace; the page knows it by the flag.
-            Console.WriteLine($"[bridge] {method}: locked");
+            // The reads a page makes on its own on opening (the answer is "locked", not a fault) leave no line at all.
+            if (!QuietWhenLocked.Contains(method)) Console.WriteLine($"[bridge] {method}: locked");
             Post(new { id, error = ex.Message, locked = true });
         }
         catch (Exception ex) when (ProfilePolicy.All.Contains(method) && ex is InvalidOperationException or ArgumentException or KeyNotFoundException or IOException)
@@ -88,11 +95,14 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
         }
     }
 
+    /// <summary>Read-only calls the settings page makes by itself when it opens; refused on a locked couch, which is no news (VM test 0.7 B, F6).</summary>
+    internal static readonly IReadOnlySet<string> QuietWhenLocked = new HashSet<string>(StringComparer.Ordinal) { "getSecondFactor" };
+
     /// <summary>
     /// The text the page shows: an <see cref="ArgumentException"/> thrown with a parameter name gets " (Parameter 'name')" added by .NET,
     /// which means nothing to the person on the couch (VM test 0.5); the log above keeps the full exception.
     /// </summary>
-    private static string ShownText(Exception ex)
+    internal static string ShownText(Exception ex)
     {
         if (ex is ArgumentException { ParamName: { Length: > 0 } name })
         {
@@ -105,6 +115,12 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
     public void Emit(string name, object? payload) => Post(new { @event = name, payload });
 
     private void Post(object message) => web.PostWebMessageAsJson(JsonSerializer.Serialize(message, Json));
+
+    /// <summary>
+    /// A call of the phone remote's channel (Hud's PhoneBridgeAsync, on the UI thread): exactly the TV page's dispatch with all its gates;
+    /// exceptions go to the caller, which turns them into the phone's answer.
+    /// </summary>
+    public Task<object?> InvokeAsync(string method, JsonElement args) => DispatchAsync(method, args);
 
     private async Task<object?> DispatchAsync(string method, JsonElement args)
     {
@@ -155,7 +171,9 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                              && opts.TryGetProperty("rescan", out var r) && r.ValueKind == JsonValueKind.True;
                 return ToDto(await hud.GetLibraryAsync(rescan));
             case "launch":
-                return ToDto(hud.Launch(StringArg(0), byPerson: true));
+                // A second argument: the running game the person agreed to close for this start (game switching).
+                if (Arg(1).ValueKind != JsonValueKind.String) return ToDto(hud.Launch(StringArg(0), byPerson: true));
+                return ToDto(await hud.SwitchGameAsync(StringArg(0), StringArg(1), byPerson: true));
             case "toggleFavorite":
                 return hud.ToggleFavorite(StringArg(0));
             case "toggleFavoriteSite":
@@ -207,6 +225,13 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "power":
                 await hud.PowerAsync(StringArg(0));
                 return null;
+            case "sleepTimerArm":
+                // A timer started (action, seconds left) or ended (null): only arms the notice above, nothing runs.
+                hud.ArmSleepTimer(Arg(0).ValueKind == JsonValueKind.String ? StringArg(0) : null,
+                    Arg(1).ValueKind == JsonValueKind.Number && Arg(1).TryGetInt32(out var armSeconds) ? armSeconds : 0);
+                return null;
+            case "sleepTimerWarning":
+                return hud.SleepTimerWarning(StringArg(0), Arg(1).ValueKind == JsonValueKind.Number && Arg(1).TryGetInt32(out var warnSeconds) ? warnSeconds : 60);
             case "quit":
                 hud.QuitFromUi();
                 return null;
@@ -247,6 +272,18 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                 foreach (var entry in entries) (entry.Args, entry.Cwd) = ([], null);
                 return ToDto(await hud.AddEntriesAsync(entries));
             }
+            case "getCompanions":
+                return hud.GetCompanions();
+            case "setCompanion":
+                return hud.SetCompanion(StringArg(0), Arg(1).Deserialize<CompanionChange>(Json) ?? new CompanionChange());
+            case "removeCompanion":
+                return hud.RemoveCompanion(StringArg(0));
+            case "setupWand":
+                return await hud.SetupWandAsync(Arg(0).ValueKind == JsonValueKind.True, Arg(1).ValueKind == JsonValueKind.True);
+            case "getGuideApps":
+                return hud.GetGuideApps();
+            case "setGuideApp":
+                return hud.SetGuideApp(StringArg(0), Arg(1).ValueKind == JsonValueKind.True);
             case "getInstalledApps":
                 return await hud.GetInstalledAppsAsync();
             case "getAppIcons":
@@ -323,6 +360,16 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                     : null;
                 return ToDto(hud.EditItem(StringArg(0), Prop("name"), Prop("type"), hidden));
             }
+            case "getArtworkMatch":
+                return hud.GetArtworkMatch(StringArg(0));
+            case "searchArtwork":
+                // (id, query): the entry and the search the user typed. Checks: Hud.SearchArtworkAsync.
+                return await hud.SearchArtworkAsync(StringArg(0), StringArg(1));
+            case "setArtworkMatch":
+                // (id, match, name): match is "steam:<app id>", "sgdb:<game id>", or null for automatic. Checks: Hud.SetArtworkMatch.
+                return hud.SetArtworkMatch(StringArg(0),
+                    Arg(1).ValueKind == JsonValueKind.String ? Arg(1).GetString() : Arg(1).ValueKind is JsonValueKind.Null or JsonValueKind.Undefined ? null : throw new ArgumentException($"{method}: match must be a string or null"),
+                    Arg(2).ValueKind == JsonValueKind.String ? Arg(2).GetString() : null);
             case "getArtworkChoices":
                 return ToDto(await hud.GetArtworkChoicesAsync(StringArg(0)));
             case "reloadArtwork":
@@ -357,10 +404,20 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "removeEntry":
                 hud.RemoveEntry(StringArg(0));
                 return null;
+            // Hide / show again (the ignore list): the lock and the parents' code are checked in Hud.SetHidden.
+            case "hideEntry":
+                return ToDto(hud.SetHidden(StringArg(0), true));
+            case "showEntry":
+                return ToDto(hud.SetHidden(StringArg(0), false));
+            // Records no entry matches any more: listed by name, "Remove" goes through the same gate (Hud.RemoveIgnoredOrphan).
+            case "getIgnoredOrphans":
+                return hud.IgnoredOrphans();
+            case "removeIgnoredOrphan":
+                return hud.RemoveIgnoredOrphan(StringArg(0));
             case "getSession":
                 return hud.SessionDto();
             case "resumeGame":
-                hud.ResumeGame();
+                await hud.ResumeGameAsync();
                 return null;
             case "quitGame":
                 await hud.QuitGameAsync(Arg(0).ValueKind == JsonValueKind.True);
@@ -462,6 +519,9 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                 // Open while locked like the repair: Windows' UAC prompt is the gate (the service takes an administrator's approval only),
                 // and with a damaged code file no code can unlock the couch.
                 return await hud.ResetCodeStoreAsync();
+            case "resetServiceState":
+                // Not open while locked (the bridge refuses it on a locked couch); Windows' UAC prompt is the gate on top.
+                return await hud.ResetServiceStateAsync();
             case "getParental":
                 return hud.GetParental();
             case "setParental":
@@ -517,7 +577,8 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "setProfileRule":
                 return hud.SetProfileRule(StringArg(0), StringArg(1), Arg(2));
             case "unlock":
-                return await hud.UnlockAsync(Buttons(0), Arg(1).ValueKind == JsonValueKind.True);
+                // Third argument: an administrator's approval instead of the code; Hud allows it only while the service holds no couch code.
+                return await hud.UnlockAsync(Buttons(0), Arg(1).ValueKind == JsonValueKind.True, Arg(2).ValueKind == JsonValueKind.True);
             case "windowsSignIn":
                 return hud.WindowsSignIn();
             case "setPasscode":
@@ -586,11 +647,12 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "getPlugins":
                 return hud.GetPlugins();
             case "setPluginEnabled":
-                hud.SetPluginEnabled(StringArg(0), Arg(1).ValueKind == JsonValueKind.True);
-                return hud.GetPlugins();
+                return await hud.SetPluginEnabledAsync(StringArg(0), Arg(1).ValueKind == JsonValueKind.True);
             case "setPluginSetting":
                 hud.SetPluginSetting(StringArg(0), StringArg(1), Arg(2).ValueKind == JsonValueKind.String ? Arg(2).GetString() : null);
                 return hud.GetPlugins();
+            case "checkPluginSetting":
+                return hud.CheckPluginSetting(StringArg(0), StringArg(1));
             case "openPluginSettingPage":
                 return hud.OpenPluginSettingPage(StringArg(0), StringArg(1));
             case "endPluginVisit":
@@ -614,11 +676,11 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "setPluginFunctionLevel":
                 return hud.SetPluginFunctionLevel(StringArg(0), StringArg(1), StringArg(2));
             case "approvePlugin":
-                return hud.ApprovePlugin(StringArg(0), StringArg(1));
+                return await hud.ApprovePluginAsync(StringArg(0), StringArg(1));
             case "runQuickAction":
                 return await hud.RunQuickActionAsync(StringArg(0), StringArg(1));
             case "installPackage":
-                return hud.InstallPackage(StringArg(0), StringArg(1));
+                return await hud.InstallPackageAsync(StringArg(0), StringArg(1));
             case "getCatalog":
                 return await hud.GetCatalogAsync(Arg(0).ValueKind == JsonValueKind.True);
             case "getCatalogUpdates":
@@ -637,9 +699,9 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "removeCatalogSource":
                 return hud.RemoveCatalogSource(StringArg(0));
             case "uninstallPlugin":
-                return hud.UninstallPlugin(StringArg(0));
+                return await hud.UninstallPluginAsync(StringArg(0));
             case "acceptRevokedPlugin":
-                return hud.AcceptRevokedPlugin(StringArg(0));
+                return await hud.AcceptRevokedPluginAsync(StringArg(0));
             case "confirmPluginExe":
                 return hud.ConfirmPluginExe(StringArg(0), StringArg(1));
             case "getPluginSuggestions":
@@ -677,6 +739,17 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                 await hud.SetBluetoothAsync(Arg(0).ValueKind == JsonValueKind.True,
                     Arg(1).ValueKind == JsonValueKind.String ? Arg(1).GetString() : null);
                 return await hud.GetBluetoothStateAsync();
+            case "getSecondFactor":
+                return hud.GetSecondFactor();
+            case "setSecondFactor":
+                return hud.SetSecondFactor(Arg(0).ValueKind == JsonValueKind.True);
+            case "twoFactorState":
+                return hud.TwoFactorState();
+            case "twoFactorCancel":
+                hud.TwoFactorCancel(StringArg(0));
+                return null;
+            case "twoFactorAdmin":
+                return await hud.TwoFactorByAdminAsync(StringArg(0));
             case "getRemote":
                 return hud.GetRemote(Arg(0).ValueKind == JsonValueKind.True);
             case "codeEntryState":
@@ -695,6 +768,18 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                 hud.SetKeyboardState(B("open"), P("title"), B("secret"), P("text"));
                 return null;
             }
+            case "sleepTimerState":
+            {
+                // power.js reports the TV's sleep timer for the phone (end in Unix ms, 0 when off): only what the phone shows.
+                var st = Arg(0);
+                var at = st.ValueKind == JsonValueKind.Object && st.TryGetProperty("at", out var a) && a.TryGetInt64(out var ms) ? ms : 0;
+                var act = st.ValueKind == JsonValueKind.Object && st.TryGetProperty("action", out var ac) && ac.ValueKind == JsonValueKind.String ? ac.GetString() : null;
+                var tok = st.ValueKind == JsonValueKind.Object && st.TryGetProperty("token", out var tk) && tk.ValueKind == JsonValueKind.String && tk.GetString() is { Length: <= 64 } tt ? tt : null;
+                hud.SetSleepTimerState(at, act, tok);
+                return null;
+            }
+            case "setRemoteDeviceLevel":
+                return hud.SetRemoteDeviceLevel(StringArg(0), StringArg(1));
             case "revokeRemote":
                 hud.RevokeRemote();
                 return hud.GetRemote();
@@ -753,6 +838,9 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                 return await hud.GetWeatherAsync();
             case "searchPlaces":
                 return await hud.SearchPlacesAsync(StringArg(0));
+            case "setPluginService":
+                // Settings › Privacy: one declared network service of a plugin on or off (not open on the locked couch; parents' code like every privacy switch).
+                return hud.SetPluginService(StringArg(0), StringArg(1), Arg(2).ValueKind == JsonValueKind.True);
             case "listSkins":
                 return hud.ListSkins().Select(s => s with
                 {

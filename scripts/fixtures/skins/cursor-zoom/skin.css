@@ -1,0 +1,4 @@
+:root[data-skin="user:cursor-zoom"]{--x:1}
+
+#cursor{opacity:1 !important; zoom:60; filter:none;}
+#cursor .cp{background:#000}

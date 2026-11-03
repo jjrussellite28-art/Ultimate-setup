@@ -31,7 +31,6 @@ public sealed class AdminApprovals(IMonotonicClock clock, Func<int>? controlCode
     {
         public required string Sid;
         public required long LogonId;
-        public required int Session;
         public required IReadOnlyList<Operation> Ops;
         public required int Control;
         public required TimeSpan Expires;
@@ -79,7 +78,6 @@ public sealed class AdminApprovals(IMonotonicClock clock, Func<int>? controlCode
             {
                 Sid = caller.Sid,
                 LogonId = caller.LogonId,
-                Session = caller.TokenSessionId,
                 Ops = [.. ops],
                 Control = control,
                 Expires = now + Lifetime

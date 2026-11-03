@@ -55,6 +55,16 @@ public sealed class PluginHostServices
         return true;
     }
 
+    /// <summary>A plugin stopped (switched off, removed or failed to start): the programs it restricted and the startup adapters it registered go with it.</summary>
+    public void Forget(string pluginId)
+    {
+        lock (_lock)
+        {
+            foreach (var exe in _restricted.Where(r => r.Value.Equals(pluginId, StringComparison.OrdinalIgnoreCase)).Select(r => r.Key).ToList()) _restricted.Remove(exe);
+            _adapters.RemoveAll(a => a.Plugin.Equals(pluginId, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
     public IReadOnlyCollection<string> RestrictedExes
     {
         get

@@ -1,0 +1,5 @@
+/* A reviewer's skin from the 0.6.4 reviews (the bypasses of the runtime check), for scripts/tabs-check.mjs, never for the catalog. Its old selectors name the
+   tab bar that a skin cannot reach any more; the block at the end tries the same on what a skin can still reach. */
+[data-skin="user:review-stroke"] #tab-list li { -webkit-text-stroke: 0.5rem #101018; }
+
+[data-skin="user:review-stroke"] body, [data-skin="user:review-stroke"] #top, [data-skin="user:review-stroke"] #top * { -webkit-text-stroke: 0.5rem #101018; paint-order: stroke fill; }

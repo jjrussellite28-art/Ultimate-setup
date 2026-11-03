@@ -26,12 +26,14 @@ import { openKeyboard } from '../components/keyboard.js';
 import { skinMenu } from '../components/skin-menu.js';
 import { choosePasscode, ensureParentCode, ensureUnlocked, ensureWindowsSignIn, guarded, isLocked } from '../components/passcode.js';
 import { addEntryFlow, gameFoldersPage, hiddenItemsPage, scanFolderFlow } from '../components/library-tools.js';
+import { openCompanionApps } from '../components/companions.js';
 import { refreshWeather } from '../core/weather.js';
 import { cleanupStuckPoliciesDialog, launchersPage, servicesPage, startupPage } from './system-tools.js';
 import { transparencyPage } from './transparency.js';
 import { disclaimerPage, privacyPage } from './legal.js';
 import { openSetupWizard } from './setup-wizard.js';
 import { pairingPage } from './phone.js';
+import { withParentGrant } from '../core/parent-retry.js';
 import { pluginSettingsPage, pluginsPage } from './plugins.js';
 import { pluginsWithSettings } from '../core/plugin-rules.js';
 import { networkPage } from './network.js';
@@ -46,7 +48,7 @@ import { ensureParentGrant, formatRemaining, lockedGamesPage, parental, refreshP
 import { openProfilesPage } from '../components/profiles.js';
 import { refreshMotion } from '../core/motion.js';
 import { admitProtectedChange, codeLockHeld, codeLockPlan } from '../core/lock-rules.js';
-import { privacyAfter, privacyDisabled, privacyDisabledReason, privacyShown } from '../core/net-rules.js';
+import { listenerNeedsParent, privacyAfter, privacyDisabled, privacyDisabledReason, privacyShown } from '../core/net-rules.js';
 import { HISTORY_OFF_ACTION, historyOffNeedsParent } from '../core/browser-logic.js';
 import { AREAS, AREA_DESC_KEYS, AREA_ICONS, AREA_NAME_KEYS, areaOfSetting, areaOn, enabledAreas, setAreas, shownRows, toggleArea } from '../core/areas.js';
 import { RATING_CHOICES, activeSystem, ageChoices, ageLabels, limitText, shownLimit } from '../core/age-rating-rules.js';
@@ -60,6 +62,8 @@ const audioModes = () => [
 let settings = null;
 let feeds = null;
 let security = null;
+/** The second factor on a phone: { on, canEnable: 'None' | 'NoCodeCheck' | 'NoPhone', phones } (null: not known yet). */
+let secondFactor = null;
 /** The installed plugins (Settings > Plugins lists those with settings). */
 let installedPlugins = [];
 // Titles of the console setup steps that are not in place (null: not known yet). Filled in the background.
@@ -107,6 +111,14 @@ async function chooseLock(preset) {
   // before, with the way back: a new code then needs this Windows sign-in once more (finding H1 of the 0.4.1 acceptance test).
   if (mode === 'windows' && security?.couchLock === 'code' && security?.serviceCodes
     && !(await confirmDialog(t('settings.lock.windowsDropsCodeTitle'), t('settings.common.continue'), { message: t('settings.lock.windowsDropsCode') }))) return 'cancelled';
+  // Switching the code check off: said plainly, and more plainly with the second factor on (it goes with it).
+  if (mode === 'off' && security?.couchLock && security.couchLock !== 'off') {
+    secondFactor = (await attempt(() => api.getSecondFactor?.(), undefined, { quietLocked: true })) ?? secondFactor;
+    const strong = !!secondFactor?.on;
+    const title = strong ? t('settings.lock.offWarnTitle2fa') : t('settings.lock.offWarnTitle');
+    const message = strong ? t('settings.lock.offWarn2fa') : t('settings.lock.offWarn');
+    if (!(await confirmDialog(title, t('settings.lock.offConfirm'), { danger: true, focusCancel: true, message }))) return 'cancelled';
+  }
   // The code lock needs a code the CouchHUD service holds: a new one goes along with the switch, in one step (a code set on its own at an
   // open couch would not survive the lock being switched on). Entered before the approval, which then names it ("lockModeCode").
   const plan = mode === 'code' ? codeLockPlan(security) : 'default';
@@ -272,12 +284,21 @@ async function disableAutoLogon() {
   }
 }
 
+// A change from outside the page (the phone remote, a tool): the open page shows the new values.
+window.addEventListener('couchhud:settings', (e) => {
+  if (!settings || !e.detail) return;
+  Object.assign(settings, e.detail);
+  if (currentView() === settingsView && !state.overlay && state.stack.length === 0) render();
+});
+
 async function loadSettings() {
   settings = (await attempt(() => api.getSettings(), t('settings.loadFailed'))) ?? settings ?? {};
   setAreas(settings.areas);
   // The feeds belong to News: not asked for while it is off (the host would refuse).
-  feeds = areaOn('news') ? (await attempt(() => api.getFeeds())) ?? feeds ?? [] : [];
+  // They come from the news plugin since 0.7: not asked for without it either.
+  feeds = areaOn('news') && settings.newsAvailable ? (await attempt(() => api.getFeeds())) ?? feeds ?? [] : [];
   security = (await attempt(() => api.getSecurity())) ?? security;
+  secondFactor = (await attempt(() => api.getSecondFactor?.(), undefined, { quietLocked: true })) ?? secondFactor;
   installedPlugins = (await attempt(() => api.getPlugins())) ?? installedPlugins;
   await refreshParental();
   refreshConsoleOpen();
@@ -304,22 +325,70 @@ async function refreshConsoleOpen() {
   if (changed && state.stack.length === 0 && currentView() === settingsView) render();
 }
 
-/** Paired phones: pick one to unpair it, or all of them. A phone that was not used for half a year is unpaired by the host anyway. */
-async function manageRemoteDevices() {
+// i18n-used: settings.phone.level.control settings.phone.level.library settings.phone.level.full
+// i18n-used: settings.phone.levelDesc.control settings.phone.levelDesc.library settings.phone.levelDesc.full
+const PHONE_LEVELS = ['control', 'library', 'full'];
+const phoneLevelKey = (level) => 'settings.phone.level.' + level;
+const phoneLevelDescKey = (level) => 'settings.phone.levelDesc.' + level;
+// i18n-used: settings.phone.level.control settings.phone.level.library settings.phone.level.full settings.phone.levelDesc.control settings.phone.levelDesc.library settings.phone.levelDesc.full
+
+/**
+ * Paired phones: pick one to set what it may do (Nur Steuerung, Bibliothek, Voll: the parents' code, as for every change to who may do
+ * what) or to unpair it, or unpair all. A phone paired before 0.7 has no encrypted channel: buttons only until it is paired again.
+ * A phone that was not used for half a year is unpaired by the host anyway.
+ */
+async function manageRemoteDevices(index) {
   const info = await attempt(() => api.getRemote(), t('phone.unavailable'));
   if (!info) return;
   if (!info.devices?.length) return toast(t('phone.noneYet'));
   const when = (ms) => fmtDateTime(ms, { dateStyle: 'short', timeStyle: 'short' });
+  const detail = (d) => [d.channel ? t(phoneLevelKey(d.level)) : t('settings.phone.legacy'),
+    t('settings.phone.deviceDetail', { paired: when(d.paired), used: when(d.lastUsed ?? d.paired) })].join(' · ');
   const pick = await chooseDialog(t('settings.phone.manage'), [
-    ...info.devices.map((d) => ({ label: d.name, detail: t('settings.phone.deviceDetail', { paired: when(d.paired), used: when(d.lastUsed ?? d.paired) }), icon: '📱', value: d.id })),
+    ...info.devices.map((d) => ({ label: d.name, detail: detail(d), icon: '📱', value: d.id })),
     { label: t('settings.phone.revoke'), detail: t('settings.phone.revokeDesc'), icon: '✕', danger: true, value: '*' }
-  ]);
+  ], index);
   if (pick === undefined) return;
-  const all = pick === '*';
-  const name = info.devices.find((d) => d.id === pick)?.name ?? '';
-  if (!(await confirmDialog(all ? t('settings.phone.revokeConfirm') : t('settings.phone.revokeOne', { name }), t('settings.common.remove'), { danger: true }))) return;
-  const done = await attempt(() => (all ? api.revokeRemote() : api.revokeRemoteDevice(pick)), t('settings.phone.notRemoved'));
-  if (done !== undefined) toast(all ? t('settings.phone.revoked') : t('settings.phone.revokedOne', { name }));
+  if (pick === '*') {
+    if (!(await confirmDialog(t('settings.phone.revokeConfirm'), t('settings.common.remove'), { danger: true }))) return;
+    const done = await attempt(() => api.revokeRemote(), t('settings.phone.notRemoved'));
+    if (done !== undefined) toast(t('settings.phone.revoked'));
+    return;
+  }
+  const device = info.devices.find((d) => d.id === pick);
+  if (!device) return;
+  await manageRemoteDevice(device);
+  return manageRemoteDevices(pick);
+}
+
+async function manageRemoteDevice(device) {
+  const name = device.name;
+  const levels = device.channel
+    ? PHONE_LEVELS.map((level) => ({ label: t(phoneLevelKey(level)), detail: t(phoneLevelDescKey(level)), icon: level === device.level ? '●' : '○', value: level }))
+    : [];
+  const choice = await chooseDialog(name, [
+    ...levels,
+    { label: t('settings.phone.unpair'), detail: device.channel ? t('settings.phone.unpairDesc') : t('settings.phone.legacyDesc'), icon: '✕', danger: true, value: '-' }
+  ], device.channel ? device.level : '-');
+  if (choice === undefined) return;
+  if (choice === '-') {
+    if (!(await confirmDialog(t('settings.phone.revokeOne', { name }), t('settings.common.remove'), { danger: true }))) return;
+    const done = await attempt(() => api.revokeRemoteDevice(device.id), t('settings.phone.notRemoved'));
+    if (done !== undefined) toast(t('settings.phone.revokedOne', { name }));
+    return;
+  }
+  if (choice === device.level) return;
+  // Locked couch: unlock first (the host refuses otherwise); then the parents' code for exactly this phone (the host asks for it).
+  const set = () => withParentGrant(() => api.setRemoteDeviceLevel(device.id, choice));
+  let done;
+  try {
+    done = await set();
+  } catch (err) {
+    if (!err?.locked) return attempt(() => Promise.reject(err), t('settings.common.saveFailed'));
+    if (!(await ensureUnlocked(t('settings.phone.levelReason')))) return;
+    done = await attempt(set, t('settings.common.saveFailed'));
+  }
+  if (done) toast(t('settings.phone.levelSet', { name, level: t(phoneLevelKey(choice)) }));
 }
 
 /**
@@ -715,6 +784,38 @@ async function eggInput(action, catId) {
   return true;
 }
 
+/**
+ * The second factor on a phone (0.7): off unless chosen. On needs the code check and a phone with the full right that is not a child's;
+ * off needs the code and the phone's confirmation (the host asks; the bridge shows the question).
+ */
+function secondFactorRow() {
+  return {
+    kind: 'toggle',
+    label: t('settings.phone.twofa'),
+    desc: t('settings.phone.twofaDesc'),
+    value: () => !!secondFactor?.on,
+    run: async () => {
+      const want = !secondFactor?.on;
+      if (want && secondFactor?.canEnable === 'NoCodeCheck') return toast(t('settings.phone.twofaNeedCode'), 8000);
+      if (want && secondFactor?.canEnable === 'NoPhone') return toast(t('settings.phone.twofaNeedPhone'), 8000);
+      if (want && secondFactor?.adminAccount) {
+        // An administrator account in Admin Approval Mode: UAC is only a click, the emergency way is then no real second proof.
+        if (!(await confirmDialog(t('settings.phone.twofaAdminTitle'), t('settings.common.continue'), { message: t('settings.phone.twofaAdmin'), focusCancel: true }))) return;
+      }
+      if (!want) {
+        const reason = t('settings.phone.twofaOffReason');
+        if (!(await ensureParentGrant(reason, { action: 'secondFactorOff' }))) return;
+      }
+      const updated = await attempt(() => api.setSecondFactor(want), t('settings.common.saveFailed'));
+      if (updated) {
+        secondFactor = updated;
+        toast(updated.on ? t('settings.phone.twofaOn') : t('settings.phone.twofaOff'), 8000);
+      }
+      render();
+    }
+  };
+}
+
 const toggle = (key, label, desc, after) => ({
   kind: 'toggle',
   // The row goes with the area of its setting (core/areas.js, FeatureAreas in Core): hidden while that area is off.
@@ -724,6 +825,22 @@ const toggle = (key, label, desc, after) => ({
   value: () => !!settings?.[key],
   run: async () => {
     await change(key, !settings[key]);
+    await after?.(settings[key]);
+  }
+});
+
+/**
+ * A switch that opens a listener on the network (phone connection, MCP): switching on takes the parents' code with parental controls on
+ * (unlock first, then the code, as for the privacy switches); switching off is free. The host asks for the same grant.
+ */
+const listenerToggle = (key, label, desc, after) => ({
+  ...toggle(key, label, desc, after),
+  run: async () => {
+    const turningOn = !settings[key];
+    const parentalOn = !!(parental.status ?? (await refreshParental()))?.enabled;
+    if (listenerNeedsParent(key, turningOn, parentalOn)
+      && !(await protectedGrant(t('settings.network.parentReason'), { action: 'networkListener', item: key }, true))) return;
+    await change(key, turningOn);
     await after?.(settings[key]);
   }
 });
@@ -769,11 +886,42 @@ function privacyItems() {
     privacyToggle('netSystemUpdates', t('settings.privacy.system'), t('settings.privacy.systemDesc')),
     privacyToggle('onlineArtwork', t('settings.privacy.artwork'), t('settings.privacy.artworkDesc')),
     privacyToggle('netSaves', t('settings.privacy.saves'), t('settings.privacy.savesDesc')),
-    privacyToggle('netWeather', t('settings.privacy.weather'), t('settings.privacy.weatherDesc')),
-    privacyToggle('netNews', t('settings.privacy.news'), t('settings.privacy.newsDesc')),
-    privacyToggle('netAssistant', t('settings.privacy.assistant'), t('settings.privacy.assistantDesc')),
+    ...pluginServiceToggles(),
+    info(t('settings.privacy.pluginNoteTitle'), t('settings.privacy.pluginNote')),
     info(t('settings.privacy.localTitle'), t('settings.privacy.localDesc'))
   ];
+}
+
+/**
+ * The network services the installed plugins declared (SDK 5), one switch each: the plugin's name, the service and where it connects. The
+ * same rules as the core's switches (Offline above all, the parents' code for exactly this switch); the host checks the switch before
+ * every request of the plugin.
+ */
+function pluginServiceToggles() {
+  return (settings?.pluginServices ?? []).map((svc) => {
+    const grantKey = `pluginNet:${svc.plugin}/${svc.id}`;
+    return {
+      kind: 'toggle',
+      label: t('settings.privacy.pluginService', { plugin: svc.pluginName, service: svc.name }),
+      // A device in the home network (the plugin's own connection, which it makes only while this switch is on) comes with its own sentence.
+      desc: [
+        svc.anyHost ? t('settings.privacy.pluginServiceAny') : (svc.hosts ?? []).length ? t('settings.privacy.pluginServiceHosts', { hosts: svc.hosts.join(', ') }) : null,
+        svc.lan ? t('settings.privacy.pluginServiceLan') : null
+      ].filter(Boolean).join(' '),
+      value: () => !settings.offline && !!svc.on,
+      disabled: () => !!settings.offline,
+      run: async () => {
+        if (settings.offline) {
+          toast(t('settings.privacy.offlineFirst'));
+          return;
+        }
+        if (!(await privacyGrant(grantKey))) return;
+        const updated = await attempt(() => api.setPluginService(svc.plugin, svc.id, !svc.on), t('settings.common.saveFailed'));
+        if (updated) settings.pluginServices = updated;
+        render();
+      }
+    };
+  });
 }
 
 /**
@@ -1061,8 +1209,21 @@ function serviceFacts() {
     ...(security?.serviceCodes ? [info(t('settings.console.serviceCodes'), t('settings.console.serviceCodesValue', {
       couch: security.serviceCodes.couch ? t('settings.console.codeHeld') : t('settings.console.codeNone'),
       parent: security.serviceCodes.parent ? t('settings.console.codeHeld') : t('settings.console.codeNone')
-    }))] : [])
+    }))] : []),
+    // The way out of a damaged service state (or a fresh start): behind the couch lock, and Windows asks for an administrator.
+    ...(security?.service?.expected ? [action(t('settings.console.resetState'), t('settings.console.resetStateDesc'), resetServiceState)] : [])
   ];
+}
+
+async function resetServiceState() {
+  if (!(await ensureUnlocked(t('settings.console.resetStateReason')))) return;
+  if (!(await confirmDialog(t('settings.console.resetStateQuestion'), t('settings.console.resetStateConfirm'), { danger: true }))) return;
+  toast(t('settings.common.confirmWindowsPrompt'), 4000);
+  const result = await attempt(() => api.resetServiceState(), t('settings.console.resetStateFailed'));
+  if (!result) return;
+  security = (await attempt(() => api.getSecurity())) ?? security;
+  toast(t('settings.console.resetStateDone'), 8000, { long: true });
+  if (state.stack.length === 0 && currentView() === settingsView) render();
 }
 
 /**
@@ -1343,7 +1504,8 @@ function categories() {
         action(t('settings.library.add'), t('settings.library.addDesc'), addEntryFlow, '+'),
         ...inArea('games',
           action(t('settings.library.folders'), t('settings.library.foldersDesc'), () => openPage(gameFoldersPage(), t('settings.cat.library'))),
-          action(t('settings.library.clients'), t('settings.library.clientsDesc'), () => openPage(launchersPage(), t('settings.cat.library')))),
+          action(t('settings.library.clients'), t('settings.library.clientsDesc'), () => openPage(launchersPage(), t('settings.cat.library'))),
+          action(t('settings.library.companions'), t('settings.library.companionsDesc'), openCompanionApps)),
         favoritesModeRow(),
         ...favoritesDaysRows(),
         toggle('favoritesSites', t('settings.favorites.sites'), t('settings.favorites.sitesDesc'), () => refreshFavorites()),
@@ -1444,15 +1606,18 @@ function categories() {
       icon: 'phone',
       name: t('settings.cat.phone'),
       items: [
-        toggle('remoteEnabled', t('settings.phone.connect'), t('settings.phone.connectDesc')),
+        listenerToggle('remoteEnabled', t('settings.phone.connect'), t('settings.phone.connectDesc')),
         ...(s.remoteEnabled ? [
           action(t('settings.phone.pair'), t('settings.phone.pairDesc'), () => openPage(pairingPage(), t('settings.cat.phone'))),
+          toggle('remotePower', t('settings.phone.power'), t('settings.phone.powerDesc')),
+          secondFactorRow(),
           ...expert(action(t('settings.phone.manage'), t('settings.phone.manageDesc'), manageRemoteDevices))
         ] : []),
         info(t('settings.phone.trouble'), t('settings.phone.troubleDesc'))
       ]
     },
-    {
+    // The feeds and the weather place come from their plugins (0.7): without the plugin the category is not there.
+    ...(s.newsAvailable ? [{
       id: 'news',
       area: 'news',
       icon: 'news',
@@ -1480,8 +1645,8 @@ function categories() {
           }
         }, '+')
       ]
-    },
-    {
+    }] : []),
+    ...(s.weatherAvailable ? [{
       id: 'home',
       icon: 'weather',
       name: t('settings.cat.home'),
@@ -1494,7 +1659,7 @@ function categories() {
           run: chooseWeatherPlace
         }
       ]
-    },
+    }] : []),
     // TV control (LG webOS first): pairing and everything else on its own page; the Guide menu option and "TV follows CouchHUD" here.
     ...(api.tvStatus ? [{
       id: 'tv',
@@ -1545,11 +1710,12 @@ function categories() {
       icon: 'power',
       name: t('settings.cat.power'),
       items: [
+        // The order of the Start menu (power-rules.js): the everyday three, then what sits behind "Mehr".
         power.standby,
-        power['pc-mode'] ?? power.quit,
-        power.restart,
-        ...(power['restart-pc'] ? expert(power['restart-pc']) : []),
         power.shutdown,
+        power.restart,
+        power['pc-mode'] ?? power.quit,
+        ...(power['restart-pc'] ? expert(power['restart-pc']) : []),
         { kind: 'choice', label: t('settings.power.timer'), desc: t('settings.power.timerDesc'), value: () => sleepTimerDetail(), run: chooseSleepTimer }
       ]
     },
@@ -1643,25 +1809,27 @@ function visibleCategories() {
     .map((c) => ({ ...c, items: c.items.filter((i) => on || !i.expert) }));
 }
 
-const providers = () => [
+/** The providers the installed plugins offer (SDK 5, 0.7): the core knows no vendor itself. */
+const providers = (s) => [
   { label: t('settings.common.off'), value: '' },
-  { label: 'Anthropic', detail: t('settings.ai.claude'), value: 'anthropic' },
-  { label: 'OpenAI', detail: t('settings.ai.gpt'), value: 'openai' }
+  ...(s.aiProviders ?? []).map((p) => ({ label: p.name, detail: (p.models ?? []).join(', '), value: p.id }))
 ];
 
 function aiItems(s) {
-  const provider = s.aiProvider ?? '';
-  const keySetting = provider === 'openai' ? 'openAiApiKey' : 'anthropicApiKey';
-  const keySet = provider === 'openai' ? s.openAiKeySet : s.anthropicKeySet;
-  const models = s.aiModels?.[provider] ?? [];
+  if (!(s.aiProviders ?? []).length) return [info(t('settings.ai.noProviders'), t('settings.ai.noProvidersDesc')), ...mcpItems(s)];
+  const current = (s.aiProviders ?? []).find((p) => p.id === s.aiProvider);
+  // A provider whose plugin is gone counts as off.
+  const provider = current ? current.id : '';
+  const keySet = !!current?.keySet;
+  const models = current?.models ?? [];
   const items = [
     {
       kind: 'choice',
       label: t('settings.ai.provider'),
       desc: t('settings.ai.providerDesc'),
-      value: () => providers().find((p) => p.value === provider)?.label ?? t('settings.common.off'),
+      value: () => providers(s).find((p) => p.value === provider)?.label ?? t('settings.common.off'),
       run: async () => {
-        const chosen = await chooseDialog(t('settings.ai.provider'), providers(), provider);
+        const chosen = await chooseDialog(t('settings.ai.provider'), providers(s), provider);
         if (chosen === undefined) return;
         await change('aiProvider', chosen);
         settings.aiModel = '';
@@ -1674,13 +1842,14 @@ function aiItems(s) {
     {
       kind: 'text',
       label: t('settings.ai.key'),
-      desc: provider === 'openai' ? t('settings.ai.keyOpenAi') : t('settings.ai.keyAnthropic'),
+      desc: t('settings.ai.keyDesc'),
       value: () => (keySet ? t('settings.ai.keySaved') : t('settings.common.notSet')),
       run: async () => {
         const key = await openKeyboard({ title: t('settings.ai.key'), secret: true, hint: t('settings.ai.keyHint'), paste: true });
         if (key === undefined) return;
-        await change(keySetting, key, key ? t('settings.ai.keySavedToast') : t('settings.ai.keyRemovedToast'));
-        settings[provider === 'openai' ? 'openAiKeySet' : 'anthropicKeySet'] = !!key;
+        // Straight to the provider's plugin (its own secret store); the page keeps no copy.
+        if ((await saveSetting('aiApiKey', key)) === undefined) return;
+        toast(key ? t('settings.ai.keySavedToast') : t('settings.ai.keyRemovedToast'));
         await refreshAssistantTab();
       }
     },
@@ -1702,11 +1871,11 @@ function aiItems(s) {
 
 function mcpItems(s) {
   const items = [
-    toggle('mcpEnabled', t('settings.mcp.server'), t('settings.mcp.serverDesc'), () => loadSettings()),
+    listenerToggle('mcpEnabled', t('settings.mcp.server'), t('settings.mcp.serverDesc'), () => loadSettings()),
   ];
   if (!s.mcpEnabled) return items;
   items.push(
-    toggle('mcpLan', t('settings.mcp.lan'), t('settings.mcp.lanDesc'), () => loadSettings()),
+    listenerToggle('mcpLan', t('settings.mcp.lan'), t('settings.mcp.lanDesc'), () => loadSettings()),
     info(t('settings.mcp.address'), (s.mcpUrls ?? []).join('  ·  ') || '–'),
     { kind: 'info', label: t('settings.mcp.token'), value: s.mcpToken || '–', secret: true },
     action(t('settings.mcp.newToken'), t('settings.mcp.newTokenDesc'), async () => {

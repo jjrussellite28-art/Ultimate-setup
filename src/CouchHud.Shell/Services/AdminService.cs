@@ -170,6 +170,10 @@ public static class AdminService
     /// <summary>Runs an operation; when the service wants a parent's or an administrator's approval it does not have yet, asks an administrator once for it and tries again.</summary>
     public static Task<OpResult> WithGrantAsync(Operation op, Func<Task<OpResult>> operation) => WithGrantAsync([op], operation);
 
+    /// <summary>For a long operation (Windows Update, the CouchHUD setup): when the service wants an approval (other accounts are signed in), asks an administrator once and starts again.</summary>
+    public static Task<JobResult> WithGrantJobAsync(Operation op, Func<Task<JobResult>> operation) =>
+        GrantFlow.WithGrantJobAsync(operation, () => ObtainAdminGrantAsync([op]));
+
     /// <summary>Like <see cref="WithGrantAsync(Operation, Func{Task{OpResult}})"/>, with one approval for several uses (e.g. release and key cleanup).</summary>
     public static Task<OpResult> WithGrantAsync(IReadOnlyList<Operation> ops, Func<Task<OpResult>> operation) =>
         GrantFlow.WithGrantAsync(operation, () => ObtainAdminGrantAsync(ops));
@@ -186,6 +190,8 @@ public static class AdminService
     public const string LegacyWindowsReason = "legacyWindows";
     /// <summary>The code just entered does not match the config's code of 0.4.0, and the person chose to have it confirmed as the new one.</summary>
     public const string LegacyNewCodeReason = "legacyNewCode";
+    /// <summary>The code lock while the service holds no couch code (after the reset of a damaged code file): an administrator opens it once.</summary>
+    public const string UnlockNoCodeReason = "unlockNoCode";
 
     /// <summary>
     /// Removes the scheduled tasks of earlier versions through the service (it deletes them as SYSTEM, after its own proof). Only a fallback

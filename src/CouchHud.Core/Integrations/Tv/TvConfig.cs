@@ -8,13 +8,19 @@ namespace CouchHud.Core.Integrations.Tv;
 /// </summary>
 public sealed class TvConfig
 {
-    /// <summary>"lg-webos", or empty when no TV is paired.</summary>
+    /// <summary>The provider id ("lg-webos", "samsung-tizen"), or empty when no TV is paired.</summary>
     public string Provider { get; set; } = "";
+
+    /// <summary>
+    /// The plugin that paired the TV and alone gets its key ("webostv"). Empty in a pairing from before 0.7, when webOS was part of the
+    /// core: such a pairing belongs to the plugin of its known provider id (<see cref="TvProviderRegistry.Known"/>), so the update keeps it.
+    /// </summary>
+    public string Plugin { get; set; } = "";
 
     /// <summary>The TV's IP address in the local network (an IP literal, never a host name).</summary>
     public string Address { get; set; } = "";
 
-    /// <summary>Paired over TLS (port 3001). A TLS pairing is never used without TLS.</summary>
+    /// <summary>Paired over TLS. A TLS pairing is never used without TLS.</summary>
     public bool Secure { get; set; } = true;
 
     /// <summary>The pairing key, DPAPI-protected.</summary>
@@ -72,13 +78,22 @@ public sealed class TvConfig
         var key = unprotect(ClientKey);
         if (key.Length == 0) return null;
         static string? Opt(string s) => s.Length == 0 ? null : s;
-        return new TvPairing(Provider, Address, Secure, key, Opt(CertPin), Opt(Mac), Opt(Name), Opt(Model), Opt(PcApp));
+        return new TvPairing(Provider, Address, Secure, key, Opt(CertPin), Opt(Mac), Opt(Name), Opt(Model), Opt(PcApp), PluginOf(Provider, Plugin));
     }
+
+    /// <summary>The plugin a pairing belongs to: the stored one, or for a pairing from before 0.7 the official plugin of its provider id; empty when unknown.</summary>
+    public static string PluginOf(string provider, string? plugin) =>
+        !string.IsNullOrEmpty(plugin) ? plugin : TvProviderRegistry.KnownById(provider)?.Plugin ?? "";
+
+    /// <summary>A pairing from before 0.7 (webOS was in the core then): it waits for its plugin, nothing of it changes until it is used.</summary>
+    [JsonIgnore]
+    public bool FromCore => Provider.Length > 0 && Plugin.Length == 0;
 
     /// <summary>Stores a pairing (key through <paramref name="protect"/>) or clears it; the follow and Guide options stay.</summary>
     public void SetPairing(TvPairing? p, Func<string, string> protect)
     {
         Provider = p?.Provider ?? "";
+        Plugin = p?.Plugin ?? "";
         Address = p?.Address ?? "";
         Secure = p?.Secure ?? true;
         ClientKey = p is null ? "" : protect(p.ClientKey);

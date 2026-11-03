@@ -14,7 +14,7 @@ import { closeTagged, confirmDialog, overlayFree } from '../components/overlay.j
 import { openKeyboard } from '../components/keyboard.js';
 import { sound } from '../sound.js';
 
-// i18n-used: assistant.tool.searchLibrary assistant.tool.getItemDetails assistant.tool.launch assistant.tool.toggleFavorite assistant.tool.editItem assistant.tool.addEntry assistant.tool.rescanLibrary assistant.tool.getSettings assistant.tool.setSetting assistant.tool.listSkins assistant.tool.setSkin assistant.tool.getSession assistant.tool.getWeather assistant.tool.getNews assistant.tool.getUpdates assistant.tool.listHomeEntities assistant.tool.activateHomeEntity assistant.tool.getAudio assistant.tool.setVolume assistant.tool.setAudioOutput assistant.tool.power
+// i18n-used: assistant.tool.searchLibrary assistant.tool.getItemDetails assistant.tool.launch assistant.tool.toggleFavorite assistant.tool.editItem assistant.tool.addEntry assistant.tool.rescanLibrary assistant.tool.getSettings assistant.tool.setSetting assistant.tool.listSkins assistant.tool.setSkin assistant.tool.getSession assistant.tool.getWeather assistant.tool.getNews assistant.tool.getUpdates assistant.tool.getAudio assistant.tool.setVolume assistant.tool.setAudioOutput assistant.tool.power
 const toolLabel = (name) => {
   switch (name) {
     case 'search_library': return t('assistant.tool.searchLibrary');
@@ -29,8 +29,8 @@ const toolLabel = (name) => {
     case 'list_skins': return t('assistant.tool.listSkins');
     case 'set_skin': return t('assistant.tool.setSkin');
     case 'get_session': return t('assistant.tool.getSession');
-    case 'get_weather': return t('assistant.tool.getWeather');
-    case 'get_news': return t('assistant.tool.getNews');
+    case 'plugin_weather_get_weather': return t('assistant.tool.getWeather');
+    case 'plugin_news_get_news': return t('assistant.tool.getNews');
     case 'get_updates': return t('assistant.tool.getUpdates');
     case 'get_audio': return t('assistant.tool.getAudio');
     case 'set_volume': return t('assistant.tool.setVolume');

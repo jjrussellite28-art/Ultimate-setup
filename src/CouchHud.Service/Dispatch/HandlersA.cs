@@ -17,6 +17,7 @@ namespace CouchHud.Service.Dispatch;
 /// <param name="AppDirectory">The program folder (<c>{app}</c>, above the service's own folder): the firewall rule's program and the old policy files.</param>
 /// <param name="ServiceOnList">The service's own fixed list of pausable services (<c>GamingServices</c>); <see cref="ServicePolicy.Denied"/> wins over it.</param>
 /// <param name="ServiceTimeout">How long one service may take to stop or start.</param>
+/// <param name="ShellRuns">Whether a CouchHUD of this installation runs on the machine now (the shell that asked for the pause); null: not known, the watch then does not look.</param>
 public sealed record OperationsAParts(
     ServiceStateStore State,
     IUserHives Hives,
@@ -33,7 +34,8 @@ public sealed record OperationsAParts(
     Func<string, bool> ServiceOnList,
     Func<DateTimeOffset> Now,
     TimeSpan ServiceTimeout,
-    ISessions? Sessions = null);
+    ISessions? Sessions = null,
+    Func<bool>? ShellRuns = null);
 
 /// <summary>
 /// The operations of package P5 ("Operationen A"): lock policies, cleanup of keys, pausing services, automatic sign-in, the remote's
@@ -478,10 +480,77 @@ public sealed class OperationsA(OperationsAParts parts)
                 continue;
             }
             held.Add(name);
-            if (running) parts.Log.Info($"[services] {name} paused for {sid}");
+            // The real result of each service, not only "ok": stopped now, or not running at the request (then the watch keeps it so).
+            parts.Log.Info(running
+                ? $"[services] {name} stopped and held for {sid}"
+                : $"[services] {name} was not running when {sid} paused it; held, the watch stops it if it starts");
         }
         if (held.Count > 0) parts.Events?.Add(sid, "services", $"paused: {string.Join(", ", held)}");
         return failed ? Fail(ErrorCodes.Failed) : Ok(new ServicesData([.. held]));
+    }
+
+    /// <summary>How often the held services are looked at again.</summary>
+    public static readonly TimeSpan PauseWatchInterval = TimeSpan.FromSeconds(30);
+
+    private readonly HashSet<string> _watchFailed = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// While a pause holds: a service that came back (delayed automatic start, a trigger, a dependency) is stopped again. Only services
+    /// that are held (in the state with a holder), on the fixed list and not denied; nothing else is ever touched, and start types stay
+    /// as they are. The stop is noted before it happens (as in the pause), so the resume starts it again. A stop that fails is logged once
+    /// per service until it works again. Returns how many services were stopped now.
+    /// </summary>
+    public int RecheckPausedServices(CancellationToken cancellation)
+    {
+        using var gate = Enter(_servicesGate, cancellation);
+        if (parts.State.Snapshot() is not { Paused.Count: > 0 }) return 0;
+        // Fail-closed towards "let the services run": the watch only keeps a service off for a hold that is alive. A hold whose account has no
+        // session any more, or while no CouchHUD of this installation runs at all (the shell crashed, the PC mode was entered without the
+        // resume arriving), ends as if it had been resumed. Unreadable sessions (or none wired): no watching either, the next look tries again.
+        if (parts.Sessions is null || parts.ShellRuns is null || parts.Sessions.SignedInSids(null) is not { } signedIn) return 0;
+        var shell = parts.ShellRuns();
+        Func<string, bool> gone = h => !shell || !signedIn.Contains(h);
+        // A start that fails keeps the hold (and the note that the service stopped it): the next look tries the start again.
+        ReleaseHolds(gone, shell ? "holds of signed-out accounts dropped" : "no CouchHUD runs, holds dropped", cancellation, keepOnFailedStart: true);
+        if (parts.State.Snapshot() is not { } state) return 0;
+        var stopped = 0;
+        foreach (var (name, entry) in state.Paused.ToList())
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (entry.Holders.Count == 0 || !ServicePolicy.IsAllowed(name, parts.ServiceOnList)) continue;
+            // Every holder is gone but the start did not work yet: only the start is retried (above), never a stop again (no flip-flop).
+            if (entry.Holders.All(gone)) continue;
+            if (parts.Scm.IsRunning(name) != true)
+            {
+                _watchFailed.Remove(name);
+                continue;
+            }
+            var noted = parts.State.Update(s =>
+            {
+                if (!s.Paused.TryGetValue(name, out var e) || e.Holders.Count == 0 || e.StoppedByService) return false;
+                e.StoppedByService = true;
+                return true;
+            });
+            if (noted is StateUpdate.Unavailable or StateUpdate.WriteFailed)
+            {
+                // Once per service and kind until it works again; nothing but the name and the kind.
+                if (_watchFailed.Add($"{name}:state:{noted}")) parts.Log.Error($"[services] {name}: the state could not be written ({noted}); the watch does not stop it");
+                continue;
+            }
+            _watchFailed.Remove($"{name}:state:{StateUpdate.Unavailable}");
+            _watchFailed.Remove($"{name}:state:{StateUpdate.WriteFailed}");
+            if (parts.Scm.Stop(name, parts.ServiceTimeout))
+            {
+                _watchFailed.Remove(name);
+                stopped++;
+                parts.Log.Info($"[services] {name} had started again during the pause; stopped again");
+            }
+            else if (_watchFailed.Add(name))
+            {
+                parts.Log.Error($"[services] {name} runs during the pause and did not stop again");
+            }
+        }
+        return stopped;
     }
 
     /// <summary>
@@ -1139,27 +1208,43 @@ public sealed class OperationsA(OperationsAParts parts)
     {
         if (parts.Sessions is null) return;
         using var gate = Enter(_servicesGate, cancellation);
-        if (parts.State.Current is not { } state || state.Paused.Count == 0) return;
         if (parts.Sessions.SignedInSids(sessionId) is not { } signedIn) return;
-        foreach (var (name, entry) in state.Paused)
+        ReleaseHolds(h => !signedIn.Contains(h), "holds of signed-out accounts dropped", cancellation);
+    }
+
+    /// <summary>
+    /// Gives back every hold for which <paramref name="gone"/> says true, as if its account had resumed: the last holder's release starts the
+    /// service again where the service stopped it and it normally starts with Windows. The caller holds the services gate.
+    /// </summary>
+    private void ReleaseHolds(Func<string, bool> gone, string why, CancellationToken cancellation, bool keepOnFailedStart = false)
+    {
+        if (parts.State.Current is not { } state || state.Paused.Count == 0) return;
+        foreach (var (name, entry) in state.Paused.ToList())
         {
             cancellation.ThrowIfCancellationRequested();
-            var gone = entry.Holders.Where(h => !signedIn.Contains(h)).ToList();
-            if (gone.Count == 0) continue;
-            var last = gone.Count == entry.Holders.Count;
+            var leaving = entry.Holders.Where(gone).ToList();
+            if (leaving.Count == 0) continue;
+            var last = leaving.Count == entry.Holders.Count;
             if (last && entry.StoppedByService && ServicePolicy.IsAllowed(name, parts.ServiceOnList)
                 && parts.Scm.GetStartType(name) == ServiceStartMode.Automatic && !parts.Scm.Start(name, parts.ServiceTimeout))
             {
-                parts.Log.Error($"[services] {name} did not start again after the sign-out of its holders");
+                if (keepOnFailedStart)
+                {
+                    // Once per service until it works: the hold stays, so the next look starts it again.
+                    if (_watchFailed.Add($"{name}:start")) parts.Log.Error($"[services] {name} did not start again after its holders ended; the next look tries again");
+                    continue;
+                }
+                parts.Log.Error($"[services] {name} did not start again after its holders ended; the hold is dropped");
             }
+            _watchFailed.Remove($"{name}:start");
             parts.State.Update(s =>
             {
                 if (!s.Paused.TryGetValue(name, out var e)) return false;
-                e.Holders.RemoveAll(gone.Contains);
+                e.Holders.RemoveAll(leaving.Contains);
                 if (e.Holders.Count == 0) s.Paused.Remove(name);
                 return true;
             });
-            parts.Log.Info($"[services] {name}: holds of signed-out accounts dropped ({gone.Count})");
+            parts.Log.Info($"[services] {name}: {why} ({leaving.Count})");
         }
     }
 

@@ -1,0 +1,2 @@
+:root[data-skin="user:cq-page-z"]{--x:1}
+#view,#bg,main,#toast,#notify-stack{position:fixed!important;z-index:2147483647!important;inset:0!important;width:100vw!important;height:100vh!important;background:#000;mix-blend-mode:difference}

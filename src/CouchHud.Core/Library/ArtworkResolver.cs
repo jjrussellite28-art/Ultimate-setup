@@ -145,10 +145,19 @@ public sealed partial class ArtworkResolver
     /// <summary>The store entry the user picked for an entry (an app id or "none"), by item id; null: automatic. Set by the library.</summary>
     public Func<string, string?> StoreMatchOf { get; set; } = _ => null;
 
-    /// <summary>A picked store entry has its own cache line, so changing the pick never reuses the art of the old one.</summary>
-    private string Key(LibraryItem item) => StoreMatchOf(item.Id) is { } match && (match == StoreMatches.None || StoreMatches.IsAppId(match))
+    /// <summary>
+    /// A pinned artwork game and a picked store entry have their own cache lines, so changing the pick never reuses the art of the old one (the
+    /// pin comes first: it is what the art is taken from). The name line is versioned ("v2"): hits cached by name before the sure-match rules
+    /// (a prefix hit such as the wrong Mortal Kombat) are not reused, the first pass after the upgrade asks again.
+    /// </summary>
+    private string Key(LibraryItem item) =>
+        PinOf(item) is { } pin ? $"{item.Type}:pin:{pin}".ToLowerInvariant()
+        : StoreMatchOf(item.Id) is { } match && (match == StoreMatches.None || StoreMatches.IsAppId(match))
         ? $"{item.Type}:store:{match}".ToLowerInvariant()
-        : $"{item.Type}:{Normalize(item.Name)}".ToLowerInvariant();
+        : $"{item.Type}:v2:{Normalize(item.Name)}".ToLowerInvariant();
+
+    /// <summary>A Steam app id the user chose for this entry: the pinned artwork game or the picked store entry.</summary>
+    private bool HasChosenApp(LibraryItem item) => ArtworkMatches.SteamAppId(PinOf(item)) is not null || StoreMatches.IsAppId(StoreMatchOf(item.Id));
 
     /// <summary>
     /// The Steam app id the art comes from: Steam's own, the picked one, none when "none" was picked, else by name (games only:
@@ -157,6 +166,8 @@ public sealed partial class ArtworkResolver
     private async Task<string?> StoreAppIdAsync(LibraryItem item, CancellationToken ct)
     {
         if (SteamStore.AppIdOf(item) is { } steam) return steam;
+        // A pinned artwork game decides: its Steam app, or none when it is a game of SteamGridDB.
+        if (PinOf(item) is { } pin) return ArtworkMatches.SteamAppId(pin);
         var match = StoreMatchOf(item.Id);
         if (match == StoreMatches.None) return null;
         if (StoreMatches.IsAppId(match)) return match;
@@ -268,7 +279,7 @@ public sealed partial class ArtworkResolver
                         try
                         {
                             // Steam's store first (no key, official images), SteamGridDB for what it doesn't have.
-                            var art = item.Type == ItemType.Game || StoreMatches.IsAppId(StoreMatchOf(item.Id)) ? await FromSteamStore(item, ct) : null;
+                            var art = item.Type == ItemType.Game || HasChosenApp(item) ? await FromSteamStore(item, ct) : null;
                             if (art is null && _apiKey.Length > 0) art = await FromSteamGridDb(item, ct);
                             lock (_cacheLock) _cache[key] = new CacheEntry(art, Clock());
                             if (art is not null)
@@ -367,7 +378,7 @@ public sealed partial class ArtworkResolver
 
     /// <summary>Whether this entry has a store or SteamGridDB to ask at all.</summary>
     private bool CanLookup(LibraryItem item) =>
-        item.Type == ItemType.Game || StoreMatches.IsAppId(StoreMatchOf(item.Id)) || _apiKey.Length > 0;
+        item.Type == ItemType.Game || HasChosenApp(item) || _apiKey.Length > 0;
 
     /// <summary>
     /// A slot counts as missing when no image of it is on disk: it is empty, or none of its downloadable addresses has arrived.
@@ -384,7 +395,7 @@ public sealed partial class ArtworkResolver
     }
 
     private bool CanSupplyHero(LibraryItem item) =>
-        SteamStore.AppIdOf(item) is not null || StoreMatches.IsAppId(StoreMatchOf(item.Id)) || _apiKey.Length > 0;
+        SteamStore.AppIdOf(item) is not null || HasChosenApp(item) || _apiKey.Length > 0;
 
     /// <summary>Cover and banner (hero) always count; the logo only when a real address for it is known (most Steam games have none).</summary>
     private bool HasMissingSlot(LibraryItem item) =>
@@ -463,7 +474,7 @@ public sealed partial class ArtworkResolver
         {
             if (await StoreAppIdAsync(current, ct) is { } appId) await _steamAssets.RefreshAsync(appId, ct);
             var item = WithSteamAssets(source, _steamAssets.Peek);
-            var art = item.Type == ItemType.Game || StoreMatches.IsAppId(StoreMatchOf(item.Id)) ? await FromSteamStore(item, ct) : null;
+            var art = item.Type == ItemType.Game || HasChosenApp(item) ? await FromSteamStore(item, ct) : null;
             if (art is null && _apiKey.Length > 0) art = await FromSteamGridDb(item, ct);
             if (art is not null)
             {
@@ -551,7 +562,7 @@ public sealed partial class ArtworkResolver
             {
                 if (await StoreAppIdAsync(item, ct) is { } appId) await _steamAssets.RefreshAsync(appId, ct);
                 item = WithSteamAssets(source, _steamAssets.Peek);
-                var art = item.Type == ItemType.Game || StoreMatches.IsAppId(StoreMatchOf(item.Id)) ? await FromSteamStore(item, ct) : null;
+                var art = item.Type == ItemType.Game || HasChosenApp(item) ? await FromSteamStore(item, ct) : null;
                 if (art is null && _apiKey.Length > 0) art = await FromSteamGridDb(item, ct);
                 if (art is not null)
                 {
@@ -767,16 +778,15 @@ public sealed partial class ArtworkResolver
 
     private async Task<CachedArt?> FromSteamGridDb(LibraryItem item, CancellationToken ct)
     {
-        using var search = await GetJson($"{SteamGridDb}/search/autocomplete/{Uri.EscapeDataString(item.Name)}", ct, auth: true);
-        if (FirstInData(search.RootElement, "id") is not { } idElement) return null;
-        var id = idElement.GetRawText();
+        // A search hit that is not surely the game gives no route: no art (and the hint to choose it) instead of another game's pictures.
+        if (await SgdbRouteAsync(item, ct) is not { } route) return null;
 
         var dims = item.Type == ItemType.App ? "920x430,460x215" : "600x900";
-        var cover = await FirstUrl($"{SteamGridDb}/grids/game/{id}?dimensions={dims}", ct);
-        var hero = await FirstUrl($"{SteamGridDb}/heroes/game/{id}", ct);
-        var logo = await FirstUrl($"{SteamGridDb}/logos/game/{id}", ct);
+        var cover = await FirstUrl($"{SteamGridDb}/grids/{route}?dimensions={dims}", ct);
+        var hero = await FirstUrl($"{SteamGridDb}/heroes/{route}", ct);
+        var logo = await FirstUrl($"{SteamGridDb}/logos/{route}", ct);
         // Over the pass's budget: null (not asked yet), asked in a later pass.
-        var square = TakeSquareBudget() ? await SquareUrlsAsync($"game/{id}", ct) : null;
+        var square = TakeSquareBudget() ? await SquareUrlsAsync(route, ct) : null;
         if (cover is null && hero is null && logo is null && (square is null || square.Count == 0)) return null;
         return new CachedArt(cover is null ? [] : [cover], hero is null ? [] : [hero], logo is null ? [] : [logo], square);
     }
@@ -816,27 +826,11 @@ public sealed partial class ArtworkResolver
         if (!Online || _apiKey.Length == 0 || item.Art.Square.Count > 0) return item;
         var cached = CachedLookup(key);
         if (!force && (cached?.Art is not { Square: null } || !TakeSquareBudget())) return item;
-        string route;
-        if (SteamStore.AppIdOf(item) is { } steamId) route = $"steam/{steamId}";
-        else if (StoreMatchOf(item.Id) is { } match && StoreMatches.IsAppId(match)) route = $"steam/{match}";
-        else
+        // SteamGridDB does not know the game (surely): that is an answer ("none"), kept so it is not asked on every pass. Errors stay unanswered.
+        if (await SgdbRouteAsync(item, ct) is not { } route)
         {
-            JsonElement? found = null;
-            try
-            {
-                using var search = await GetJson($"{SteamGridDb}/search/autocomplete/{Uri.EscapeDataString(item.Name)}", ct, auth: true);
-                found = FirstInData(search.RootElement, "id")?.Clone();
-            }
-            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-            }
-            // SteamGridDB does not know the game: that is an answer ("none"), kept so it is not asked on every pass. Errors above stay unanswered.
-            if (found is not { } id)
-            {
-                SetSquare(key, []);
-                return item;
-            }
-            route = $"game/{id.GetRawText()}";
+            SetSquare(key, []);
+            return item;
         }
         var square = await SquareUrlsAsync(route, ct);
         SetSquare(key, square);

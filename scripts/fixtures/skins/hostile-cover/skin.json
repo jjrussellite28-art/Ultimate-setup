@@ -1,0 +1,4 @@
+{
+  "name": { "de": "Feindlich, verdeckt (Test)", "en": "Hostile, covering (test)" },
+  "description": { "de": "Nur für scripts/tabs-check.mjs, nie für den Katalog.", "en": "Only for scripts/tabs-check.mjs, never for the catalog." }
+}

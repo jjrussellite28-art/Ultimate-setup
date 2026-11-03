@@ -1,0 +1,2 @@
+:root[data-skin="user:cq-scope"]{--x:1}
+@scope(html){:scope{font-size:1px!important;zoom:.1}}@container style(--x:1){body{display:none!important}}

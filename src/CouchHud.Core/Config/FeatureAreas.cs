@@ -51,18 +51,18 @@ public static class FeatureAreas
         ["tvInGuide"] = Always, ["tvOnWithCouchHud"] = Always, ["tvOffWithPc"] = Always,
         ["bluetoothAutoOn"] = Always, ["selfUpdateCheck"] = Always, ["pixelShift"] = Always, ["reduceMotion"] = Always,
         ["pointer"] = Always, ["mouseUnlocked"] = Always, ["closeExplorerInLight"] = Always, ["acceptedTerms"] = Always,
-        ["setupWizardDone"] = Always, ["modeSwitchJournal"] = Always, ["autoLogonDeclined"] = Always, ["guideTapInGame"] = Always, ["suppressCompetitors"] = Always, ["gameBarButton"] = Always,
+        ["setupWizardDone"] = Always, ["modeSwitchJournal"] = Always, ["autoLogonDeclined"] = Always, ["guideTapInGame"] = Always, ["suppressCompetitors"] = Always, ["suppressBySetup"] = Always, ["gameBarButton"] = Always,
         ["musicVolume"] = Always, ["soundVolume"] = Always, ["soundSet"] = Always, ["uiHdr"] = Always, ["sounds"] = Always,
         ["expertMode"] = Always, ["language"] = Always, ["rumble"] = Always, ["padGlyphs"] = Always, ["runStartupApps"] = Always,
         ["killExplorerOnReturn"] = Always, ["nightMode"] = Always, ["nightModeStrength"] = Always,
         ["closePcAppsOnReturn"] = Always, ["onlineArtwork"] = Always, ["clearArtworkCache"] = Always,
         ["autoSwitchHeadphones"] = Always, ["returnHoldMs"] = Always, ["weatherLocation"] = Always,
         ["aiProvider"] = Always, ["aiModel"] = Always,
-        ["anthropicApiKey"] = Always, ["openAiApiKey"] = Always, ["mcpEnabled"] = Always, ["mirrorNotifications"] = Always,
-        // Privacy (Settings > Privacy): the save list belongs to Gaming, the news feeds to News, the rest is shared.
-        ["offline"] = Always, ["netCatalog"] = Always, ["netSystemUpdates"] = Always, ["netWeather"] = Always, ["netAssistant"] = Always,
-        ["catalogUpdateCheck"] = Always, ["pluginAutoUpdate"] = Always, ["netSaves"] = Games, ["netNews"] = News,
-        ["remoteEnabled"] = Always, ["mcpLan"] = Always, ["mcpToken"] = Always, ["screenshotCombo"] = Always,
+        ["aiApiKey"] = Always, ["mcpEnabled"] = Always, ["mirrorNotifications"] = Always,
+        // Privacy (Settings > Privacy): the save list belongs to Gaming, the rest is shared (the plugins' services have their own call, setPluginService).
+        ["offline"] = Always, ["netCatalog"] = Always, ["netSystemUpdates"] = Always,
+        ["catalogUpdateCheck"] = Always, ["pluginAutoUpdate"] = Always, ["netSaves"] = Games,
+        ["remoteEnabled"] = Always, ["remotePower"] = Always, ["mcpLan"] = Always, ["mcpToken"] = Always, ["screenshotCombo"] = Always,
     };
 
     /// <summary>The keys of setSaveSetting (save backups exist for games only).</summary>
@@ -91,8 +91,10 @@ public static class FeatureAreas
         ["getDownloads"] = Games,
         // Scanning a folder for games (Settings › Library › Scan a folder).
         ["scanFolder"] = Games,
-        // Apps: the list of installed Windows programs to add from, and their icons.
-        ["getInstalledApps"] = Apps, ["addInstalledApp"] = Apps, ["getAppIcons"] = Apps,
+        // Companion apps start next to a game: they go with Gaming. Wand is set up as one.
+        ["getCompanions"] = Games, ["setCompanion"] = Games, ["removeCompanion"] = Games, ["setupWand"] = Games,
+        // Apps: the list of installed Windows programs to add from, and their icons; the apps in the Guide menu.
+        ["getInstalledApps"] = Apps, ["addInstalledApp"] = Apps, ["getAppIcons"] = Apps, ["getGuideApps"] = Apps, ["setGuideApp"] = Apps,
         // Browser: the couch browser itself, its window, focus and dialogs, its bookmarks, links that open in it.
         ["openBrowser"] = Browser, ["getBrowser"] = Browser, ["browserType"] = Browser, ["browserCommand"] = Browser,
         ["setBrowserZoom"] = Browser, ["revealBrowserRecent"] = Browser, ["addBookmark"] = Browser, ["removeBookmark"] = Browser,
@@ -111,11 +113,12 @@ public static class FeatureAreas
         // Library and entries (checked per entry or per added entry).
         "getLibrary", "getFavorites", "launch", "toggleFavorite", "toggleFavoriteSite", "getStoreInfo", "getDetails", "uninstall", "browse", "addEntries", "editLaunch",
         "getLaunchOptions", "setLaunchOverride", "getItemInfo", "setItemInfo", "editItem", "getArtworkChoices", "setArtwork", "reloadArtwork",
+        "getArtworkMatch", "searchArtwork", "setArtworkMatch",
         "getCollections", "createCollection", "renameCollection", "deleteCollection", "setCollectionMember", "setCollectionOnHome",
-        "removeEntry", "getSession", "resumeGame", "quitGame",
+        "removeEntry", "hideEntry", "showEntry", "getIgnoredOrphans", "removeIgnoredOrphan", "getSession", "resumeGame", "quitGame",
         // Console, settings (per key), lock, codes, parental controls and profiles.
-        "systemInfo", "setShell", "enterPcMode", "power", "quit", "restartCouchHud", "getSettings", "setFeatureAreas", "setSetting", "setIntegrationMode",
-        "displayOn", "displayOff", "getSecurity", "getServiceStatus", "repairService", "resetCodeStore", "getParental", "setParental",
+        "systemInfo", "setShell", "enterPcMode", "power", "sleepTimerWarning", "sleepTimerArm", "quit", "restartCouchHud", "getSettings", "setFeatureAreas", "setSetting", "setIntegrationMode",
+        "displayOn", "displayOff", "getSecurity", "getServiceStatus", "repairService", "resetCodeStore", "resetServiceState", "getParental", "setParental",
         "setParentalItemLock", "parentalCheck", "parentalExtend", "parentalAuth", "confirmWindowsUnlock", "parentalReset",
         "parentalAcceptClock", "parentalAdoptZone", "parentalCloseGame", "getProfiles", "switchProfile", "profileScreen", "profileIdle",
         "addProfile", "renameProfile", "setProfileLook", "setProfileRestricted", "setProfileCode", "removeProfile", "getProfileRules",
@@ -129,19 +132,19 @@ public static class FeatureAreas
         // Downloads tab (CouchHUD's and Windows' own downloads; game lines go with Gaming inside the center).
         "getDownloadCenter", "dismissDownload", "cancelDownload",
         // Plugins and skins.
-        "getPlugins", "setPluginEnabled", "setPluginSetting", "openPluginSettingPage", "setPluginFunctionLevel", "endPluginVisit", "getPluginPage", "getPluginTabs", "getPluginGate", "activatePluginRow", "activatePluginAction", "getQuickActions", "approvePlugin",
+        "getPlugins", "setPluginEnabled", "setPluginSetting", "checkPluginSetting", "openPluginSettingPage", "setPluginFunctionLevel", "endPluginVisit", "getPluginPage", "getPluginTabs", "getPluginGate", "activatePluginRow", "activatePluginAction", "getQuickActions", "approvePlugin",
         "runQuickAction", "installPackage", "getCatalog", "getCatalogUpdates", "installCatalogEntry", "updateCatalogEntry", "getCatalogDetail", "getCatalogSources", "addCatalogSource", "removeCatalogSource", "uninstallPlugin", "acceptRevokedPlugin",
         "confirmPluginExe", "getPluginSuggestions", "dismissPluginSuggestion", "changePluginRow", "listSkins", "setSkin",
         // Notifications, Bluetooth, Wi-Fi, phone remote, firewall.
         "getNotifications", "markNotificationsRead", "clearNotifications", "getBluetooth", "scanBluetooth", "pairBluetooth",
         "unpairBluetooth", "getWifi", "scanWifi", "connectWifi", "disconnectWifi", "answerBluetoothRecovery", "setBluetooth", "getRemote",
-        "codeEntryState", "pairingState", "keyboardState", "revokeRemote", "revokeRemoteDevice", "allowFirewall",
+        "codeEntryState", "pairingState", "keyboardState", "sleepTimerState", "revokeRemote", "revokeRemoteDevice", "setRemoteDeviceLevel", "allowFirewall", "getSecondFactor", "setSecondFactor", "twoFactorState", "twoFactorCancel", "twoFactorAdmin",
         // Startup, services, policies, processes, updates.
         "getStartup", "setStartupMode", "applyStartupSuggestions", "getServices", "toggleCouchService", "setupServiceTask",
         "releaseLockPolicies", "cleanupStuckPolicies", "getProcesses", "switchProcess", "killProcess", "getUpdates", "checkUpdates",
         "getSelfUpdate", "refreshUpdates", "checkSelfUpdate", "startSelfUpdate", "startUpdate",
-        // Weather.
-        "getWeather", "searchPlaces",
+        // Weather, and the switches of the plugins' network services (Settings › Privacy).
+        "getWeather", "searchPlaces", "setPluginService",
     };
 
     /// <summary>Bridge calls whose first argument is a library entry: refused for an entry of an area that is off.</summary>
@@ -149,13 +152,15 @@ public static class FeatureAreas
     {
         "launch", "toggleFavorite", "getStoreInfo", "getDetails", "uninstall", "getItemInfo", "setItemInfo", "getArtworkChoices",
         "setArtwork", "reloadArtwork", "editLaunch", "getLaunchOptions", "setLaunchOverride", "setStoreMatch", "setEntryEdge", "getSaveInfo",
-        "backupSaves", "restoreSaves", "deleteSaveBackup", "getProfile", "setProfile", "editItem", "removeEntry",
+        "backupSaves", "restoreSaves", "deleteSaveBackup", "getProfile", "setProfile", "editItem", "removeEntry", "hideEntry", "showEntry", "getArtworkMatch",
+        "searchArtwork", "setArtworkMatch",
     };
 
     /// <summary>Assistant and MCP tools that belong to one area (the others work on the entries that are shown).</summary>
     public static readonly IReadOnlyDictionary<string, string> Tools = new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        ["get_news"] = News,
+        // The news plugin's tool (SDK 5): its source is the News tab, so it goes with it.
+        [Assistant.ToolCatalog.PluginPrefix + "news_get_news"] = News,
     };
 
     /// <summary>Background work and what it belongs to. Hud asks <see cref="Runs"/> before each run.</summary>
@@ -167,6 +172,7 @@ public static class FeatureAreas
         ["saveAutoBackup"] = Games,       // save backup after playing, and its notifications
         ["gameDownloads"] = Games,        // Steam/Epic download watch, not installed games
         ["launcherStandby"] = Games,      // Steam, Epic & co. started in the background
+        ["companionStart"] = Games,       // companion apps that start (and end) with a game
         ["steamGuardSettings"] = Games,   // Steam's Big Picture/overlay settings CouchHud sets
         ["installedApps"] = Apps,         // the list of installed Windows programs (read when asked)
         ["couchBrowser"] = Browser,       // the WebView2 browser window

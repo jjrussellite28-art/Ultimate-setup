@@ -2,7 +2,7 @@
 // The host decides for real (NetPolicy in Core); this only keeps the page honest. No DOM, no host calls, so ui-logic-check can test it.
 
 /** The switches Offline overrides: every setting of the page except Offline itself. */
-export const NET_KEYS = ['selfUpdateCheck', 'netCatalog', 'catalogUpdateCheck', 'pluginAutoUpdate', 'netSystemUpdates', 'onlineArtwork', 'netSaves', 'netWeather', 'netNews', 'netAssistant'];
+export const NET_KEYS = ['selfUpdateCheck', 'netCatalog', 'catalogUpdateCheck', 'pluginAutoUpdate', 'netSystemUpdates', 'onlineArtwork', 'netSaves'];
 
 /** Is the switch shown as on? Offline shows every switch below it as off. */
 export const privacyShown = (settings, key) => (key === 'offline' ? !!settings?.offline : !settings?.offline && !!settings?.[key]);
@@ -36,3 +36,10 @@ export const updateChoices = (choices) => ({
   catalogUpdateCheck: !!choices.catalogUpdateCheck,
   pluginAutoUpdate: !!choices.catalogUpdateCheck && !!choices.pluginAutoUpdate
 });
+
+/**
+ * The settings that open a listener on the network (phone connection, MCP, MCP in the home network). Switching one ON takes the parents' code
+ * with parental controls on (host: NetworkListeners, action "networkListener"); switching off stays free.
+ */
+export const LISTENER_KEYS = ['remoteEnabled', 'mcpEnabled', 'mcpLan'];
+export const listenerNeedsParent = (key, turningOn, parentalOn) => !!turningOn && !!parentalOn && LISTENER_KEYS.includes(key);

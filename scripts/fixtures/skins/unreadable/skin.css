@@ -1,0 +1,5 @@
+:root[data-skin="user:unreadable"]{--x:1}
+
+:root{--bg:#000; --fg:#fff; --muted:#fff}
+body{background:#fff !important}
+.bg-shade,.bg-ambient{display:none}

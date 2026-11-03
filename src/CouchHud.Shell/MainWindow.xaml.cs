@@ -435,8 +435,19 @@ public partial class MainWindow : Window
     /// the last input event". So: share the input queue of the current foreground thread, toggle
     /// topmost to lift the window above the others, and only if that fails tap Alt as a last resort.
     /// </summary>
-    public void BringToFront()
+    /// <summary>
+    /// How often a PERSON brought the HUD to the front (see <see cref="BringToFront"/>); a pending hand-over to a game gives way when this
+    /// changes. Automatic fronts (the foreground guard, the standby clients, the upgrade watch, the first load) are not counted: they can
+    /// happen while a switch has closed the old game and the new one has no window yet, and they must not end the hand-over. That is safe
+    /// because the hand-over runs the Resume gate (profile, parental rules) before it activates anything.
+    /// </summary>
+    public int FrontRequests => Volatile.Read(ref _frontRequests);
+    private int _frontRequests;
+
+    /// <param name="personCameBack">The person asked for it (Guide button, unlock confirmation, closing the browser): counts as "back in the HUD".</param>
+    public void BringToFront(bool personCameBack = false)
     {
+        if (personCameBack) Interlocked.Increment(ref _frontRequests);
         if (!IsVisible) Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
 

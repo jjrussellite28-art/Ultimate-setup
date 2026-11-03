@@ -48,14 +48,14 @@ public sealed class ConfigFaultDriftContractTests
         "public object SetBlockTaskManager(bool on)",
         "public async Task<object> EnableAutoLogonAsync(string password, bool acceptNoLock)",
         "public object SetFeatureAreas(IReadOnlyList<string> enabled)",
-        "public void SetPluginEnabled(string folder, bool enabled)",
-        "public string InstallPackage(string zipPath, string kind)",
-        "public object ApprovePlugin(string folder, string shownHash)",
-        "public object AcceptRevokedPlugin(string folder)",
+        "public async Task<object> SetPluginEnabledAsync(string folder, bool enabled)",
+        "public async Task<object> InstallPackageAsync(string zipPath, string kind)",
+        "public async Task<object> ApprovePluginAsync(string folder, string shownHash)",
+        "public async Task<object> AcceptRevokedPluginAsync(string folder)",
         "public object ConfirmPluginExe(string folder, string exe)",
         "public object AddCatalogSource(string url, string? publisherKey, string? name, bool acknowledgedTrust)",
         "public object RemoveCatalogSource(string url)",
-        "public object UninstallPlugin(string folder)",
+        "public async Task<object> UninstallPluginAsync(string folder)",
         "public async Task<object> InstallCatalogEntryAsync(string id, string kind)",
         "private ParentTicket? RequirePluginChange(PluginChange change, PluginOrigin origin, IReadOnlyCollection<string>? capabilities, string item, bool addsCapabilities = false)",
     ];
@@ -160,7 +160,7 @@ public sealed class ConfigFaultDriftContractTests
     [Fact]
     public void Switching_a_plugin_on_or_off_never_reports_what_was_not_saved()
     {
-        var body = Body(Hud(), "public void SetPluginEnabled(string folder, bool enabled)");
+        var body = Body(Hud(), "public async Task<object> SetPluginEnabledAsync(string folder, bool enabled)");
         Assert.Contains("config.UpdateOrThrow(", body);
         Assert.DoesNotContain("config.Update(", body);
         // The grant is used up only after the save.

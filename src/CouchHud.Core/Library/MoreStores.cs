@@ -94,28 +94,44 @@ public sealed class FolderGamesProvider(Func<IReadOnlyList<string>> folders) : I
     public Task<IReadOnlyList<LibraryItem>> GetItemsAsync(CancellationToken cancellationToken) =>
         Task.Run(() => Scan(cancellationToken), cancellationToken);
 
+    /// <summary>Raised after a scan with the entries whose start exe differs from what an older version picked (see <see cref="FolderIdMigration"/>).</summary>
+    public event Action<IReadOnlyList<FolderIdMove>>? IdsMoved;
+
     private IReadOnlyList<LibraryItem> Scan(CancellationToken ct)
     {
         var items = new List<LibraryItem>();
+        var moves = new List<FolderIdMove>();
         foreach (var folder in folders())
         {
             if (!Directory.Exists(folder)) continue;
             try
             {
-                foreach (var c in ExeScanner.Scan(folder, ct)) items.Add(ToItem(c));
+                var found = ExeScanner.Scan(folder, ct);
+                foreach (var c in found) items.Add(ToItem(c));
+                moves.AddRange(FolderIdMigration.MovesFor(found, IdOf));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 Console.Error.WriteLine($"[folders] {folder}: {ex.Message}");
             }
         }
+        if (moves.Count > 0 && !ct.IsCancellationRequested)
+        {
+            try { IdsMoved?.Invoke(moves); }
+            catch (Exception ex) { Console.Error.WriteLine($"[folders] could not move saved settings: {ex.Message}"); }
+        }
         return items;
     }
+
+#pragma warning disable CA5350 // an id for the entry (it has to stay the same across versions), not a security use
+    public static string IdOf(string exePath) =>
+        "folder:" + Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(exePath.ToLowerInvariant())))[..12].ToLowerInvariant();
+#pragma warning restore CA5350
 
     /// <summary>The id comes from the exe path, so it survives rescans and renames by the user.</summary>
     public static LibraryItem ToItem(ExeCandidate c) => new()
     {
-        Id = "folder:" + Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(c.Path.ToLowerInvariant())))[..12].ToLowerInvariant(),
+        Id = IdOf(c.Path),
         Source = "folder",
         Name = c.Name,
         InstallDir = WinPath.DirectoryName(c.Path),

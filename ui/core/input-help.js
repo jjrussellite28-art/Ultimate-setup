@@ -44,6 +44,24 @@ export const isCodeEntry = (view) => view?.codeEntry === true;
  */
 export const holdsDialogs = (view) => isCodeEntry(view) || view?.id === 'parental-timeup';
 
+/**
+ * Whether a click on a tab of the bar may switch tabs now. Not while a page holds the screen: the code prompt (the controller's LB/RB belong to it, and a tab
+ * switch would close it unanswered), the parental time-up page (clearStack would take it off the screen for good, the game under it uncovered) or a required
+ * profile picker (home, tab switches and the guide menu stay out). The click does nothing then, like LB/RB do not.
+ */
+export const tabClickAllowed = (view, state) => !state?.pickerHold && !holdsDialogs(view);
+
+/** Whether something holds the screen so that no navigation (a tab, home, the guide menu, a chip, a call of the host or the phone) may take it away: the required profile picker or the time-up page. */
+export const screenHeld = (state) => !!state?.pickerHold || !!state?.stack?.some((p) => p.id === 'parental-timeup');
+
+/**
+ * What clearStack keeps and closes. A sticky page (the first-start notice, a required profile picker, the time-up page) is never closed by it, whoever asks:
+ * a tab switch, home, a chip, the guide menu, the phone. Everything else is closed, newest first (an open code prompt then resolves unanswered).
+ */
+export function splitStack(stack) {
+  return { keep: stack.filter((p) => p.sticky), closing: stack.filter((p) => !p.sticky).reverse() };
+}
+
 export function switchOffWarning(bt, turningOn) {
   if (turningOn || !bt?.controllerConnected) return null;
   // i18n-used: bluetooth.offWarnAuto bluetooth.offWarn

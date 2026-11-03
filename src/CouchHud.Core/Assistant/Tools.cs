@@ -48,15 +48,14 @@ public static class ToolCatalog
             Props(("name", Str("Display name")), ("path", Str("Full path to the .exe")), ("type", Choice("game or app", "game", "app")),
                 ("args", new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" }, ["description"] = "Command line arguments" })),
             "name", "path", "type"),
-        Read("rescan_library", "Scan Steam, Epic and all plugins again for new or removed games.", Props()),
+        // Changes nothing the user set, but starts disk and plugin work (and runs plugin code): over MCP it needs the A on the TV like a change.
+        new ToolSpec("rescan_library", "Scan Steam, Epic and all plugins again for new or removed games.", Schema(Props(), []), Writes: false, Sensitive: true),
         Read("get_settings", "Current settings.", Props()),
         Write("set_setting", "Change a setting. returnHoldMs is a number (200-5000), all others are true/false.",
             Props(("key", Choice("Setting name", SettingKeys)), ("value", new JsonObject { ["description"] = "true/false, or a number for returnHoldMs" })), "key", "value"),
         Read("list_skins", "Available designs (skins) with id, name and the other names they answer to.", Props()),
         Write("set_skin", "Switch the design.", Props(("id", Str("Skin id or name from list_skins"))), "id"),
         Read("get_session", "The game that is running right now, if any.", Props()),
-        Read("get_weather", "Current weather and forecast for the configured place.", Props()),
-        Read("get_news", "Latest headlines from the configured news feeds.", Props(("limit", Int("How many, default 10")))),
         Read("get_updates", "Pending Windows and app updates from the last check.", Props()),
         Read("get_audio", "Volume, mute state and audio outputs.", Props()),
         Write("set_volume", "Set the master volume.", Props(("percent", Int("0-100"))), "percent"),
@@ -81,9 +80,6 @@ public static class ToolCatalog
 
     private static ToolSpec Read(string name, string description, JsonObject props, params string[] required) =>
         new(name, description, Schema(props, required), false);
-
-    private static ToolSpec Sensitive(string name, string description, JsonObject props, params string[] required) =>
-        new(name, description, Schema(props, required), false, Sensitive: true);
 
     private static ToolSpec Write(string name, string description, JsonObject props, params string[] required) =>
         new(name, description, Schema(props, required), true);

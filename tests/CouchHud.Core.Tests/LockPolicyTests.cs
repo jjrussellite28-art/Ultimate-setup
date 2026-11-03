@@ -33,4 +33,16 @@ public sealed class LockPolicyTests
         var running = start with { GameRunning = true, StrictClients = true };
         Assert.True(ForegroundPolicy.Decide(running, "steam", "Steam", () => false).Suppress);
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Expert_mode_is_an_admin_setting_behind_the_unlock(bool profilesGuarded)
+    {
+        // 0.6.3: a guest could switch expert mode on the locked couch (it was a "harmless" setting); it shows the admin's tools.
+        Assert.False(LockPolicy.IsHarmlessSetting("expertMode", profilesGuarded));
+        Assert.DoesNotContain("expertMode", LockPolicy.HarmlessSettings);
+        // Look and sound stay open.
+        Assert.True(LockPolicy.IsHarmlessSetting("nightModeStrength", profilesGuarded));
+    }
 }

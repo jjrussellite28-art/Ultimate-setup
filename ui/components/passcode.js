@@ -28,6 +28,9 @@ onGlyphsChanged(() => openPrompt?.renderGlyphText());
 const codeReport = changeReporter((open) => api.codeEntryState?.(open));
 const codeEntries = codeEntryTracker(codeReport);
 
+/** Is a code entry open right now (the page must not reload under it)? */
+export const codeEntryOpen = () => codeEntries.open > 0;
+
 /** Tells the host whether a code entry is open (at start: none), and now and then again, changed or not (see changeReporter). */
 export function reportCodeEntries() {
   codeReport(codeEntries.open > 0);
@@ -287,14 +290,58 @@ async function askForCode(reason) {
       return true;
     }
     sound.bump();
+    let resetDone = false;
+    // The service's code file is damaged: no code can open. The administrator's reset right here (UAC); the host opens the couch for two
+    // minutes afterwards when the service holds no code then, so the new code can be set.
+    if (result?.codesDamaged) {
+      const after = await resetDamagedCodes(result.blocked);
+      if (after?.unlocked) {
+        sound.select();
+        toast(t('passcode.resetCodesOpen'), 12000, { long: true });
+        return true;
+      }
+      if (after) {
+        toast(t('passcode.resetCodesDone'), 8000, { long: true });
+        resetDone = true;
+      }
+    }
+    // No couch code in the service (after such a reset): an administrator can open instead (UAC); the host checks the state again.
+    if (result?.admin === 'noCode' && (await confirmDialog(t('passcode.adminUnlock'), t('passcode.adminFallbackButton')))) {
+      const viaAdmin = await attempt(() => api.unlock(null, false, true));
+      if (viaAdmin?.ok) {
+        sound.select();
+        toast(t('passcode.adminUnlockDone'), 12000, { long: true });
+        return true;
+      }
+      if (viaAdmin?.blocked) toast(viaAdmin.blocked, 6000);
+    }
     // The host refuses to open while the CouchHUD service is missing or blocked (fail-closed): its reason, not "wrong code".
-    error = result?.blocked ? result.blocked : result?.waitSeconds ? t('passcode.wrongWait', { count: result.waitSeconds }) : t('passcode.wrong');
+    // After a reset that did not open the couch the "store damaged" text is stale: the store is reset, the entry says so.
+    error = resetDone ? t('passcode.resetCodesDone') : result?.blocked ? result.blocked : result?.waitSeconds ? t('passcode.wrongWait', { count: result.waitSeconds }) : t('passcode.wrong');
   }
 }
 
+// The reset of the service's damaged code file from a code entry: one at a time (the couch's and the parents' entry share it).
+let codesReset = null;
+
+/**
+ * Offers the administrator's reset of the service's damaged code file (set aside, never deleted; Windows asks for an administrator, the
+ * service takes nothing else). The security view afterwards (its `unlocked` says whether the host opened the couch), null when it was
+ * declined or failed. `message` is the host's reason.
+ */
+export function resetDamagedCodes(message) {
+  codesReset ??= (async () => {
+    const question = message ? `${message} ${t('passcode.resetCodesQuestion')}` : t('passcode.resetCodesQuestion');
+    if (!(await confirmDialog(question, t('passcode.resetCodesConfirm')))) return null;
+    return (await attempt(() => api.resetCodeStore(), t('passcode.resetCodesFailed'))) ?? null;
+  })().finally(() => { codesReset = null; });
+  return codesReset;
+}
+
 // Before Windows' UAC prompt for an administrator's approval: what exactly is approved (the prompt itself only names sc.exe).
-// i18n-used: passcode.approve.autoLogon passcode.approve.lockMode passcode.approve.removeCode passcode.approve.changeCode passcode.approve.release passcode.approve.firewall passcode.approve.update passcode.approve.resetCodes
+// i18n-used: passcode.approve.autoLogon passcode.approve.lockMode passcode.approve.removeCode passcode.approve.changeCode passcode.approve.release passcode.approve.firewall passcode.approve.update passcode.approve.resetCodes passcode.approve.resetServiceState
 const LEGACY_TEXT = {
+  unlockNoCode: () => t('passcode.approve.unlockNoCode'),
   legacyCode: () => t('passcode.approve.legacyCode'),
   legacyWindows: () => t('passcode.approve.legacyWindows'),
   legacyNewCode: () => t('passcode.approve.legacyNewCode')
@@ -309,7 +356,8 @@ const APPROVAL_TEXT = {
   CleanupPolicyKeys: 'passcode.approve.release',
   SetRemoteFirewall: 'passcode.approve.firewall',
   InstallCouchHudUpdate: 'passcode.approve.update',
-  ResetCodeStore: 'passcode.approve.resetCodes'
+  ResetCodeStore: 'passcode.approve.resetCodes',
+  ResetServiceState: 'passcode.approve.resetServiceState'
 };
 // Pages that wait for an unlock hear when an administrator's approval is coming (UAC), so they say so instead of a status of their own.
 const approvalListeners = new Set();
@@ -371,15 +419,28 @@ export async function ensureParentCode(reason = '', scope = {}) {
   for (;;) {
     const code = await enterPasscode({ title: t('passcode.parentCode'), hint: reason, error });
     if (!code) return false;
-    const result = await attempt(() => api.parentalAuth(code, action, item));
+    let result = await attempt(() => api.parentalAuth(code, action, item));
+    let resetDone = false;
     if (result?.ok) {
       sound.select();
       return true;
     }
     sound.bump();
+    // The service's code file is damaged: the administrator's reset right here (UAC). Afterwards there is no parents' code until it is set
+    // again, so the administrator's way for this one action follows (the host decides it as for "no parents' code").
+    if (result?.codesDamaged) {
+      const after = await resetDamagedCodes(result.blocked);
+      if (after) {
+        result = { ok: false, admin: 'noCode', blocked: t('passcode.resetCodesDone') };
+        resetDone = true;
+      }
+    }
     // Locked out, or no parents' code in the CouchHUD service yet: an administrator of this PC can approve instead (Windows' own UAC
     // prompt), so a forgotten, missing or planted parents' code never shuts the parents out.
-    const fallback = result?.admin === 'noCode' ? t('passcode.adminFallbackNoCode') : t('passcode.adminFallback');
+    // After the reset just done (its own Windows question was the first) the text says that a second one follows for this action.
+    // i18n-used: passcode.adminFallback passcode.adminFallbackNoCode passcode.adminFallbackDamaged passcode.adminFallbackAfterReset
+    const fallback = t(resetDone ? 'passcode.adminFallbackAfterReset'
+      : { noCode: 'passcode.adminFallbackNoCode', damaged: 'passcode.adminFallbackDamaged' }[result?.admin] ?? 'passcode.adminFallback');
     if (result?.admin && (await confirmDialog(fallback, t('passcode.adminFallbackButton')))) {
       const viaAdmin = await attempt(() => api.parentalAuth(null, action, item));
       if (viaAdmin?.ok) {

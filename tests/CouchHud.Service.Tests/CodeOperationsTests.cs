@@ -68,6 +68,7 @@ internal sealed class CodeRig : IDisposable
                 h[Operation.ReleaseLockPolicies] = Harness.Ok;
                 h[Operation.SetAutoLogon] = Harness.Ok;
                 h[Operation.SetRemoteFirewall] = Harness.Ok;
+                h[Operation.ResetServiceState] = Harness.Ok;
             },
             extraChecks: c =>
             {

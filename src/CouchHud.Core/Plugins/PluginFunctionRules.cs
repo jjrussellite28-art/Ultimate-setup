@@ -126,14 +126,4 @@ public static class PluginFunctionRules
         foreach (var key in levels.Keys.Where(k => string.Equals(k, functionId, StringComparison.OrdinalIgnoreCase)).ToList()) levels.Remove(key);
         levels[functionId] = LevelId(level);
     }
-
-    /// <summary>Drops the entries of plugins that are not there (any case); true when something went.</summary>
-    public static bool Prune(Dictionary<string, Dictionary<string, string>>? map, IEnumerable<string> presentPluginIds)
-    {
-        if (map is null) return false;
-        var present = presentPluginIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var gone = map.Keys.Where(k => !present.Contains(k)).ToList();
-        foreach (var key in gone) map.Remove(key);
-        return gone.Count > 0;
-    }
 }

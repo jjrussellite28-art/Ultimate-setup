@@ -208,8 +208,8 @@ public class LocalPackageGuardTests : IDisposable
     public void The_host_asks_before_it_installs_and_before_the_code_is_used_up()
     {
         var hud = HudSource();
-        var start = hud.IndexOf("public string InstallPackage(", StringComparison.Ordinal);
-        var body = hud[start..hud.IndexOf("public object ApprovePlugin(", start, StringComparison.Ordinal)];
+        var start = hud.IndexOf("public async Task<object> InstallPackageAsync(", StringComparison.Ordinal);
+        var body = hud[start..hud.IndexOf("public async Task<object> ApprovePluginAsync(", start, StringComparison.Ordinal)];
         var guard = body.IndexOf("plugins.RefuseLocalPackage(", StringComparison.Ordinal);
         Assert.True(guard > 0);
         Assert.True(guard < body.IndexOf("UseUp(ticket)", StringComparison.Ordinal));

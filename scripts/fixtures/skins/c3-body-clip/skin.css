@@ -1,0 +1,2 @@
+:root[data-skin="user:c3-body-clip"]{--x:1}
+body,html{clip-path:inset(0 0 0 0)!important;overflow:clip!important;contain:paint!important}

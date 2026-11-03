@@ -7,15 +7,17 @@
 //         (skin:user:<folder> shows a skin from the folder given with --catalog, see below)
 //         mouse:x,y (move the mouse: shows the pointer)  shot:name  eval:<js>       contrast:label   text:abc (type into page)
 // Keys: Arrow*, Enter=A, Escape=B, q/e=LB/RB, x, y, m=Start, Home=Guide.
-// Options: --query lang=en (URL query of the preview page), --catalog DIR (a folder with skin folders, served like installed skins,
+// Options: --path remote/index.html (another page of ui/, e.g. the phone page against the preview server's pretend PC; add --mobile 1
+//          for a phone viewport; its language follows Edge's), --query lang=en (URL query of the preview page), --catalog DIR (a folder with skin folders, served like installed skins,
 //          for skins from the catalog: skin:user:<folder>).
 // Env: EDGE (path to msedge.exe).
-import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdirSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
+import { decodePng, ink, inkContrast } from './png.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -33,8 +35,18 @@ const server = spawn(process.execPath, [join(here, 'preview-server.js')], { env:
 const profile = mkdtempSync(join(tmpdir(), 'couchhud-edge-'));
 const browser = spawn(edge, [`--remote-debugging-port=${opt.debug}`, '--headless=new', '--mute-audio', '--disable-gpu', '--disable-extensions', '--force-color-profile=srgb', `--user-data-dir=${profile}`,
   `--window-size=${W},${H}`, '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
-const cleanup = () => { server.kill(); browser.kill(); };
+const browserGone = new Promise((r) => browser.once('exit', r));
+// Edge runs as a process tree; on Windows only taskkill /T ends the children that hold the profile folder (only while Edge runs: a finished PID may be reused).
+const killBrowser = () => { if (process.platform === 'win32' && browser.pid && browser.exitCode === null && browser.signalCode === null) spawnSync('taskkill', ['/pid', String(browser.pid), '/T', '/F'], { stdio: 'ignore' }); browser.kill(); };
+const cleanup = () => { server.kill(); killBrowser(); };
 process.on('exit', cleanup);
+// Remove the Edge profile only after Edge has let go of it; an 'exit' handler cannot wait, so this runs before process.exit.
+async function removeProfile() {
+  cleanup();
+  await Promise.race([browserGone, new Promise((r) => setTimeout(r, 5000))]);
+  try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch { /* still held: left in %TEMP% */ }
+}
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => removeProfile().finally(() => process.exit(130)));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const getJson = (url) => new Promise((res, rej) => http.get(url, (r) => { let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
@@ -100,8 +112,8 @@ const CONTRAST_JS = `(() => {
 })()`;
 
 await send('Page.enable');
-await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: +opt.dpr || 1, mobile: false });
-await send('Page.navigate', { url: `http://127.0.0.1:${opt.port}/${opt.query ? `?${opt.query}` : ""}` });
+await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: +opt.dpr || 1, mobile: opt.mobile === '1' });
+await send('Page.navigate', { url: `http://127.0.0.1:${opt.port}/${opt.path ?? ''}${opt.query ? `?${opt.query}` : ""}` });
 await sleep(3500);
 await evaluate('document.querySelector("#boot")?.classList.add("done")');
 
@@ -124,6 +136,19 @@ try {
       const r = await send('Page.captureScreenshot', { format: 'png' });
       writeFileSync(join(opt.out, `${arg}.png`), Buffer.from(r.result.data, 'base64'));
       console.log('shot', arg);
+    } else if (cmd === 'media') {
+      // media:prefers-contrast=more switches an emulated media feature on while the page runs (a skin's @media rules turn on).
+      const [name, value] = arg.split('=');
+      await send('Emulation.setEmulatedMedia', { features: [{ name, value }] });
+      await sleep(200);
+    } else if (cmd === 'ink') {
+      // ink:name reads window[name] = [{ name, x, y, w, h }, ...] (rectangles in page pixels), takes a screenshot and prints how much of each
+      // rectangle differs from its ground (see png.mjs): letters that are drawn give some, a covered or ground-coloured label gives none.
+      await sleep(450);
+      const rects = (await evaluate(`JSON.stringify(window[${JSON.stringify(arg)}] || [])`)) || '[]';
+      const r = await send('Page.captureScreenshot', { format: 'png' });
+      const png = decodePng(Buffer.from(r.result.data, 'base64'));
+      console.log('ink ->', JSON.stringify(JSON.parse(rects).map((q) => ({ name: q.name, ink: Math.round(ink(png, q) * 1000) / 1000, contrast: Math.round(inkContrast(png, q) * 10) / 10 }))));
     } else if (cmd === 'contrast') {
       await sleep(600); // let focus transitions settle
       const bad = await evaluate(CONTRAST_JS);
@@ -132,6 +157,6 @@ try {
     } else console.log('unbekannter Schritt', step);
   }
 } finally {
-  cleanup();
+  await removeProfile();
   process.exit(0);
 }

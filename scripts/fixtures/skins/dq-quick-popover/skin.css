@@ -1,0 +1,2 @@
+:root[data-skin="user:dq-quick-popover"]{--x:1}
+:is(#quick,#overlay):popover-open{inset:0!important;width:100vw!important}[popover]{inset:0!important;width:100vw!important;height:100vh!important}

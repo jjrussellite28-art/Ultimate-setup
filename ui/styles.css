@@ -152,90 +152,33 @@ body[data-view="detail"] #bg-hero.has-image ~ .bg-shade {
 
 /* ------------------------------------------------------------------ header */
 
-#top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2rem 4rem 0;
+/* The tab bar is a closed shadow root in the top layer, styled inside (core/tab-bar.js); a skin reaches it only through the --tab-* and
+   --bar-* custom properties (docs/SKINS.md). What is left here is the room it keeps free in the page flow (set from the bar's height) and
+   the status area, which stays in the page and is slotted into the bar. */
+#top-gap {
+  height: 5.2rem;
 }
 
-#tabs {
-  display: flex;
-  align-items: center;
-  /* Takes the width the status area leaves (not the width of its content): fitTabs measures the room from it. */
-  flex: 1 1 0;
-  position: relative;
-  min-width: 0;
-  gap: 1.2rem;
-}
-
-#tab-list {
-  display: flex;
-  gap: 1.8rem;
-  list-style: none;
+/* A popover starts with the browser's box (inset 0, auto margins, a border, padding, a background, overflow auto): the core's overlays that
+   stand in the top layer while they are open (core/layers.js) keep their own box, so the defaults go. :where() keeps this at the weight of
+   nothing: every rule of an overlay and of a skin wins. */
+:where([popover]) {
+  inset: auto;
   margin: 0;
   padding: 0;
-  /* The status on the right always stays whole; with too little room the tabs are cut (renderTabs keeps the active one in view). */
-  min-width: 0;
-  /* Scrolls (mouse, touch, wheel, the focus) only when the tabs do not fit even at their smallest width; no scroll bar. */
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-
-#tab-list::-webkit-scrollbar {
-  display: none;
-}
-
-/* The hints at the edge where tabs are hidden (nav.js shows one only on that side). */
-.tab-more {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--fg);
-  text-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.95);
-  pointer-events: none;
-}
-
-#tab-list > li {
-  flex: none;
-}
-
-/* Assistant and Settings: list items of the same list with the class "pinned", always whole at the end of the bar (sticky, the offset
-   from the right edge is set by nav.js); only the other tabs scroll. */
-#tab-list > li.pinned {
-  position: sticky;
-}
-
-#tab-list li {
-  /* Backstop for the length of a title (plugins are cut at 14 characters by the host): never wider than this, cut with an ellipsis. */
-  max-width: 16rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 1.35rem;
-  font-weight: 600;
-  color: var(--muted);
-  padding: 0.3rem 0;
-  border-bottom: 0.18rem solid transparent;
-  transition: color 0.2s, border-color 0.2s;
-}
-
-#tab-list li.active {
-  color: var(--fg);
-  border-color: var(--accent);
+  border: 0;
+  background: none;
+  color: inherit;
+  overflow: visible;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
 }
 
 #status {
   display: flex;
   flex: none;
-  margin-left: 1.5rem;
   align-items: center;
   gap: 1.1rem;
 }
@@ -259,11 +202,6 @@ body[data-view="detail"] #bg-hero.has-image ~ .bg-shade {
   font-weight: 700;
   background: rgba(255, 255, 255, 0.14);
   color: var(--fg);
-}
-
-.glyph.shoulder {
-  border-radius: 0.4rem;
-  opacity: 0.8;
 }
 
 /* Dark symbols on the colored discs: white only reached 2.3 to 3.4:1 here. */
@@ -305,12 +243,6 @@ body[data-view="detail"] #bg-hero.has-image ~ .bg-shade {
   padding: 0 0.4rem;
 }
 
-/* On the keyboard and code pages LB/RB belong to the page, not to the tabs. */
-body[data-view="keyboard"] #tabs .shoulder,
-body[data-view="passcode"] #tabs .shoulder {
-  visibility: hidden;
-}
-
 /* ------------------------------------------------------------------ view */
 
 #view {
@@ -346,9 +278,15 @@ body[data-view="passcode"] #tabs .shoulder {
   display: none;
 }
 
-/* Landscape art on a portrait or square tile: whole picture in the middle, a blurred copy fills the rest. */
+/*
+ * A picture whose shape does not suit its tile (a store header on a cover tile, a cover on a square tile, a cover standing in for a
+ * hero): the whole picture in the middle, a blurred copy fills the rest. Never stretched. art-fit on tiles (see core/square-rules.js),
+ * art-wide when the picture is the wider one (also on the detail page and the launch screen).
+ */
 .art.art-wide::before,
-.art.art-wide::after {
+.art.art-wide::after,
+.art.art-fit::before,
+.art.art-fit::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -356,21 +294,17 @@ body[data-view="passcode"] #tabs .shoulder {
   background-image: var(--art-img);
 }
 
-.art.art-wide::before {
+.art.art-wide::before,
+.art.art-fit::before {
   inset: -1rem;
   background-size: cover;
   filter: blur(1rem) brightness(0.7);
 }
 
-.art.art-wide::after {
+.art.art-wide::after,
+.art.art-fit::after {
   background-size: contain;
   background-repeat: no-repeat;
-}
-
-/* A skin with square tiles (--tile-art: square) shows a cover without a square picture cropped to a square, centred. */
-.art.art-square.art-cropped {
-  background-size: cover;
-  background-position: center;
 }
 
 /* Generated banner: shown when no image exists. Pure CSS, hue from the exe icon or the name. */
@@ -616,6 +550,8 @@ body[data-view="passcode"] #tabs .shoulder {
 
 .shelf .hero-art {
   aspect-ratio: 4 / 3;
+  /* The wide hero picture; a skin that makes this card square sets --tile-art: square on it (a value on :root does not reach it). */
+  --tile-art: hero;
 }
 
 /* In the top padding of the shelf, so it takes no room; fades in while the focus is in "Continue playing". */
@@ -684,6 +620,8 @@ body[data-view="passcode"] #tabs .shoulder {
 
 .grid-apps .cover {
   aspect-ratio: 16 / 9;
+  /* App tiles are wide: they keep their own picture when a skin asks for square game tiles on :root. */
+  --tile-art: cover;
 }
 
 /* The focused tile grows by about 0.9rem per side: the gap must leave room for that. */
@@ -994,64 +932,7 @@ body[data-view="passcode"] #tabs .shoulder {
   background: #0f1420;
 }
 
-/* A page in full screen leaves this strip (30 px, see MainWindow.FullScreenStrip) to the HUD: it is a website, always visible. */
-#web-fullscreen-badge {
-  position: fixed;
-  inset: 0 0 auto 0;
-  height: 30px;
-  z-index: 2147483000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5em;
-  background: #0f1420;
-  border-bottom: 2px dashed rgba(120, 170, 255, 0.85);
-  color: #dfe8ff;
-  font: 600 16px/1 'Segoe UI', sans-serif;
-  pointer-events: none;
-  box-sizing: border-box;
-  overflow: hidden;
-  white-space: nowrap;
-  padding: 0 12px;
-}
-
-/* Never shrunk: the web mark and the warning. Only the host gives way (cut to 48 characters first, see shortHost). */
-#web-fullscreen-badge .web-badge-icon,
-#web-fullscreen-badge .web-badge-label {
-  flex-shrink: 0;
-}
-
-#web-fullscreen-badge .web-badge-host {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Said once by a screen reader when the warning starts, not shown. */
-#web-fullscreen-badge .web-badge-say {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-
-/* The unlock runs out: the warning with its countdown in the strip (the page covers the toasts in full screen). */
-#web-fullscreen-badge.closing {
-  background: #2a1d05;
-  border-bottom-color: #ffb020;
-}
-
-#web-fullscreen-badge .web-badge-warn {
-  flex-shrink: 0;
-  margin-left: 0.5em;
-  padding: 3px 10px;
-  border-radius: 4px;
-  background: #ffb020;
-  color: #1a1000;
-  font-weight: 700;
-  white-space: nowrap;
-}
+/* The mark of a page in full screen (a strip of 30 px at the top) is a shadow root of its own, styled in views/browser.js. */
 
 /* The hints bar over a blurred, dimmed screen gets its own calm backing. */
 body.overlay-open #hints {
@@ -1130,6 +1011,27 @@ body.overlay-open #hints {
   min-width: 0;
 }
 
+/* A search hit's small cover ("Search artwork"): portrait frame, empty when the hit has none. */
+.menu.with-thumbs li {
+  padding: 0.45rem 1.1rem;
+}
+
+.menu-thumb {
+  flex: none;
+  width: 2.6rem;
+  height: 3.6rem;
+  border-radius: 0.3rem;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.menu-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 /* Danger rows only tint text and icon: an outline of their own looked like a second focus (VM test 0.5). */
 .menu li.danger .menu-label,
 .menu li.danger .menu-icon { color: #ff7b72; }
@@ -1151,7 +1053,7 @@ body.overlay-open #hints {
 
 #toast {
   position: fixed;
-  top: 6rem;
+  top: max(6rem, calc(var(--bar-h, 0px) + 1rem));
   left: 50%;
   transform: translateX(-50%);
   /* Without a width the box shrinks to half the screen (left: 50%) and a longer text wraps into a tall block, on a 5:4 or
@@ -1636,105 +1538,9 @@ body[data-view="passcode"] #toast {
 
 /* ------------------------------------------------------------------ mouse */
 
-#cursor {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 100;
-  /* The hotspot (--pointer-hx/hy, a fraction of the box) sits exactly on the mouse position. */
-  width: var(--pointer-size);
-  height: var(--pointer-size);
-  margin: calc(var(--pointer-size) * var(--pointer-hy) * -1) 0 0 calc(var(--pointer-size) * var(--pointer-hx) * -1);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.25s;
-  filter: drop-shadow(0 0 0.5rem var(--accent-glow)) drop-shadow(0 0.25rem 0.4rem rgba(0, 0, 0, 0.55));
-}
-
-/* Skin pointer: the skin's --pointer image, so skins (also installed ones) bring their own. */
-#cursor .cp {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: var(--pointer) 0 0 / 100% 100% no-repeat;
-  transform-origin: calc(var(--pointer-hx) * 100%) calc(var(--pointer-hy) * 100%);
-}
-
-#cursor.click .cp {
-  animation: cm-squish 0.22s ease-out;
-}
-
 /* Real pointer: the system cursor shows, no overlay. */
 :root[data-pointer="system"] body {
   cursor: auto;
-}
-
-:root[data-pointer="system"] #cursor {
-  display: none;
-}
-
-/* The comic mouse (easter egg) keeps its own size and hotspot: the nose at 6.5/64. */
-:root[data-pointer="mouse"] #cursor {
-  --pointer-size: 4.6rem;
-  --pointer-hx: 0.1;
-  --pointer-hy: 0.1;
-}
-
-:root[data-motion="off"] #cursor.click .cp,
-:root[data-motion="off"] #cursor.click svg,
-:root[data-motion="off"] #cursor .cm-eyes,
-:root[data-motion="off"] #cursor .cm-tail {
-  animation: none;
-}
-
-#cursor svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  transform-origin: 10% 10%;
-}
-
-#cursor .cm-scarf {
-  stroke: var(--accent);
-}
-
-#cursor .cm-tail {
-  transform-origin: 46px 46px;
-  transform-box: view-box;
-}
-
-#cursor.moving .cm-tail {
-  animation: cm-wag 0.35s ease-in-out infinite alternate;
-}
-
-#cursor .cm-eyes {
-  transform-origin: 15px 15px;
-  transform-box: view-box;
-  animation: cm-blink 4.5s infinite;
-}
-
-#cursor.click svg {
-  animation: cm-squish 0.22s ease-out;
-}
-
-@keyframes cm-wag {
-  from { transform: rotate(-14deg); }
-  to { transform: rotate(14deg); }
-}
-
-@keyframes cm-blink {
-  0%, 94%, 100% { transform: scale(1); }
-  97% { transform: scale(1, 0.1); }
-}
-
-@keyframes cm-squish {
-  40% { transform: scale(0.82); }
-  100% { transform: scale(1); }
-}
-
-body.mouse-active #cursor {
-  opacity: 1;
-  transition: opacity 0.08s;
 }
 
 body.mouse-active .hover:not(.focused) {
@@ -1761,7 +1567,6 @@ body.mouse-active .tile.hover:not(.focused) {
   white-space: nowrap;
 }
 
-#tab-list li,
 #status > * {
   white-space: nowrap;
 }
@@ -1841,9 +1646,11 @@ body.mouse-active .tile.hover:not(.focused) {
   font-size: 1.8rem;
 }
 
+/* The guide menu stands UNDER the tab bar, which is in the top layer: it starts below the bar (--bar-h, set from the bar's height by nav.js) and no rule of a
+   skin for its box, its children or its pseudo elements can ever reach the tabs. The bar dims while it is open (core/tab-bar.js). */
 #quick {
   position: fixed;
-  top: 0;
+  top: var(--bar-h, 0px);
   right: 0;
   bottom: 0;
   z-index: 9;
@@ -1851,7 +1658,7 @@ body.mouse-active .tile.hover:not(.focused) {
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
-  padding: 2.4rem 2rem 7rem;
+  padding: 1.4rem 2rem 7rem;
   /* Opaque: through a see-through panel the page behind showed as faint blobs (a bright toggle as a circle, VM test 0.5). */
   background: rgb(10, 13, 22);
   border-left: 0.08rem solid rgba(255, 255, 255, 0.1);
@@ -1880,8 +1687,8 @@ body.quick-open #hints {
   border-radius: 0;
 }
 
-body.quick-open #view,
-body.quick-open #top {
+/* The bar gets the same dim inside its shadow root (core/tab-bar.js, setBarDim). */
+body.quick-open #view {
   filter: brightness(0.55) blur(0.15rem);
   transition: filter 0.3s;
 }
@@ -2742,7 +2549,7 @@ body.quick-open #top {
 
 #notify-stack {
   position: fixed;
-  top: 6.5rem;
+  top: max(6.5rem, calc(var(--bar-h, 0px) + 1.5rem));
   right: 2.5rem;
   z-index: 60;
   display: flex;
@@ -3052,10 +2859,6 @@ body.quick-open #top {
   100% { filter: brightness(1) drop-shadow(0 0 1.2rem var(--accent-glow)); }
 }
 
-:root[data-hdr] #cursor {
-  filter: drop-shadow(0 0 1rem var(--accent-glow)) drop-shadow(0 0.25rem 0.4rem rgba(0, 0, 0, 0.55));
-}
-
 /* Controller passcode */
 
 .passcode {
@@ -3195,7 +2998,6 @@ body[data-view="passcode"] .passcode {
 
 /* Burn-in protection: pixel shift moves everything a few pixels */
 /* Only the content moves; the full-screen backdrop stays put, so no colored edge shows up. */
-#top,
 #view,
 #hints {
   translate: var(--shift-x, 0) var(--shift-y, 0);
@@ -4050,14 +3852,11 @@ body[data-view="passcode"] .passcode {
   animation-play-state: paused !important;
 }
 
-/* The finished boot screen and the hidden mouse cursor keep nothing running. */
+/* The finished boot screen keeps nothing running. */
 #boot.done .boot-bar div,
-#boot.done .boot-logo,
-body:not(.mouse-active) #cursor .cm-eyes,
-body:not(.mouse-active) #cursor .cm-tail {
+#boot.done .boot-logo {
   animation: none;
 }
-
 /* "Reduce animations": no decorative endless motion in any skin. */
 :root[data-motion="off"] .boot-bar div,
 :root[data-motion="off"] .tile.focused::before,
@@ -4214,10 +4013,6 @@ body:not(.mouse-active) #cursor .cm-tail {
 
 /* ------------------------------------------------------------------ setup assistant (views/setup-wizard.js) */
 /* Skin tokens only. Nothing here clips: no overflow on the containers, and room around the cards for the focus scale and glow. */
-
-body[data-view="setup-wizard"] #tabs {
-  visibility: hidden;
-}
 
 /* No notification cards over the first-run questions (notifications.js stops new ones; this hides those already showing),
    except security notices, which the host flags and which always show. */
@@ -4863,6 +4658,16 @@ body[data-view="terms"] #notify-stack .notify-card:not(.security) {
   max-width: 60rem;
 }
 
+/* The list's sections (running, the updates by kind, finished): a small heading above each, the first one flush with the list. */
+.downloads-list .downloads-section {
+  margin: 0.9rem 0 0.1rem 0.2rem;
+  flex: none;
+}
+
+.downloads-list .downloads-section:first-child {
+  margin-top: 0;
+}
+
 /* The search's state by the heading (running, its outcome, when it last searched): one line, a spinner while it runs. */
 .files-head .downloads-search {
   display: flex;
@@ -5309,4 +5114,60 @@ body[data-view="terms"] #notify-stack .notify-card:not(.security) {
   color: var(--muted);
   font-size: 1.05rem;
   text-align: center;
+}
+
+/* Power menu: below the three tiles the "Mehr" row, its entries and the timer are slim full-width rows (.menu-row inside .menu.tiles).
+   Compact on purpose: expanded, the whole menu still has to fit at 1280x720 without scrolling. */
+.menu.tiles li.menu-row:not(.menu-group) {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.9rem;
+  min-height: 0;
+  padding: 0.45rem 1rem;
+  text-align: left;
+}
+
+.menu.tiles li.menu-row .menu-icon {
+  flex: none;
+  width: 1.8rem;
+  font-size: 1.4rem;
+}
+
+.menu.tiles li.menu-row .menu-text {
+  flex: 1;
+  width: auto;
+  align-items: flex-start;
+}
+
+.menu.tiles li.menu-row .menu-label {
+  font-size: 1.05rem;
+}
+
+/* A status on the right of the row (the timer) wraps instead of pushing the row wider. */
+.menu.tiles li.menu-row .menu-value {
+  flex: 0 1 auto;
+  margin: 0 0 0 auto;
+  padding-left: 0.8rem;
+  font-size: 0.95rem;
+  text-align: right;
+  white-space: normal;
+}
+
+/* Folding out: a short fade and slide, once. Off with reduced motion and with the app's own motion switch. */
+@keyframes menu-reveal {
+  from { opacity: 0; transform: translateY(-0.4rem); }
+}
+
+.menu li.menu-reveal {
+  animation: menu-reveal 0.16s ease-out both;
+}
+
+:root[data-motion="off"] .menu li.menu-reveal {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu li.menu-reveal { animation: none; }
 }

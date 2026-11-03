@@ -158,25 +158,31 @@ public class CatalogTests : IDisposable
         else if (File.Exists(marker)) Assert.False(signed, "index.json is signed again: delete catalog/index.json.unsigned");
         else Assert.True(signed);
         var entries = Parse(File.ReadAllText(file));
-        Assert.Equal(["wand", "homeassistant", "casehud", "vpn", "synthwave", "stardust", "deepsea", "greenlight", "neoncity", "nova"], entries.Select(e => e.Id));
-        // Every entry works with this build: the skins and plugins that ask for 0.6.0 are installable now that the product is 0.6.0.
-        Assert.All(entries, e => Assert.True(CatalogRules.IsCompatible(e, CatalogRules.AppVersion), $"{e.Id} needs {e.MinCouchHud}"));
+        Assert.Equal(["homeassistant", "casehud", "vpn", "weather", "news", "anthropic", "openai", "streaming", "fancontrol", "webostv", "samsungtv", "synthwave", "stardust", "deepsea", "greenlight", "neoncity", "nova"], entries.Select(e => e.Id));
+        // Every entry works with the release of this build: a local build is the pre-release 0.7.0-dev, older than the 0.7.0 that the 0.7 plugins ask for.
+        var releaseVersion = CatalogRules.AppVersion with { Pre = "" };
+        Assert.All(entries, e => Assert.True(CatalogRules.IsCompatible(e, releaseVersion), $"{e.Id} needs {e.MinCouchHud}"));
         // An icon is shown only with a hash: an entry with a statement takes it from the signed statement (never from the index), every
-        // other entry with an icon names it in the index.
-        Assert.All(entries.Where(e => e.IconUrl is not null && e.Statement is null),
+        // other entry with an icon names it in the index (a plugin still waiting for its statement gets the icon from it later).
+        Assert.All(entries.Where(e => e.IconUrl is not null && e.Statement is null && !(e.Kind == CatalogKind.Plugin && e.Problem is not null)),
             e => Assert.True(e.IconSha256 is { Length: 64 }, $"{e.Id} has an icon but no iconSha256, so the catalog would not show it"));
         Assert.All(entries.Where(e => e.Statement is not null), e => SignedCatalogEntry.AssertOwnSigned(e));
+        // A plugin that has not been signed yet (no statement, no hash) is listed but cannot be installed; its entry says what the package needs.
+        Assert.All(entries.Where(e => e.Kind == CatalogKind.Plugin && e.Statement is null), e => { Assert.Null(e.Sha256); Assert.NotNull(e.Problem); });
         // New entries use one spelling for the project's repositories (CatalogUrl.CanonicalRepositories); the host accepts any case, the index does not.
         foreach (var url in System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(file), "\"(https://[^\"]+)\"").Select(m => m.Groups[1].Value))
             Assert.True(CatalogUrl.NonCanonicalReason(url) is null, $"{url}: {CatalogUrl.NonCanonicalReason(url)}");
-        // The Home Assistant plugin waits for the owner's signed statement (catalog/statements/homeassistant.json): until the entry has one it
+        // A first-party plugin waits for the owner's signed statement (catalog/statements/<id>.json): until the entry has one it
         // is listed but cannot be installed, which is what a missing package hash means.
         Assert.All(entries, e =>
         {
-            if (e.Id is "homeassistant" or "casehud" or "vpn" && e.Statement is null) Assert.NotNull(e.Problem);
+            if (e.Kind == CatalogKind.Plugin && e.Statement is null) Assert.NotNull(e.Problem);
             else Assert.Null(e.Problem);
         });
-        Assert.Equal("CouchHud.Plugin.Wand", entries[0].Folder);
+        // Wand is a companion app of the core since 0.7 and no longer in the catalog; every entry names its category.
+        Assert.DoesNotContain(entries, e => e.Id == "wand");
+        Assert.Equal("CouchHud.Plugin.HomeAssistant", entries[0].Folder);
+        Assert.Equal(["smartHome", "hardware", "other", "information", "information", "ai", "ai", "streaming", "hardware", "hardware", "hardware", "skins", "skins", "skins", "skins", "skins", "skins"], entries.Select(e => e.Category));
     }
 
     // ---- hash

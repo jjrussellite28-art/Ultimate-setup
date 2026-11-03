@@ -1,7 +1,8 @@
 import { api } from '../core/api.js';
 import { state } from '../core/state.js';
 import { applySkin } from '../core/skins.js';
-import { render } from '../core/nav.js';
+import { render, skinRejected, skinVerdict } from '../core/nav.js';
+import { toast } from '../core/feedback.js';
 import { t } from '../core/i18n.js';
 import { BUILTIN_SKINS } from '../skins/index.js';
 
@@ -37,6 +38,14 @@ export async function skinMenu() {
       detail: skin.description,
       run: async () => {
         applySkin(skin);
+        // The bar is looked at with the skin first: one that covers or squashes the tabs is replaced by the default skin and is not saved
+        // (it would come back at every start); the screen and the setting stay what they were.
+        if (!(await skinVerdict(skin.id))) {
+          if (original && !skinRejected(original.id)) applySkin(original);
+          toast(t('skinMenu.rejected', { name: skin.name }), 6000, { long: true });
+          render();
+          return;
+        }
         await api.setSkin(skin.id);
         render();
       }

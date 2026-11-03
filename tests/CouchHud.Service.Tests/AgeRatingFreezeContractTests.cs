@@ -43,7 +43,7 @@ public sealed class AgeRatingFreezeContractTests
     [Fact]
     public void The_system_switch_comes_after_the_fault_check_and_before_any_other_rule()
     {
-        var body = Body(Hud, "    public object SetParental(string key, System.Text.Json.JsonElement value)");
+        var body = Body(Hud, "    private object SetParentalCore(string key, System.Text.Json.JsonElement value)");
         InOrder(body, "RefuseWhileConfigFaulted();", "if (key == \"ratingSystem\") return SetRatingSystem(value);", "RequireParentGrant(");
     }
 

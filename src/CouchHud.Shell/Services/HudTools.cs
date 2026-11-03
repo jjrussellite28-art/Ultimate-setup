@@ -66,9 +66,6 @@ public sealed class HudTools(Hud hud) : IToolHost
             "list_skins" => ListSkins(),
             "set_skin" => SetSkin(args),
             "get_session" => hud.SessionDto() ?? new { running = false },
-            "get_weather" => await hud.GetWeatherAsync() ?? (object)new { error = Strings.Get("tools.noWeatherPlace") },
-            "get_news" => (await hud.GetNewsAsync()).Take(Math.Clamp(OptInt(args, "limit") ?? 10, 1, 30))
-                .Select(n => new { n.Feed, n.Title, n.Summary, published = DateTimeOffset.FromUnixTimeMilliseconds(n.Published).ToLocalTime().ToString("g") }),
             "get_updates" => hud.GetUpdates(),
             "get_audio" => hud.GetAudio(),
             "set_volume" => hud.SetVolume(Math.Clamp(OptInt(args, "percent") ?? throw new ArgumentException(Strings.Get("tools.percentMissing")), 0, 100)),

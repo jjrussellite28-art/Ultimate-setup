@@ -87,8 +87,8 @@ public sealed class ServiceSwitch
             try
             {
                 var ops = AdminService.Ops;
-                var result = mode == StartupMode.Pc ? await ops.ResumeServicesAsync(names) : await ops.PauseServicesAsync(names);
-                Console.WriteLine($"[services] {(mode == StartupMode.Pc ? "resume" : "pause")} {string.Join(',', names)}: {result}");
+                var result = mode == StartupMode.Pc ? await ops.ResumeServicesAsync(names) : await AdminService.WithGrantAsync(CouchHud.Service.Contracts.Operation.PauseServices, () => ops.PauseServicesAsync(names));
+                Console.WriteLine($"[services] {(mode == StartupMode.Pc ? "resume" : "pause")} {string.Join(',', names)}: {result}; {StatusLine(names)}");
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
@@ -99,6 +99,25 @@ public sealed class ServiceSwitch
                 _gate.Release();
             }
         });
+    }
+
+    /// <summary>The services' real state after the call ("WSearch=stopped, PcaSvc=running"), read-only: the answer "ok" alone says nothing about it.</summary>
+    internal static string StatusLine(IEnumerable<string> names)
+    {
+        var parts = new List<string>();
+        foreach (var name in names)
+        {
+            try
+            {
+                using var service = new ServiceController(name);
+                parts.Add($"{name}={service.Status.ToString().ToLowerInvariant()}");
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                parts.Add($"{name}=unknown");
+            }
+        }
+        return string.Join(", ", parts);
     }
 
     private static ServiceStartMode SafeStartType(ServiceController s)
@@ -273,6 +292,21 @@ public static class ProcessList
             // Elevated or protected: the process name has to do.
         }
         return fallback;
+    }
+
+    /// <summary>The process ids of this session running under that image name.</summary>
+    public static List<int> PidsOf(string name)
+    {
+        var session = Process.GetCurrentProcess().SessionId;
+        var processes = Process.GetProcessesByName(name);
+        try
+        {
+            return processes.Where(p => SafeSession(p) == session).Select(p => p.Id).ToList();
+        }
+        finally
+        {
+            foreach (var p in processes) p.Dispose();
+        }
     }
 
     /// <summary>Brings the window of a program to the front.</summary>

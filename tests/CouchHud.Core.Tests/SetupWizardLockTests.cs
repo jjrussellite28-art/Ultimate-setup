@@ -17,6 +17,7 @@ public class SetupWizardLockTests
     [InlineData("guideTapInGame")]
     [InlineData("autoLogonDeclined")]
     [InlineData("suppressCompetitors")]
+    [InlineData("suppressBySetup")]
     public void Settings_the_assistant_writes_need_the_code(string key) =>
         Assert.DoesNotContain(key, LockPolicy.HarmlessSettings);
 

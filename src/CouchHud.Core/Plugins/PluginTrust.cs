@@ -33,6 +33,13 @@ public sealed record PluginTrustEntry
     public string? KeyFingerprint { get; init; }
     public IReadOnlyList<string>? Capabilities { get; init; }
 
+    /// <summary>
+    /// The network services (id, hosts) the signed statement declared when this was installed; null: none recorded (a plugin from before, or
+    /// without any). Not written when null, so a list from before keeps its signature. A third-party plugin gets only services within this.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<PackageService>? Services { get; init; }
+
     /// <summary>Programs (canonical paths) the user confirmed for <see cref="CouchHud.Sdk.IPluginContext.RunTrustedCliAsync"/>.</summary>
     public IReadOnlyList<string> ConfirmedExes { get; init; } = [];
 
@@ -187,10 +194,25 @@ public sealed class PluginTrust(string dataDir, byte[]? key = null)
         {
             return PluginTrustState.Changed;
         }
-        return CryptographicOperations.FixedTimeEquals(System.Text.Encoding.ASCII.GetBytes(known.Hash), System.Text.Encoding.ASCII.GetBytes(now))
+        return Compare(known, now);
+    }
+
+    /// <summary>
+    /// The same decision for a hash that was taken already, from the files the loader holds (<see cref="PluginFolderSnapshot"/>): the loader
+    /// judges and loads the very bytes it hashed, so the hash is passed in instead of being taken from the folder a second time.
+    /// </summary>
+    internal PluginTrustState Check(string folder, PluginFolderSnapshot held)
+    {
+        if (!TryRead(out var state)) return PluginTrustState.Fault;
+        if (state.Removed.Contains(folder)) return PluginTrustState.Unknown;
+        if (!state.Plugins.TryGetValue(folder, out var known)) return PluginTrustState.Unknown;
+        return Compare(known, held.Hash);
+    }
+
+    private static PluginTrustState Compare(PluginTrustEntry known, string now) =>
+        CryptographicOperations.FixedTimeEquals(System.Text.Encoding.ASCII.GetBytes(known.Hash), System.Text.Encoding.ASCII.GetBytes(now))
             ? PluginTrustState.Trusted
             : PluginTrustState.Changed;
-    }
 
     /// <summary>What is recorded for the folder; null when nothing is (or the list cannot be trusted).</summary>
     public PluginTrustEntry? Entry(string folder) => TryRead(out var state) && state.Plugins.TryGetValue(folder, out var e) ? e : null;

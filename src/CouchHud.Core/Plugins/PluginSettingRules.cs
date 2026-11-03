@@ -38,6 +38,13 @@ public static class PluginSettingRules
         return clean.Length > 60 ? clean[..60] : clean;
     }
 
+    /// <summary>Text that came from a plugin (an exception message, a reason) for a log line or a line shown in the list: one line, no control, line or paragraph separators, at most 200 characters.</summary>
+    public static string LogLine(string? text)
+    {
+        var clean = new string((text ?? "").Where(c => !char.IsControl(c) && char.GetUnicodeCategory(c) is not (System.Globalization.UnicodeCategory.LineSeparator or System.Globalization.UnicodeCategory.ParagraphSeparator or System.Globalization.UnicodeCategory.Format)).ToArray());
+        return clean.Length > 200 ? clean[..200] : clean;
+    }
+
     /// <summary>The longest label of a page entry (longer is cut).</summary>
     public const int MaxPageLabel = 40;
 

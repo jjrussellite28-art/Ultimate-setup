@@ -31,8 +31,6 @@ export default {
   'assistant.tool.getWeather': 'Checking the weather',
   'assistant.tool.getNews': 'Reading the news',
   'assistant.tool.getUpdates': 'Checking for updates',
-  'assistant.tool.listHomeEntities': 'Asking Home Assistant',
-  'assistant.tool.activateHomeEntity': 'Switching in Home Assistant',
   'assistant.tool.getAudio': 'Checking the sound',
   'assistant.tool.setVolume': 'Changing the volume',
   'assistant.tool.setAudioOutput': 'Switching the audio output',

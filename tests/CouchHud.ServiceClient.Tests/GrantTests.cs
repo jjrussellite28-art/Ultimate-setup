@@ -85,7 +85,7 @@ public class GrantCacheTests
 
     [Theory]
     [InlineData(Operation.ApplyLockPolicies)]
-    [InlineData(Operation.PauseServices)]
+    [InlineData(Operation.ResumeServices)]
     [InlineData(Operation.VerifyCode)]
     public void Operations_without_a_grant_get_none(Operation op)
     {
@@ -135,6 +135,30 @@ public class GrantFlowTests
             () => { calls++; return Task.FromResult(new OpResult(FailureKind.NeedGrant, ErrorCodes.NeedGrant)); },
             () => Task.FromResult(false));
         Assert.Equal(FailureKind.NeedGrant, result.Failure);
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task A_long_operation_that_needs_an_approval_asks_once_and_starts_again()
+    {
+        var calls = 0;
+        var asked = 0;
+        var result = await GrantFlow.WithGrantJobAsync(
+            () => Task.FromResult(++calls == 1 ? new JobResult(new OpResult(FailureKind.NeedGrant, ErrorCodes.NeedGrant), null) : new JobResult(OpResult.Success, null, true)),
+            () => { asked++; return Task.FromResult(true); });
+        Assert.True(result.Started);
+        Assert.Equal(2, calls);
+        Assert.Equal(1, asked);
+    }
+
+    [Fact]
+    public async Task A_long_operation_whose_approval_is_declined_keeps_the_refusal()
+    {
+        var calls = 0;
+        var result = await GrantFlow.WithGrantJobAsync(
+            () => { calls++; return Task.FromResult(new JobResult(new OpResult(FailureKind.NeedGrant, ErrorCodes.NeedGrant), null)); },
+            () => Task.FromResult(false));
+        Assert.Equal(FailureKind.NeedGrant, result.Result.Failure);
         Assert.Equal(1, calls);
     }
 
@@ -217,6 +241,36 @@ public class CodeRouterTests
     }
 
     private static readonly string[] Seq = ["a", "b", "x", "y", "up", "down"];
+
+    [Fact]
+    public async Task Windows_update_is_never_sent_the_unlocks_grant_only_an_approval()
+    {
+        await using var server = new FakePipeServer(_ => throw new InvalidOperationException());
+        var ops = Ops(server);
+        Assert.True(ops.Cache.Set(new GrantData(Grant, GrantKindNames.Couch, 120)));
+        // The unlock's grant goes to the CouchHUD update (it keeps the session), not to Windows Update.
+        Assert.Null(await ops.Grants!(Operation.InstallWindowsUpdates, default));
+        Assert.Equal(Grant, await ops.Grants!(Operation.InstallCouchHudUpdate, default));
+        var approval = Convert.ToBase64String(Enumerable.Repeat((byte)7, 32).ToArray());
+        Assert.True(ops.Cache.Set(new GrantData(approval, GrantKindNames.Parent, 30, ["InstallWindowsUpdates"])));
+        Assert.Equal(approval, await ops.Grants!(Operation.InstallWindowsUpdates, default));
+        Assert.Null(await ops.Grants!(Operation.InstallWindowsUpdates, default));
+    }
+
+    [Fact]
+    public async Task Pause_services_is_never_sent_the_unlocks_grant_only_an_approval()
+    {
+        await using var server = new FakePipeServer(_ => throw new InvalidOperationException());
+        var ops = Ops(server);
+        Assert.True(ops.Cache.Set(new GrantData(Grant, GrantKindNames.Couch, 120)));
+        // The service answers ApprovalOnly to the unlock's grant: it must not go on the wire at all.
+        Assert.Null(await ops.Grants!(Operation.PauseServices, default));
+        Assert.Equal(Grant, await ops.Grants!(Operation.InstallCouchHudUpdate, default));
+        var approval = Convert.ToBase64String(Enumerable.Repeat((byte)9, 32).ToArray());
+        Assert.True(ops.Cache.Set(new GrantData(approval, GrantKindNames.Parent, 30, ["PauseServices"])));
+        Assert.Equal(approval, await ops.Grants!(Operation.PauseServices, default));
+        Assert.Null(await ops.Grants!(Operation.PauseServices, default));
+    }
 
     [Fact]
     public async Task A_right_couch_code_puts_its_grant_into_the_cache_and_release_carries_it()
@@ -375,4 +429,97 @@ public class CodeRouterTests
     }
 
     private const string Hash = "pbkdf2-sha256$100000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+}
+
+/// <summary>The shell's follow-up of the service-state reset: after a timeout the policies are set again only once the job has ended.</summary>
+public class ResetFollowUpTests
+{
+    private static async Task<(string Outcome, List<string> Log)> Run(string outcome, TimeSpan cap, params string?[] statuses)
+    {
+        var queue = new Queue<string?>(statuses);
+        var log = new List<string>();
+        var now = DateTimeOffset.UnixEpoch;
+        var result = await ResetFollowUp.RunAsync(outcome,
+            () => { log.Add("status"); return Task.FromResult(queue.Count > 0 ? queue.Dequeue() : "running"); },
+            d => { now += d; return Task.CompletedTask; }, () => now, () => log.Add("reapply"), cap);
+        return (result, log);
+    }
+
+    [Fact]
+    public async Task After_a_timeout_the_job_is_polled_and_the_policies_are_set_again_only_after_its_end()
+    {
+        var (outcome, log) = await Run("timeout", TimeSpan.FromSeconds(30), "running", "running", "done");
+        Assert.Equal("done", outcome);
+        Assert.Equal(["status", "status", "status", "reapply"], log);
+    }
+
+    [Fact]
+    public async Task A_job_still_running_at_the_cap_stays_a_timeout_never_a_success()
+    {
+        var (outcome, log) = await Run("timeout", TimeSpan.FromSeconds(6));
+        Assert.Equal("timeout", outcome);
+        Assert.Equal("reapply", log[^1]);
+        Assert.DoesNotContain("done", outcome);
+    }
+
+    [Fact]
+    public async Task A_running_job_at_the_cap_is_not_reapplied_when_a_slower_poll_follows()
+    {
+        var reapplied = 0;
+        var now = DateTimeOffset.UnixEpoch;
+        var result = await ResetFollowUp.RunAsync("timeout", () => Task.FromResult<string?>("running"), d => { now += d; return Task.CompletedTask; },
+            () => now, () => reapplied++, TimeSpan.FromSeconds(6), reapplyIfRunning: false);
+        Assert.Equal("timeout", result);
+        Assert.Equal(0, reapplied);
+    }
+
+    [Fact]
+    public async Task The_slow_poll_sets_again_when_the_job_ends_late()
+    {
+        var reapplied = 0;
+        var now = DateTimeOffset.UnixEpoch;
+        var queue = new Queue<string?>(["running", "running", "done"]);
+        var result = await ResetFollowUp.RunAsync("timeout", () => Task.FromResult(queue.Dequeue()), d => { now += d; return Task.CompletedTask; },
+            () => now, () => reapplied++, TimeSpan.FromMinutes(12), ResetFollowUp.SlowPoll);
+        Assert.Equal("done", result);
+        Assert.Equal(1, reapplied);
+        Assert.Equal(DateTimeOffset.UnixEpoch + 2 * ResetFollowUp.SlowPoll, now);
+    }
+
+    [Fact]
+    public async Task A_late_failure_is_reported_as_failed()
+    {
+        var (outcome, _) = await Run("timeout", TimeSpan.FromSeconds(30), "running", "failed");
+        Assert.Equal("failed", outcome);
+    }
+
+    [Theory]
+    [InlineData("done")]
+    [InlineData("failed")]
+    [InlineData("refused")]
+    public async Task Other_outcomes_are_not_polled_but_the_policies_are_set_again(string given)
+    {
+        var (outcome, log) = await Run(given, TimeSpan.FromSeconds(30));
+        Assert.Equal(given, outcome);
+        Assert.Equal(["reapply"], log);
+    }
+
+    [Fact]
+    public async Task The_set_again_runs_even_when_the_status_call_throws()
+    {
+        var reapplied = false;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ResetFollowUp.RunAsync("timeout",
+            () => throw new InvalidOperationException("pipe"), _ => Task.CompletedTask, () => DateTimeOffset.UnixEpoch, () => reapplied = true, TimeSpan.FromSeconds(30)));
+        Assert.True(reapplied);
+    }
+
+    [Fact]
+    public async Task The_second_look_waits_ten_seconds_and_then_sets_again()
+    {
+        TimeSpan? waited = null;
+        var reapplied = 0;
+        await ResetFollowUp.VerifyAsync(d => { waited = d; return Task.CompletedTask; }, () => reapplied++);
+        Assert.Equal(TimeSpan.FromSeconds(10), waited);
+        Assert.Equal(1, reapplied);
+    }
 }

@@ -7,7 +7,7 @@ import { state } from './core/state.js';
 import { attempt, toast } from './core/feedback.js';
 import { applySkin, onGlyphsChanged, setPadGlyphs } from './core/skins.js';
 import { apps, games, reloadLibrary, setLibrary } from './core/library.js';
-import { currentView, pop, render, renderHints, setTabs, switchTab, push, clearStack } from './core/nav.js';
+import { currentView, onSkinRejected, skinRejected, pop, render, renderHints, setTabs, switchTab, push, clearStack } from './core/nav.js';
 import { cycleBar, handleChip } from './core/bar-chips.js';
 import { closeOverlay, handleOverlay, openOverlay } from './components/overlay.js';
 import { Input } from './input.js';
@@ -19,11 +19,13 @@ import { hideLaunch, launchFocus, launchInput, launchSession, launchTimedOut } f
 import { closeQuickMenu, handleQuick, openQuickMenu, quick, renderQuick } from './components/quick-menu.js';
 import { BUILTIN_SKINS } from './skins/index.js';
 import { migrateSkinId, movedSkinCatalogId } from './core/skin-rules.js';
+import { languageChanged, languageReloadWaits } from './core/settings-rules.js';
+import { codeEntryOpen } from './components/passcode.js';
 import { reloadSkins } from './components/skin-menu.js';
 import { homeView } from './views/home.js';
 import { browserView } from './views/browser.js';
 import { startFirstRun } from './views/setup-wizard.js';
-import { powerMenu } from './core/power.js';
+import { listenToPhoneSleepTimer, powerMenu } from './core/power.js';
 import { configureScreensaver, screensaverInput, setScreensaverFocus, startScreensaverWatch } from './core/screensaver.js';
 import { gridView } from './views/grid.js';
 import { checkInterruptedSwitch, settingsView } from './views/settings.js';
@@ -39,13 +41,14 @@ import { startParental } from './components/parental.js';
 import { startProfiles } from './components/profiles.js';
 import { startNotifications } from './views/notifications.js';
 import { startBluetoothRecovery } from './components/bluetooth-recovery.js';
-import { isCodeEntry } from './core/input-help.js';
+import { isCodeEntry, screenHeld } from './core/input-help.js';
 import { showShotToast } from './components/shot-toast.js';
 import { changeReporter, PAIRING_SELECTOR, REPORT_REFRESH_MS } from './core/screenshot-rules.js';
 import { reportCodeEntries } from './components/passcode.js';
+import { startSecondFactor } from './components/second-factor.js';
 import './views/deck.js';
 import { assistantView, startAssistant } from './views/assistant.js';
-import { startWeather } from './core/weather.js';
+import { refreshWeather, startWeather } from './core/weather.js';
 import { onBatteryChanged, startBattery } from './core/battery.js';
 import { loadCollections } from './core/collections.js';
 import './components/collections.js';
@@ -83,7 +86,8 @@ export function updateTabs() {
 // already left out those of areas that are off, the child's profile and plugins that are not loaded, and the page checks the area once more.
 let pluginTabViews = [];
 const tabList = () => arrangeTabs(
-  shownTabs([homeView, gamesView, appsView, downloadsView, newsView, browserView]),
+  // News comes from its plugin (0.7): without one there is no tab.
+  shownTabs([homeView, gamesView, appsView, downloadsView, ...(state.info.news ? [newsView] : []), browserView]),
   pluginTabViews.filter((v) => areaOn(v.tabArea)),
   [...(state.info.assistant ? [assistantView] : []), settingsView]);
 
@@ -92,6 +96,17 @@ const tabSignature = () => tabList().map((v) => `${v.id}:${v.name}`).join('|');
 /** Asks the host which plugin tabs exist now (at start, when plugins finished loading, after an area, profile or plugin change). */
 let tabsLoading = false;
 let tabsAgain = false;
+/** What plugins bring to the core's own places (SDK 5): the News tab, the weather in the header, the assistant's provider. */
+async function refreshPluginFeatures() {
+  const info = await api.systemInfo().catch(() => null);
+  if (!info) return;
+  const weatherBefore = !!state.info.weather;
+  state.info.news = !!info.news;
+  state.info.weather = !!info.weather;
+  state.info.assistant = !!info.assistant;
+  if (state.info.weather !== weatherBefore) refreshWeather();
+}
+
 export async function refreshPluginTabs() {
   if (tabsLoading) {
     tabsAgain = true;
@@ -103,6 +118,7 @@ export async function refreshPluginTabs() {
       tabsAgain = false;
       const before = tabSignature();
       pluginTabViews = await loadPluginTabs();
+      await refreshPluginFeatures();
       updateTabs();
       // Only a changed tab bar is drawn again (a page that is open keeps its place).
       if (tabSignature() !== before) render();
@@ -154,6 +170,7 @@ function watchPairingCode() {
 
 function goHome() {
   clearStack();
+  state.browserOrigin = null;
   state.tab = 0;
   homeView.index = 0;
   render();
@@ -180,6 +197,7 @@ function onAction(action) {
       if (pop()) return;
       if (state.tab !== 0) {
         sound.back();
+        state.browserOrigin = null;
         state.tab = 0;
         render();
       }
@@ -214,6 +232,20 @@ function missingSkinNotice(id) {
   toast(t(nameKey) + ': ' + t('skins.missing'), 12000, { long: true });
 }
 
+// A new language (set from the phone) needs the page again; it waits for a quiet moment (see languageReloadWaits).
+let languageReloadPending = false;
+function reloadForLanguage() {
+  if (!languageReloadPending || languageReloadWaits({ codeEntry: codeEntryOpen(), overlay: state.overlay, pickerHold: state.pickerHold })) return;
+  languageReloadPending = false;
+  let recent = false;
+  try {
+    recent = Date.now() - Number(sessionStorage.getItem('couchhud.languageReload') || 0) < 10000;
+    if (!recent) sessionStorage.setItem('couchhud.languageReload', String(Date.now()));
+  } catch { /* storage blocked: reload anyway, the guard above is then the host's saying the same */ }
+  if (!recent) location.reload();
+}
+setInterval(reloadForLanguage, 1000);
+
 async function init() {
   state.info = (await attempt(() => api.systemInfo(), t('app.systemInfoFailed'))) || {};
   state.info.areas = setAreas(state.info.areas);
@@ -228,6 +260,19 @@ async function init() {
   const wantedSkin = migrateSkinId(state.info.skin);
   const foundSkin = state.skins.find((s) => s.id === wantedSkin);
   applySkin(foundSkin || BUILTIN_SKINS[0]);
+  // A saved skin covers the tab bar or makes tabs unusable (nav.js put the default skin in its place): the setting follows, so the next start
+  // does not run into the same again. The host is asked which skin is saved now (one chosen in the setup assistant or saved before a late
+  // verdict counts too); a skin only previewed in the menu is not the saved one and is left alone.
+  onSkinRejected(async (id) => {
+    const savedNow = async () => migrateSkinId((await attempt(() => api.systemInfo()))?.skin ?? wantedSkin);
+    if (id !== (await savedNow())) return;
+    // The reset is only written when the verdict holds a moment later too (one wrong look must not undo the person's choice).
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    if (!skinRejected(id) || id !== (await savedNow())) return;
+    state.info.skin = BUILTIN_SKINS[0].id;
+    Promise.resolve(api.setSkin(BUILTIN_SKINS[0].id)).catch(console.error);
+    toast(t('skinMenu.fellBack', { name: state.skins.find((s) => s.id === id)?.name ?? id }), 7000, { long: true });
+  });
   // A skin that moved to the catalog and is not installed (yet): the Couch skin meanwhile. While the host still installs it nothing is
   // said; when it is clear it is not coming (offline, refused, tried enough times) the person is told once.
   if (!foundSkin && state.info.skinRestore?.state === 'missing') missingSkinNotice(wantedSkin);
@@ -285,6 +330,18 @@ async function init() {
     setPointer(s.pointer, s.mouseUnlocked);
     refreshMotion();
     setPadGlyphs({ padGlyphs: s.padGlyphs });
+    // A change from outside the page (the phone remote, a tool): the screensaver follows, the settings page takes the new values.
+    state.info.screensaverMinutes = s.screensaverMinutes;
+    state.info.screensaverStyle = s.screensaverStyle;
+    configureScreensaver({ minutes: s.screensaverMinutes ?? 5, style: s.screensaverStyle ?? 'art', displayOff: s.displayOffMinutes ?? 0, pixelShift: s.pixelShift ?? true });
+    window.dispatchEvent(new CustomEvent('couchhud:settings', { detail: s }));
+    // The language is read once at the start: a new one needs the page again (at most once in ten seconds, so a host that keeps
+    // saying something else can never loop).
+    // Not under a code entry, an open dialog or the profile picker: then it waits and is made up as soon as they are gone.
+    if (languageChanged(state.info.languageSetting, s.language)) {
+      languageReloadPending = true;
+      reloadForLanguage();
+    }
   });
   startTv();
 
@@ -317,8 +374,8 @@ async function init() {
 
   api.onNav((target) => {
     input.releaseAll();
-    // A protected profile waits at the picker: no guide menu, no way home past it.
-    if (state.pickerHold) return;
+    // A protected profile waits at the picker and the time-up page holds the screen: no guide menu, no way home past them (the host and the phone ask in vain).
+    if (screenHeld(state)) return;
     if (state.overlay) closeOverlay();
     hideLaunch();
     if (target === 'quick') return openQuickMenu();
@@ -347,6 +404,7 @@ async function init() {
   api.onScreenshot?.(showShotToast);
   // A fresh page has no code entry and no pairing code on screen, whatever the last one said; from now on every change is reported.
   reportCodeEntries();
+  startSecondFactor();
   watchPairingCode();
   api.onLaunchTimeout?.(() => launchTimedOut());
   setHaptics((kind) => api.rumble(kind).catch(() => {}));
@@ -362,6 +420,13 @@ async function init() {
   startScreensaverWatch();
   showSession();
   api.onLibrary(setLibrary);
+  // A collection changed from the phone: the host sends the new list, the TV shows it at once.
+  api.onCollections?.((list) => {
+    if (!Array.isArray(list)) return;
+    state.collections = list;
+    render();
+  });
+  listenToPhoneSleepTimer();
   // quiet: a pad that comes or goes within 1.5 s of a pad of the other kind (PlayStation and XInput), most likely the Steam Input
   // or DS4Windows mirror of the other one. Disconnects are told once the burst is over, so a pad and its mirror going away
   // together give one toast, and "no controller left" is seen even when the mirror goes a moment after the pad.

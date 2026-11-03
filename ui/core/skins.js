@@ -2,6 +2,7 @@ import { $ } from './dom.js';
 import { state } from './state.js';
 import { setSkinSounds } from '../sound.js';
 import { glyphFor, glyphKind } from './pad-glyphs.js';
+import { skinStyler } from './skin-load.js';
 
 /** "xbox" or "playstation": the expert setting when fixed, else the kind of pad the host saw pressed last. */
 export const glyphKindNow = () => glyphKind(state.info?.padGlyphs, state.info?.padKind);
@@ -40,10 +41,15 @@ export function setPadGlyphs({ padKind, padGlyphs } = {}) {
   if (glyphKindNow() !== before) refreshGlyphs();
 }
 
+let styleSkin = null;
+const styled = () => window.dispatchEvent(new Event('couchhud:skin-styled'));
+
 export function applySkin(skin) {
   const link = $('#skin-css');
-  if (skin.css) link.href = skin.css;
-  else link.removeAttribute('href');
+  // Once the skin's stylesheet is in, what it declares can be read (the tiles' --tile-art, art.js): "couchhud:skin-styled".
+  // Only for the skin applied last; a stylesheet that fails to load still counts, the app's own rules then apply (skin-load.js).
+  styleSkin ??= skinStyler(link);
+  styleSkin(skin.css, styled);
   document.documentElement.dataset.skin = skin.id;
   state.skin = skin;
   setSkinSounds(skin.id, skin.sounds, skin.soundSet);

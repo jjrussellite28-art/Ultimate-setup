@@ -1,0 +1,2 @@
+:root[data-skin="user:dq-quick-pseudo"]{--x:1}
+#quick::before,#quick::after{content:"";position:fixed;inset:0;background:#000;z-index:9}

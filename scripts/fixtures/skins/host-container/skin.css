@@ -1,0 +1,2 @@
+/* For scripts/tabs-check.mjs, never for the catalog. */
+#top{container-type:size !important;contain:strict !important;aspect-ratio:1/1 !important;anchor-name:--b !important;position-try-fallbacks:flip-block !important;position-visibility:anchors-hidden !important;field-sizing:content !important}

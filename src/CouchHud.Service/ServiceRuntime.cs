@@ -77,7 +77,10 @@ public sealed class ServiceRuntime
                 : $"[alarm] the service's access list lets {string.Join(", ", untrusted)} send controls: administrator approvals through UAC are ignored until it is repaired");
         }
         var handlers = BasicHandlers.Create(state, events, WallMs);
-        var checks = StateChecks.BuiltIn(serviceOnList, codes);
+        // The machine's sessions as the service reads them itself (WTS); what cannot be read asks for an approval (SessionChecks).
+        var sessionFacts = new SessionFacts(CouchHud.Privileged.WindowsSessions.ActiveConsoleSessionId,
+            callerSession => operationsParts.Sessions?.SignedInSids(callerSession));
+        var checks = StateChecks.BuiltIn(serviceOnList, codes, sessionFacts);
         HandlersB.Register(handlers, checks, HandlersB.CreateDefault(_log, events, clock, codes, grants, _stop.Token, codes.View));
         var operations = _operations = OperationsA.Register(handlers, checks, operationsParts, state);
         // Taking over a lock of 0.4.0 forgets the account's codes and mode: its user may have planted them before (security review H-1).
@@ -133,7 +136,12 @@ public sealed class ServiceRuntime
         });
         // The old SYSTEM tasks of 0.4.0: no user may start them any more, signed-in accounts are migrated (finding B1).
         SweepLegacy(all: true);
+        WatchPausedServices(operations);
     }
+
+    /// <summary>A paused service that starts again (delayed start, trigger) is stopped again while the pause holds.</summary>
+    private void WatchPausedServices(OperationsA operations) =>
+        _ = Task.Run(() => PausedServiceWatch.RunAsync(operations.RecheckPausedServices, OperationsA.PauseWatchInterval, _log, _stop.Token));
 
     /// <summary>How long the start waits for the restriction of the old tasks at most.</summary>
     private static readonly TimeSpan RestrictWait = TimeSpan.FromSeconds(15);

@@ -303,7 +303,7 @@ public sealed class ForegroundGuard : IDisposable
                 _endMouseMode();
                 context = _context();
             }
-            if (context.GameRunning || context.MouseMode || context.PcMode || context.Browsing || context.Suspended) return;
+            if (!GameFront.HudMayTakeFront(HudFrontRequest.GuardRecovery, HudFrontState.From(context))) return;
             if (_hudFront.TryAcquire(0, DateTimeOffset.UtcNow)) _bringHud();
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -322,7 +322,8 @@ public sealed class ForegroundGuard : IDisposable
     /// <summary>Locked and a foreign window insists on the foreground: the HUD goes in front of it (not while a game runs or in PC mode).</summary>
     private void PullHudForward(ForegroundContext context)
     {
-        if (context.GameRunning || context.PcMode || context.Browsing || context.Suspended) return;
+        // The same rule as after a minimize, except the mouse mode: a locked couch has none (see ShouldEndMouseMode), so a leftover one does not hold the HUD back.
+        if (!GameFront.HudMayTakeFront(HudFrontRequest.GuardRecovery, HudFrontState.From(context) with { MouseMode = false })) return;
         if (_lockedFront.TryAcquire(0, DateTimeOffset.UtcNow)) _bringHud();
     }
 
@@ -458,6 +459,20 @@ public static class OwnLaunches
         }
     }
 
+    /// <summary>
+    /// Registers a process by the start time read from the handle it was created with (FILETIME ticks): nothing is looked up by the process id
+    /// afterwards, so a number that Windows handed out again can never be registered by mistake.
+    /// </summary>
+    public static void Register(int pid, long startFileTime)
+    {
+        if (pid <= 0 || startFileTime <= 0) return;
+        lock (Started)
+        {
+            Started[pid] = DateTime.FromFileTimeUtc(startFileTime);
+            if (Started.Count > 64) Prune();
+        }
+    }
+
     /// <summary>The process, or one of its ancestors, was started by CouchHud.</summary>
     public static bool Contains(int pid)
     {
@@ -499,6 +514,9 @@ public static class OwnLaunches
             if (StartOf(pid) is not { } t || Math.Abs((t - Started[pid]).TotalSeconds) >= 2) Started.Remove(pid);
         }
     }
+
+    /// <summary>The start time of a process (UTC), null when it is gone or cannot be read.</summary>
+    internal static DateTime? StartTime(int pid) => StartOf(pid);
 
     private static DateTime? StartOf(int pid)
     {

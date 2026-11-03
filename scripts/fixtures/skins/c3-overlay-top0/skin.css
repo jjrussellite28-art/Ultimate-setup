@@ -1,0 +1,2 @@
+:root[data-skin="user:c3-overlay-top0"]{--x:1}
+#overlay{top:-20vh!important;height:140vh!important;background:#fff!important;backdrop-filter:invert(1) blur(3rem)!important;z-index:2147483647!important;will-change:transform,filter!important;isolation:isolate!important}#quick{top:-20vh!important;height:140vh!important;background:#fff!important;z-index:2147483647!important}

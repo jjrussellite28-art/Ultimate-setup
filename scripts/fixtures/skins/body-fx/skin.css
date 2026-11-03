@@ -1,0 +1,4 @@
+:root[data-skin="user:body-fx"]{--x:1}
+
+body{zoom:5 !important; display:none !important; content-visibility:hidden !important}
+html{zoom:0.05 !important;content-visibility:hidden !important; display:none !important}

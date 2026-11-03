@@ -90,7 +90,7 @@ public static class AutoLogon
     public static void OpenDialog()
     {
         // netplwiz asks for administrator rights itself.
-        Process.Start(new ProcessStartInfo("netplwiz.exe") { UseShellExecute = true })?.Dispose();
+        Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "netplwiz.exe")) { UseShellExecute = true })?.Dispose();
     }
 
     // ---- check the password (not elevated) ------------------------------------------------

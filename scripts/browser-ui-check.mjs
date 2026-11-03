@@ -2,35 +2,81 @@
 // and the page stays in step with the host, the page's questions and downloads are asked in the HUD, typing into the page
 // works, and the page never stays "focused" while the host steers the HUD.
 //
-//   node scripts/browser-ui-check.mjs [--port 5198] [--debug 9334]
+//   node scripts/browser-ui-check.mjs [--port N] [--debug N]   (free ports by default, so runs in parallel never meet)
 //
-// Env: EDGE (path to msedge.exe). Runs only headless (--headless=new --mute-audio); exit code 1 on a failed check.
-import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+// Env: EDGE (path to msedge.exe). Runs only headless (--headless=new --mute-audio); exit code 1 on a failed check. Without an Edge
+// (none at EDGE or the usual places) or Node 22 it says "skipped" and exits 0, so scripts/check.sh stays usable on machines without
+// Edge; in CI (CI=true) the same is a failure (exit 1), so a runner without them never passes unseen. A watchdog ends the run
+// after 180 s (cleanup, exit 1).
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
+import net from 'node:net';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
-const opt = { port: '5198', debug: '9334' };
+const opt = { port: '', debug: '' };
 for (let i = 0; i < args.length; i++) if (args[i].startsWith('--')) opt[args[i].slice(2)] = args[++i];
+// Ports: a fixed default made two runs at the same time (other worktrees, CI next to a local run) share one DevTools port and
+// one preview server, so a run steered the other's browser and its page ("Failed to resolve module specifier '/views/browser.js'"
+// from a document that was not the app, then a wall of FAILs). Without --port/--debug a free port is asked from the system.
+const freePort = () => new Promise((res, rej) => {
+  const s = net.createServer();
+  s.once('error', rej);
+  s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => res(String(port))); });
+});
+if (!opt.port) opt.port = await freePort();
+if (!opt.debug) opt.debug = await freePort();
 
-const edge = process.env.EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+// EDGE when set, else the usual install places (Windows, Linux, macOS). Only a file that exists is started.
+const edgeCandidates = process.env.EDGE ? [process.env.EDGE] : [
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+  '/usr/bin/microsoft-edge',
+  '/usr/bin/microsoft-edge-stable',
+  '/opt/microsoft/msedge/msedge',
+  '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
+];
+const edge = edgeCandidates.find((p) => existsSync(p));
+// Locally a missing Edge or Node only skips; in CI it fails.
+const skip = (why) => {
+  const ci = /^(1|true)$/i.test(process.env.CI ?? '');
+  console.log(`browser ui: ${ci ? 'FAIL, in CI not skipped' : 'skipped'} (${why})`);
+  process.exit(ci ? 1 : 0);
+};
+if (!edge) {
+  skip(`no Microsoft Edge found${process.env.EDGE ? ` at EDGE=${process.env.EDGE}` : '; set EDGE to msedge.exe'}`);
+}
+// The DevTools connection uses Node's own WebSocket (Node 22 and later).
+if (typeof WebSocket === 'undefined') {
+  skip(`Node ${process.version} has no built-in WebSocket, Node 22 or later needed`);
+}
 const server = spawn(process.execPath, [join(here, 'preview-server.js')], { env: { ...process.env, PORT: opt.port }, stdio: 'ignore' });
+let serverGone = null;
+server.on('exit', (code) => { serverGone = code; });
 const profile = mkdtempSync(join(tmpdir(), 'couchhud-edge-'));
 const browser = spawn(edge, [`--remote-debugging-port=${opt.debug}`, '--headless=new', '--mute-audio', '--disable-gpu', '--disable-extensions',
   '--no-first-run', `--user-data-dir=${profile}`, '--window-size=1920,1080', 'about:blank'], { stdio: 'ignore' });
-let cleaned = false;
-const cleanup = () => {
-  if (cleaned) return;
-  cleaned = true;
-  server.kill();
-  browser.kill();
-  setTimeout(() => { try { rmSync(profile, { recursive: true, force: true }); } catch { /* Edge still holds it */ } }, 500);
-};
+const browserGone = new Promise((r) => browser.once('exit', r));
+// Edge runs as a process tree; on Windows only taskkill /T ends the children that hold the profile folder (only while Edge runs: a finished PID may be reused).
+const killBrowser = () => { if (process.platform === 'win32' && browser.pid && browser.exitCode === null && browser.signalCode === null) spawnSync('taskkill', ['/pid', String(browser.pid), '/T', '/F'], { stdio: 'ignore' }); browser.kill(); };
+const cleanup = () => { server.kill(); killBrowser(); };
 process.on('exit', cleanup);
+// Remove the Edge profile only after Edge has let go of it; an 'exit' handler cannot wait, so this runs before process.exit.
+async function removeProfile() {
+  cleanup();
+  await Promise.race([browserGone, new Promise((r) => setTimeout(r, 5000))]);
+  try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch { /* still held: left in %TEMP% */ }
+}
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => removeProfile().finally(() => process.exit(130)));
+// A hung Edge or DevTools connection never holds the check up: after 180 s it ends as a failure.
+setTimeout(() => {
+  console.log('browser ui: FAIL, watchdog: no result after 180 s');
+  removeProfile().finally(() => process.exit(1));
+}, 180_000).unref();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const getJson = (url) => new Promise((res, rej) => http.get(url, (r) => { let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
@@ -46,6 +92,20 @@ async function connect() {
   throw new Error('headless Edge not reachable');
 }
 
+// The preview server must answer on the port before the page is opened (it is a child that needs a moment to listen; a
+// navigation to a port nobody listens on leaves an error page where no module path resolves) and must still be our own child.
+async function serverUp() {
+  for (let i = 0; i < 80; i++) {
+    if (serverGone !== null) throw new Error(`preview server ended with ${serverGone} (port ${opt.port} taken?)`);
+    try {
+      await new Promise((res, rej) => http.get(`http://127.0.0.1:${opt.port}/`, (r) => { r.resume(); r.statusCode === 200 ? res() : rej(new Error(`status ${r.statusCode}`)); }).on('error', rej));
+      return;
+    } catch { /* not listening yet */ }
+    await sleep(100);
+  }
+  throw new Error('preview server not reachable');
+}
+await serverUp();
 const ws = new WebSocket(await connect());
 await new Promise((r) => (ws.onopen = r));
 let id = 0;
@@ -84,7 +144,22 @@ function check(ok, what, detail) {
 await send('Page.enable');
 await send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
 await send('Page.navigate', { url: `http://127.0.0.1:${opt.port}/?lang=en` });
-await sleep(3500);
+// Ready when the document is the app (not about:blank or an error page), complete, the mock API is installed and the modules the
+// checks import resolve; waited for instead of a fixed pause.
+let ready = false;
+for (let i = 0; i < 120 && !ready; i++) {
+  ready = await evaluate(`location.href.startsWith('http://127.0.0.1:${opt.port}/') && document.readyState === 'complete' && typeof window.couchhudMockBrowser === 'function' && !!document.querySelector('#boot')`).catch(() => false);
+  if (!ready) await sleep(250);
+}
+if (!ready) {
+  console.log(`FAIL the app page did not load (${await evaluate('location.href').catch(() => '?')})`);
+  process.exit(1);
+}
+const mods = await evaluate(`import('/views/browser.js').then(() => true, (e) => String(e))`).catch((e) => String(e));
+if (mods !== true) {
+  console.log(`FAIL the app modules did not load: ${mods}`);
+  process.exit(1);
+}
 await evaluate('document.querySelector("#boot")?.classList.add("done")');
 
 try {
@@ -116,8 +191,8 @@ try {
     state.info.isShell = false;
     return r;
   })()`);
-  check(tiles.tiles && tiles.headings === '-,-' && tiles.entries === 7 && tiles.focused === 'standby' && tiles.details === 0 && !!tiles.below && tiles.fits,
-    'power menu: tiles, two headings outside the indices, detail under the tiles, labels fit', tiles);
+  check(tiles.tiles && tiles.headings === '' && tiles.entries === 5 && tiles.focused === 'standby' && tiles.details === 0 && !!tiles.below && tiles.fits,
+    'power menu: three tiles, Mehr and timer rows, no headings, detail under the tiles, labels fit', tiles);
 
   // 1. Opening a site: the browser tab comes up with the page in front and the controller on it.
   await clearCalls();
@@ -254,11 +329,11 @@ try {
   // 12c. A page in full screen: the HUD's strip above it says it is a website.
   await host('browser', { open: true, url: 'https://example.org/', title: 'Example', canGoBack: true, fullScreen: true });
   await sleep(300);
-  const badge = await evaluate(`document.querySelector('#web-fullscreen-badge')?.textContent ?? null`);
+  const badge = await evaluate(`window.__couchhudBadge?.root.querySelector('.strip')?.textContent ?? null`);
   check(!!badge && badge.includes('example.org'), 'full screen: the website badge is shown', badge);
   await host('browser', { open: true, url: 'https://other.example/', title: 'Other', canGoBack: true, fullScreen: true });
   await sleep(300);
-  const moved = await evaluate(`document.querySelector('#web-fullscreen-badge')?.textContent ?? null`);
+  const moved = await evaluate(`window.__couchhudBadge?.root.querySelector('.strip')?.textContent ?? null`);
   check(!!moved && moved.includes('other.example') && !moved.includes('example.org'), 'full screen: the badge follows a redirect to another site', moved);
   await host('browser', { open: true, url: 'https://example.org/', title: 'Example', canGoBack: true, fullScreen: false });
   await sleep(300);
@@ -307,11 +382,131 @@ try {
     return { refused, disabled: v.disablePictureInPicture === true, docPip: window.documentPictureInPicture === undefined, enabled: document.pictureInPictureEnabled };
   })()`);
   check(pip?.refused && pip.disabled && pip.docPip && pip.enabled === false, 'guard: picture-in-picture and Document PiP refused', pip);
+
+  // A second run in the same window (the navigation script and a frame's ContentLoading run) wraps nothing twice.
+  await evaluate(`window.__click = HTMLInputElement.prototype.click; 1`);
+  await evaluate(guard);
+  check(await evaluate(`window.__click === HTMLInputElement.prototype.click`) === true, 'guard: a second run in the same window changes nothing');
+
+  // 15. File and color fields in shadow roots (also closed ones), and print and the pickers in a frame a script makes (about:blank, srcdoc).
+  const dialogs = await evaluate(`(async () => {
+    const swallowed = (root, type) => {
+      const input = document.createElement('input');
+      input.type = type;
+      root.append(input);
+      const event = new MouseEvent('click', { bubbles: true, composed: true, cancelable: true });
+      input.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    const closed = document.body.appendChild(document.createElement('div')).attachShadow({ mode: 'closed' });
+    const open = document.body.appendChild(document.createElement('div')).attachShadow({ mode: 'open' });
+    const label = open.appendChild(document.createElement('label'));
+    const frame = document.body.appendChild(document.createElement('iframe'));
+    const fw = frame.contentWindow;
+    const inFrame = fw.document.createElement('input');
+    inFrame.type = 'file';
+    fw.document.body.append(inFrame);
+    const frameEvent = new fw.MouseEvent('click', { bubbles: true, cancelable: true });
+    inFrame.dispatchEvent(frameEvent);
+    const doc = document.body.appendChild(document.createElement('iframe'));
+    doc.srcdoc = '<p>x</p>';
+    await new Promise((r) => setTimeout(r, 300));
+    const own = (w) => /=>\\s*\\{\\s*\\}/.test(String(w.print));
+    return {
+      closedFile: swallowed(closed, 'file'), closedColor: swallowed(closed, 'color'), openFile: swallowed(open, 'file'),
+      frameFile: frameEvent.defaultPrevented, framePrint: own(fw), srcdocPrint: own(doc.contentWindow), top: own(window),
+      picker: String(fw.showOpenFilePicker).includes('Promise.reject'), label: !!label
+    };
+  })()`);
+  check(dialogs?.closedFile && dialogs.closedColor && dialogs.openFile && dialogs.frameFile && dialogs.framePrint && dialogs.srcdocPrint && dialogs.top && dialogs.picker,
+    'guard: file and color fields in shadow roots and script-made frames, print and pickers in frames', dialogs);
+  // 16. The TV page (ui/views/tv.js) on the mock host (ui/mock-tv.js; the mock reads ?notv, ?tvnoplugin from the address): no provider,
+  // one provider with a found device, the controller through the rows, and the German and English texts.
+  const openApp = async (query) => {
+    await send('Page.navigate', { url: `http://127.0.0.1:${opt.port}/?${query}` });
+    let up = false;
+    for (let i = 0; i < 120 && !up; i++) {
+      up = await evaluate(`location.href.startsWith('http://127.0.0.1:${opt.port}/') && document.readyState === 'complete' && typeof window.couchhudMockBrowser === 'function' && !!document.querySelector('#boot')`).catch(() => false);
+      if (!up) await sleep(250);
+    }
+    if (!up) throw new Error(`the app page did not load for ?${query}`);
+    await evaluate('document.querySelector("#boot")?.classList.add("done")');
+  };
+  const openTv = async () => {
+    await evaluate(`import('/views/tv.js').then(async (m) => { await m.refreshTv(false); (await import('/core/nav.js')).push(m.tvPage()); })`);
+    await sleep(500);
+  };
+  const tvRows = () => evaluate(`(() => { const list = document.querySelector('.check-list'); return list ? { labels: [...list.children].map((li) => li.querySelector('strong')?.textContent), details: [...list.children].map((li) => li.querySelector('small')?.textContent ?? ''), focus: [...list.children].findIndex((li) => li.classList.contains('focused')), head: document.querySelector('.files-head h2')?.textContent, meta: [...document.querySelectorAll('.files-head .meta')].map((m) => m.textContent).join(' | ') } : null; })()`);
+
+  // 16a. No TV plugin and no pairing: the page offers the search and the way to the catalog, in English and in German.
+  await openApp('lang=en&notv&tvnoplugin');
+  await openTv();
+  let tv = await tvRows();
+  check(tv?.head === 'TV' && tv.labels.join() === 'Find TV,Get a TV plugin' && /No TV paired/.test(tv.meta) && tv.focus === 0, 'TV page without provider (en): search and plugin rows', tv);
+  await openApp('lang=de&notv&tvnoplugin');
+  await openTv();
+  tv = await tvRows();
+  check(tv?.head === 'Fernseher' && tv.labels.join() === 'Fernseher suchen,TV-Plugin holen' && /Kein Fernseher gekoppelt/.test(tv.meta), 'TV page without provider (de): same rows in German', tv);
+
+  // 16b. One provider (LG webOS) and a device in the network: A on "Find TV" lists the devices found.
+  await openApp('lang=en&notv&fresh&quiet');
+  await openTv();
+  tv = await tvRows();
+  check(tv?.labels.join() === 'Find TV' && tv.focus === 0, 'TV page with one provider, not paired: only the search row', tv);
+  await key('Enter');
+  await sleep(2200);
+  const found = await overlay();
+  check(!!found && found.includes('[LG] webOS TV OLED55C3') && found.includes('192.168.1.20') && found.includes('LG webOS'), 'device search lists the found TV with address and kind', found);
+  await key('Escape');
+  await sleep(300);
+
+  // 16c. Paired and on: the rows, the controller through them, and the host is asked.
+  await openApp('lang=en&fresh&quiet');
+  await openTv();
+  tv = await tvRows();
+  check(tv?.head === 'OLED55C3' && tv.labels.join() === 'Turn off,Volume,Choose input,Refresh,Remove TV' && tv.details[1] === '18 %' && /On · 18 %/.test(tv.meta), 'paired TV page: head, rows, volume and state', tv);
+  await key('ArrowDown');
+  tv = await tvRows();
+  check(tv?.focus === 1, 'controller down moves the focus to Volume', tv);
+  await key('ArrowRight');
+  await sleep(300);
+  tv = await tvRows();
+  check(tv?.details[1] === '19 %', 'controller right steps the volume on the host (the mock host answers 19)', tv);
+  await key('ArrowLeft');
+  await sleep(300);
+  tv = await tvRows();
+  check(tv?.details[1] === '18 %', 'controller left steps it back', tv);
+  await key('ArrowUp');
+  await key('ArrowUp');
+  tv = await tvRows();
+  check(tv?.focus === 0, 'controller up stops at the first row', tv);
+  await key('ArrowDown');
+  await key('ArrowDown');
+  await key('Enter');
+  await sleep(500);
+  const inputs = await overlay();
+  check(!!inputs && inputs.includes('PlayStation 5') && inputs.includes('HDMI 3'), 'A on Choose input opens the input list from the TV', inputs);
+  await key('Escape');
+  await sleep(300);
+  check(await evaluate(`import('/core/nav.js').then((n) => n.currentView().id)`) === 'tv', 'B closes the list and stays on the TV page');
+  await key('Escape');
+  await sleep(300);
+  check(await evaluate(`import('/core/nav.js').then((n) => n.currentView().id !== 'tv')`), 'B on the TV page goes back');
+
+  // 16d. The same page in German, and a TV that is off.
+  await openApp('lang=de&tvoff&fresh&quiet');
+  await openTv();
+  tv = await tvRows();
+  check(tv?.labels.join() === 'Einschalten,Aktualisieren,Fernseher entfernen', 'TV page (de), TV off: German rows', tv);
+  await openApp('lang=de');
+  await openTv();
+  tv = await tvRows();
+  check(tv?.labels.join() === 'Ausschalten,Lautstärke,Eingang wählen,Aktualisieren,Fernseher entfernen' && tv.details[1] === '18 %', 'TV page (de), TV on: German rows', tv);
 } catch (e) {
   console.log('FAIL', e.message);
   failed++;
 } finally {
   console.log(failed ? `browser ui: ${failed} failed` : 'browser ui: ok');
-  cleanup();
-  setTimeout(() => process.exit(failed ? 1 : 0), 700);
+  await removeProfile();
+  process.exit(failed ? 1 : 0);
 }

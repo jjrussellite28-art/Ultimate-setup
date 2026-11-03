@@ -66,25 +66,37 @@ public sealed class WindowsSessions(IAccountLookup accounts) : ISessions, ISessi
     public IReadOnlySet<string>? SignedInSids(int? leaving)
     {
         if (!WTSEnumerateSessions(IntPtr.Zero, 0, 1, out var list, out var count)) return null;
-        var sids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
             var size = Marshal.SizeOf<SessionInfo>();
-            for (var i = 0; i < count; i++)
-            {
-                var session = Marshal.PtrToStructure<SessionInfo>(list + i * size);
-                if (session.SessionId == 0 || session.SessionId == leaving) continue;
-                var user = Query(session.SessionId, WtsUserName);
-                if (string.IsNullOrEmpty(user)) continue;
-                var domain = Query(session.SessionId, WtsDomainName);
-                // A session whose account cannot be resolved: unknown, so nothing may be dropped on its account's behalf.
-                if (accounts.SidOf(string.IsNullOrEmpty(domain) ? user : $@"{domain}\{user}") is not { } sid) return null;
-                sids.Add(sid);
-            }
+            var ids = new List<int>();
+            for (var i = 0; i < count; i++) ids.Add(Marshal.PtrToStructure<SessionInfo>(list + i * size).SessionId);
+            return Collect(ids, leaving, Query, accounts.SidOf);
         }
         finally
         {
             WTSFreeMemory(list);
+        }
+    }
+
+    /// <summary>
+    /// The account SIDs of the sessions, from the two queries (<paramref name="query"/>: session, info class → text; null when the query itself
+    /// failed). Fail-closed: a failed query, or an account that cannot be resolved, makes the whole answer null (unknown, so nothing may be
+    /// dropped or allowed on its account's behalf). Only an empty user name (a session nobody is signed in to) is skipped.
+    /// </summary>
+    public static IReadOnlySet<string>? Collect(IEnumerable<int> sessionIds, int? leaving, Func<int, int, string?> query, Func<string, string?> sidOf)
+    {
+        var sids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var id in sessionIds)
+        {
+            if (id == 0 || id == leaving) continue;
+            var user = query(id, WtsUserName);
+            if (user is null) return null;
+            if (user.Length == 0) continue;
+            var domain = query(id, WtsDomainName);
+            if (domain is null) return null;
+            if (sidOf(domain.Length == 0 ? user : $@"{domain}\{user}") is not { } sid) return null;
+            sids.Add(sid);
         }
         return sids;
     }
@@ -127,6 +139,16 @@ public sealed class WindowsSessions(IAccountLookup accounts) : ISessions, ISessi
         {
             WTSFreeMemory(buffer);
         }
+    }
+
+    [DllImport("kernel32.dll")]
+    private static extern uint WTSGetActiveConsoleSessionId();
+
+    /// <summary>The session on the physical console now; null when there is none (all disconnected) or it is session 0.</summary>
+    public static int? ActiveConsoleSessionId()
+    {
+        var id = WTSGetActiveConsoleSessionId();
+        return id is 0 or 0xFFFFFFFF ? null : (int)id;
     }
 
     public string? UserOf(int sessionId)

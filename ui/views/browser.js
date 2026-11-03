@@ -12,6 +12,7 @@ import { hue } from '../core/art.js';
 import { attempt, toast } from '../core/feedback.js';
 import { currentView, move, render, renderHints, switchTab, tabViews } from '../core/nav.js';
 import { state } from '../core/state.js';
+import { enterBrowser, leaveBrowser } from '../core/stack-rules.js';
 import { openKeyboard } from '../components/keyboard.js';
 import { chooseDialog, closeTagged, confirmDialog, openOverlay, overlayFree } from '../components/overlay.js';
 import { quick } from '../components/quick-menu.js';
@@ -62,7 +63,6 @@ export async function ensureBrowserState() {
   if (browserState) render();
 }
 /** Where the user came from when the browser opened (tab and pages on top of it), for "back" on the first page. */
-let origin = null;
 
 function loadRecent() {
   try {
@@ -382,22 +382,14 @@ function showTab() {
   const tabs = tabViews();
   const at = tabs.indexOf(browserView);
   if (at < 0) return;
-  if (currentView() !== browserView) {
-    origin = { tab: state.tab, stack: [...state.stack] };
-    state.stack = [];
-    state.tab = at;
-    sound.tab();
-  }
+  // The stack rules (core/stack-rules.js): what holds the screen stays on the stack, where the browser came from is kept once.
+  if (enterBrowser(state, at, currentView() === browserView)) sound.tab();
   browserView.focus = 'page';
   render();
 }
 
 function leaveToOrigin() {
-  if (!origin) return switchTab(0);
-  const { tab, stack } = origin;
-  origin = null;
-  state.stack = stack;
-  state.tab = tab;
+  if (!leaveBrowser(state)) return switchTab(0);
   sound.back();
   render();
 }
@@ -544,50 +536,74 @@ function layoutRect(node) {
 
 // In full screen the page leaves a strip at the top to the HUD: there the HUD says it is a website, which no page can paint over.
 let fullBadge = null;
+let badgeStrip = null;
+
+// The mark is the host of a closed shadow root (it stands in the top layer, over the tab bar, core/layers.js): no rule of a skin or a page reaches it.
+const BADGE_CSS = `
+:host { all: initial !important; display: block !important; position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; height: 30px !important;
+  z-index: 2147483000 !important; pointer-events: none !important; opacity: 1 !important; visibility: visible !important; overflow: hidden !important; zoom: 1 !important;
+  content-visibility: visible !important; contain: none !important; aspect-ratio: auto !important; }
+:host::before, :host::after { content: none !important; display: none !important; }
+:host::backdrop { display: none !important; background: none !important; }
+.strip { display: flex; align-items: center; justify-content: center; gap: 0.5em; height: 30px; background: #0f1420; border-bottom: 2px dashed rgba(120, 170, 255, 0.85);
+  color: #dfe8ff; font: 600 16px/1 'Segoe UI', sans-serif; box-sizing: border-box; overflow: hidden; white-space: nowrap; padding: 0 12px; }
+.web-badge-icon, .web-badge-label { flex-shrink: 0; }
+.web-badge-host { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.web-badge-say { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.strip.closing { background: #2a1d05; border-bottom-color: #ffb020; }
+.web-badge-warn { flex-shrink: 0; margin-left: 0.5em; padding: 3px 10px; border-radius: 4px; background: #ffb020; color: #1a1000; font-weight: 700; white-space: nowrap; }
+`;
 
 function showFullBadge(on) {
   if (!on) {
     fullBadge?.remove();
     fullBadge = null;
+    badgeStrip = null;
+    if (!window.chrome?.webview) delete window.__couchhudBadge;
     return;
   }
   if (!fullBadge?.isConnected) {
     // The web mark ("Website in full screen") never shrinks; only the host is cut (shortHost keeps the end of the domain).
     // The countdown is not read out every second (aria-live off); a screen reader hears the start of the warning once (.web-badge-say).
-    fullBadge = el('div', { id: 'web-fullscreen-badge', role: 'status' },
+    fullBadge = el('div', { id: 'web-fullscreen-badge', role: 'status' });
+    const root = fullBadge.attachShadow({ mode: 'closed' });
+    badgeStrip = el('div', { className: 'strip' },
       el('span', { className: 'web-badge-icon', textContent: '🌐' }),
       el('span', { className: 'web-badge-label' }),
       el('span', { className: 'web-badge-host' }),
       el('span', { className: 'web-badge-say' }));
+    root.append(el('style', { textContent: BADGE_CSS }), badgeStrip);
+    // The checks of the preview (never the app) read the closed root through this.
+    if (!window.chrome?.webview) window.__couchhudBadge = { root };
     document.body.append(fullBadge);
   }
-  const label = fullBadge.querySelector('.web-badge-label');
+  const label = badgeStrip.querySelector('.web-badge-label');
   const labelText = `${t('browser.fullscreenLabel')} ·`;
   if (label.textContent !== labelText) label.textContent = labelText;
   // The site of right now (a redirect in full screen changes it), on every round.
   const site = host(browserState?.url ?? '') || t('browser.dialog.page');
-  const hostEl = fullBadge.querySelector('.web-badge-host');
+  const hostEl = badgeStrip.querySelector('.web-badge-host');
   const hostText = shortHost(site);
   if (hostEl.textContent !== hostText) hostEl.textContent = hostText;
   // The unlock runs out: the page covers the HUD's toast, so the warning and its countdown are here, where no page can paint
   // (nor fake or hide it). Any key or button extends; the host then sends closesInMs null and the warning is gone.
   const left = closeCountdown(browserState, browserStateAt, performance.now());
-  const say = fullBadge.querySelector('.web-badge-say');
-  let warn = fullBadge.querySelector('.web-badge-warn');
+  const say = badgeStrip.querySelector('.web-badge-say');
+  let warn = badgeStrip.querySelector('.web-badge-warn');
   if (left === null) {
     warn?.remove();
     if (say.textContent) say.textContent = '';
-    fullBadge.classList.remove('closing');
+    badgeStrip.classList.remove('closing');
     return;
   }
   if (!warn) {
     warn = el('span', { className: 'web-badge-warn' });
     warn.setAttribute('aria-live', 'off');
-    fullBadge.insertBefore(warn, say);
+    badgeStrip.insertBefore(warn, say);
     // Said once, when the warning starts.
     say.textContent = t('browser.closesSoonSay');
   }
-  fullBadge.classList.add('closing');
+  badgeStrip.classList.add('closing');
   const warnText = t('browser.closesSoonStrip', { s: left });
   if (warn.textContent !== warnText) warn.textContent = warnText;
 }

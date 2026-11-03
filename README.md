@@ -149,7 +149,7 @@ Details, Grenzen und Lücken melden: [SECURITY.md](SECURITY.md) · [Haftungsauss
 - **Skins** sind CSS plus optionale Glyphen, Sounds und Mauszeiger: [docs/SKINS.md](docs/SKINS.md)
 - **Plugins** (C#) bringen Spiele-Quellen, Seiten, Einstellungen und Guide-Menü-Einträge: [docs/PLUGINS.md](docs/PLUGINS.md)
 - **Katalog** [`kewe87/CouchHUD-Catalog`](https://github.com/kewe87/CouchHUD-Catalog): Installieren mit A, signierter Index, Pflicht-Prüfsumme
-- Mitgeliefert: das Plugin **Wand** (Cheats und Mods), zugleich Beispiel für eigene Plugins
+- Das Plugin **Wand** liegt nur noch als Beispiel für eigene Plugins im Repository (Wand selbst ist seit 0.7 eine Begleit-App)
 
 ### Home Assistant, CaseHUD und VPN
 
@@ -315,7 +315,7 @@ Details, limits and reporting a vulnerability: [SECURITY.md](SECURITY.md#english
 - **Skins** are CSS plus optional glyphs, sounds and mouse pointer: [docs/SKINS.en.md](docs/SKINS.en.md)
 - **Plugins** (C#) add game sources, pages, settings and Guide menu entries: [docs/PLUGINS.md](docs/PLUGINS.md) (German)
 - **Catalog** [`kewe87/CouchHUD-Catalog`](https://github.com/kewe87/CouchHUD-Catalog): install with A, signed index, mandatory checksum
-- Included: the **Wand** plugin (cheats and mods), which is also the example for your own plugins
+- The **Wand** plugin is only an example for your own plugins in the repository now (Wand itself is a companion app since 0.7)
 
 ### Home Assistant, CaseHUD and the VPN
 
@@ -355,7 +355,7 @@ CI builds the setup (Inno Setup 6); the steps are in [.github/workflows/build.ym
 - System.ServiceProcess.ServiceController and System.Diagnostics.EventLog (MIT, .NET Foundation).
 - QRCoder (MIT) draws the pairing QR code.
 - Save game locations: the Ludusavi manifest, based on PCGamingWiki data (CC BY-NC-SA 3.0), downloaded at runtime, not shipped.
-- Weather: Open-Meteo.com (CC BY 4.0). Artwork: the Steam store and, with your own key, SteamGridDB.
+- Weather (weather plugin): Open-Meteo.com (CC BY 4.0). Artwork: the Steam store and, with your own key, SteamGridDB.
 - The installer is built with Inno Setup (Inno Setup License).
 - Logo, banner and screenshots are made for this project; the games shown are made up.
 

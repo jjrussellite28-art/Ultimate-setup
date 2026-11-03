@@ -443,12 +443,18 @@ public sealed class PluginFunctionTests : IDisposable
     }
 
     [Fact]
-    public void Uninstalling_a_plugin_forgets_its_levels()
+    public void Uninstalling_a_plugin_keeps_its_levels_so_a_reinstall_cannot_lift_a_lock()
     {
-        var body = Body(Hud(), "public object UninstallPlugin(");
-        Assert.Contains("ForgetFunctionLevels(ids)", body);
-        var forget = Body(Hud(), "private void ForgetFunctionLevels(");
-        Assert.Contains("c.PluginFunctionLevels.Remove(key)", forget);
+        var hud = Hud();
+        var body = Body(hud, "public async Task<object> UninstallPluginAsync(");
+        Assert.DoesNotContain("PluginFunctionLevels", body);
+        Assert.DoesNotContain("ForgetFunctionLevels", hud);
+        // Nothing at the start removes them either (that would be the same lift one restart later).
+        Assert.DoesNotContain("PruneFunctionLevels", hud);
+        Assert.False(typeof(PluginFunctionRules).GetMethod("Prune") is not null, "nothing prunes the levels");
+        // Levels are keyed by plugin id and read by it again after the reinstall.
+        var map = new Dictionary<string, Dictionary<string, string>> { ["p"] = new() { ["f"] = "restricted" } };
+        Assert.Equal("restricted", PluginFunctionRules.Stored(map, "p", "f"));
     }
 
     [Fact]
@@ -586,21 +592,10 @@ public sealed class PluginFunctionTests : IDisposable
     }
 
     [Fact]
-    public void Stored_levels_of_plugins_that_are_not_there_are_dropped_and_a_refused_uninstall_keeps_them()
+    public void A_refused_uninstall_keeps_the_levels()
     {
-        var map = new Dictionary<string, Dictionary<string, string>>
-        {
-            ["here"] = new() { ["f"] = "restricted" },
-            ["Gone"] = new() { ["f"] = "restricted" }
-        };
-        Assert.True(PluginFunctionRules.Prune(map, ["HERE", "other"]));
-        Assert.Equal(["here"], map.Keys);
-        Assert.False(PluginFunctionRules.Prune(map, ["here"]));
-        Assert.False(PluginFunctionRules.Prune(null, ["here"]));
-        var hud = Hud();
-        Assert.Contains("if (gone) ForgetFunctionLevels(ids);", Body(hud, "public object UninstallPlugin("));
-        Assert.Contains("plugins.Loaded.ContinueWith(_ => Ui(PruneFunctionLevels)", hud);
-        Assert.Contains("PluginFunctionRules.Prune(c.PluginFunctionLevels, present)", Body(hud, "private void PruneFunctionLevels("));
+        var uninstall = Body(Hud(), "public async Task<object> UninstallPluginAsync(");
+        Assert.Matches(@"if \(gone\)\s*\{[^}]*plugins\.ForgetSecrets\(ids\);\s*\}", uninstall);
     }
 
     [Fact]
@@ -770,16 +765,6 @@ public sealed class PluginFunctionTests : IDisposable
         Folder(dir, "Broken.Folder", "brokenplugin");
         var installed = m.InstalledPluginIds();
         foreach (var id in new[] { "disabledplugin", "approvalplugin", "brokenplugin", "Disabled.Folder" }) Assert.Contains(id, installed);
-        var map = new Dictionary<string, Dictionary<string, string>>
-        {
-            ["disabledplugin"] = new() { ["f"] = "off" },
-            ["approvalplugin"] = new() { ["f"] = "off" },
-            ["brokenplugin"] = new() { ["f"] = "off" },
-            ["gone"] = new() { ["f"] = "restricted" }
-        };
-        Assert.True(PluginFunctionRules.Prune(map, installed));
-        Assert.Equal(["approvalplugin", "brokenplugin", "disabledplugin"], map.Keys.Order());
-        Assert.Equal("off", map["disabledplugin"]["f"]);
     }
 
     [Fact]
@@ -792,16 +777,12 @@ public sealed class PluginFunctionTests : IDisposable
         var installed = m.InstalledPluginIds();
         Assert.DoesNotContain("markedplugin", installed);
         Assert.Contains("Still.There", installed);
-        var map = new Dictionary<string, Dictionary<string, string>> { ["markedplugin"] = new() { ["f"] = "off" }, ["neverhere"] = new() { ["f"] = "off" } };
-        Assert.True(PluginFunctionRules.Prune(map, installed));
-        Assert.Empty(map);
         // Uninstalling forgets by every id the folder was known by, also for a plugin that never loaded.
         Folder(dir, "Old.Folder", "oldplugin");
         Assert.Contains("oldplugin", m.PluginIdsOf("Old.Folder"));
         Assert.Contains("Old.Folder", m.PluginIdsOf("Old.Folder"));
         var hud = Hud();
-        Assert.Contains("plugins.PluginIdsToForget(folder)", Body(hud, "public object UninstallPlugin("));
-        Assert.Contains("plugins.InstalledPluginIds()", Body(hud, "private void PruneFunctionLevels("));
+        Assert.Contains("plugins.PluginIdsToForget(folder)", Body(hud, "public async Task<object> UninstallPluginAsync("));
     }
 
     // ---- Follow-ups: the grant of an install is used up before the work, reserved ids ----
@@ -815,11 +796,13 @@ public sealed class PluginFunctionTests : IDisposable
         var catalog = Body(hud, "public async Task<object> InstallCatalogEntryAsync(");
         Assert.Contains("CatalogInstallFlow.RunAsync(extraSkin,", catalog);
         Assert.Contains("early: () => RequirePluginChange(PluginChange.Install, PluginOrigin.ThirdParty, null, id)", catalog);
-        Assert.Contains("gate: request => UseUp(RequirePluginChange(", catalog);
+        Assert.Contains("gate: request =>", catalog);
+        Assert.Contains("var change = RequirePluginChange(", catalog);
+        Assert.Contains("UseUp(change);", catalog);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(catalog, @"UseUp\("));
         Assert.DoesNotContain("UseUp", catalog[catalog.IndexOf("return new { message, restartNeeded, state };", StringComparison.Ordinal)..]);
         // A package from a file: after the gates and the lint, before the unpacking.
-        var package = Body(hud, "public string InstallPackage(");
+        var package = Body(hud, "public async Task<object> InstallPackageAsync(");
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(package, @"UseUp\("));
         Assert.True(package.IndexOf("PluginLint.CheckZip(", StringComparison.Ordinal) < package.IndexOf("UseUp(ticket);", StringComparison.Ordinal));
         Assert.True(package.IndexOf("UseUp(ticket);", StringComparison.Ordinal) < package.IndexOf("PackageInstaller.Install(", StringComparison.Ordinal));
@@ -838,8 +821,6 @@ public sealed class PluginFunctionTests : IDisposable
         Assert.DoesNotContain("homeassistant", m.PluginIdsOf("homeassistant"));
         Assert.DoesNotContain("homeassistant", m.InstalledPluginIds());
         // So the real one's choices are not kept alive by the impostor (the real one is not installed here) ...
-        var map = new Dictionary<string, Dictionary<string, string>> { ["homeassistant"] = new() { ["actions"] = "off" } };
-        Assert.True(PluginFunctionRules.Prune(map, m.InstalledPluginIds()));
         // ... and removing the impostor does not name the id to forget.
         Assert.DoesNotContain("homeassistant", m.PluginIdsToForget("Impostor"));
         // CouchHUD's own plugin (recorded as first party in the trust list) does hold the id.
@@ -863,7 +844,7 @@ public sealed class PluginFunctionTests : IDisposable
         // The other one is marked for removal: now the first holds the id alone.
         m.Trust!.MarkRemoved("Two");
         Assert.Contains("sharedplugin", m.PluginIdsToForget("One"));
-        Assert.Contains("plugins.PluginIdsToForget(folder)", Body(Hud(), "public object UninstallPlugin("));
+        Assert.Contains("plugins.PluginIdsToForget(folder)", Body(Hud(), "public async Task<object> UninstallPluginAsync("));
     }
 
     // ---- Behaviour: one grant, checked and used up once, in a catalog install ----
@@ -961,10 +942,7 @@ public sealed class PluginFunctionTests : IDisposable
         Assert.Throws<IOException>(() => m.PluginIdsToForget("CouchHud.Plugin.HomeAssistant"));
         // The Hud keeps every choice then (the owner's "nobody" does not fall back to the plugin's weaker suggestion).
         var hud = Hud();
-        var prune = Body(hud, "private void PruneFunctionLevels(");
-        Assert.Contains("plugins.InstalledPluginIds()", prune);
-        Assert.Contains("catch (Exception ex) when (ex is InvalidOperationException or IOException", prune);
-        var uninstall = Body(hud, "public object UninstallPlugin(");
+        var uninstall = Body(hud, "public async Task<object> UninstallPluginAsync(");
         Assert.Contains("catch (IOException)", uninstall);
         Assert.True(uninstall.IndexOf("ids = [];", StringComparison.Ordinal) > uninstall.IndexOf("catch (IOException)", StringComparison.Ordinal));
         // No store at all is a fresh install, not a damaged one.

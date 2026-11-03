@@ -1,0 +1,12 @@
+/* Two layers over the whole screen that are each below the limit and cover about 0.83 together, for scripts/tabs-check.mjs: the runtime adds
+   them up and falls back to the default skin. Never for the catalog. */
+
+[data-skin="user:hostile-layers"] body::before,
+[data-skin="user:hostile-layers"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: rgba(17, 17, 17, 0.59);
+}

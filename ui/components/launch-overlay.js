@@ -74,8 +74,6 @@ export function hideLaunch({ instant = false } = {}) {
   setTimeout(() => node.remove(), FADE_MS + 60);
 }
 
-export const launching = () => !!shown;
-
 /** The start itself failed: take the transition away right away. */
 export function cancelLaunch(item) {
   if (item && shown?.item !== item) return;

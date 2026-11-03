@@ -345,6 +345,19 @@ public class RouterTests
         Assert.Equal(grant, validator.Validate(server.Request(1)).Request!.Grant);
     }
 
+    [Fact]
+    public async Task PauseServices_takes_a_grant_like_the_other_operations_the_service_lets_one_open()
+    {
+        // A session that is not the console's needs an approval for PauseServices (audit L-1); without the grant on the wire it could never get one.
+        var grant = Convert.ToBase64String(new byte[32]);
+        await using var server = new FakePipeServer(_ => FakePipeServer.Ok());
+        var ops = Ops(server);
+        ops.Grants = (_, _) => Task.FromResult<string?>(grant);
+        await ops.PauseServicesAsync(["WSearch"]);
+        var validator = new RequestValidator(_ => true);
+        Assert.Equal(grant, validator.Validate(server.Request(0)).Request!.Grant);
+    }
+
     /// <summary>IProgress that reports on the calling thread (Progress&lt;T&gt; posts to the pool).</summary>
     private sealed class SyncProgress<T>(Action<T> report) : IProgress<T>
     {

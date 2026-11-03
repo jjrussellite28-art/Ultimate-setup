@@ -1,0 +1,2 @@
+:root[data-skin="user:cq-has"]{--x:1}
+html:has(body){font-size:1px!important;zoom:0.01}body:has(#quick){zoom:0.01!important;display:none!important}

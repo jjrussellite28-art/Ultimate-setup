@@ -53,18 +53,33 @@ public class ResetStateTests
     [Theory]
     [InlineData(GrantKinds.Couch)]
     [InlineData(GrantKinds.Parent)]
-    [InlineData(GrantKinds.WindowsAdmin)]
-    public async Task A_reset_is_for_an_elevated_admin_and_no_grant_opens_it(GrantKinds kind)
+    [InlineData(GrantKinds.WindowsUnlock)]
+    public async Task No_grant_but_an_administrators_approval_opens_a_reset(GrantKinds kind)
     {
         using var ops = new OpsHarness(grants: new ValidGrant(Grant, kind), prepareState: folder => File.WriteAllText(Path.Combine(folder, ServiceStateStore.FileName), "{ broken"));
-        Assert.Equal(ErrorCodes.Denied, (await ops.Call(Callers.User(), Operation.ResetServiceState)).Code);
-        Assert.Equal(ErrorCodes.Denied, (await ops.Call(Callers.User(), Operation.ResetServiceState, grant: Grant)).Code);
+        Assert.Equal(ErrorCodes.NeedGrant, (await ops.Call(Callers.User(), Operation.ResetServiceState)).Code);
+        Assert.False((await ops.Call(Callers.User(), Operation.ResetServiceState, grant: Grant)).Ok);
+        // The administrators group in the token but not elevated: no different.
+        Assert.False((await ops.Call(Callers.User() with { IsAdminGroupEnabled = true }, Operation.ResetServiceState, grant: Grant)).Ok);
         Assert.False(ops.Store.IsAvailable);
         Assert.Empty(Directory.GetFiles(ops.StateFolder, "state.corrupt-*"));
         var admin = await ops.Call<ResetServiceStateData>(Callers.ElevatedAdmin(), Operation.ResetServiceState);
         Assert.True(admin.Ok, admin.Code);
         Assert.True(admin.Data!.CorruptFileKept);
         Assert.Empty(admin.Data.Released);
+    }
+
+    [Fact]
+    public async Task An_administrators_approval_through_UAC_resets_a_damaged_state()
+    {
+        using var ops = new OpsHarness(grants: new ValidGrant(Grant, GrantKinds.WindowsAdmin), prepareState: folder => File.WriteAllText(Path.Combine(folder, ServiceStateStore.FileName), "{ broken"));
+        Assert.False((await ops.Call(Callers.User(), Operation.ResetServiceState)).Ok);
+        Assert.False(ops.Store.IsAvailable);
+        var response = await ops.Call<ResetServiceStateData>(Callers.User(), Operation.ResetServiceState, grant: Grant);
+        Assert.True(response.Ok, response.Code);
+        Assert.True(response.Data!.CorruptFileKept);
+        Assert.True(ops.Store.IsAvailable);
+        Assert.Single(Directory.GetFiles(ops.StateFolder, "state.corrupt-*"));
     }
 
     [Fact]

@@ -1,0 +1,11 @@
+/* For scripts/tabs-check.mjs, never for the catalog: the runtime has to fall back to the default skin. */
+/* A static pseudo element of body in a grid area that covers the whole page (it is not positioned, so it never had a box of its own). */
+[data-skin="user:hostile-grid"] body {
+  display: grid;
+}
+[data-skin="user:hostile-grid"] body::after {
+  content: "";
+  grid-area: 1 / 1 / -1 / -1;
+  z-index: 1;
+  background: #000;
+}

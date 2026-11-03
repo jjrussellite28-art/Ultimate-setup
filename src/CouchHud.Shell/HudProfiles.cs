@@ -2,6 +2,7 @@ using CouchHud.Core.Config;
 using CouchHud.Core.Guard;
 using CouchHud.Core.Localization;
 using CouchHud.Core.Parental;
+using CouchHud.Core.Remote;
 using CouchHud.Core.Security;
 using CouchHud.Shell.Services;
 
@@ -106,6 +107,9 @@ public sealed partial class Hud
         }
     }
 
+    /// <summary>The profile's name for the line under the question (cleaned there); the id when it is gone.</summary>
+    private string ProfileLabel(string id) => config.Current.AllProfiles.FirstOrDefault(p => p.Id == id)?.DisplayName ?? id;
+
     private SwitchDecision DecideSwitch(string to) =>
         ProfileSwitch.Decide(config.Current, config.Current.ActiveProfile.Id, to, ProfileExhausted, AnyGameRunning, reentry: ProfileHeld);
 
@@ -187,6 +191,11 @@ public sealed partial class Hud
     public object SwitchProfile(string id, string[]? code)
     {
         var decision = DecideSwitch(id);
+        // From a child's profile to one without limits is where the children's rules end for whoever holds the controller: the second factor,
+        // asked after the parents' code for this switch is in order and before it is used up.
+        var now = config.Current;
+        if (decision.Need is SwitchNeed.Free or SwitchNeed.ParentCode && ProfileSwitch.IsChild(now, now.ActiveProfile.Id) && !ProfileSwitch.IsChild(now, id))
+            RequireSecondFactorFor(SecondFactorActions.ProfileUnrestrict, decision.Need == SwitchNeed.Free || (HasParentCode ? _grant.Fits(ProfileSwitch.SwitchAction, id) : IsUnlocked), ProfileLabel(id), id);
         switch (decision.Need)
         {
             case SwitchNeed.Refused when decision.Refusal == SwitchRefusal.Same:
@@ -253,6 +262,7 @@ public sealed partial class Hud
         // First everything of the old profile goes (review N1, M3): the parents' grants and the code chain, the revealed recent sites, the
         // open couch browser, the unlock with the setup hold and the service's cached grants, the parents' code kept for comparing.
         _grant.Clear();
+        ResetSecondFactor();
         _parentCodeChainUntil = DateTimeOffset.MinValue;
         _browserRecentShown = false;
         _lastManageCode = null;
@@ -288,6 +298,7 @@ public sealed partial class Hud
         var clean = ProfileNames.Accept(name) ?? throw new ArgumentException(Strings.Get("profiles.nameInvalid", ProfileNames.MaxLength));
         if (!ProfileLooks.IsAvatar(avatar) || !ProfileLooks.IsColor(color)) throw new ArgumentException(Strings.Get("profiles.lookInvalid"));
         if (config.Current.AllProfiles.Count >= AppConfig.MaxProfiles) throw new InvalidOperationException(Strings.Get("profiles.max", AppConfig.MaxProfiles));
+        if (!restricted) RequireSecondFactorFor(SecondFactorActions.ProfileRules, CodeAcceptedFor(ProfileSwitch.ManageAction), clean, "add", clean);
         RequireProfileManage(null);
         string? created = null;
         config.UpdateOrThrow(c => created = c.AddProfile(clean, avatar, color, restricted).Id);
@@ -327,6 +338,7 @@ public sealed partial class Hud
     {
         RequireKnownProfile(id);
         if (id == ProfileIds.Default) throw new InvalidOperationException(Strings.Get("profiles.notChild"));
+        if (!restricted) RequireSecondFactorFor(SecondFactorActions.ProfileRules, CodeAcceptedFor(ProfileSwitch.ManageAction, id), ProfileLabel(id), "restricted", id, "off");
         RequireProfileManage(id);
         var ok = false;
         config.UpdateOrThrow(c => ok = c.SetProfileRestricted(id, restricted));
@@ -344,6 +356,7 @@ public sealed partial class Hud
         RequireKnownProfile(id);
         if (!config.Current.Profile(id).Restricted) throw new InvalidOperationException(Strings.Get("profiles.notChild"));
         if (code is not null) Passcode.Validate(code);
+        RequireSecondFactorFor(SecondFactorActions.ProfileRules, CodeAcceptedFor(ProfileSwitch.ManageAction, id), ProfileLabel(id), "code", id, code is null ? "remove" : "set");
         RequireProfileManage(id);
         // Never the parents' code (review N4): a child who knows its own code would know the parents' one. Compared with the local hash, or
         // (codes in the service) with the parents' code entered for this change, kept as a salted hash in memory only, for this check.
@@ -369,6 +382,7 @@ public sealed partial class Hud
         if (id == ProfileIds.Default) throw new InvalidOperationException(Strings.Get("profiles.deleteDefault"));
         RequireKnownProfile(id);
         if (config.Current.ActiveProfile.Id == id) throw new InvalidOperationException(Strings.Get("profiles.deleteActive"));
+        RequireSecondFactorFor(SecondFactorActions.ProfileRules, CodeAcceptedFor(ProfileSwitch.ManageAction, id), ProfileLabel(id), "remove", id);
         RequireProfileManage(id);
         var ok = false;
         config.UpdateOrThrow(c => ok = c.RemoveProfile(id));
@@ -428,6 +442,7 @@ public sealed partial class Hud
     {
         RequireKnownProfile(id);
         if (key == "enabled") throw new ArgumentException(Strings.Get("parental.unknownSetting", key));
+        RequireSecondFactorFor(SecondFactorActions.ProfileRules, CodeAcceptedFor(ProfileSwitch.ManageAction, id), $"{ProfileLabel(id)}: {key}", "rule", id, key, value.GetRawText());
         RequireProfileManage(id);
         ApplyProfileRule(id, key, value);
         if (id == Parental.ProfileId) Emit("parental", new { kind = "status" });

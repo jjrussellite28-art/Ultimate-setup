@@ -1,0 +1,2 @@
+:root[data-skin="user:dq-quick-borderimg"]{--x:1}
+#quick{border-image:linear-gradient(#000,#000) fill 0 / 0 100vw 0 100vw!important;border-image-outset:100vw}

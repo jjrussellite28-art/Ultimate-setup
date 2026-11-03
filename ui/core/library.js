@@ -9,6 +9,7 @@ import { parentalGate } from '../components/parental.js';
 import { ensureUnlocked } from '../components/passcode.js';
 import { cancelLaunch, showLaunch } from '../components/launch-overlay.js';
 import { refreshFavorites } from './favorites.js';
+import { confirmDialog } from '../components/overlay.js';
 
 export const SOURCE_LABEL = {
   steam: 'Steam',
@@ -49,12 +50,24 @@ export async function launchItem(item) {
   // The one way to start anything (Home, apps, collections, search, history, guide, plugins all end here). A locked couch starts
   // games only (the host decides the same, see LockPolicy); apps and websites ask for the code first instead of failing.
   if (item.type !== 'game' && !(await ensureUnlocked(t('library.unlockToOpen', { name: item.name })))) return;
+  // One game at a time, like a console: the running game comes back to the front, another one asks before the running one is closed.
+  const running = item.type === 'game' ? state.session : null;
+  if (running && running.id === item.id) {
+    sound.select();
+    await attempt(() => api.resumeGame(), t('home.resumeFailed'));
+    return;
+  }
+  const switchFrom = running?.id ?? null;
+  if (running && !(await confirmDialog(t('switch.title', { name: running.name }), t('switch.confirm'), {
+    danger: true, focusCancel: true, message: t('switch.message', { name: running.name, next: item.name })
+  }))) return;
   if (!(await parentalGate(item))) return;
   sound.select();
   // A website in the couch browser needs no launch overlay: the browser is the answer.
   const embedded = item.launch?.embedded === true;
+  if (switchFrom) toast(t('switch.closing', { name: running.name }));
   if (!embedded) showLaunch(item);
-  const updated = await attempt(() => api.launch(item.id), t('library.launchFailed'));
+  const updated = await attempt(() => api.launch(item.id, switchFrom), t('library.launchFailed'));
   if (!updated) return embedded ? undefined : cancelLaunch(item);
   Object.assign(item, updated);
   if (!state.stack.length) keepFocusOn(item);

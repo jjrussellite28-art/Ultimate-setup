@@ -1,0 +1,20 @@
+{
+  "id": "webostv",
+  "folder": "CouchHud.Plugin.WebOsTv",
+  "version": "1.0.0",
+  "sha256": "",
+  "sdk": 5,
+  "minCouchHud": "0.7.0",
+  "capabilities": [
+    "tv.control"
+  ],
+  "publisherKey": "",
+  "license": "GPL-3.0-only",
+  "author": "kewe87",
+  "name": "LG webOS",
+  "summary": "Pair and control LG TVs with webOS: on/off, volume and HDMI inputs, only through CouchHUD and only the paired TV",
+  "icon": {
+    "sha256": "fdb230ac547ff8ac8f88d8fe752c18531bff5d77eb1b283b1b4bf9aeb68af9ed",
+    "bytes": 37308
+  }
+}

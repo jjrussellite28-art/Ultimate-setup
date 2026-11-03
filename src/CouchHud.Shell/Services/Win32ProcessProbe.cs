@@ -55,28 +55,88 @@ public sealed class Win32ProcessProbe : IProcessProbe
         return key?.GetValue("RunningAppID") is int id ? id : 0;
     }
 
-    /// <summary>Brings the biggest visible window of the given processes to the front.</summary>
-    public static bool Activate(IReadOnlyCollection<int> pids)
+    /// <summary>
+    /// Brings the main window of the given processes to the front (see <see cref="GameFront.PickWindow"/>): only a window the program
+    /// really shows, judged by its normal size even while minimized, and with the same means CouchHUD uses for itself
+    /// (<see cref="ForceForeground"/>), because a plain SetForegroundWindow is refused by Windows when the last press came from the
+    /// controller and not from Windows' own input. True when the window is in front afterwards.
+    /// </summary>
+    public static bool Activate(IReadOnlyCollection<int> pids) => PickAndFront(pids, out _) == GameFocusResult.InFront;
+
+    /// <summary>
+    /// The game's window, handed the front (the HUD's Resume game). Logs nothing about the window (its title may name a profile or a server).
+    /// A full-screen game coming back from minimized may answer late: one more try after a moment, awaited, so the UI thread keeps running.
+    /// </summary>
+    public static async Task<GameFocusResult> ActivateGameAsync(IReadOnlyCollection<int> pids)
     {
-        var best = IntPtr.Zero;
-        long bestArea = 0;
+        var result = PickAndFront(pids, out var hwnd);
+        if (result != GameFocusResult.Refused) return result;
+        await Task.Delay(150);
+        return ForceForeground(hwnd) ? GameFocusResult.InFront : GameFocusResult.Refused;
+    }
+
+    /// <summary>Whether the processes show a window that could take the front (read-only: nothing is changed).</summary>
+    public static bool HasGameWindow(IReadOnlyCollection<int> pids)
+    {
+        var real = pids.Where(p => p > 0).ToHashSet();
+        return real.Count > 0 && GameFront.PickWindow(GameWindows(real), real) is not null;
+    }
+
+    /// <summary>The handle of the window <see cref="HasGameWindow"/> counts (the game's main window: see GameFront.PickWindow), or 0. Read-only.</summary>
+    public static long GameMainWindow(IReadOnlyCollection<int> pids)
+    {
+        var real = pids.Where(p => p > 0).ToHashSet();
+        return real.Count == 0 ? 0 : GameFront.PickWindow(GameWindows(real), real)?.Handle ?? 0;
+    }
+
+    private static GameFocusResult PickAndFront(IReadOnlyCollection<int> pids, out IntPtr hwnd)
+    {
+        hwnd = IntPtr.Zero;
+        var real = pids.Where(p => p > 0).ToHashSet();
+        if (real.Count == 0) return GameFocusResult.NoWindow;
+        var window = GameFront.PickWindow(GameWindows(real), real);
+        if (window is null) return GameFocusResult.NoWindow;
+        hwnd = new IntPtr(window.Handle);
+        // CouchHUD is in front right now and may pass the right on: the game's process gets it before the switch.
+        NativeMethods.AllowSetForegroundWindow(window.Pid);
+        return ForceForeground(hwnd) ? GameFocusResult.InFront : GameFocusResult.Refused;
+    }
+
+    /// <summary>The top-level windows of these processes, as <see cref="GameFront.PickWindow"/> needs them.</summary>
+    private static List<GameWindow> GameWindows(HashSet<int> pids)
+    {
+        var list = new List<GameWindow>();
+        var z = 0;
         NativeMethods.EnumWindows((hWnd, _) =>
         {
+            z++;
             NativeMethods.GetWindowThreadProcessId(hWnd, out var pid);
-            if (!pids.Contains(pid) || !NativeMethods.IsWindowVisible(hWnd)) return true;
-            if (!NativeMethods.GetWindowRect(hWnd, out var r)) return true;
-            long area = (long)(r.Right - r.Left) * (r.Bottom - r.Top);
-            if (area > bestArea)
+            if (!pids.Contains(pid)) return true;
+            const int GwlExStyle = -20, WsExToolWindow = 0x80;
+            var cloaked = NativeMethods.DwmGetWindowAttribute(hWnd, NativeMethods.DwmwaCloaked, out var c, sizeof(int)) == 0 && c != 0;
+            var minimized = NativeMethods.IsIconic(hWnd);
+            int width = 0, height = 0;
+            if (minimized)
             {
-                bestArea = area;
-                best = hWnd;
+                var placement = new NativeMethods.WindowPlacement { Length = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.WindowPlacement>() };
+                if (NativeMethods.GetWindowPlacement(hWnd, ref placement))
+                {
+                    width = placement.NormalPosition.Right - placement.NormalPosition.Left;
+                    height = placement.NormalPosition.Bottom - placement.NormalPosition.Top;
+                }
             }
+            else if (NativeMethods.GetWindowRect(hWnd, out var r))
+            {
+                width = r.Right - r.Left;
+                height = r.Bottom - r.Top;
+            }
+            list.Add(new GameWindow(hWnd.ToInt64(), pid, NativeMethods.IsWindowVisible(hWnd), cloaked,
+                ToolWindow: (NativeMethods.GetWindowLong(hWnd, GwlExStyle) & WsExToolWindow) != 0,
+                Owned: NativeMethods.GetWindow(hWnd, 4 /* GW_OWNER */) != IntPtr.Zero,
+                minimized, width, height, Titled: NativeMethods.GetWindowTextLength(hWnd) > 0, z));
             return true;
         }, IntPtr.Zero);
-
-        if (best == IntPtr.Zero) return false;
-        NativeMethods.ShowWindow(best, NativeMethods.SwRestore);
-        return NativeMethods.SetForegroundWindow(best);
+        return list;
     }
 
     /// <summary>Visible, titled, unowned top-level windows of other processes (what a user would call an app window).</summary>
@@ -194,8 +254,14 @@ public sealed class Win32ProcessProbe : IProcessProbe
         try
         {
             const uint flags = NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpShowWindow | NativeMethods.SwpNoActivate;
-            NativeMethods.SetWindowPos(hwnd, NativeMethods.HwndTopmost, 0, 0, 0, 0, flags);
-            NativeMethods.SetWindowPos(hwnd, NativeMethods.HwndNoTopmost, 0, 0, 0, 0, flags);
+            // The flip lifts the window above the others; a window that is topmost by itself (some full-screen games) is above them
+            // already and must stay topmost, the flip would take that away.
+            const int GwlExStyle = -20, WsExTopmost = 0x8;
+            if ((NativeMethods.GetWindowLong(hwnd, GwlExStyle) & WsExTopmost) == 0)
+            {
+                NativeMethods.SetWindowPos(hwnd, NativeMethods.HwndTopmost, 0, 0, 0, 0, flags);
+                NativeMethods.SetWindowPos(hwnd, NativeMethods.HwndNoTopmost, 0, 0, 0, 0, flags);
+            }
             NativeMethods.BringWindowToTop(hwnd);
             NativeMethods.SetForegroundWindow(hwnd);
         }
@@ -241,11 +307,15 @@ public sealed class Win32ProcessProbe : IProcessProbe
     /// <summary>
     /// Asks the game to close, then ends it after a grace period. Only the processes that are still the ones the tracker saw
     /// (same start time and image) are touched, never a stranger that got an old process id (see <see cref="SafeTermination"/>).
+    /// Game clients (Steam, Epic …) are spared even when the game started them, unless the client is the session's own entry
+    /// (<see cref="SafeTermination.SpareClients"/>).
     /// </summary>
     /// <param name="force">End right away, for a game that hangs.</param>
-    public static async Task QuitAsync(IReadOnlyDictionary<int, ProcessStamp> stamps, bool force = false, TimeSpan? grace = null, CancellationToken cancel = default)
+    public static async Task<SafeTermination.Outcome> QuitAsync(IReadOnlyDictionary<int, ProcessStamp> stamps, bool force = false, TimeSpan? grace = null, CancellationToken cancel = default, Func<bool>? mayEnd = null)
     {
-        var outcome = await SafeTermination.QuitAsync(Win32ProcessControl.Instance, stamps, force, force ? TimeSpan.Zero : grace ?? TimeSpan.FromSeconds(4), cancel).ConfigureAwait(false);
+        var outcome = await SafeTermination.QuitAsync(Win32ProcessControl.Instance, stamps, force, force ? TimeSpan.Zero : grace ?? TimeSpan.FromSeconds(4), cancel,
+            spare: SafeTermination.SpareClients(stamps), mayEnd: mayEnd).ConfigureAwait(false);
         if (outcome.Found == 0) throw new InvalidOperationException(Strings.Get("hud.cannotCloseGame"));
+        return outcome;
     }
 }

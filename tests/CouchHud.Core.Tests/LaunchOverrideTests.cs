@@ -478,6 +478,195 @@ public sealed class LaunchOverrideTests
         Assert.False(config.Current.Overrides.ContainsKey(item.Id));
     }
 
+    /// <summary>Call of Duty as a found folder: the program in _retail_ (the install folder), the main folder above it, a library folder around.</summary>
+    private static (string Library, string Main, string Retail, string Exe) CallOfDuty()
+    {
+        var library = Directory.CreateDirectory(Path.Combine(Directory.CreateTempSubdirectory("couchhud-cod-").FullName, "Program Files (x86)")).FullName;
+        var main = Directory.CreateDirectory(Path.Combine(library, "Call of Duty")).FullName;
+        var retail = Directory.CreateDirectory(Path.Combine(main, "_retail_")).FullName;
+        var exe = Path.Combine(retail, "cod.exe");
+        File.WriteAllText(exe, "");
+        return (library, main, retail, exe);
+    }
+
+    [Fact]
+    public void A_batch_file_in_the_main_folder_above_the_program_folder_is_a_start_target()
+    {
+        // 0.6.3 (Kevin, Call of Duty): the found entry's install folder is _retail_ (the exe's folder), so start.cmd in "Call of Duty"
+        // was refused as outside the game's folder.
+        var (_, main, retail, exe) = CallOfDuty();
+        var script = Path.Combine(main, "start dx12.cmd");
+        File.WriteAllText(script, "@echo off\r\nstart \"\" \"_retail_\\cod.exe\" -d3d12\r\n");
+        var item = Folder(retail, exe);
+        Assert.Equal(main + "\\", LaunchOverrides.ScriptRoot(item, Fs()));
+        var o = new ItemOverride();
+        LaunchOverrides.Apply(o, item, new LaunchOverrideChange { SetTarget = true, Target = script }, Fs());
+        Assert.Equal(script, o.LaunchTarget);
+        // Still pinned: the content approved with the pick.
+        Assert.Equal(FileFingerprint.Read(script), FileFingerprint.Pinned(o));
+        var start = LaunchOverrides.Effective(item, o, Fs());
+        Assert.Equal(script, start.Target);
+        Assert.Equal(main, start.WorkingDirectory);
+        Assert.Equal(FileFingerprint.Pinned(o), LaunchOverrides.PinFor(start, o));
+        // The main folder and the program folder are working folders a batch file may have; the library folder is not.
+        LaunchOverrides.Apply(o, item, new LaunchOverrideChange { SetCwd = true, Cwd = main }, Fs());
+        LaunchOverrides.Apply(o, item, new LaunchOverrideChange { SetCwd = true, Cwd = retail }, Fs());
+        Assert.Throws<ArgumentException>(() => LaunchOverrides.Apply(o, item, new LaunchOverrideChange { SetCwd = true, Cwd = Path.GetDirectoryName(main) }, Fs()));
+        // Changed afterwards: the start is refused as before.
+        File.AppendAllText(script, "del *.*\r\n");
+        Assert.Throws<InvalidOperationException>(() => LaunchOverrides.Effective(item, o, Fs()));
+    }
+
+    [Fact]
+    public void A_program_folder_name_never_leads_up_to_a_library_folder()
+    {
+        // Security review M2: D:\Games\bin\game.exe would reach D:\Games, a watched library folder that holds every game.
+        var root = Directory.CreateTempSubdirectory("couchhud-lib-").FullName;
+        var games = Directory.CreateDirectory(Path.Combine(root, "Games")).FullName;
+        var bin = Directory.CreateDirectory(Path.Combine(games, "bin")).FullName;
+        var x64 = Directory.CreateDirectory(Path.Combine(games, "x64")).FullName;
+        var other = Directory.CreateDirectory(Path.Combine(games, "Other Game")).FullName;
+        var item = Folder(bin, Path.Combine(bin, "game.exe"));
+        // Nothing known about the library: the old behaviour (what the review found).
+        Assert.Equal(games + "\\", LaunchOverrides.ScriptRoot(item, Fs()));
+        // The folder is a watched game folder, or another entry lives in it: not reached, in either layout.
+        var watched = Fs() with { LibraryFolders = _ => [games] };
+        Assert.Equal(bin + "\\", LaunchOverrides.ScriptRoot(item, watched));
+        Assert.Equal(x64 + "\\", LaunchOverrides.ScriptRoot(Folder(x64, Path.Combine(x64, "game.exe")), watched));
+        var sibling = Fs() with { LibraryFolders = _ => [other] };
+        Assert.Equal(bin + "\\", LaunchOverrides.ScriptRoot(item, sibling));
+        // A script in the library folder is refused, one in the program folder is fine; the message names the folder to move it to.
+        var script = Path.Combine(games, "all.cmd");
+        File.WriteAllText(script, "@echo off\r\n");
+        var ex = Assert.Throws<ArgumentException>(() => LaunchOverrides.ValidateTarget(script, item, watched));
+        Assert.Contains(bin, ex.Message);
+        var own = Path.Combine(bin, "own.cmd");
+        File.WriteAllText(own, "@echo off\r\n");
+        Assert.Equal(own, LaunchOverrides.ValidateTarget(own, item, watched));
+        // Its own folder tree is no reason to stop: Call of Duty with a watched library around still reaches its main folder.
+        var (library, main, retail, exe) = CallOfDuty();
+        var cod = Folder(retail, exe);
+        Assert.Equal(main + "\\", LaunchOverrides.ScriptRoot(cod, Fs() with { LibraryFolders = _ => [Path.GetDirectoryName(library)!] }));
+        Assert.Equal(retail + "\\", LaunchOverrides.ScriptRoot(cod, Fs() with { LibraryFolders = _ => [Path.Combine(main, "Other Edition")] }));
+        // A Steam library: steamapps\common is never reached, also without a watched folder.
+        var common = Directory.CreateDirectory(Path.Combine(root, "SteamLibrary", "steamapps", "common")).FullName;
+        var steamBin = Directory.CreateDirectory(Path.Combine(common, "bin")).FullName;
+        Assert.Equal(steamBin + "\\", LaunchOverrides.ScriptRoot(Folder(steamBin, Path.Combine(steamBin, "a.exe")), Fs()));
+        // The folder above steamapps\common (the library folder) is not reached through a program folder either.
+        var libRoot = Path.Combine(root, "SteamLibrary");
+        var hasCommon = Fs();
+        Assert.True(hasCommon.DirectoryExists(Path.Combine(libRoot, "steamapps", "common")));
+        var topBin = Directory.CreateDirectory(Path.Combine(libRoot, "bin")).FullName;
+        Assert.Equal(topBin + "\\", LaunchOverrides.ScriptRoot(Folder(topBin, Path.Combine(topBin, "a.exe")), hasCommon));
+    }
+
+    [Fact]
+    public void The_folders_of_all_accounts_are_no_game_folder()
+    {
+        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var users = Path.GetDirectoryName(profile)!;
+        var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        foreach (var folder in new[] { users, Path.Combine(users, "Public"), programData })
+        {
+            Assert.Null(GameSessionTracker.SaneRoot(folder));
+            // A program folder name below one of them stops there: the batch file's folder never becomes the parent.
+            var below = Path.Combine(folder, "bin");
+            Assert.Equal(below + "\\", LaunchOverrides.ScriptRoot(Folder(below, Path.Combine(below, "a.exe")), Fs()));
+        }
+        // A folder below them is an ordinary game folder.
+        Assert.NotNull(GameSessionTracker.SaneRoot(Path.Combine(users, "Public", "Games")));
+    }
+
+    [Fact]
+    public void A_linked_main_folder_refuses_the_working_folder_below_it()
+    {
+        // Security review L4: the main folder above the install folder is checked as a link too, not only the folders below it.
+        var (_, main, retail, exe) = CallOfDuty();
+        var item = Folder(retail, exe);
+        var script = Path.Combine(main, "start.cmd");
+        File.WriteAllText(script, "@echo off\r\n");
+        var sub = Directory.CreateDirectory(Path.Combine(main, "mods")).FullName;
+        var o = new ItemOverride();
+        LaunchOverrides.Apply(o, item, new LaunchOverrideChange { SetTarget = true, Target = script }, Fs());
+        LaunchOverrides.Apply(o, item, new LaunchOverrideChange { SetCwd = true, Cwd = sub }, Fs());
+        var mainIsLink = Fs(redirect: p => string.Equals(p.TrimEnd('\\'), main.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase));
+        Assert.Throws<ArgumentException>(() => LaunchOverrides.Apply(o, item, new LaunchOverrideChange { SetCwd = true, Cwd = sub }, mainIsLink));
+    }
+
+    [Fact]
+    public void A_start_script_in_a_linked_main_folder_is_refused_when_picked()
+    {
+        // Review LOW-4: ValidateTarget checks the main folder above the install folder as a link, like the working folder.
+        var (_, main, retail, exe) = CallOfDuty();
+        var item = Folder(retail, exe);
+        var script = Path.Combine(main, "start.cmd");
+        File.WriteAllText(script, "@echo off"+"\r\n");
+        Assert.Equal(script, LaunchOverrides.ValidateTarget(script, item, Fs()));
+        var mainIsLink = Fs(redirect: p => string.Equals(p.TrimEnd('\\'), main.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase));
+        Assert.Throws<ArgumentException>(() => LaunchOverrides.ValidateTarget(script, item, mainIsLink));
+    }
+
+    [Fact]
+    public void The_main_folder_is_only_reached_through_program_folder_names_and_only_for_batch_files()
+    {
+        var (library, main, retail, exe) = CallOfDuty();
+        var item = Folder(retail, exe);
+        // An .exe stays inside the install folder (the play time goes by it); the refusal says how to do it instead.
+        var mainExe = Path.Combine(main, "Launcher.exe");
+        File.WriteAllText(mainExe, "");
+        var ex = Assert.Throws<ArgumentException>(() => LaunchOverrides.ValidateTarget(mainExe, item, Fs()));
+        Assert.Contains(retail, ex.Message);
+        Assert.Contains(".cmd", ex.Message);
+        // A batch file in the library folder above the main folder: refused, and the message names the folder to move it to.
+        var libraryScript = Path.Combine(library, "all.cmd");
+        File.WriteAllText(libraryScript, "@echo off\r\n");
+        ex = Assert.Throws<ArgumentException>(() => LaunchOverrides.ValidateTarget(libraryScript, item, Fs()));
+        Assert.Contains(main, ex.Message);
+        // An install folder with an ordinary name ("My Game" in D:\Games) does not open its parent: the library folder holds every game.
+        var (dir, gameExe, _, _) = GameFolder();
+        var nextTo = Path.Combine(Path.GetDirectoryName(dir)!, "next to.cmd");
+        File.WriteAllText(nextTo, "@echo off\r\n");
+        var game = Folder(dir, gameExe);
+        Assert.Equal(dir + "\\", LaunchOverrides.ScriptRoot(game, Fs()));
+        Assert.Throws<ArgumentException>(() => LaunchOverrides.ValidateTarget(nextTo, game, Fs()));
+        // Unreal's Binaries\Win64 and bin\x64 lead up to the game's folder, a Steam library's "common" is never reached.
+        var common = Directory.CreateDirectory(Path.Combine(Directory.CreateTempSubdirectory("couchhud-steam-").FullName, "steamapps", "common")).FullName;
+        var unreal = Directory.CreateDirectory(Path.Combine(common, "Some Game", "Binaries", "Win64")).FullName;
+        Assert.Equal(Path.Combine(common, "Some Game") + "\\", LaunchOverrides.ScriptRoot(Folder(unreal, Path.Combine(unreal, "Game.exe")), Fs()));
+        var bin = Directory.CreateDirectory(Path.Combine(common, "Witcher", "bin", "x64")).FullName;
+        Assert.Equal(Path.Combine(common, "Witcher") + "\\", LaunchOverrides.ScriptRoot(Folder(bin, Path.Combine(bin, "witcher3.exe")), Fs()));
+        // Never a drive or a program folder itself.
+        var x86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+        if (x86.Length > 0)
+        {
+            var underPf = Path.Combine(x86, "bin");
+            Assert.Equal(underPf + "\\", LaunchOverrides.ScriptRoot(Folder(underPf, Path.Combine(underPf, "a.exe")), Fs()));
+        }
+        Assert.Equal(@"C:\bin\", LaunchOverrides.ScriptRoot(Folder(@"C:\bin", @"C:\bin\a.exe"), Fs()));
+    }
+
+    [Fact]
+    public void A_batch_file_in_the_main_folder_keeps_the_link_checks_of_its_working_folder()
+    {
+        var (_, main, retail, exe) = CallOfDuty();
+        var item = Folder(retail, exe);
+        var script = Path.Combine(retail, "inside.cmd");
+        File.WriteAllText(script, "@echo off\r\n");
+        // Inside the install folder: checked from it as before (the install folder itself may be a link: a library on another drive).
+        var linkRetail = Fs(redirect: p => p.TrimEnd('\\').Equals(retail, StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(script, LaunchOverrides.ValidateTarget(script, item, linkRetail));
+        // A batch file in the main folder whose working folder is a link below it (a folder swapped for one elsewhere): refused.
+        var top = Path.Combine(main, "top.cmd");
+        File.WriteAllText(top, "@echo off\r\n");
+        var tools = Directory.CreateDirectory(Path.Combine(main, "tools")).FullName;
+        var o = new ItemOverride();
+        LaunchOverrides.Apply(o, item, new LaunchOverrideChange { SetTarget = true, Target = top }, Fs());
+        var linkTools = Fs(redirect: p => p.TrimEnd('\\').Equals(tools, StringComparison.OrdinalIgnoreCase));
+        Assert.Throws<ArgumentException>(() => LaunchOverrides.Apply(o, item, new LaunchOverrideChange { SetCwd = true, Cwd = tools }, linkTools));
+        LaunchOverrides.Apply(o, item, new LaunchOverrideChange { SetCwd = true, Cwd = tools }, Fs());
+        Assert.Throws<InvalidOperationException>(() => LaunchOverrides.Effective(item, o, linkTools));
+    }
+
     private sealed class FixedProvider(params LibraryItem[] items) : ILibraryProvider
     {
         public string Name => "fixed";

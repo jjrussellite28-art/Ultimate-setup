@@ -39,6 +39,9 @@ public sealed record CatalogRow(
 
     public string? License { get; init; }
     public IReadOnlyList<string> Capabilities { get; init; } = [];
+
+    /// <summary>The network services the signed statement declares (id and hosts), shown in the approval text.</summary>
+    public IReadOnlyList<PackageService> Services { get; init; } = [];
     public long? Size { get; init; }
 
     /// <summary>Why an unavailable entry is: needsNewer (CouchHUD too old) or officialFirst (load CouchHUD's own catalog first); null otherwise.</summary>
@@ -46,6 +49,11 @@ public sealed record CatalogRow(
 
     /// <summary>An update that asks for capabilities the installed version does not have: the host treats it like a new install (warning and code again).</summary>
     public bool AddsCapabilities { get; init; }
+
+    /// <summary>The catalog category (an id of <see cref="CatalogCategories.All"/>) and its name in the current language; the page groups and filters by the id.</summary>
+    public string Category { get; init; } = CatalogCategories.Other;
+
+    public string CategoryLabel { get; init; } = "";
 }
 
 /// <summary>The detail page of an entry: the row, the long text, the verified screenshots and the changelog.</summary>
@@ -82,6 +90,12 @@ public sealed class CatalogManager
     /// no skin is updated automatically. Plugins are only staged for the next start and need no such gate.
     /// </summary>
     public Func<bool> SkinAutoAllowed { get; init; } = () => false;
+
+    /// <summary>
+    /// May a plugin that was just installed start now (the gate of the host again: locked couch, child's profile, expert mode for another developer's
+    /// plugin)? Asked right before the start. Without it nothing starts at once.
+    /// </summary>
+    public Func<PluginOrigin, bool> StartAllowed { get; init; } = _ => false;
 
     /// <summary>Gets the skins back that left the app in 0.6 (see <see cref="CouchHud.Core.Skins.SkinRestore"/>), through the same service as every catalog install.</summary>
     public CouchHud.Core.Skins.SkinRestore SkinRestore => new(_dataDir, _restoreService, () => CatalogRules.AppVersion);
@@ -317,13 +331,16 @@ public sealed class CatalogManager
                 originProblem ?? (sdkTooNew ? Strings.Get("catalog.needsSdk", verified!.Statement.Sdk) : installed && word == "installed" ? null : CatalogRules.Reason(e, app)), e.Homepage, IconOf(e), e.MinCouchHud, e.Unsigned)
             {
                 Extra = e.Extra,
+                Category = e.Category,
+                CategoryLabel = CatalogCategories.Label(e.Category),
                 Origin = verified?.Origin switch { PluginOrigin.FirstParty => "firstParty", PluginOrigin.ThirdParty => "thirdParty", _ => e.Extra && e.Kind == CatalogKind.Plugin ? "thirdParty" : "local" },
                 Publisher = verified?.Origin == PluginOrigin.ThirdParty ? PackageStatements.ShortFingerprint(verified.KeyFingerprint) : null,
                 License = verified?.Statement.License ?? e.License,
                 Capabilities = verified?.Statement.Capabilities ?? e.Capabilities,
                 Size = verified?.Statement.Size ?? e.Size,
                 AddsCapabilities = word == "update" && e.Kind == CatalogKind.Plugin && verified is not null
-                    && CapabilityCompare.Added(new PluginTrust(_dataDir).Entry(e.Folder)?.Capabilities ?? (IEnumerable<string>)PluginPolicy.Legacy, verified.Statement.Capabilities).Count > 0,
+                    && CapabilityCompare.AddsRights(new PluginTrust(_dataDir).Entry(e.Folder), verified.Statement),
+                Services = verified?.Statement.Services ?? [],
                 ReasonCode = e.Problem is not null && e.Extra && e.Problem == Strings.Get("catalog.source.officialFirst") ? "officialFirst"
                     : e.Problem is null && (sdkTooNew || !CatalogRules.IsCompatible(e, app)) ? "needsNewer" : null
             };
@@ -368,9 +385,10 @@ public sealed class CatalogManager
             {
                 if (generation == _generation) _last = result;
             }
+            var (message, restartNeeded) = await StartInstalledAsync(entry, outcome);
             RaiseIfOfficial(result);
             PublishUpdates(Describe(result), announce: false);
-            return (outcome.Message, outcome.RestartNeeded, Describe(result));
+            return (message, restartNeeded, Describe(result));
         }
         finally
         {
@@ -378,12 +396,47 @@ public sealed class CatalogManager
         }
     }
 
-    /// <summary>Removes a user plugin (the host's gate comes first). True when it is gone now, false when it goes at the next start.</summary>
-    public bool Uninstall(string folder)
+    /// <summary>
+    /// A plugin that was just installed (new, not an update) starts now, through the same loader as at the start (trust check on the held files,
+    /// capabilities, revocation, Offline mode). When it does not start, the answer says why or that it starts with the next start.
+    /// </summary>
+    private async Task<(string Message, bool RestartNeeded)> StartInstalledAsync(CatalogEntry entry, InstallOutcome outcome)
+    {
+        if (outcome.StartNow is not { } folder) return (outcome.Message, outcome.RestartNeeded);
+        // The gate may have changed while the package downloaded (the couch locked, a child's profile on): then it starts with the next start.
+        if (!StartAllowed(_plugins.Trust?.Entry(folder)?.Origin ?? PluginOrigin.Local)) return (outcome.Message, outcome.RestartNeeded);
+        try
+        {
+            var infos = await _plugins.LoadNowAsync(folder);
+            if (infos.Any(i => i.Loaded)) return (Strings.Get("catalog.pluginStarted", entry.Name, entry.Version), false);
+            if (infos.FirstOrDefault(i => i.Error is not null) is { } failed && !failed.NeedsApproval) return (Strings.Get("catalog.pluginStartFailed", entry.Name, entry.Version, PluginSettingRules.LogLine(failed.Error)), false);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Console.Error.WriteLine($"[catalog] {PluginSettingRules.LogLine(entry.Folder)}: starting now failed: {PluginSettingRules.LogLine(ex.Message)}");
+        }
+        return (outcome.Message, outcome.RestartNeeded);
+    }
+
+    /// <summary>
+    /// Removes a user plugin (the host's gate comes first). The removal is marked first (the plugin can never load again), then it is cut off and
+    /// asked to stop, then the folder is moved away once the files are free. Gone: the folder is gone now (else at the next start). The stop
+    /// result says whether the plugin's own code confirmed that it stopped.
+    /// </summary>
+    public async Task<(bool Gone, PluginManager.StopResult Stop)> UninstallAsync(string folder)
     {
         var gone = _service.UninstallPlugin(folder);
+        var stop = await _plugins.StopAsync(folder);
+        if (!gone)
+        {
+            // Stopped cleanly, the files may be free now.
+            CatalogService.FinishRemovals(_dataDir);
+            gone = !Directory.Exists(Path.Combine(_dataDir, "plugins", folder));
+        }
+        // The files are gone: nothing to list. Else the list keeps the entry as "uninstalled, removed at the next start" (PluginInfo.RemovedAtRestart).
+        if (gone) _plugins.DropListing(folder);
         if (_last is { } last) PublishUpdates(Describe(last), announce: false);
-        return gone;
+        return (gone, stop);
     }
 
     /// <summary>The entries of CouchHUD's own signed catalog as last loaded (for the suggestions; never a source the user added).</summary>
@@ -520,6 +573,7 @@ public sealed class CatalogManager
             verified?.Origin, installed?.Origin, row.InstalledVersion, highest, entry.Version, entry.MinCouchHud,
             verified?.Statement.Sdk ?? entry.Sdk, CatalogRules.AppVersion,
             installed?.Capabilities, verified?.Statement.Capabilities,
+            InstalledServices: installed?.Services, OfferedServices: verified?.Statement.Services,
             SkinInUse: entry.Kind == CatalogKind.Skin && AutoUpdateRules.IsSkinInUse(entry.Folder, SkinIdsInUse()));
     }
 

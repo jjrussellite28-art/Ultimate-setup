@@ -1,0 +1,2402 @@
+[
+ {
+  "name": "import-url-external",
+  "input": "@import url(https://fonts.example/x.css);",
+  "output": ""
+ },
+ {
+  "name": "import-string-external",
+  "input": "@import \"https://fonts.example/x.css\";",
+  "output": ""
+ },
+ {
+  "name": "import-layer",
+  "input": "@import url(x.css) layer(ch-pins);a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "import-layer-supports",
+  "input": "@import url(\"x.css\") layer(a) supports(display:grid) screen;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "import-upper",
+  "input": "@IMPORT 'x.css';a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "import-escape",
+  "input": "@\\69 mport url(x.css);a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "import-comment-in-prelude",
+  "input": "@import url(x.css) /* ; */ layer;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "layer-statement",
+  "input": "@layer ch-pins;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "layer-statement-list",
+  "input": "@layer a, b, ch-pins;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "layer-upper",
+  "input": "@LAYER ch-pins;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "layer-escape",
+  "input": "@\\6c ayer ch-pins;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "layer-comment-name",
+  "input": "@layer/**/ch-pins;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "layer-block",
+  "input": "@layer ch-pins{[popover]::backdrop{background:#000!important}}",
+  "output": "[popover]::backdrop{background:#000!important}"
+ },
+ {
+  "name": "layer-anonymous",
+  "input": "@layer{a{b:c}}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "layer-block-two-rules",
+  "input": "@layer x{a{b:c}d{e:f}}g{h:i}",
+  "output": "a{b:c}d{e:f}g{h:i}"
+ },
+ {
+  "name": "layer-nested",
+  "input": "@layer x{@layer y{a{b:c}}}d{e:f}",
+  "output": "a{b:c}d{e:f}"
+ },
+ {
+  "name": "layer-in-media",
+  "input": "@media (min-width:1px){@layer x{a{b:c}}d{e:f}}",
+  "output": "@media (min-width:1px){a{b:c}d{e:f}}"
+ },
+ {
+  "name": "layer-after-media",
+  "input": "@media (min-width:1px){a{b:c}}@layer x{d{e:f}}",
+  "output": "@media (min-width:1px){a{b:c}}d{e:f}"
+ },
+ {
+  "name": "plain-string-mentions",
+  "input": "a{content:\"@layer x;\"}",
+  "output": ""
+ },
+ {
+  "name": "plain-string-import",
+  "input": "a{content:'@import url(x)'}",
+  "output": ""
+ },
+ {
+  "name": "plain-comment",
+  "input": "/* @layer x; @import url(x); */a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "plain-url-word",
+  "input": "a{background:url(\"x@layer.png\")}",
+  "output": ""
+ },
+ {
+  "name": "plain-font-face",
+  "input": "@media screen{a{b:c}}@font-face{font-family:x;src:url(x.woff2)}",
+  "output": "@media screen{a{b:c}}@font-face{font-family:x;src:url(x.woff2)}"
+ },
+ {
+  "name": "plain-layerx",
+  "input": "a{b:c}@layerx{d:e}",
+  "output": ""
+ },
+ {
+  "name": "unfinished-import",
+  "input": "a{b:c}@import url(x",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "unfinished-layer",
+  "input": "a{b:c}@layer x",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "unfinished-layer-block",
+  "input": "a{b:c}@layer x{",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "stray-close-brace",
+  "input": "@layer x{}}",
+  "output": "}"
+ },
+ {
+  "name": "imp-unk-urlc",
+  "input": "@x url(/*);@import \"e.css\" layer(ch);/* */",
+  "output": "@x url(/*);/* */"
+ },
+ {
+  "name": "imp-unk-ff",
+  "input": "@x \"\f;@import \"e.css\" layer(ch);\"",
+  "output": "@x \"\f;\""
+ },
+ {
+  "name": "imp-unk-cr",
+  "input": "@x \"\r;@import \"e.css\" layer(ch);\"",
+  "output": "@x \"\r;\""
+ },
+ {
+  "name": "imp-charset-urlc",
+  "input": "@charset \"utf-8\";@x url(/*);@import \"e.css\" layer(ch);/* */",
+  "output": "@x url(/*);/* */"
+ },
+ {
+  "name": "imp-after-layerstmt-urlc",
+  "input": "@layer a;@import url(/*);@import \"e.css\" layer(ch);/* */",
+  "output": "/* */"
+ },
+ {
+  "name": "imp-bare",
+  "input": "@import url(/*);@import \"e.css\" layer(ch);/* */",
+  "output": "/* */"
+ },
+ {
+  "name": "layer-stmt-urlc",
+  "input": "a{b:url(/*)}@layer ch,a;/* */",
+  "output": "a{b:url(/*)}/* */"
+ },
+ {
+  "name": "layer-urlc",
+  "input": "a{b:url(/*)}@layer ch{c{d:e}}/* */",
+  "output": "a{b:url(/*)}c{d:e}/* */"
+ },
+ {
+  "name": "layer-urlc-ws",
+  "input": "a{b:url( /*)}@layer ch{c{d:e}}/* */",
+  "output": "a{b:url( /*)}c{d:e}/* */"
+ },
+ {
+  "name": "layer-in-supports",
+  "input": "@supports (b:url(/*)) {a{b:c}} @layer ch{c{d:e}} /* */",
+  "output": "@supports (b:url(/*)) {a{b:c}} c{d:e} /* */"
+ },
+ {
+  "name": "layer-in-media-prelude",
+  "input": "@media (min-width:url(/*)){a{b:c}} @layer ch{c{d:e}} /* */",
+  "output": "@media (min-width:url(/*)){a{b:c}} c{d:e} /* */"
+ },
+ {
+  "name": "layer-sel-attr",
+  "input": "a[x=url(/*)]{b:c} @layer ch{c{d:e}} /* */",
+  "output": "a[x=url(/*)]{b:c} c{d:e} /* */"
+ },
+ {
+  "name": "layer-string-cr",
+  "input": "a{content:\"\r}@layer ch{x{y:z}}\"}",
+  "output": "a{content:\"\r}x{y:z}\"}"
+ },
+ {
+  "name": "layer-string-ff",
+  "input": "a{content:\"\f}@layer ch{x{y:z}}\"}",
+  "output": "a{content:\"\f}x{y:z}\"}"
+ },
+ {
+  "name": "layer-string-lf",
+  "input": "a{content:\"\n}@layer ch{x{y:z}}\"}",
+  "output": "a{content:\"\n}x{y:z}\"}"
+ },
+ {
+  "name": "layer-string-crlf",
+  "input": "a{content:\"\r\n}@layer ch{x{y:z}}\"}",
+  "output": "a{content:\"\r\n}x{y:z}\"}"
+ },
+ {
+  "name": "layer-url-quote",
+  "input": "a{b:url(')}@layer ch{c{d:e}}/* ')*/",
+  "output": ""
+ },
+ {
+  "name": "layer-url-escape-paren",
+  "input": "a{b:url(x\\)y/*)}@layer ch{c{d:e}}/* */",
+  "output": "a{b:url(x\\)y/*)}c{d:e}/* */"
+ },
+ {
+  "name": "layer-url-bad-then-comment",
+  "input": "a{b:url(x y/*)}@layer ch{c{d:e}}/* */",
+  "output": "a{b:url(x y/*)}c{d:e}/* */"
+ },
+ {
+  "name": "layer-upper-url",
+  "input": "a{b:URL(/*)}@layer ch{c{d:e}}/* */",
+  "output": "a{b:URL(/*)}c{d:e}/* */"
+ },
+ {
+  "name": "layer-escaped-url",
+  "input": "a{b:u\\72l(/*)}@layer ch{c{d:e}}/* */",
+  "output": "a{b:u\\72l(/*)}c{d:e}/* */"
+ },
+ {
+  "name": "layer-dimension-url",
+  "input": "a{b:1url(/*)}@layer ch{c{d:e}}/* */",
+  "output": ""
+ },
+ {
+  "name": "layer-ident-ends-url",
+  "input": "a{b:foo-url(/*)}@layer ch{c{d:e}}/* */",
+  "output": ""
+ },
+ {
+  "name": "layer-escaped-newline-string",
+  "input": "a{content:\"x\\\n}@layer ch{c{d:e}}\"}",
+  "output": ""
+ },
+ {
+  "name": "layer-after-bad-string-comment",
+  "input": "a{content:\"\n/*}@layer ch{c{d:e}}/* */",
+  "output": ""
+ },
+ {
+  "name": "url-quoted-ok",
+  "input": "a{b:url(\"x.png\")}c{d:url( 'y.png' )}",
+  "output": "a{b:url(\"x.png\")}c{d:url( 'y.png' )}"
+ },
+ {
+  "name": "url-unquoted-ok",
+  "input": "a{b:url(x.png)}c{d:url(  y.png  )}",
+  "output": "a{b:url(x.png)}c{d:url(  y.png  )}"
+ },
+ {
+  "name": "hidden-mention-in-string",
+  "input": "a{content:\"\\40layer\"}",
+  "output": ""
+ },
+ {
+  "name": "hidden-mention-in-comment",
+  "input": "/* @\\6c ayer */a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "hidden-mention-in-url",
+  "input": "a{b:url(@layer)}",
+  "output": ""
+ },
+ {
+  "name": "charset-utf8",
+  "input": "@charset \"utf-8\";a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "charset-utf8-upper",
+  "input": "@charset \"UTF-8\" ;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "charset-utf8-single-quotes",
+  "input": "@charset 'utf-8';a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "charset-not-first-utf8",
+  "input": "a{b:c}@charset \"utf-8\";d{e:f}",
+  "output": "a{b:c}d{e:f}"
+ },
+ {
+  "name": "charset-iso2022jp-layer",
+  "input": "@charset \"iso-2022-jp\";\n@\u001b(Blayer ch{x{y:z}}",
+  "output": ""
+ },
+ {
+  "name": "charset-iso2022jp-layer-mid",
+  "input": "@charset \"iso-2022-jp\";\n@l\u001b(Bayer ch{x{y:z}}",
+  "output": ""
+ },
+ {
+  "name": "charset-iso2022jp-url",
+  "input": "@charset \"iso-2022-jp\";a{b:url(ht\u001b(Btps://x.example/y.png)}",
+  "output": ""
+ },
+ {
+  "name": "charset-iso2022jp-plain",
+  "input": "@charset \"iso-2022-jp\";a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "charset-utf16",
+  "input": "@charset \"utf-16\";a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "charset-utf16le",
+  "input": "@charset \"UTF-16LE\";\n@layer ch{x{y:z}}",
+  "output": ""
+ },
+ {
+  "name": "charset-shift-jis",
+  "input": "@charset \"shift_jis\";a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "charset-windows-1252",
+  "input": "@charset \"windows-1252\";a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "charset-utf8-prefix-trick",
+  "input": "@charset \"utf-8x\";a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "charset-block",
+  "input": "@charset \"iso-2022-jp\"{a{b:c}}",
+  "output": ""
+ },
+ {
+  "name": "esc-alone",
+  "input": "a{b:c}\u001b",
+  "output": ""
+ },
+ {
+  "name": "esc-before-layer",
+  "input": "\u001b(B@layer ch{x{y:z}}",
+  "output": ""
+ },
+ {
+  "name": "nul-in-layer",
+  "input": "@l\u0000ayer ch{x{y:z}}",
+  "output": ""
+ },
+ {
+  "name": "nul-in-url",
+  "input": "a{b:url(ht\u0000tps://x.example/y.png)}",
+  "output": ""
+ },
+ {
+  "name": "so-si",
+  "input": "a{b:c}\u000e\u000f",
+  "output": ""
+ },
+ {
+  "name": "vt",
+  "input": "a{b:c}\u000b",
+  "output": ""
+ },
+ {
+  "name": "del-allowed",
+  "input": "a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "tab-lf-ff-cr-allowed",
+  "input": "a{b:c}\t\n\f\r\na{d:e}",
+  "output": "a{b:c}\t\n\f\r\na{d:e}"
+ },
+ {
+  "name": "fuzz-0",
+  "input": "@import(\n\u0000@import \"e.css\" layer(ch);@import url(e.css)-->;src:url(@\\6c ayer x;src:url(\t",
+  "output": ""
+ },
+ {
+  "name": "fuzz-1",
+  "input": "url('@layer ch\\@layer a,b;\r}",
+  "output": ""
+ },
+ {
+  "name": "fuzz-2",
+  "input": "\"(src:url(x@media screen{\u0000a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "fuzz-3",
+  "input": "@import url(e.css)@import \"e.css\" layer(ch);\u0000",
+  "output": ""
+ },
+ {
+  "name": "fuzz-4",
+  "input": "\u0000src:url(\t@import \"e.css\"a(\f\\)x}-url(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-5",
+  "input": "a{b:c}\\\n\\\n\\\n",
+  "output": "a{b:c}\\\n\\\n\\\n"
+ },
+ {
+  "name": "fuzz-6",
+  "input": "+\u0000\n @layer ch{;@import@import@keyframes k{:@media screen{\n;\f",
+  "output": ""
+ },
+ {
+  "name": "fuzz-7",
+  "input": ";@import \"e.css\"<!--u\\72l(@layer ch\\1url(@layer chxurl(",
+  "output": ";"
+ },
+ {
+  "name": "fuzz-8",
+  "input": "@\\6c ayer x;aurl(/*",
+  "output": "aurl(/*"
+ },
+ {
+  "name": "fuzz-9",
+  "input": ";<!--<!--\f\"{@import url(e.css)@import\\)*/[",
+  "output": ""
+ },
+ {
+  "name": "fuzz-10",
+  "input": "+1e\t@keyframes k{\t[u\\72l(( ",
+  "output": "+1e\t@keyframes k{\t[u\\72l(( "
+ },
+ {
+  "name": "fuzz-11",
+  "input": "@\\6c ayer x;\u00001e+{u\\72l(url(/*",
+  "output": ""
+ },
+ {
+  "name": "fuzz-12",
+  "input": " a@keyframes k{@media screen{\"@layer:\f@layer a,b;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-13",
+  "input": "\ra\\))-url(\r-url(\rURL(@font-face{",
+  "output": "\ra\\))-url(\r-url(\rURL(@font-face{"
+ },
+ {
+  "name": "fuzz-14",
+  "input": "1url(:\"url( ",
+  "output": "1url(:\"url( "
+ },
+ {
+  "name": "fuzz-15",
+  "input": "u\\72l(x}\f-url(u\\72l(",
+  "output": "u\\72l(x}\f-url(u\\72l("
+ },
+ {
+  "name": "fuzz-16",
+  "input": "\r}][x\\40layer ch;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-17",
+  "input": "@import \"e.css\"}\\\\-url(@layer@keyframes k{@media screen{",
+  "output": "}\\\\-url(@media screen{"
+ },
+ {
+  "name": "fuzz-18",
+  "input": "'@layer a,b;url(/*[;src:url(/* ",
+  "output": ""
+ },
+ {
+  "name": "fuzz-19",
+  "input": "u+:u\\72l(:URL(-url(url( \n@import \"e.css\" layer(ch);@media screen{(\f\n@layer ch{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-20",
+  "input": " /*\n)(url(/**/url(\"url(/*:)\u0000@import \"e.css\"",
+  "output": ""
+ },
+ {
+  "name": "fuzz-21",
+  "input": "1url(url( a@\\6c ayer x;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-22",
+  "input": "@layer churl(\"1e  \"+\fx}",
+  "output": ""
+ },
+ {
+  "name": "fuzz-23",
+  "input": "url('url(\"(\f\t@import url(e.css)\"@\\6c ayer x;+@font-face{url(\"u+url(\"",
+  "output": "url('url(\"(\f\t"
+ },
+ {
+  "name": "fuzz-24",
+  "input": "url('a{b:c}@font-face{",
+  "output": "url('a{b:c}@font-face{"
+ },
+ {
+  "name": "fuzz-25",
+  "input": "<!--url(\"@import x\\\n\furl(\\@layer ch\t\u0000",
+  "output": ""
+ },
+ {
+  "name": "fuzz-26",
+  "input": "\\\n@\\6c ayer x;\\\nu\\72l(\n'@layer a,b;url(/*url('",
+  "output": ""
+ },
+ {
+  "name": "fuzz-27",
+  "input": "[;@layer a,b;;@x /*:x@keyframes k{",
+  "output": "[;;@x /*:x@keyframes k{"
+ },
+ {
+  "name": "fuzz-28",
+  "input": "\\@layer a,b;{URL(.5'\r",
+  "output": ""
+ },
+ {
+  "name": "fuzz-29",
+  "input": "u+-url(}<!--u\\72l(URL(/*u\\72l(/*@import \"e.css\" layer(ch);",
+  "output": ""
+ },
+ {
+  "name": "fuzz-30",
+  "input": "@import url(e.css)1e<!--\u0000\\)@import",
+  "output": ""
+ },
+ {
+  "name": "fuzz-31",
+  "input": ":\turl(' @font-face{*/",
+  "output": ":\turl(' @font-face{*/"
+ },
+ {
+  "name": "fuzz-32",
+  "input": "@\\6c ayer x;:\"x);\"@x \\url(/*",
+  "output": ":\"x);\"@x \\url(/*"
+ },
+ {
+  "name": "fuzz-33",
+  "input": "a.5(url('@import1url(-@layer ch{\nx@x .5@x u+",
+  "output": ""
+ },
+ {
+  "name": "fuzz-34",
+  "input": "@layer\ra{b:c}@import \"e.css\" layer(ch);",
+  "output": "b:c"
+ },
+ {
+  "name": "fuzz-35",
+  "input": "]src:url(<!--\\url(/*url( a{b:c}@supports (a:b){@import url(e.css)u+",
+  "output": "]src:url(<!--\\url(/*url( a{b:c}@supports (a:b){"
+ },
+ {
+  "name": "fuzz-36",
+  "input": "src:url(\\40layer ch;)\\)<!--",
+  "output": ""
+ },
+ {
+  "name": "fuzz-37",
+  "input": "@layer[)@keyframes k{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-38",
+  "input": "URL(*/-<!--@layer",
+  "output": ""
+ },
+ {
+  "name": "fuzz-39",
+  "input": "src:url(@media screen{\u0000}url(/*1url( }{@supports (a:b){}@import url(e.css)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-40",
+  "input": "-->\"u\\72l(\n{1e\\40layer ch;\\)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-41",
+  "input": "url(\"::@layer ch{+URL(url(url('@import url(e.css)@\\6c ayer x;URL(}",
+  "output": ""
+ },
+ {
+  "name": "fuzz-42",
+  "input": "}@import \"e.css\" layer(ch);@layer ch{src:url(",
+  "output": "}src:url("
+ },
+ {
+  "name": "fuzz-43",
+  "input": "'@keyframes k{--> @media screen{1e[1url(@keyframes k{url(@x @import url(e.css)/*-",
+  "output": ""
+ },
+ {
+  "name": "fuzz-44",
+  "input": "\r1url(a{b:c}\\40layer ch;[x<!--\t\u0000*/",
+  "output": ""
+ },
+ {
+  "name": "fuzz-45",
+  "input": "src:url(@supports (a:b){@x /*@layer@import url(e.css)\\a\u0000@import \"e.css\"@media screen{(URL(\\40layer ch;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-46",
+  "input": ")(URL(1url(@import \"e.css\" @importu\\72l(\\40layer ch;)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-47",
+  "input": "@import url(e.css)--> @x @import@layer a,b;url(1url(<!--url( [",
+  "output": "url(1url(<!--url( ["
+ },
+ {
+  "name": "fuzz-48",
+  "input": "]a{b:c}url( url( 1e@media screen{a{b:c}\r+url(/*@\\6c ayer x;@layer ch",
+  "output": ""
+ },
+ {
+  "name": "fuzz-49",
+  "input": "\"1url(*/u+(:\\40layer ch;@font-face{+\n)\f",
+  "output": ""
+ },
+ {
+  "name": "fuzz-50",
+  "input": "@font-face{ @importsrc:url(.5)\t\\)a{b:c}1ea{b:c}url(/*",
+  "output": ""
+ },
+ {
+  "name": "fuzz-51",
+  "input": "url(\"url( u\\72l(",
+  "output": "url(\"url( u\\72l("
+ },
+ {
+  "name": "fuzz-52",
+  "input": "URL(;@import url(e.css)@x src:url(@layer<!--url(@media screen{;\t",
+  "output": ""
+ },
+ {
+  "name": "fuzz-53",
+  "input": "\r@layer a,b; \u0000 '[]}{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-54",
+  "input": "@import \"e.css\"\t -url(url(')",
+  "output": ""
+ },
+ {
+  "name": "fuzz-55",
+  "input": "-url(;{@layer churl( a\\40layer ch;/*@\\6c ayer x;*/-url(\f@import url(e.css)",
+  "output": "-url(;{"
+ },
+ {
+  "name": "fuzz-56",
+  "input": " @import \"e.css\" layer(ch);;; )",
+  "output": " ;; )"
+ },
+ {
+  "name": "fuzz-57",
+  "input": "\t[)@import;.5{\\40layer ch;\\40layer ch;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-58",
+  "input": ".5{@font-face{@font-face{1url(1url(]/*url(/*",
+  "output": ".5{@font-face{@font-face{1url(1url(]/*url(/*"
+ },
+ {
+  "name": "fuzz-59",
+  "input": "(\t\\\r[\\40layer ch;@x @supports (a:b){",
+  "output": ""
+ },
+ {
+  "name": "fuzz-60",
+  "input": "@media screen{]@x */-->\\40layer ch;\f\u0000src:url(1url(@x url('@import \"e.css\" layer(ch);",
+  "output": ""
+ },
+ {
+  "name": "fuzz-61",
+  "input": "( {'\r}@layer ch{@import \"e.css\" layer(ch);",
+  "output": "( {'\r}"
+ },
+ {
+  "name": "fuzz-62",
+  "input": "url('a{b:c}\na@layer ch{-:a{b:c}@import \"e.css\"a{b:c}\\)(@x ",
+  "output": "url('a{b:c}\na-:a{b:c}b:c\\)(@x "
+ },
+ {
+  "name": "fuzz-63",
+  "input": "@keyframes k{@media screen{/*@keyframes k{\rURL(;url( @font-face{/*-url(*/url(\"@import",
+  "output": ""
+ },
+ {
+  "name": "fuzz-64",
+  "input": "1e/*@x }1e@font-face{",
+  "output": "1e/*@x }1e@font-face{"
+ },
+ {
+  "name": "fuzz-65",
+  "input": "<!--\\)u+url(/*}[a{b:c}u\\72l(@keyframes k{@layer ch@supports (a:b){}",
+  "output": ""
+ },
+ {
+  "name": "fuzz-66",
+  "input": "@import \"e.css\"a{b:c}@import \"e.css\" layer(ch);@x \u0000@\\6c ayer x;-url(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-67",
+  "input": "\t)@supports (a:b){]\n@layer ch]]@x ]url(/*/*<!--src:url(",
+  "output": "\t)@supports (a:b){]\n"
+ },
+ {
+  "name": "fuzz-68",
+  "input": "@keyframes k{@x @\\6c ayer x;@import \"e.css\" layer(ch);)[\"u+",
+  "output": "@keyframes k{@x )[\"u+"
+ },
+ {
+  "name": "fuzz-69",
+  "input": "-@layer ch:@import url(e.css)a-url(\u0000:URL(url(/*\t\\40layer ch;src:url(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-70",
+  "input": "-url(\r@supports (a:b){\r",
+  "output": "-url(\r@supports (a:b){\r"
+ },
+ {
+  "name": "fuzz-71",
+  "input": "@supports (a:b){{\\40layer ch;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-72",
+  "input": "src:url(\\40layer ch;src:url(url(\"u\\72l(@import url(e.css)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-73",
+  "input": " @\\6c ayer x;@import \"e.css\" layer(ch);@layer a,b;<!--src:url(u\\72l(;url(\"*/",
+  "output": " <!--src:url(u\\72l(;url(\"*/"
+ },
+ {
+  "name": "fuzz-74",
+  "input": "\\@import \"e.css\"url(\"aurl(')",
+  "output": ""
+ },
+ {
+  "name": "fuzz-75",
+  "input": "\nurl(\"-->'",
+  "output": "\nurl(\"-->'"
+ },
+ {
+  "name": "fuzz-76",
+  "input": "]1e :@\\6c ayer x;)-url(@media screen{url(\"url('a{b:c}-->*/",
+  "output": "]1e :)-url(@media screen{url(\"url('a{b:c}-->*/"
+ },
+ {
+  "name": "fuzz-77",
+  "input": "xurl(\n@import \"e.css\".5@\\6c ayer x;\t\f\\40layer ch;1e@keyframes k{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-78",
+  "input": "+*/@font-face{--->x1e<!--u+x@font-face{",
+  "output": "+*/@font-face{--->x1e<!--u+x@font-face{"
+ },
+ {
+  "name": "fuzz-79",
+  "input": "url(\"[@import \"e.css\"\f@layer a,b;u\\72l(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-80",
+  "input": "@supports (a:b){@x @supports (a:b){@import url(e.css)",
+  "output": "@supports (a:b){@x @supports (a:b){"
+ },
+ {
+  "name": "fuzz-81",
+  "input": "]<!--@supports (a:b){\turl(url('@layer a,b;\\)xurl( ",
+  "output": ""
+ },
+ {
+  "name": "fuzz-82",
+  "input": "1ea)url(@x \\",
+  "output": "1ea)url(@x \\"
+ },
+ {
+  "name": "fuzz-83",
+  "input": "\r\"1url(@layer ch{@import \"e.css\" layer(ch);url(\"@layer ch{)/*]\\",
+  "output": ""
+ },
+ {
+  "name": "fuzz-84",
+  "input": "1url(\r*/\\)]@import",
+  "output": "1url(\r*/\\)]"
+ },
+ {
+  "name": "fuzz-85",
+  "input": "-url('url( -url(",
+  "output": "-url('url( -url("
+ },
+ {
+  "name": "fuzz-86",
+  "input": "@layer ch/*@import/*-url(-->]\\40layer ch;@media screen{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-87",
+  "input": ")/*@layer a,b;u\\72l(@layer a,b;[@supports (a:b){\fURL(@import url(e.css)-",
+  "output": ""
+ },
+ {
+  "name": "fuzz-88",
+  "input": "a{b:c}url('a",
+  "output": "a{b:c}url('a"
+ },
+ {
+  "name": "fuzz-89",
+  "input": "/*url(\"1e@x url(/*@\\6c ayer x;@keyframes k{URL(a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "fuzz-90",
+  "input": "u+\"\\",
+  "output": "u+\"\\"
+ },
+ {
+  "name": "fuzz-91",
+  "input": "url(url(\"*/]\\\n ",
+  "output": "url(url(\"*/]\\\n "
+ },
+ {
+  "name": "fuzz-92",
+  "input": "--url(}",
+  "output": "--url(}"
+ },
+ {
+  "name": "fuzz-93",
+  "input": "+\\url( \u0000",
+  "output": ""
+ },
+ {
+  "name": "fuzz-94",
+  "input": "url( )url(/*@import url(e.css)/*.5@import \"e.css\"1eurl('src:url(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-95",
+  "input": "url('-->\ra{b:c}url(-a(@\\6c ayer x;]a{b:c}\f",
+  "output": ""
+ },
+ {
+  "name": "fuzz-96",
+  "input": "-->1url(]@keyframes k{@layer ch{\\)<!--*/*/@supports (a:b){@import",
+  "output": ""
+ },
+ {
+  "name": "fuzz-97",
+  "input": "u+url(/*: @layer\\\n@layer a,b;{\\<!--@layer ch{'@import \"e.css\"'",
+  "output": ""
+ },
+ {
+  "name": "fuzz-98",
+  "input": ".5@import \"e.css\" layer(ch); \u0000<!--*//*",
+  "output": ""
+ },
+ {
+  "name": "fuzz-99",
+  "input": "-->}1url(\\40layer ch;@x url( ",
+  "output": ""
+ },
+ {
+  "name": "fuzz-100",
+  "input": "+\f@layer a,b;)1e ;'x\r@import \"e.css\"URL(",
+  "output": "+\f)1e ;'x\r"
+ },
+ {
+  "name": "fuzz-101",
+  "input": "a\t@x u\\72l(",
+  "output": "a\t@x u\\72l("
+ },
+ {
+  "name": "fuzz-102",
+  "input": "[@\\6c ayer x;-url(\\)@media screen{a",
+  "output": "[-url(\\)@media screen{a"
+ },
+ {
+  "name": "fuzz-103",
+  "input": "-url( \tu\\72l(@supports (a:b){@x u+-url((",
+  "output": "-url( \tu\\72l(@supports (a:b){@x u+-url(("
+ },
+ {
+  "name": "fuzz-104",
+  "input": "(-url(-\f\"\f@layer ch@font-face{@layer\f}[",
+  "output": "(-url(-\f\"\f["
+ },
+ {
+  "name": "fuzz-105",
+  "input": "(@media screen{[:\f <!--\\",
+  "output": "(@media screen{[:\f <!--\\"
+ },
+ {
+  "name": "fuzz-106",
+  "input": "URL(\\@keyframes k{src:url(\\1e@layer ch@import",
+  "output": ""
+ },
+ {
+  "name": "fuzz-107",
+  "input": "url( @supports (a:b){\f\raurl(\"]@font-face{@layer ch{<!--",
+  "output": ""
+ },
+ {
+  "name": "fuzz-108",
+  "input": "<!--@layer ch\\\n@font-face{'\\);@keyframes k{1url(@import*/aurl( ",
+  "output": ""
+ },
+ {
+  "name": "fuzz-109",
+  "input": "u\\72l(\\\n*/@layer a,b;@layer ch{*/{x @keyframes k{(-url(/*",
+  "output": ""
+ },
+ {
+  "name": "fuzz-110",
+  "input": "@supports (a:b){URL(@layer churl('<!--url('",
+  "output": ""
+ },
+ {
+  "name": "fuzz-111",
+  "input": "a@supports (a:b){@layer a,b;-->'@layerurl(\"'URL(\\)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-112",
+  "input": "\f{<!--)@import \"e.css\"url(\"@layer ch{;@font-face{-url(\\)a{b:c}1e",
+  "output": "\f{<!--)"
+ },
+ {
+  "name": "fuzz-113",
+  "input": "@import \"e.css\" layer(ch);x[url(\"@import url(e.css)@layer a,b;URL(\"@layer a,b;-",
+  "output": ""
+ },
+ {
+  "name": "fuzz-114",
+  "input": "-src:url(url(",
+  "output": "-src:url(url("
+ },
+ {
+  "name": "fuzz-115",
+  "input": "url(/*a*/@x }src:url((\u0000\n",
+  "output": ""
+ },
+ {
+  "name": "fuzz-116",
+  "input": "\u0000\rx)u+@keyframes k{1e+@font-face{;-url(<!--",
+  "output": ""
+ },
+ {
+  "name": "fuzz-117",
+  "input": "@supports (a:b){\\)@keyframes k{/*\furl( {}",
+  "output": "@supports (a:b){\\)@keyframes k{/*\furl( {}"
+ },
+ {
+  "name": "fuzz-118",
+  "input": "\u0000<!--\fURL(u\\72l(1url(@media screen{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-119",
+  "input": "1url(\\@layer a,b;u+{+url(/*@font-face{\r-url(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-120",
+  "input": ";\t:-->\"\\)",
+  "output": ";\t:-->\"\\)"
+ },
+ {
+  "name": "fuzz-121",
+  "input": "url('@layer \\\n\t)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-122",
+  "input": "-->@media screen{a{b:c}\\\n\r@font-face{+@x {{@x src:url(/*-url(",
+  "output": "-->@media screen{a{b:c}\\\n\r@font-face{+@x {{@x src:url(/*-url("
+ },
+ {
+  "name": "fuzz-123",
+  "input": "/*a\t:",
+  "output": "/*a\t:"
+ },
+ {
+  "name": "fuzz-124",
+  "input": "\f\\40layer ch;u+\\\n@supports (a:b){",
+  "output": ""
+ },
+ {
+  "name": "fuzz-125",
+  "input": "]@layer ch{src:url(@layer a,b;}a{b:c}url(/*",
+  "output": ""
+ },
+ {
+  "name": "fuzz-126",
+  "input": "a{b:c}\n(url(\"-url(@layer a,b;<!--u\\72l(/*",
+  "output": ""
+ },
+ {
+  "name": "fuzz-127",
+  "input": "@importurl('@layer ch{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-128",
+  "input": "))1e@import url(e.css)url(\"",
+  "output": "))1e"
+ },
+ {
+  "name": "fuzz-129",
+  "input": "\"url(\"@layer ch{[\\\n@x :a/*URL(.5:+]",
+  "output": "\"url(\"[\\\n@x :a/*URL(.5:+]"
+ },
+ {
+  "name": "fuzz-130",
+  "input": ";@keyframes k{[URL(@layer a,b;@import<!--:url('{\"@layer ch{-->@import \"e.css\"",
+  "output": ""
+ },
+ {
+  "name": "fuzz-131",
+  "input": "url( @layer ch{<!--url(src:url(@x */<!--\\)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-132",
+  "input": "{@font-face{ax@import@layer ch{(",
+  "output": "{@font-face{ax("
+ },
+ {
+  "name": "fuzz-133",
+  "input": "\t@x <!--]@import url(e.css)---",
+  "output": "\t@x <!--]"
+ },
+ {
+  "name": "fuzz-134",
+  "input": ".5@import url(e.css)}}/*@import \"e.css\" layer(ch);{{@font-face{@layer",
+  "output": ""
+ },
+ {
+  "name": "fuzz-135",
+  "input": "@import url(e.css)url(/*@media screen{[@layer ch@layer\\@import url(e.css)-;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-136",
+  "input": "url(/*\u0000URL(xurl(/*\u0000:@media screen{src:url(*/@keyframes k{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-137",
+  "input": "\r /*url( @layera{b:c}@media screen{-->a{b:c}url(;a{b:c}*/@layer a,b;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-138",
+  "input": "url('*/u+\n@import\u0000-->\f\t(\n",
+  "output": ""
+ },
+ {
+  "name": "fuzz-139",
+  "input": "url(*/'\"\\}1e@import\f1e",
+  "output": ""
+ },
+ {
+  "name": "fuzz-140",
+  "input": "@\\6c ayer x;@keyframes k{-url(@layer ch@import url(e.css)@media screen{url('",
+  "output": "@keyframes k{-url(url('"
+ },
+ {
+  "name": "fuzz-141",
+  "input": "\"\n -+\\",
+  "output": "\"\n -+\\"
+ },
+ {
+  "name": "fuzz-142",
+  "input": "]'url(\"(url( ",
+  "output": "]'url(\"(url( "
+ },
+ {
+  "name": "fuzz-143",
+  "input": "+@layer\\",
+  "output": "+"
+ },
+ {
+  "name": "fuzz-144",
+  "input": "{u\\72l(@x @import \"e.css\"+@font-face{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-145",
+  "input": ".5@layer@import \"e.css\"1eu\\72l(\fu\\72l(",
+  "output": ".5"
+ },
+ {
+  "name": "fuzz-146",
+  "input": "@importURL(URL(-url(1url(a{b:c}\\40layer ch;src:url(\u0000@layer a,b;\"1url(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-147",
+  "input": "\\)url(1e@layer chau\\72l(1e\\)@layer ch{-url(@import \"e.css\" layer(ch);\f",
+  "output": "\\)url(1e"
+ },
+ {
+  "name": "fuzz-148",
+  "input": "@import+u+-url(url( .5\"@layer ch\\",
+  "output": ""
+ },
+ {
+  "name": "fuzz-149",
+  "input": "[-url(url( [@layer churl( \u0000@media screen{:-url( \\}",
+  "output": ""
+ },
+ {
+  "name": "fuzz-150",
+  "input": "\t\\)<!--a{b:c}@x \n",
+  "output": "\t\\)<!--a{b:c}@x \n"
+ },
+ {
+  "name": "fuzz-151",
+  "input": "@layer ch1url(@layer\f<!-- \\  \\)(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-152",
+  "input": "\\40layer ch;url( \"",
+  "output": ""
+ },
+ {
+  "name": "fuzz-153",
+  "input": "\t.5-->@layer ch{-url(@import url(e.css)",
+  "output": "\t.5-->-url("
+ },
+ {
+  "name": "fuzz-154",
+  "input": "@font-face{u\\72l((@layer-@keyframes k{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-155",
+  "input": " @keyframes k{\\40layer ch;-- '\\40layer ch;a{b:c}URL(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-156",
+  "input": "\furl(/*u\\72l()src:url(<!--@media screen{:u\\72l(@layer ch[+url(-->",
+  "output": ""
+ },
+ {
+  "name": "fuzz-157",
+  "input": "@font-face{@import\t[",
+  "output": "@font-face{"
+ },
+ {
+  "name": "fuzz-158",
+  "input": "a\nsrc:url(@keyframes k{.5@supports (a:b){{\n@\\6c ayer x;u+-(src:url(url(",
+  "output": "a\nsrc:url(@keyframes k{.5@supports (a:b){{\nu+-(src:url(url("
+ },
+ {
+  "name": "fuzz-159",
+  "input": "'; @supports (a:b){\n",
+  "output": "'; @supports (a:b){\n"
+ },
+ {
+  "name": "fuzz-160",
+  "input": "@layer ch{@import \"e.css\" layer(ch);url( url(\"\tu+\"\\40layer ch;src:url(@import url(e.css)/*@layer ch{1e\\40layer ch;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-161",
+  "input": ".5:\r",
+  "output": ".5:\r"
+ },
+ {
+  "name": "fuzz-162",
+  "input": "@import@import@import \"e.css\" layer(ch);@import@layer a,b;URL(@x 1url()\\@layer a,b;<!--\"]",
+  "output": ""
+ },
+ {
+  "name": "fuzz-163",
+  "input": "\n1url(1e",
+  "output": "\n1url(1e"
+ },
+ {
+  "name": "fuzz-164",
+  "input": "[x +\r\\40layer ch;\u0000-->u+",
+  "output": ""
+ },
+ {
+  "name": "fuzz-165",
+  "input": "\t@media screen{url(@import\u0000\\\n-'@layer ch{@import \"e.css\" layer(ch);@keyframes k{url('/*",
+  "output": ""
+ },
+ {
+  "name": "fuzz-166",
+  "input": "url('aa a{b:c}-",
+  "output": "url('aa a{b:c}-"
+ },
+ {
+  "name": "fuzz-167",
+  "input": "a{b:c}\rurl(url(/*u\\72l(u+@x \n \\40layer ch;u+\u0000@keyframes k{url(\"",
+  "output": ""
+ },
+ {
+  "name": "fuzz-168",
+  "input": "\\url(\"URL(-.5url(/*a{b:c}a{b:c}+u+",
+  "output": "\\url(\"URL(-.5url(/*a{b:c}a{b:c}+u+"
+ },
+ {
+  "name": "fuzz-169",
+  "input": "x1url(@import@font-face{@keyframes k{@layer",
+  "output": "x1url(@keyframes k{"
+ },
+ {
+  "name": "fuzz-170",
+  "input": "]@import \"e.css\"/*<!--\\\nu\\72l(@import \"e.css\"}\\\nurl(/*-url(\\",
+  "output": "]"
+ },
+ {
+  "name": "fuzz-171",
+  "input": ":url(\r:",
+  "output": ":url(\r:"
+ },
+ {
+  "name": "fuzz-172",
+  "input": "-url(\f\\\n\t.5",
+  "output": "-url(\f\\\n\t.5"
+ },
+ {
+  "name": "fuzz-173",
+  "input": "\\40layer ch;<!--@import \"e.css\" layer(ch);}@layer a,b;.5",
+  "output": ""
+ },
+ {
+  "name": "fuzz-174",
+  "input": "\f\\)url(/*@layer\n\f@layer cha{b:c}@import'url( url(\"url(/*",
+  "output": ""
+ },
+ {
+  "name": "fuzz-175",
+  "input": "@media screen{:@import url(e.css)]@import@importa<!--@x \f]*/+",
+  "output": "@media screen{:"
+ },
+ {
+  "name": "fuzz-176",
+  "input": "@media screen{-->@layer a,b;src:url( u+\\40layer ch;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-177",
+  "input": "]+\tURL(@import \"e.css\".5+",
+  "output": ""
+ },
+ {
+  "name": "fuzz-178",
+  "input": "url(\"url( -a{b:c}1url(",
+  "output": "url(\"url( -a{b:c}1url("
+ },
+ {
+  "name": "fuzz-179",
+  "input": "')-url('\u0000url(\\40layer ch;:",
+  "output": ""
+ },
+ {
+  "name": "fuzz-180",
+  "input": ")'\u0000+@keyframes k{@layer a,b;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-181",
+  "input": ")\":url('url(a\tu+",
+  "output": ")\":url('url(a\tu+"
+ },
+ {
+  "name": "fuzz-182",
+  "input": "\nurl('1url(;-url(1url(-->u\\72l(u\\72l(:\":u\\72l(\u0000",
+  "output": ""
+ },
+ {
+  "name": "fuzz-183",
+  "input": "\t@font-face{@\\6c ayer x;@layer ch@import\t\\{u\\72l((@media screen{@\\6c ayer x;",
+  "output": "\t@font-face{"
+ },
+ {
+  "name": "fuzz-184",
+  "input": "\t\\)URL(@x ",
+  "output": "\t\\)URL(@x "
+ },
+ {
+  "name": "fuzz-185",
+  "input": "'/*'",
+  "output": "'/*'"
+ },
+ {
+  "name": "fuzz-186",
+  "input": "\\40layer ch;\\40layer ch; \u0000@keyframes k{.5\n",
+  "output": ""
+ },
+ {
+  "name": "fuzz-187",
+  "input": "\\-)\\40layer ch;\\\nurl(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-188",
+  "input": "@font-face{\\40layer ch;-url(URL(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-189",
+  "input": "u+u+:@import \"e.css\" layer(ch);src:url(url(u++1url(-url(src:url(@x u+",
+  "output": "u+u+:src:url(url(u++1url(-url(src:url(@x u+"
+ },
+ {
+  "name": "fuzz-190",
+  "input": "+-@media screen{.5\u0000",
+  "output": ""
+ },
+ {
+  "name": "fuzz-191",
+  "input": "-@import url(e.css)\r@font-face{src:url(\\)\\@keyframes k{@supports (a:b){@supports (a:b){",
+  "output": "-src:url(\\)\\@keyframes k{@supports (a:b){@supports (a:b){"
+ },
+ {
+  "name": "fuzz-192",
+  "input": "\t{-url(@layer a,b;src:url(@layer",
+  "output": ""
+ },
+ {
+  "name": "fuzz-193",
+  "input": "[aURL('+1e\r( ",
+  "output": "[aURL('+1e\r( "
+ },
+ {
+  "name": "fuzz-194",
+  "input": "url(/*u\\72l(@importurl(+[1url(@layerxurl(\"",
+  "output": ""
+ },
+ {
+  "name": "fuzz-195",
+  "input": ")URL(;",
+  "output": ")URL(;"
+ },
+ {
+  "name": "fuzz-196",
+  "input": ".5::{-->url(\"@layer ch{1url(/*(@media screen{)u+",
+  "output": ""
+ },
+ {
+  "name": "fuzz-197",
+  "input": "url( a@media screen{[xu\\72l(@layer ch",
+  "output": ""
+ },
+ {
+  "name": "fuzz-198",
+  "input": "@layer\u0000<!--@layer ch{u\\72l(\t",
+  "output": ""
+ },
+ {
+  "name": "fuzz-199",
+  "input": "]<!--a{b:c}",
+  "output": "]<!--a{b:c}"
+ },
+ {
+  "name": "fuzz-200",
+  "input": "@layer ch{ url(a@layer ch\n1e@layer a,b;src:url([",
+  "output": ""
+ },
+ {
+  "name": "fuzz-201",
+  "input": "\\)<!--( [\rsrc:url(url('",
+  "output": "\\)<!--( [\rsrc:url(url('"
+ },
+ {
+  "name": "fuzz-202",
+  "input": "u\\72l(@import url(e.css)\t ",
+  "output": ""
+ },
+ {
+  "name": "fuzz-203",
+  "input": "\\url(\" a{b:c};1url(",
+  "output": "\\url(\" a{b:c};1url("
+ },
+ {
+  "name": "fuzz-204",
+  "input": "  @font-face{",
+  "output": "  @font-face{"
+ },
+ {
+  "name": "fuzz-205",
+  "input": "@\\6c ayer x;\\40layer ch;\\40layer ch;[\r@import \"e.css\" layer(ch);@import \"e.css\" layer(ch);)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-206",
+  "input": ")\f\\\n@import \"e.css\"[ */1e'u+",
+  "output": ")\f\\\n"
+ },
+ {
+  "name": "fuzz-207",
+  "input": "*/1url()@import.5]\r@import \"e.css\" layer(ch);1e<!--",
+  "output": "*/1url()1e<!--"
+ },
+ {
+  "name": "fuzz-208",
+  "input": "url(/*@x @layer ch@supports (a:b){url(\") [@import \"e.css\"URL(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-209",
+  "input": "\\40layer ch;\u0000<!--a\\40layer ch;u\\72l((@import url(e.css){)@layer1e",
+  "output": ""
+ },
+ {
+  "name": "fuzz-210",
+  "input": "@supports (a:b){@media screen{-{url(@font-face{url(\"\"\\40layer ch;1e\u0000\f{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-211",
+  "input": "@import \"e.css\" layer(ch);\t@media screen{\t[@\\6c ayer x;url(  */@font-face{url('-1eurl(/*",
+  "output": "\t@media screen{\t[url(  */@font-face{url('-1eurl(/*"
+ },
+ {
+  "name": "fuzz-212",
+  "input": "u\\72l(\\\n\\@x \"@layer ch{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-213",
+  "input": "\\) ()\\\n<!--",
+  "output": "\\) ()\\\n<!--"
+ },
+ {
+  "name": "fuzz-214",
+  "input": "\\40layer ch;/*@import \"e.css\" layer(ch);-url(u\\72l(]",
+  "output": ""
+ },
+ {
+  "name": "fuzz-215",
+  "input": "@import \"e.css\" layer(ch); url(\"-src:url(\u0000+-url(url( -url(\r",
+  "output": ""
+ },
+ {
+  "name": "fuzz-216",
+  "input": "-->-->@layeru++\\40layer ch;-[\t",
+  "output": ""
+ },
+ {
+  "name": "fuzz-217",
+  "input": "url(url(':",
+  "output": "url(url(':"
+ },
+ {
+  "name": "fuzz-218",
+  "input": "*//*URL(\rurl(\"",
+  "output": "*about:blank\rurl(\""
+ },
+ {
+  "name": "fuzz-219",
+  "input": "@font-face{u+\\)url(\"\f\\)",
+  "output": "@font-face{u+\\)url(\"\f\\)"
+ },
+ {
+  "name": "fuzz-220",
+  "input": "1url(@\\6c ayer x; \\40layer ch;[@import@layer ch{-@media screen{1url(@layer ch",
+  "output": ""
+ },
+ {
+  "name": "fuzz-221",
+  "input": "\\:a{b:c}",
+  "output": "\\:a{b:c}"
+ },
+ {
+  "name": "fuzz-222",
+  "input": "@layer ch@font-face{URL()@layer ch{x@layer-url(1url(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-223",
+  "input": "url('[@font-face{x:@layer ch{\\)\\40layer ch; @import url(e.css)\f[{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-224",
+  "input": "url( ]-@supports (a:b){url(/*@layer ch{'url(\"@x @layer ch{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-225",
+  "input": ".51ex\furl('url(/**/[\\",
+  "output": ".51ex\furl('url(/**/[\\"
+ },
+ {
+  "name": "fuzz-226",
+  "input": "url( a{b:c}URL(a{b:c}\t.5)*/-->@layer ch\\",
+  "output": "url( a{b:c}URL(a{b:c}\t.5)*/-->"
+ },
+ {
+  "name": "fuzz-227",
+  "input": "url('@font-face{\\\n[\n@import@x u\\72l(\u0000@\\6c ayer x;url(\"\u0000@import]",
+  "output": ""
+ },
+ {
+  "name": "fuzz-228",
+  "input": "1url(]x\u0000 ",
+  "output": ""
+ },
+ {
+  "name": "fuzz-229",
+  "input": "\n url(\"<!--@media screen{{url(\"url(/**/@layer a,b;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-230",
+  "input": "@font-face{1eu+@media screen{\f\f\u0000url(@import@layer",
+  "output": ""
+ },
+ {
+  "name": "fuzz-231",
+  "input": "a{b:c}@layer\f1e@x <!--*/\\40layer ch;<!--URL((url(\"",
+  "output": "a{b:c}<!--URL((url(\""
+ },
+ {
+  "name": "fuzz-232",
+  "input": "url( @supports (a:b){@media screen{@import url(e.css)@layer a,b;url(/*",
+  "output": "url( @supports (a:b){@media screen{url(/*"
+ },
+ {
+  "name": "fuzz-233",
+  "input": "@layer ch{-->@import \"e.css\" layer(ch);@import \"e.css\" @keyframes k{\f@media screen{\fu+",
+  "output": "-->\f@media screen{\fu+"
+ },
+ {
+  "name": "fuzz-234",
+  "input": "\\40layer ch;\\)\"a@layer ch[@font-face{\n-url(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-235",
+  "input": " @layer ch{-@import\r\f@media screen{\"u\\72l(-->\r\f<!--",
+  "output": " -\"u\\72l(-->\r\f<!--"
+ },
+ {
+  "name": "fuzz-236",
+  "input": "a@layer ch{-->@import \"e.css\"",
+  "output": "a-->"
+ },
+ {
+  "name": "fuzz-237",
+  "input": "a\"x\\\n/*1url(*/u+",
+  "output": "a\"x\\\n/*1url(*/u+"
+ },
+ {
+  "name": "fuzz-238",
+  "input": "u+@layer.5@layer ch*/",
+  "output": "u+"
+ },
+ {
+  "name": "fuzz-239",
+  "input": "]@layer@layer ch@import \"e.css\"*/@media screen{\t+",
+  "output": "]\t+"
+ },
+ {
+  "name": "fuzz-240",
+  "input": "xa{b:c}\\40layer ch;+ @import \"e.css\"@font-face{@keyframes k{@layer a,b;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-241",
+  "input": "@import url(e.css)1url(@x x(@layer a,b;@import \"e.css\" 1url(@x @layer ch{\\@import url(e.css)url(/*",
+  "output": ""
+ },
+ {
+  "name": "fuzz-242",
+  "input": "-->[}}a{b:c}\\40layer ch;\u0000url('\\)url('*/",
+  "output": ""
+ },
+ {
+  "name": "fuzz-243",
+  "input": "/*@x -x@import \"e.css\" layer(ch);aurl(\"src:url(url( u\\72l(url(\"[@media screen{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-244",
+  "input": "'@layer cha{b:c}@font-face{@layer churl('@layer ch]",
+  "output": ""
+ },
+ {
+  "name": "fuzz-245",
+  "input": ":\\40layer ch; /*url('",
+  "output": ""
+ },
+ {
+  "name": "fuzz-246",
+  "input": "@import url(e.css)\"a{b:c}-url(;-url(\f:",
+  "output": ""
+ },
+ {
+  "name": "fuzz-247",
+  "input": "{url(/*-url(\\\"@font-face{URL(@x @import \"e.css\" layer(ch);@layer ch\na{b:c}@layer\\40layer ch;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-248",
+  "input": "url( \u0000:}x+[-->@supports (a:b){",
+  "output": ""
+ },
+ {
+  "name": "fuzz-249",
+  "input": "]:1e\ta]:\\40layer ch;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-250",
+  "input": "++]\t(@import url(e.css)-->@\\6c ayer x;a\"",
+  "output": "++]\t(a\""
+ },
+ {
+  "name": "fuzz-251",
+  "input": ";URL(}@layer ch{)@keyframes k{;\n@layer",
+  "output": ""
+ },
+ {
+  "name": "fuzz-252",
+  "input": "\f@layer ch{@import \"e.css\"@keyframes k{1url(url( u+\n-/*'url( ]",
+  "output": "\f1url(url( u+\n-/*'url( ]"
+ },
+ {
+  "name": "fuzz-253",
+  "input": "\n/*]\u0000",
+  "output": ""
+ },
+ {
+  "name": "fuzz-254",
+  "input": "\fURL(url( url('1ea{b:c}\\40layer ch;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-255",
+  "input": "@import url(e.css)url( \\\n\"\\40layer ch;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-256",
+  "input": "u+@x <!--",
+  "output": "u+@x <!--"
+ },
+ {
+  "name": "fuzz-257",
+  "input": "+-url(<!--(a{b:c}(url('@font-face{{\\-->src:url(1e",
+  "output": "+-url(<!--(a{b:c}(url('@font-face{{\\-->src:url(1e"
+ },
+ {
+  "name": "fuzz-258",
+  "input": "\t\t(}src:url(@supports (a:b){<!----url(",
+  "output": "\t\t(}src:url(@supports (a:b){<!----url("
+ },
+ {
+  "name": "fuzz-259",
+  "input": "+]url(\"@supports (a:b){url('-url(@font-face{",
+  "output": "+]url(\"@supports (a:b){url('-url(@font-face{"
+ },
+ {
+  "name": "fuzz-260",
+  "input": "a{b:c}.5url(\"+*/\turl(\u0000\f\"-@layer",
+  "output": ""
+ },
+ {
+  "name": "fuzz-261",
+  "input": "<!--\\)+\f:-url()-url(1e+\f@layer ch{+",
+  "output": "<!--\\)+\f:-url()-url(1e+\f+"
+ },
+ {
+  "name": "fuzz-262",
+  "input": "\n1e+url('url(\"\r;\\\n-url(",
+  "output": "\n1e+url('url(\"\r;\\\n-url("
+ },
+ {
+  "name": "fuzz-263",
+  "input": "]\\40layer ch;}-->)a{b:c}u\\72l(@layer a,b;:",
+  "output": ""
+ },
+ {
+  "name": "fuzz-264",
+  "input": "\u0000@layer@keyframes k{@media screen{@keyframes k{@layer ch{\f",
+  "output": ""
+ },
+ {
+  "name": "fuzz-265",
+  "input": "\"']\\\n 1url(url(*/u+)@import \"e.css\" layer(ch);\\40layer ch; ",
+  "output": ""
+ },
+ {
+  "name": "fuzz-266",
+  "input": "@import url(e.css)@supports (a:b){1e])]:\"@import \"e.css\"+-url(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-267",
+  "input": "(url('url( 1e-",
+  "output": "(url('url( 1e-"
+ },
+ {
+  "name": "fuzz-268",
+  "input": "x -->",
+  "output": "x -->"
+ },
+ {
+  "name": "fuzz-269",
+  "input": ";1eu\\72l(",
+  "output": ";1eu\\72l("
+ },
+ {
+  "name": "fuzz-270",
+  "input": ":\"*/<!--(url('",
+  "output": ":\"*/<!--(url('"
+ },
+ {
+  "name": "fuzz-271",
+  "input": "@importurl(/*\\\n'-url(/*u+'",
+  "output": ""
+ },
+ {
+  "name": "fuzz-272",
+  "input": ";;.5url(\\40layer ch;\f",
+  "output": ""
+ },
+ {
+  "name": "fuzz-273",
+  "input": "{@supports (a:b){u+.5@import \"e.css\"@import \"e.css\" layer(ch);@import \"e.css\" layer(ch); \u0000",
+  "output": ""
+ },
+ {
+  "name": "fuzz-274",
+  "input": "}\t url('\\);\nurl( <!--@import \"e.css\"\t@keyframes k{url(/*",
+  "output": ""
+ },
+ {
+  "name": "fuzz-275",
+  "input": "+.5URL( @x @import \"e.css\"url( u++\t@layer",
+  "output": "+.5URL( @x "
+ },
+ {
+  "name": "fuzz-276",
+  "input": "url( /*x\"",
+  "output": "url( /*x\""
+ },
+ {
+  "name": "fuzz-277",
+  "input": "src:url(u+@font-face{@layer a,b;@media screen{-url( \\\n ",
+  "output": ""
+ },
+ {
+  "name": "fuzz-278",
+  "input": "/*)/*\\\n ((@media screen{-*/url( ",
+  "output": "/*)/*\\\n ((@media screen{-*/url( "
+ },
+ {
+  "name": "fuzz-279",
+  "input": "url(/*\f1e<!--\n@layer ch{@x ",
+  "output": ""
+ },
+ {
+  "name": "fuzz-280",
+  "input": "aurl('url((\r:-->@layer1url(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-281",
+  "input": "@layer@import\\@layer a,b;(a{b:c}(u+'@font-face{@font-face{\fa{b:c}",
+  "output": "(a{b:c}(u+'@font-face{@font-face{\fa{b:c}"
+ },
+ {
+  "name": "fuzz-282",
+  "input": "@importURL((@supports (a:b){@font-face{-:][",
+  "output": ""
+ },
+ {
+  "name": "fuzz-283",
+  "input": "src:url(@import url(e.css)@font-face{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-284",
+  "input": "\rurl( \\40layer ch;url(-](:\r@import \"e.css\" layer(ch);\\\n",
+  "output": ""
+ },
+ {
+  "name": "fuzz-285",
+  "input": "\\40layer ch;@layer a,b;[url(/*:",
+  "output": ""
+ },
+ {
+  "name": "fuzz-286",
+  "input": "\t@layer ch@media screen{",
+  "output": "\t"
+ },
+ {
+  "name": "fuzz-287",
+  "input": "  /*URL(url(\"/*\\\n\r.5url( @import \"e.css\".5",
+  "output": ""
+ },
+ {
+  "name": "fuzz-288",
+  "input": "@media screen{;*/URL(;src:url(*/ ",
+  "output": "@media screen{;*/URL(;src:url(*/ "
+ },
+ {
+  "name": "fuzz-289",
+  "input": "1e@media screen{/*+",
+  "output": "1e@media screen{/*+"
+ },
+ {
+  "name": "fuzz-290",
+  "input": "@keyframes k{;\r'a@keyframes k{-->",
+  "output": "@keyframes k{;\r'a@keyframes k{-->"
+ },
+ {
+  "name": "fuzz-291",
+  "input": "\f<!---url(@layer<!--@layer ch{]\t-url(\\\n} @import \"e.css\" layer(ch);",
+  "output": "\f<!---url(]\t-url(\\\n "
+ },
+ {
+  "name": "fuzz-292",
+  "input": "\" url( u\\72l(",
+  "output": "\" url( u\\72l("
+ },
+ {
+  "name": "fuzz-293",
+  "input": ")-->\"src:url(\n1esrc:url(-\n\\)1url(1e",
+  "output": ")-->\"src:url(\n1esrc:url(-\n\\)1url(1e"
+ },
+ {
+  "name": "fuzz-294",
+  "input": " '@font-face{@media screen{;u+\\\n\\\n;@supports (a:b){}\nxu+",
+  "output": " '@font-face{@media screen{;u+\\\n\\\n;@supports (a:b){}\nxu+"
+ },
+ {
+  "name": "fuzz-295",
+  "input": " .5@layer ch{'a \\\n\\)\rsrc:url(1url(",
+  "output": " .5'a \\\n\\)\rsrc:url(1url("
+ },
+ {
+  "name": "fuzz-296",
+  "input": "@layer:url('url( @import \"e.css\"url(\f@x @import \\\n;",
+  "output": ""
+ },
+ {
+  "name": "fuzz-297",
+  "input": "url(/*url(\"@x u+@font-face{@supports (a:b){@supports (a:b){}\\40layer ch;]u+/*\t",
+  "output": ""
+ },
+ {
+  "name": "fuzz-298",
+  "input": "@layer a,b;+url(\"\\\nURL(",
+  "output": "+url(\"\\\nURL("
+ },
+ {
+  "name": "fuzz-299",
+  "input": "(@layer a,b;@x \\\n-(1e]{a{b:c};(",
+  "output": "(@x \\\n-(1e]{a{b:c};("
+ },
+ {
+  "name": "fuzz-300",
+  "input": "-->{@importurl('url(\"'*/1url(\"@import \"e.css\" layer(ch);",
+  "output": ""
+ },
+ {
+  "name": "fuzz-301",
+  "input": "url(url('url( u\\72l(@font-face{@import \"e.css\"@keyframes k{\\[u+:@supports (a:b){",
+  "output": ""
+ },
+ {
+  "name": "fuzz-302",
+  "input": "/*[*/-url(u+{)@import \"e.css\" layer(ch);\"/* ",
+  "output": "/*[*/-url(u+{)\"/* "
+ },
+ {
+  "name": "fuzz-303",
+  "input": "/*\f@\\6c ayer x;@layer a,b; \u0000;\u0000:url( url(/*-url(@x @import url(e.css)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-304",
+  "input": "\u0000@font-face{@import \"e.css\" layer(ch);@media screen{url(+\n@\\6c ayer x;@layer a,b;@import url(e.css)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-305",
+  "input": "]url(1url({@layer ch{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-306",
+  "input": "}]u\\72l(u+@supports (a:b){\r}\\\n{(\\\n*/@import",
+  "output": "}]u\\72l(u+@supports (a:b){\r}\\\n{(\\\n*/"
+ },
+ {
+  "name": "fuzz-307",
+  "input": "@import url(e.css)+@\\6c ayer x;'a<!--",
+  "output": "'a<!--"
+ },
+ {
+  "name": "fuzz-308",
+  "input": " <!--;\\40layer ch;@supports (a:b){.5@x \n\t",
+  "output": ""
+ },
+ {
+  "name": "fuzz-309",
+  "input": "a1url(1url(",
+  "output": "a1url(1url("
+ },
+ {
+  "name": "fuzz-310",
+  "input": "1e@keyframes k{(u\\72l(:1url(\\40layer ch;:",
+  "output": ""
+ },
+ {
+  "name": "fuzz-311",
+  "input": "{\t\\\\\n-->",
+  "output": "{\t\\\\\n-->"
+ },
+ {
+  "name": "fuzz-312",
+  "input": "(url(/*u+x[-url(\r\r",
+  "output": "(url(/*u+x[-url(\r\r"
+ },
+ {
+  "name": "fuzz-313",
+  "input": "xURL(@media screen{a{b:c}@x -\\40layer ch;@import\f.5\r",
+  "output": ""
+ },
+ {
+  "name": "fuzz-314",
+  "input": "\f [.5\tu\\72l([\n.5}\\\nurl(\u0000url('",
+  "output": ""
+ },
+ {
+  "name": "fuzz-315",
+  "input": "/*src:url(1e@import url(e.css)\f\\;a1e\\)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-316",
+  "input": "url('\\src:url( ",
+  "output": "url('\\src:url( "
+ },
+ {
+  "name": "fuzz-317",
+  "input": "\u0000-(src:url(url(/*.5-url(url( a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "fuzz-318",
+  "input": "@layer a,b;(@\\6c ayer x;@layer{\"url(<!--@layer a,b;a",
+  "output": ""
+ },
+ {
+  "name": "fuzz-319",
+  "input": "@\\6c ayer x;\\\n.5x'@layer a,b;u\\72l(url('@font-face{@supports (a:b){url(\"@import \"e.css\" layer(ch);",
+  "output": ""
+ },
+ {
+  "name": "fuzz-320",
+  "input": "@layer(<!--URL(@import url(e.css):1e[url('\\-->\\\n\n",
+  "output": ""
+ },
+ {
+  "name": "fuzz-321",
+  "input": "-u+]-url( @import/*url(\"@\\6c ayer x;1url(@import'",
+  "output": "-u+]-url( "
+ },
+ {
+  "name": "fuzz-322",
+  "input": "\\)@media screen{1url(url('(xurl(\"a@import \"e.css\"'\f",
+  "output": ""
+ },
+ {
+  "name": "fuzz-323",
+  "input": "\fURL(@font-face{URL(\t}\u0000@layer a,b;\"- \r",
+  "output": ""
+ },
+ {
+  "name": "fuzz-324",
+  "input": ".5 -[/*\\)-->@layer ch{\f",
+  "output": ""
+ },
+ {
+  "name": "fuzz-325",
+  "input": "url('}\"\\40layer ch;@x <!--1e@import \"e.css\"\\\nurl(\"@media screen{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-326",
+  "input": "\\40layer ch;@supports (a:b){url( ''@layer a,b;'@\\6c ayer x;url( @import url(e.css)-(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-327",
+  "input": "@import \"e.css\" layer(ch);src:url(\\40layer ch;URL(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-328",
+  "input": "@keyframes k{@\\6c ayer x;@keyframes k{",
+  "output": "@keyframes k{@keyframes k{"
+ },
+ {
+  "name": "fuzz-329",
+  "input": "\\)u\\72l(x@layer@media screen{\"1e*/",
+  "output": "\\)u\\72l(x\"1e*/"
+ },
+ {
+  "name": "fuzz-330",
+  "input": "a{b:c}}\\) url( @import \"e.css\" layer(ch);URL(",
+  "output": "a{b:c}}\\) url( URL("
+ },
+ {
+  "name": "fuzz-331",
+  "input": "@layer@import \"e.css\"+@\\6c ayer x; -/* */@keyframes k{\\\n@supports (a:b){",
+  "output": " -/* */@keyframes k{\\\n@supports (a:b){"
+ },
+ {
+  "name": "fuzz-332",
+  "input": ";\"\\\nurl(/*@import \"e.css\"- <!--)*/\r\u0000@layer1e",
+  "output": ""
+ },
+ {
+  "name": "fuzz-333",
+  "input": "xurl(' url( @font-face{-->url('@import url(e.css) ",
+  "output": "xurl(' url( @font-face{-->url('"
+ },
+ {
+  "name": "fuzz-334",
+  "input": "\n-->x@media screen{u\\72l(\"@keyframes k{@import \"e.css\" layer(ch);src:url(u+)u\\72l(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-335",
+  "input": " @supports (a:b){)@import",
+  "output": " @supports (a:b){)"
+ },
+ {
+  "name": "fuzz-336",
+  "input": "-->:@\\6c ayer x;@font-face{@layer1url(\\",
+  "output": ""
+ },
+ {
+  "name": "fuzz-337",
+  "input": "url(\"@media screen{*/)@media screen{;\furl(/*url(",
+  "output": "url(\"@media screen{*/)@media screen{;\furl(/*url("
+ },
+ {
+  "name": "fuzz-338",
+  "input": "+@import \"e.css\"@supports (a:b){\\\n@font-face{URL(\f@import \"e.css\" layer(ch);src:url(url(@import url(e.css)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-339",
+  "input": "\\(url('*/URL(@keyframes k{@layerurl( @keyframes k{@font-face{@keyframes k{\u0000)(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-340",
+  "input": "\\)(\\)[/*})1e\"@import \"e.css\"}src:url(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-341",
+  "input": "(url('a@layer@font-face{@media screen{aURL(\"",
+  "output": ""
+ },
+ {
+  "name": "fuzz-342",
+  "input": "src:url(\f@media screen{\\\n\\\n\f\r'@keyframes k{/*/*",
+  "output": "src:url(\f@media screen{\\\n\\\n\f\r'@keyframes k{/*/*"
+ },
+ {
+  "name": "fuzz-343",
+  "input": "@import url(e.css)@layer<!--\\40layer ch;\t)URL(url(*/a{b:c}\\)@layer a,b;[*/",
+  "output": ""
+ },
+ {
+  "name": "fuzz-344",
+  "input": "@import[\\40layer ch;\t\fu+/*\\\n@x \t]1url(@\\6c ayer x;'",
+  "output": ""
+ },
+ {
+  "name": "fuzz-345",
+  "input": "\\\n<!--\\\n",
+  "output": "\\\n<!--\\\n"
+ },
+ {
+  "name": "fuzz-346",
+  "input": ":{1url(]url( ]\"@layer a,b;/*x*/@layer",
+  "output": ""
+ },
+ {
+  "name": "fuzz-347",
+  "input": ")aa{b:c}]url('src:url('+)URL(\f",
+  "output": ")aa{b:c}]url('src:url('+)URL(\f"
+ },
+ {
+  "name": "fuzz-348",
+  "input": "u\\72l(\t]'src:url(@layer ch{'",
+  "output": ""
+ },
+ {
+  "name": "fuzz-349",
+  "input": ":URL(/*-\n-->-->\\)",
+  "output": ":URL(/*-\n-->-->\\)"
+ },
+ {
+  "name": "fuzz-350",
+  "input": "a{b:c}url(/*@import}\f@import \"e.css\"\"\n@layer a,b;'",
+  "output": ""
+ },
+ {
+  "name": "fuzz-351",
+  "input": "+a{b:c}{",
+  "output": "+a{b:c}{"
+ },
+ {
+  "name": "fuzz-352",
+  "input": "]-++url(/*)(@x :@media screen{\\url( ",
+  "output": "]-++url(/*)(@x :@media screen{\\url( "
+ },
+ {
+  "name": "fuzz-353",
+  "input": "a[@import \"e.css\" layer(ch);",
+  "output": "a["
+ },
+ {
+  "name": "fuzz-354",
+  "input": "\\\n/*+a@\\6c ayer x;@import \"e.css\" layer(ch);]",
+  "output": ""
+ },
+ {
+  "name": "fuzz-355",
+  "input": "\u0000 url(/*-[.5*/@layer a,b;'\\40layer ch;src:url(src:url(\n\t",
+  "output": ""
+ },
+ {
+  "name": "fuzz-356",
+  "input": "\\\n@layer ch{u+;\t\\)-@keyframes k{u\\72l(",
+  "output": "\\\nu+;\t\\)-@keyframes k{u\\72l("
+ },
+ {
+  "name": "fuzz-357",
+  "input": "\turl(@layer a,b;/*",
+  "output": ""
+ },
+ {
+  "name": "fuzz-358",
+  "input": "a{b:c}@supports (a:b){@x url(']/*\\a{b:c}@layer ch\r@supports (a:b){ @import \"e.css\" layer(ch);\\\n",
+  "output": ""
+ },
+ {
+  "name": "fuzz-359",
+  "input": "@import \"e.css\"u\\72l({:@layer ch{ @import \"e.css\"src:url(@layer ch{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-360",
+  "input": "@layer ch{;\")]<!--\"\t @import@media screen{\f\\\n",
+  "output": ";\")]<!--\"\t \f\\\n"
+ },
+ {
+  "name": "fuzz-361",
+  "input": "@layer ch\\\nurl('\n@\\6c ayer x;[ }u+url( ]",
+  "output": "[ }u+url( ]"
+ },
+ {
+  "name": "fuzz-362",
+  "input": " url( \u0000u\\72l(@\\6c ayer x;a\r\t\"'",
+  "output": ""
+ },
+ {
+  "name": "fuzz-363",
+  "input": "@media screen{][\\40layer ch; @layer ch",
+  "output": ""
+ },
+ {
+  "name": "fuzz-364",
+  "input": "@layer ch<!--URL(@import \"e.css\"url(@import \"e.css\"x<!--@media screen{u\\72l(@keyframes k{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-365",
+  "input": "-URL([@x a@media screen{",
+  "output": "-URL([@x a@media screen{"
+ },
+ {
+  "name": "fuzz-366",
+  "input": "u\\72l( 1e",
+  "output": "u\\72l( 1e"
+ },
+ {
+  "name": "fuzz-367",
+  "input": "url(/*1url(}@import \"e.css\" layer(ch);\t-url(\"\\\n\r-*/u\\72l(@import \"e.css\"",
+  "output": ""
+ },
+ {
+  "name": "fuzz-368",
+  "input": "url(  ;url(\"@import url(e.css))1e@import\"@x ",
+  "output": ""
+ },
+ {
+  "name": "fuzz-369",
+  "input": "+(src:url(",
+  "output": "+(src:url("
+ },
+ {
+  "name": "fuzz-370",
+  "input": "\\40layer ch;@layer a,b;@layer a,b;\"@supports (a:b){+url(/*;\u0000\\40layer ch;@layer\turl( ",
+  "output": ""
+ },
+ {
+  "name": "fuzz-371",
+  "input": "@import \"e.css\"@import.51url(\u0000url(/*@keyframes k{@keyframes k{-",
+  "output": ""
+ },
+ {
+  "name": "fuzz-372",
+  "input": "url( <!-- \\\n-'",
+  "output": "url( <!-- \\\n-'"
+ },
+ {
+  "name": "fuzz-373",
+  "input": "@layer ch@import \"e.css\"@layer ch",
+  "output": ""
+ },
+ {
+  "name": "fuzz-374",
+  "input": "';<!--\n@x @import \"e.css\"-",
+  "output": "';<!--\n@x "
+ },
+ {
+  "name": "fuzz-375",
+  "input": "\t@import-@supports (a:b){-@keyframes k{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-376",
+  "input": "\t\\url(\"url(  @\\6c ayer x;@import \"e.css\" layer(ch);+a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "fuzz-377",
+  "input": "url(\"@import@layer a,b;a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "fuzz-378",
+  "input": "@layer a,b;@layer a,b;\\\n\\40layer ch;*/@font-face{[\t\u0000",
+  "output": ""
+ },
+ {
+  "name": "fuzz-379",
+  "input": "src:url(''/*+src:url(@import url(e.css)a\t",
+  "output": ""
+ },
+ {
+  "name": "fuzz-380",
+  "input": "+[@x */@import+:url( [@import<!--a{b:c}[",
+  "output": "+[@x */"
+ },
+ {
+  "name": "fuzz-381",
+  "input": "1url(-->@keyframes k{\fsrc:url(@\\6c ayer x;--->;+@media screen{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-382",
+  "input": "URL(-:url( \f1url(@importurl(/*",
+  "output": ""
+ },
+ {
+  "name": "fuzz-383",
+  "input": "{@x \\\n",
+  "output": "{@x \\\n"
+ },
+ {
+  "name": "fuzz-384",
+  "input": ".5\\40layer ch;@layer:\\\n\\40layer ch;@layer\\\n\r@x ;@import url(e.css)",
+  "output": ""
+ },
+ {
+  "name": "fuzz-385",
+  "input": "src:url(u\\72l(.5\\\n\\)",
+  "output": "src:url(u\\72l(.5\\\n\\)"
+ },
+ {
+  "name": "fuzz-386",
+  "input": "{@font-face{url(/*+[",
+  "output": "{@font-face{url(/*+["
+ },
+ {
+  "name": "fuzz-387",
+  "input": "x{\\)([@import \"e.css\" layer(ch);:a\\40layer ch;\"{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-388",
+  "input": "\r{1url(@import(url('@import \"e.css\"-->@media screen{-url(url(/*",
+  "output": "\r{1url("
+ },
+ {
+  "name": "fuzz-389",
+  "input": "@layer a,b;].5\\@layer ch(",
+  "output": ""
+ },
+ {
+  "name": "fuzz-390",
+  "input": "@font-face{\f.5src:url(\\)url(",
+  "output": "@font-face{\f.5src:url(\\)url("
+ },
+ {
+  "name": "fuzz-391",
+  "input": ".5@keyframes k{ @supports (a:b){",
+  "output": ".5@keyframes k{ @supports (a:b){"
+ },
+ {
+  "name": "fuzz-392",
+  "input": "]xurl( ",
+  "output": "]xurl( "
+ },
+ {
+  "name": "fuzz-393",
+  "input": "@import \"e.css\" layer(ch);@import \"e.css\"a@layer ch(\\url(/*u\\72l(@layer ch{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-394",
+  "input": "\\@\\6c ayer x;url(/* }@layer)xsrc:url(url('\\)a:",
+  "output": ""
+ },
+ {
+  "name": "fuzz-395",
+  "input": "/*@layer ch@x @layer ch@import \"e.css\"@keyframes k{",
+  "output": ""
+ },
+ {
+  "name": "fuzz-396",
+  "input": "{@supports (a:b){ \r\"@media screen{\n@keyframes k{{",
+  "output": "{@supports (a:b){ \r\"@media screen{\n@keyframes k{{"
+ },
+ {
+  "name": "fuzz-397",
+  "input": "url('u\\72l(\"\u0000[a@keyframes k{url(\"@supports (a:b){.5[1url(}",
+  "output": ""
+ },
+ {
+  "name": "fuzz-398",
+  "input": "\\\n-->xURL(\u0000a@font-face{@layer ch{\"+@import \"e.css\"",
+  "output": ""
+ },
+ {
+  "name": "fuzz-399",
+  "input": "u+@layer a,b;]@keyframes k{",
+  "output": "u+]@keyframes k{"
+ }
+]

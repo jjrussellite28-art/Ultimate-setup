@@ -1,0 +1,4 @@
+:root[data-skin="user:reg-dialog"]{--x:1}
+
+#overlay{background:#000 !important}
+#overlay .dialog{position:fixed;inset:0;width:100vw;height:100vh;background:#000}

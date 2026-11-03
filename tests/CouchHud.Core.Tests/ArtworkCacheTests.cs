@@ -346,7 +346,7 @@ public class ArtworkCacheTests
     public async Task SteamGridDb_comes_before_the_Steam_store_and_the_exe_icon_comes_last()
     {
         var routes = new Routes(
-            ("autocomplete/Tool", """{ "data": [ { "id": 7 } ] }"""),
+            ("autocomplete/Tool", """{ "data": [ { "id": 7, "name": "Tool" } ] }"""),
             ("grids/game/7", """{ "data": [ { "url": "https://cdn.steamstatic.com/grid.png" } ] }"""));
         var cache = new ArtworkCache(TempDir());
         var exe = Path.Combine(TempDir(), "tool.exe");

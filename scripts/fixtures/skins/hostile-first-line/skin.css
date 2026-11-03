@@ -1,0 +1,2 @@
+/* For scripts/tabs-check.mjs, never for the catalog. */
+[data-skin="user:hostile-first-line"] #tab-list li::first-line { -webkit-text-fill-color: transparent; color: transparent; }

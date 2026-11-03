@@ -9,6 +9,11 @@ namespace CouchHud.Plugin.Wand;
 /// right moment: from the guide menu, through the assistant, or with every game.
 /// Also the reference example for CouchHud plugins: settings, a page, a quick action,
 /// a tool, events and two languages, all in one small file.
+/// <para>
+/// SDK EXAMPLE ONLY (from CouchHUD 0.7): Wand is a normal app entry now, started next to a game as a companion app by the core
+/// (Settings, Library, Companion apps), and this plugin is no longer in the catalog. The code stays as a small, complete example of the SDK.
+/// It uses no icons or emojis in its names, as the plugin rules ask.
+/// </para>
 /// </summary>
 public sealed class WandPlugin : IPlugin
 {
@@ -70,7 +75,6 @@ public sealed class WandPlugin : IPlugin
         _context.RegisterQuickAction(new QuickAction
         {
             Id = "open",
-            Icon = "🪄",
             Label = T("Cheats & Mods (Wand)", "Cheats & mods (Wand)"),
             Detail = () => FindExe() is null
                 ? T("Wand ist nicht installiert", "Wand is not installed")
@@ -82,7 +86,6 @@ public sealed class WandPlugin : IPlugin
         {
             Id = "status",
             Title = "Wand",
-            Icon = "🪄",
             Description = T("Cheats und Mods für das laufende Spiel", "Cheats and mods for the running game"),
             Rows = _ => Task.FromResult(Rows()),
             Activate = (row, _) => Task.FromResult(row switch
@@ -103,24 +106,21 @@ public sealed class WandPlugin : IPlugin
             [
                 new PluginRow("state", T("Wand ist nicht installiert", "Wand is not installed"))
                 {
-                    Icon = "⚠",
                     Detail = T("Im PC-Modus von wand.com laden und installieren, dann hier wieder reinschauen", "Download and install it from wand.com in PC mode, then come back here")
                 },
-                new PluginRow("get", T("wand.com öffnen", "Open wand.com")) { Icon = "🌐" }
+                new PluginRow("get", T("wand.com öffnen", "Open wand.com"))
             ];
         }
         var auto = _context.Settings.GetBool("autostart");
         return
         [
-            new PluginRow("state", "Wand") { Icon = "✓", Detail = T($"Gefunden: {exe}", $"Found: {exe}"), Value = T("Installiert", "Installed"), On = true },
+            new PluginRow("state", "Wand") { Detail = T($"Gefunden: {exe}", $"Found: {exe}"), Value = T("Installiert", "Installed"), On = true },
             new PluginRow("open", T("Wand öffnen", "Open Wand"))
             {
-                Icon = "🪄",
                 Detail = _running is { } g ? T($"Cheats für {g.Name}", $"Cheats for {g.Name}") : T("Startet Wand oder holt es nach vorne", "Starts Wand or brings it to the front")
             },
             new PluginRow("auto", T("Mit jedem Spiel starten", "Start with every game"))
             {
-                Icon = "⚙",
                 Value = auto ? T("An", "On") : T("Aus", "Off"),
                 On = auto,
                 Detail = T("Umschalten in den Plugin-Einstellungen", "Switch it in the plugin settings")

@@ -1,0 +1,2 @@
+/* For scripts/tabs-check.mjs, never for the catalog. */
+[data-skin="user:hostile-stroke"] #tab-list li { -webkit-text-stroke: 0.5rem #101018; }

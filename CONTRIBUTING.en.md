@@ -37,7 +37,8 @@ The script runs on Windows (Git Bash), Linux and macOS and does, in order:
 1. `dotnet build` of the whole solution (the Windows projects too; outside Windows through `EnableWindowsTargeting`),
 2. `dotnet test` of all tests,
 3. **UI syntax**: every `.js`/`.mjs` file in `ui/` and `scripts/` is checked as an **ES module** (`node --input-type=module --check`; a plain `node --check` lets module errors through),
-4. **i18n check** (`scripts/i18n-check.mjs`): every key in German and English with the same placeholders, every key used exists, no orphaned keys, no German text in code.
+4. **i18n check** (`scripts/i18n-check.mjs`): every key in German and English with the same placeholders, every key used exists, no orphaned keys, no German text in code,
+5. **Browser UI** (`scripts/browser-ui-check.mjs`): the couch browser's HUD side in a **headless** Edge (`--headless=new --mute-audio`, no window, no sound); without an Edge (variable `EDGE` or the usual install places) or without Node 22 it reports "skipped" and holds nothing up; in CI (`CI=true`) that is a failure. After 180 seconds without a result it stops (failure). `SKIP_BROWSER_UI=1` leaves the step out of `scripts/check.sh`.
 
 It is at least as strict as CI (which builds and tests on Windows). Red stays local, not in everyone else's inbox.
 
@@ -100,6 +101,7 @@ The principles: everything through the GUI, controller first, seamless full scre
 Maintainers only. The private signing key is not in the repository and not in CI, but in the maintainer's user profile (`%USERPROFILE%\.couchhud\catalog-signing.key`, protected with DPAPI).
 
 1. Raise the version in `Directory.Build.props`, merge, set and push the tag: `git tag v0.4.0 && git push origin v0.4.0`. CI builds the setup with this version (and stops if tag and version do not match), creates the build attestation and attaches `CouchHud-Setup-<v>.exe` and `CouchHud-Setup-<v>.exe.sha256` to a GitHub release.
+   Only the CI's tag build is a release build (`CouchHudRelease=true`, set by the CI from the tag) and carries exactly this number. Every other build, a local one too, is called `<Version>-dev+<commit>` (e.g. `0.7.0-dev+f627fe74`): a pre-release the updater sees as older than the release.
 2. `.\scripts\sign-release.ps1 -Tag v0.4.0` (PowerShell 7, `gh` signed in): checks commit and version, downloads the setup and compares its hash with GitHub and the `.sha256`, checks the attestation and only then signs the `.sha256` (context `couchhud-release-v1`). Uploads `.sha256.sig`. **Only then do installed CouchHUDs offer the update.**
 3. Edit the release notes in the GitHub release as needed (they appear shortened on the TV).
 

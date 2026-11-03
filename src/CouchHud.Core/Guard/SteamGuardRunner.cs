@@ -148,11 +148,10 @@ public sealed class SteamGuardRunner(
             if (!needs)
             {
                 // Entries that are not ours any more are only bookkeeping: clear them.
-                if (!want && snapshot.HasPending)
-                {
-                    snapshot.Restore(); // only entries that are not ours any more are left: bookkeeping
-                    SyncRunEntry(snapshot);
-                }
+                if (!want && snapshot.HasPending) snapshot.Restore(); // only entries that are not ours any more are left: bookkeeping
+                // The Run entry follows the snapshot here too: one left behind with nothing pending (a state file that is gone or was
+                // cleared by another process, a write that never needed one) would otherwise start CouchHud at every sign-in for nothing.
+                SyncRunEntry(snapshot);
                 _deferred = false;
                 RestartIfWeEndedIt(markerSet);
                 return;

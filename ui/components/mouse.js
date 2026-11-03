@@ -5,13 +5,16 @@
 import { el } from '../core/dom.js';
 import { state } from '../core/state.js';
 import { currentView, switchTab } from '../core/nav.js';
+import { setTabHover, tabAtPoint } from '../core/tab-bar.js';
 import { quick } from './quick-menu.js';
-import { isCodeEntry } from '../core/input-help.js';
+import { isCodeEntry, tabClickAllowed } from '../core/input-help.js';
 
 const HIDE_AFTER_MS = 2200;
 const WHEEL_STEP = 60;
 
 let cursor;
+let pointerParts = null; // { pos, box, art } inside the closed root of #cursor
+let pointerMode = 'skin';
 let hideTimer;
 let last = { x: -1, y: -1 };
 let wheelAccumulator = 0;
@@ -40,17 +43,67 @@ const MOUSE_SVG = `
  * The pointer inside the HUD: "skin" (the skin's --pointer image, the default), "system" (the real
  * Windows pointer, no overlay) or "mouse" (the comic mouse). Falls back to "skin" without the unlock.
  */
+const POINTER_CSS = `
+:host { all: initial !important; display: block !important; position: fixed !important; top: 0 !important; left: 0 !important; width: 0 !important; height: 0 !important;
+  overflow: visible !important; pointer-events: none !important; opacity: 1 !important; visibility: visible !important; z-index: 2147483645 !important; zoom: 1 !important;
+  content-visibility: visible !important; contain: none !important; aspect-ratio: auto !important; }
+:host::before, :host::after { content: none !important; display: none !important; }
+:host::backdrop { display: none !important; background: none !important; }
+.pos { position: absolute; left: 0; top: 0; }
+.box { --u: calc(100vh / 54); width: var(--p-size); height: var(--p-size); margin: calc(var(--p-size) * var(--p-hy) * -1) 0 0 calc(var(--p-size) * var(--p-hx) * -1);
+  contain: paint; overflow: hidden; filter: drop-shadow(0 0 calc(var(--u) * 0.5) var(--accent-glow)) drop-shadow(0 calc(var(--u) * 0.25) calc(var(--u) * 0.4) rgba(0, 0, 0, 0.55)); }
+.cp { display: block; width: 100%; height: 100%; background: var(--pointer) 0 0 / 100% 100% no-repeat; transform-origin: calc(var(--p-hx) * 100%) calc(var(--p-hy) * 100%); }
+.box.click .cp { animation: cm-squish 0.22s ease-out; }
+svg { width: 100%; height: 100%; overflow: visible; transform-origin: 10% 10%; }
+.box.click svg { animation: cm-squish 0.22s ease-out; }
+.cm-scarf { stroke: var(--accent); }
+.cm-tail { transform-origin: 46px 46px; transform-box: view-box; }
+.box.moving .cm-tail { animation: cm-wag 0.35s ease-in-out infinite alternate; }
+.cm-eyes { transform-origin: 15px 15px; transform-box: view-box; animation: cm-blink 4.5s infinite; }
+.off .box.click .cp, .off .box.click svg, .off .cm-eyes, .off .cm-tail { animation: none; }
+@keyframes cm-wag { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
+@keyframes cm-blink { 0%, 94%, 100% { transform: scale(1); } 97% { transform: scale(1, 0.1); } }
+@keyframes cm-squish { 40% { transform: scale(0.82); } 100% { transform: scale(1); } }
+`;
+
 export function setPointer(mode, mouseUnlocked) {
   const next = mode === 'system' ? 'system' : mode === 'mouse' && mouseUnlocked ? 'mouse' : 'skin';
   document.documentElement.dataset.pointer = next;
-  if (cursor) cursor.innerHTML = next === 'mouse' ? MOUSE_SVG : '<i class="cp"></i>';
+  pointerMode = next;
+  if (cursor) {
+    // The real Windows pointer shows: no overlay (core/layers.js keeps the pointer out of the top layer then).
+    cursor.toggleAttribute('data-off', next === 'system');
+    pointerParts.art.innerHTML = next === 'mouse' ? MOUSE_SVG : '<i class="cp"></i>';
+    sizePointer();
+  }
+}
+
+/** The pointer's box from the skin's --pointer-size and hotspot, held to a few rem (the comic mouse keeps its own); set inside the closed root. */
+function sizePointer() {
+  const cs = getComputedStyle(document.documentElement);
+  const rem = innerHeight / 54;
+  const num = (name, [min, max, def]) => { const v = parseFloat(cs.getPropertyValue(name)); return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : def; };
+  const len = (name, [min, max, def]) => {
+    const m = /^\s*(-?\d*\.?\d+)\s*(rem|px)?\s*$/i.exec(cs.getPropertyValue(name));
+    return m ? Math.min(max, Math.max(min, (m[2]?.toLowerCase() === 'px' ? Number(m[1]) / rem : Number(m[1])))) : def;
+  };
+  const comic = pointerMode === 'mouse';
+  const size = comic ? 4.6 : len('--pointer-size', [1, 8, 4.6]);
+  const hx = comic ? 0.1 : num('--pointer-hx', [0, 1, 0.104]);
+  const hy = comic ? 0.1 : num('--pointer-hy', [0, 1, 0.0625]);
+  const style = pointerParts.box.style;
+  style.setProperty('--p-size', `${size * rem}px`);
+  style.setProperty('--p-hx', String(hx));
+  style.setProperty('--p-hy', String(hy));
+  pointerParts.pos.classList.toggle('off', document.documentElement.dataset.motion === 'off');
 }
 
 function show(x, y) {
-  cursor.style.transform = `translate(${x}px, ${y}px)`;
-  cursor.classList.add('moving');
+  pointerParts.pos.style.transform = `translate(${x}px, ${y}px)`;
+  pointerParts.box.classList.add('moving');
   clearTimeout(movingTimer);
-  movingTimer = setTimeout(() => cursor.classList.remove('moving'), 180);
+  movingTimer = setTimeout(() => pointerParts.box.classList.remove('moving'), 180);
+  sizePointer();
   document.body.classList.add('mouse-active');
   clearTimeout(hideTimer);
   hideTimer = setTimeout(hide, HIDE_AFTER_MS);
@@ -72,7 +125,7 @@ function target(e) {
   return e.target instanceof Element ? e.target : null;
 }
 
-const CLICKABLE = '.passcode-key, .timeup-option, .quick-row, .ha-card, .news-card, .tile, .action, .settings li, .settings-cats li, .file-row, .check-row, .chip, .wizard-option, .osk-key, .menu li:not(.menu-group), #tab-list li, .hint';
+const CLICKABLE = '.passcode-key, .timeup-option, .quick-row, .ha-card, .news-card, .tile, .action, .settings li, .settings-cats li, .file-row, .check-row, .chip, .wizard-option, .osk-key, .menu li:not(.menu-group), .hint';
 
 // The code prompt without a menu over it: only clicks on its buttons count there.
 const codeEntry = () => !state.overlay && !quick.open && isCodeEntry(currentView());
@@ -81,6 +134,14 @@ function onClick(e, dispatch) {
   // A click next to an open menu closes it, like on any desktop, and does nothing else (not a tile behind it). The hint bar
   // belongs to the menu: its buttons act on it.
   if (state.overlay && !target(e)?.closest('.dialog, #hints')) return dispatch('b');
+  // The tabs live in the bar's closed shadow root: the page only sees the bar as one element, the bar says which tab is at the point.
+  const tab = tabAtPoint(e.clientX, e.clientY);
+  if (tab) {
+    // A page that holds the screen (code prompt, time-up page, required profile picker) is not left by a click on a tab, as LB/RB do not leave it.
+    // (an open guide menu still closes on the click, as everywhere else)
+    if (!tabClickAllowed(currentView(), state)) return quick.open ? dispatch('b') : undefined;
+    return quick.open ? dispatch('b') : switchTab(Number(tab.dataset.tab));
+  }
   const node = target(e)?.closest(CLICKABLE);
   if (!node) {
     if (quick.open && !target(e)?.closest('#quick')) dispatch('b');
@@ -93,7 +154,6 @@ function onClick(e, dispatch) {
   }
   // Clicking next to the open guide menu closes it.
   if (quick.open) return dispatch('b');
-  if (node.matches('#tab-list li')) return switchTab(Number(node.dataset.tab));
   if (node.matches('.hint')) return dispatch(node.dataset.btn === '≡' ? 'start' : node.dataset.btn.toLowerCase());
   if (node.matches('.menu li')) {
     // Group headings sit between the entries: the entry's own index, not its place among the list's children.
@@ -125,7 +185,17 @@ function onWheel(e, dispatch) {
 
 /** dispatch(action): the same entry point the controller uses. */
 export function attachMouse(dispatch, { pointer, mouseUnlocked } = {}) {
+  // The pointer stands in the top layer, above the tab bar (core/layers.js), only while the mouse is active. It is the host of a closed shadow root with
+  // its own box (all: initial, held from inside), so no rule of a skin, no ::backdrop or outline, can make it cover the tabs; the skin's --pointer image,
+  // --pointer-size (held to 8 rem) and hotspot are read here and set inside.
   cursor = el('div', { id: 'cursor', ariaHidden: 'true' });
+  const root = cursor.attachShadow({ mode: 'closed' });
+  const art = el('div', { className: 'art' });
+  const box = el('div', { className: 'box' }, art);
+  const pos = el('div', { className: 'pos' }, box);
+  art.style.display = 'contents';
+  root.append(el('style', { textContent: POINTER_CSS }), pos);
+  pointerParts = { pos, box, art };
   document.body.append(cursor);
   setPointer(pointer, mouseUnlocked);
 
@@ -136,13 +206,14 @@ export function attachMouse(dispatch, { pointer, mouseUnlocked } = {}) {
     show(e.clientX, e.clientY);
     for (const n of document.querySelectorAll('.hover')) n.classList.remove('hover');
     target(e)?.closest(CLICKABLE)?.classList.add('hover');
+    setTabHover(tabAtPoint(e.clientX, e.clientY));
   });
   window.addEventListener('mousedown', (e) => {
     e.preventDefault();
     show(e.clientX, e.clientY);
-    cursor.classList.remove('click');
-    void cursor.offsetWidth; // restart the squish animation
-    cursor.classList.add('click');
+    pointerParts.box.classList.remove('click');
+    void pointerParts.box.offsetWidth; // restart the squish animation
+    pointerParts.box.classList.add('click');
     if (e.button === 0) onClick(e, dispatch);
     // Right button and the side button are B; on the code prompt B is a code button, so they type nothing there.
     if ((e.button === 2 || e.button === 3) && !codeEntry()) dispatch('b');

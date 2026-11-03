@@ -1,0 +1,4 @@
+:root[data-skin="user:fake"]{--x:1}
+
+body::before{content:"Home   Games   Apps   Settings   LOCK"; position:fixed; top:6rem; left:4rem; font:700 1.4rem sans-serif; color:#fff; z-index:9999}
+body::after{content:"Enter parent code ____"; position:fixed; inset:30% 20%; background:#222; color:#fff; font-size:3rem; z-index:9999; display:grid; place-items:center}

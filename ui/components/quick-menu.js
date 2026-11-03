@@ -6,7 +6,8 @@ import { api } from '../core/api.js';
 import { $, el, formatDuration, keepInView, setFocused } from '../core/dom.js';
 import { attempt, toast } from '../core/feedback.js';
 import { state } from '../core/state.js';
-import { push, renderHints, switchTab, tabViews, render, clearStack } from '../core/nav.js';
+import { screenHeld } from '../core/input-help.js';
+import { push, renderHints, switchTab, tabViews, clearStack } from '../core/nav.js';
 import { tasksPage } from '../views/system-tools.js';
 import { notificationsPage } from '../views/notifications.js';
 import { bluetoothPage } from '../views/bluetooth.js';
@@ -23,6 +24,7 @@ import { weatherLine } from '../core/weather.js';
 import { remainingLabel } from './parental.js';
 import { batteryEntries, systemBadge } from '../core/battery-rules.js';
 import { refreshBattery } from '../core/battery.js';
+import { guideRows } from '../core/companion-rules.js';
 
 /** Icons of the Bluetooth devices with a battery (the kinds of views/bluetooth.js). */
 const KIND_ICON = { controller: '🎮', headphones: '🎧', keyboard: '⌨', mouse: '🖱', speaker: '🔊', phone: '📱' };
@@ -55,8 +57,8 @@ export function addQuickRows(provider) {
 }
 
 export async function openQuickMenu() {
-  // A protected profile waits at the profile picker (components/profiles.js): nothing opens over it.
-  if (state.pickerHold) return;
+  // A protected profile waits at the profile picker (components/profiles.js) and the time-up page stays: nothing opens over them.
+  if (screenHeld(state)) return;
   quick.weather = weatherLine(true);
   // Fresh battery values (the host answers with its last read and sends a new one when something changed).
   refreshBattery();
@@ -65,15 +67,18 @@ export async function openQuickMenu() {
   quick.index = 0;
   sound.open();
   renderQuick();
-  const [audio, pads, session, actions] = await Promise.all([
+  const [audio, pads, session, actions, guideApps] = await Promise.all([
     attempt(() => api.getAudio(), t('quick.audioUnavailable')),
     attempt(() => api.getPads()),
     attempt(() => api.getSession()),
-    api.getQuickActions ? attempt(() => api.getQuickActions()) : []
+    api.getQuickActions ? attempt(() => api.getQuickActions()) : [],
+    // Quiet on purpose: the list is empty on a locked couch and for what a child may not start, and a failure only means no extra rows.
+    api.getGuideApps ? api.getGuideApps().catch(() => null) : null
   ]);
   quick.audio = audio ?? null;
   quick.pads = pads ?? [];
   quick.pluginActions = actions ?? [];
+  quick.guideApps = guideRows(guideApps?.items);
   if (session !== undefined) state.session = session;
   // Do not start on the dead "no audio output" row.
   if (quick.index === 0 && noOutput() && rows()[0]?.kind === 'volume') quick.index = 1;
@@ -175,6 +180,19 @@ function rows() {
       run: async () => {
         const message = await attempt(() => withParentGrant(() => api.runQuickAction(a.plugin, a.id)), a.label);
         if (message) toast(message);
+      }
+    });
+  }
+  // Apps the person put into the Guide menu: a quick start during a game, through the library's own start (the same checks).
+  for (const app of quick.guideApps ?? []) {
+    list.push({
+      kind: 'action',
+      icon: '▦',
+      label: app.name,
+      detail: t('quick.guideApp'),
+      run: async () => {
+        const started = await attempt(() => api.launch(app.id), t('quick.guideAppFailed', { name: app.name }));
+        if (started) toast(t('quick.guideAppStarting', { name: app.name }));
       }
     });
   }
@@ -326,10 +344,4 @@ export async function handleQuick(action) {
     case 'start':
       return closeQuickMenu();
   }
-}
-
-/** Updates from the host while the panel is open. */
-export function refreshQuick() {
-  if (quick.open) renderQuick();
-  else render();
 }

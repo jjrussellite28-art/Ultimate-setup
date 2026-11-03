@@ -1,0 +1,20 @@
+/* A skin that lays a nearly opaque layer over the whole screen with a pseudo element of the page, under a harmless decoration, for
+   scripts/tabs-check.mjs: the runtime cannot take that back, so it has to fall back to the default skin. Never for the catalog. */
+
+[data-skin="user:hostile-pseudo"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  pointer-events: none;
+  background: repeating-linear-gradient(rgba(0, 0, 0, 0.18) 0 2px, transparent 2px 4px);
+}
+
+:root[data-skin="user:hostile-pseudo"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: rgba(17, 17, 17, 0.97);
+}

@@ -1,0 +1,10 @@
+/* For scripts/tabs-check.mjs, never for the catalog: the runtime has to fall back to the default skin. */
+/* A gradient with hard stops: black exactly where the bar is, transparent elsewhere, so its mean over the page is low. */
+[data-skin="user:hostile-gradient-bar"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent 0, transparent 2%, #000 2%, #000 14%, transparent 14%);
+}

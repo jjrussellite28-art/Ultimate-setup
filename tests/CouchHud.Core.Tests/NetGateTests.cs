@@ -22,10 +22,7 @@ public class NetGateTests
         { NetService.Catalog, nameof(AppConfig.NetCatalog) },
         { NetService.SystemUpdates, nameof(AppConfig.NetSystemUpdates) },
         { NetService.Artwork, nameof(AppConfig.OnlineArtwork) },
-        { NetService.Saves, nameof(AppConfig.NetSaves) },
-        { NetService.Weather, nameof(AppConfig.NetWeather) },
-        { NetService.News, nameof(AppConfig.NetNews) },
-        { NetService.Assistant, nameof(AppConfig.NetAssistant) }
+        { NetService.Saves, nameof(AppConfig.NetSaves) }
     };
 
     private static void Set(AppConfig c, string property, bool value) => typeof(AppConfig).GetProperty(property)!.SetValue(c, value);
@@ -43,7 +40,7 @@ public class NetGateTests
         Assert.False(old.SelfUpdateCheck);
         Assert.False(NetPolicy.Allows(old, NetService.Updates));
         Assert.True(NetPolicy.Allows(old, NetService.Catalog));
-        Assert.True(NetPolicy.Allows(old, NetService.Weather));
+        Assert.True(NetPolicy.Allows(old, NetService.Plugin));
         Assert.False(old.Offline);
     }
 
@@ -82,7 +79,7 @@ public class NetGateTests
     [Fact]
     public void The_clock_check_has_no_switch_only_offline_stops_it()
     {
-        var c = new AppConfig { SelfUpdateCheck = false, NetCatalog = false, NetSystemUpdates = false, OnlineArtwork = false, NetSaves = false, NetWeather = false, NetNews = false, NetAssistant = false };
+        var c = new AppConfig { SelfUpdateCheck = false, NetCatalog = false, NetSystemUpdates = false, OnlineArtwork = false, NetSaves = false };
         Assert.True(NetPolicy.Allows(c, NetService.Time));
         c.Offline = true;
         Assert.False(NetPolicy.Allows(c, NetService.Time));
@@ -113,11 +110,24 @@ public class NetGateTests
     [Fact]
     public void The_privacy_keys_survive_a_save_and_a_load_and_are_normalized_on_load()
     {
-        var parsed = ConfigStore.Parse("""{ "offline": true, "netNews": false, "netCatalog": false, "pluginAutoUpdate": true }""")!;
+        var parsed = ConfigStore.Parse("""{ "offline": true, "netSaves": false, "netCatalog": false, "pluginAutoUpdate": true }""")!;
         Assert.True(parsed.Offline);
-        Assert.False(parsed.NetNews);
+        Assert.False(parsed.NetSaves);
         Assert.False(parsed.PluginAutoUpdate);
-        Assert.True(parsed.NetWeather);
+        Assert.False(parsed.NetCatalog);
+    }
+
+    [Fact]
+    public void The_old_switches_of_weather_news_and_assistant_become_the_switches_of_their_plugins_services()
+    {
+        var parsed = ConfigStore.Parse("""{ "netWeather": false, "netNews": true, "netAssistant": false }""")!;
+        Assert.Equal(["anthropic/api", "openai/api", "weather/open-meteo"], parsed.PluginNetOff.Order(StringComparer.Ordinal));
+        // Taken over once: the old fields are back to their default, so a second load adds nothing.
+        Assert.True(parsed.NetWeather && parsed.NetNews && parsed.NetAssistant);
+        var again = ConfigStore.Parse(System.Text.Json.JsonSerializer.Serialize(parsed, ConfigStore.JsonOptions))!;
+        Assert.Equal(3, again.PluginNetOff.Count);
+
+        Assert.Empty(ConfigStore.Parse("{}")!.PluginNetOff);
     }
 
     // ---------- the gate ----------
@@ -141,7 +151,7 @@ public class NetGateTests
     public async Task A_service_that_is_on_goes_through_to_a_public_host_without_a_lookup()
     {
         var inner = new Inner();
-        var client = Client(NetService.Weather, new AppConfig(), inner);
+        var client = Client(NetService.Saves, new AppConfig(), inner);
         using var response = await client.GetAsync("https://api.open-meteo.com/v1/forecast");
         Assert.Single(inner.Seen);
     }
@@ -187,7 +197,7 @@ public class NetGateTests
     public async Task The_local_network_is_never_covered_by_a_switch(string url)
     {
         var inner = new Inner();
-        var client = Client(NetService.Assistant, new AppConfig { Offline = true, NetAssistant = false }, inner);
+        var client = Client(NetService.Saves, new AppConfig { Offline = true, NetSaves = false }, inner);
         using var response = await client.GetAsync(url);
         Assert.Single(inner.Seen);
     }
@@ -205,7 +215,7 @@ public class NetGateTests
     public async Task Public_addresses_are_refused_when_the_service_is_off(string url)
     {
         var inner = new Inner();
-        var client = Client(NetService.News, new AppConfig { NetNews = false }, inner);
+        var client = Client(NetService.Saves, new AppConfig { NetSaves = false }, inner);
         await Assert.ThrowsAsync<NetBlockedException>(() => client.GetAsync(url));
         Assert.Empty(inner.Seen);
     }
@@ -213,7 +223,7 @@ public class NetGateTests
     [Fact]
     public async Task A_name_counts_by_what_it_resolves_to_not_by_how_it_looks()
     {
-        var config = new AppConfig { NetNews = false };
+        var config = new AppConfig { NetSaves = false };
         IPAddress[] Dns(string host) => host switch
         {
             "homeassistant.local" => [IPAddress.Parse("192.168.1.2")],
@@ -232,13 +242,13 @@ public class NetGateTests
         foreach (var local in new[] { "homeassistant.local", "router", "localhost" })
         {
             var inner = new Inner();
-            using var response = await Client(NetService.News, config, inner, dns: Dns).GetAsync($"http://{local}/feed");
+            using var response = await Client(NetService.Saves, config, inner, dns: Dns).GetAsync($"http://{local}/feed");
             Assert.Single(inner.Seen);
         }
         foreach (var name in new[] { "printer.local", "localhost.evil.example", "192.168.1.1.evil.example", "mixed.example", "gone.example", "unknown.example" })
         {
             var inner = new Inner();
-            await Assert.ThrowsAsync<NetBlockedException>(() => Client(NetService.News, config, inner, dns: Dns).GetAsync($"http://{name}/feed"));
+            await Assert.ThrowsAsync<NetBlockedException>(() => Client(NetService.Saves, config, inner, dns: Dns).GetAsync($"http://{name}/feed"));
             Assert.Empty(inner.Seen);
         }
     }
@@ -246,11 +256,11 @@ public class NetGateTests
     [Fact]
     public async Task A_redirect_from_the_local_network_to_a_public_host_is_refused_when_the_service_is_off()
     {
-        var config = new AppConfig { NetWeather = false };
+        var config = new AppConfig { NetSaves = false };
         var inner = new Inner(request => request.RequestUri!.Host == "192.168.1.5"
             ? new HttpResponseMessage(HttpStatusCode.Found) { Headers = { Location = new Uri("https://tracker.example/pixel") } }
             : new HttpResponseMessage(HttpStatusCode.OK));
-        var client = Client(NetService.Weather, config, inner, follow: true, dns: _ => [IPAddress.Parse("93.184.216.34")]);
+        var client = Client(NetService.Saves, config, inner, follow: true, dns: _ => [IPAddress.Parse("93.184.216.34")]);
         await Assert.ThrowsAsync<NetBlockedException>(() => client.GetAsync("http://192.168.1.5/start"));
         // The first hop went out (it is local); the public hop did not.
         Assert.Equal([new Uri("http://192.168.1.5/start")], inner.Seen);
@@ -264,13 +274,13 @@ public class NetGateTests
             : new HttpResponseMessage(HttpStatusCode.OK));
 
         var local = Redirecting();
-        using (await Client(NetService.Weather, new AppConfig { Offline = true }, local, follow: true).GetAsync("http://10.1.1.1/start")) { }
+        using (await Client(NetService.Saves, new AppConfig { Offline = true }, local, follow: true).GetAsync("http://10.1.1.1/start")) { }
         Assert.Equal(["http://10.1.1.1/start", "http://10.1.1.1/final"], local.Seen.Select(u => u.ToString()));
 
         var on = new Inner(request => request.RequestUri!.Host == "a.example"
             ? new HttpResponseMessage(HttpStatusCode.Found) { Headers = { Location = new Uri("https://b.example/x") } }
             : new HttpResponseMessage(HttpStatusCode.OK));
-        using (await Client(NetService.Weather, new AppConfig(), on, follow: true).GetAsync("https://a.example/start")) { }
+        using (await Client(NetService.Saves, new AppConfig(), on, follow: true).GetAsync("https://a.example/start")) { }
         Assert.Equal(["https://a.example/start", "https://b.example/x"], on.Seen.Select(u => u.ToString()));
     }
 
@@ -278,12 +288,12 @@ public class NetGateTests
     public async Task Redirects_stop_after_a_few_hops_and_never_go_from_https_to_http_or_carry_credentials_to_another_host()
     {
         var loop = new Inner(request => new HttpResponseMessage(HttpStatusCode.Found) { Headers = { Location = new Uri("https://loop.example/next") } });
-        using var last = await Client(NetService.News, new AppConfig(), loop, follow: true).GetAsync("https://loop.example/start");
+        using var last = await Client(NetService.Saves, new AppConfig(), loop, follow: true).GetAsync("https://loop.example/start");
         Assert.Equal(NetGateHandler.MaxRedirects + 1, loop.Seen.Count);
         Assert.Equal(HttpStatusCode.Found, last.StatusCode);
 
         var downgrade = new Inner(_ => new HttpResponseMessage(HttpStatusCode.Found) { Headers = { Location = new Uri("http://plain.example/x") } });
-        using var stopped = await Client(NetService.News, new AppConfig(), downgrade, follow: true).GetAsync("https://secure.example/x");
+        using var stopped = await Client(NetService.Saves, new AppConfig(), downgrade, follow: true).GetAsync("https://secure.example/x");
         Assert.Single(downgrade.Seen);
 
         var seenAuth = new List<bool>();
@@ -295,7 +305,7 @@ public class NetGateTests
                 : new HttpResponseMessage(HttpStatusCode.OK);
         });
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://one.example/x") { Headers = { Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "secret") } };
-        using (await Client(NetService.News, new AppConfig(), hop, follow: true).SendAsync(request)) { }
+        using (await Client(NetService.Saves, new AppConfig(), hop, follow: true).SendAsync(request)) { }
         Assert.Equal([true, false], seenAuth);
     }
 
@@ -303,7 +313,7 @@ public class NetGateTests
     public async Task A_post_is_never_followed_to_another_place()
     {
         var inner = new Inner(_ => new HttpResponseMessage(HttpStatusCode.TemporaryRedirect) { Headers = { Location = new Uri("https://other.example/x") } });
-        using var response = await Client(NetService.Assistant, new AppConfig(), inner, follow: true).PostAsync("https://api.example/x", new StringContent("{}"));
+        using var response = await Client(NetService.Saves, new AppConfig(), inner, follow: true).PostAsync("https://api.example/x", new StringContent("{}"));
         Assert.Single(inner.Seen);
         Assert.Equal(HttpStatusCode.TemporaryRedirect, response.StatusCode);
     }
@@ -312,7 +322,7 @@ public class NetGateTests
     public async Task Only_http_and_https_pass_the_gate()
     {
         var inner = new Inner();
-        var client = Client(NetService.Weather, new AppConfig(), inner);
+        var client = Client(NetService.Saves, new AppConfig(), inner);
         await Assert.ThrowsAsync<NetBlockedException>(() => client.GetAsync("ftp://example.com/x"));
         Assert.Empty(inner.Seen);
     }
@@ -335,21 +345,10 @@ public class NetGateTests
     }
 
     [Fact]
-    public async Task The_assistant_turns_a_blocked_request_into_its_own_message()
-    {
-        var inner = new Inner();
-        var client = Client(NetService.Assistant, new AppConfig { NetAssistant = false }, inner, dns: _ => [IPAddress.Parse("160.79.104.10")]);
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages") { Content = new StringContent("{}") };
-        var ex = await Assert.ThrowsAsync<AssistantException>(() => ChatProviders.PostAsync(client, request, default));
-        Assert.Contains("api.anthropic.com", ex.Message);
-        Assert.Empty(inner.Seen);
-    }
-
-    [Fact]
     public async Task The_default_client_refuses_before_it_connects_and_a_failed_connection_counts_for_nobody()
     {
         // No server involved: the public literal is refused by the gate itself, so nothing is dialed.
-        var client = NetGate.CreateClient(NetService.News, new NetPolicy(() => new AppConfig { NetNews = false }), TimeSpan.FromSeconds(2));
+        var client = NetGate.CreateClient(NetService.Saves, new NetPolicy(() => new AppConfig { NetSaves = false }), TimeSpan.FromSeconds(2));
         await Assert.ThrowsAsync<NetBlockedException>(() => client.GetAsync("http://203.0.113.9/feed"));
     }
 
@@ -372,7 +371,7 @@ public class NetGateTests
         request.Headers.TryAddWithoutValidation("Accept-Language", "de");
         request.Headers.TryAddWithoutValidation("User-Agent", "CouchHUD/1");
         request.Headers.TryAddWithoutValidation("If-None-Match", "\"abc\"");
-        using (await Client(NetService.News, new AppConfig(), hop, follow: true).SendAsync(request)) { }
+        using (await Client(NetService.Saves, new AppConfig(), hop, follow: true).SendAsync(request)) { }
 
         var second = seen.Single(s => s.Host == "two.example").Headers;
         Assert.Equal(["Accept-Language", "If-None-Match", "User-Agent"], second.OrderBy(h => h, StringComparer.Ordinal));
@@ -392,7 +391,7 @@ public class NetGateTests
         });
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://one.example/a");
         request.Headers.TryAddWithoutValidation("x-api-key", "secret");
-        using (await Client(NetService.News, new AppConfig(), hop, follow: true).SendAsync(request)) { }
+        using (await Client(NetService.Saves, new AppConfig(), hop, follow: true).SendAsync(request)) { }
         Assert.Equal(2, seen.Count);
         Assert.Contains("x-api-key", seen[1]);
     }
@@ -409,7 +408,7 @@ public class NetGateTests
     public async Task Unspecified_multicast_and_shared_addresses_are_not_local(string url)
     {
         var inner = new Inner();
-        await Assert.ThrowsAsync<NetBlockedException>(() => Client(NetService.Weather, new AppConfig { Offline = true }, inner).GetAsync(url));
+        await Assert.ThrowsAsync<NetBlockedException>(() => Client(NetService.Saves, new AppConfig { Offline = true }, inner).GetAsync(url));
         Assert.Empty(inner.Seen);
     }
 
@@ -418,7 +417,7 @@ public class NetGateTests
     {
         // 2130706433 is 127.0.0.1 (the URL parser turns it into the dotted form, so the gate sees the loopback address); 3232235777 is 192.168.1.1.
         var inner = new Inner();
-        var client = Client(NetService.Weather, new AppConfig { Offline = true }, inner);
+        var client = Client(NetService.Saves, new AppConfig { Offline = true }, inner);
         using (await client.GetAsync("http://2130706433/")) { }
         using (await client.GetAsync("http://3232235777/")) { }
         Assert.Equal(["http://127.0.0.1/", "http://192.168.1.1/"], inner.Seen.Select(u => u.ToString()));
@@ -472,13 +471,15 @@ public class NetGateTests
         ["src/CouchHud.Core/Plugins/PluginLint.cs"] = new("names of types the lint looks for in plugins, no network code", 4, "^\\(\"System\\.(Net|Net\\.Http|Net\\.WebSockets)\", \""),
         ["src/CouchHud.Core/Integrations/Tv/SsdpDiscovery.cs"] = new("UDP discovery on the local network interfaces", 2, "UdpClient"),
         ["src/CouchHud.Core/Integrations/Tv/WakeOnLan.cs"] = new("Wake-on-LAN broadcast on the local network", 1, "new UdpClient\\(new IPEndPoint\\(local, 0\\)\\) \\{ EnableBroadcast"),
-        // The paired TV: its connect callback takes only addresses TvAddressPolicy allows (local network). Exactly these five lines.
-        ["src/CouchHud.Core/Integrations/Tv/WebOsClient.cs"] = new("the paired TV: only addresses TvAddressPolicy allows, never the internet", 5,
-            "^internal sealed record Connected\\(ClientWebSocket Socket, HttpMessageInvoker Invoker,",
+        // The paired TV, for the TV plugins (SDK 5): the link's connect callback takes only the one address of the pairing, which
+        // TvAddressPolicy allows (local network), and only the provider's declared ports. Exactly these six lines.
+        ["src/CouchHud.Core/Integrations/Tv/TvLink.cs"] = new("the paired TV: one local address and the declared ports only, never the internet", 6,
+            "^private HttpMessageInvoker Invoker\\(TvPort port, Action<string> sawPin\\)$",
             "^var handler = new SocketsHttpHandler$",
             "^var s = new Socket\\(ip\\.AddressFamily, SocketType\\.Stream, ProtocolType\\.Tcp\\)",
             "^var invoker = new HttpMessageInvoker\\(handler, disposeHandler: true\\);$",
-            "^var ws = new ClientWebSocket\\(\\);$")
+            "^var ws = new ClientWebSocket\\(\\);$",
+            "^private sealed class Channel\\(ClientWebSocket ws, HttpMessageInvoker invoker, TvLinkOptions o, TvPort port, TvLink owner\\) : ITvChannel$")
     };
 
     private static readonly Regex Bypass = new(
@@ -542,7 +543,7 @@ public class NetGateTests
         {
             Assert.Matches(Bypass, bad);
         }
-        Assert.DoesNotMatch(Bypass, "var c = NetGate.CreateClient(NetService.News, net, t);");
+        Assert.DoesNotMatch(Bypass, "var c = NetGate.CreateClient(NetService.Saves, net, t);");
         Assert.DoesNotMatch(Bypass, "public static async Task<IReadOnlyList<StoreCandidate>> SearchAsync(HttpClient http, string query)");
     }
 

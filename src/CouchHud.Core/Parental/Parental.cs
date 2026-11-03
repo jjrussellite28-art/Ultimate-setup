@@ -255,6 +255,21 @@ public sealed class PlayLedger
         }
     }
 
+    /// <summary>The per-game time of one key follows another (a game's folder changed); adds up when both are there. Nothing happens when the old key is gone.</summary>
+    public void Rekey(string from, string to)
+    {
+        if (from == to) return;
+        lock (_gate)
+        {
+            foreach (var record in _data.Days.Values)
+            {
+                if (!record.Games.Remove(from, out var seconds)) continue;
+                record.Games[to] = record.Games.GetValueOrDefault(to) + seconds;
+                Dirty = true;
+            }
+        }
+    }
+
     public void AddBonus(DateOnly day, int minutes)
     {
         lock (_gate)
@@ -473,6 +488,8 @@ public sealed partial class ParentalService
     /// <summary>Same game, different entries (a Steam game and a shortcut to it) share limit and lock.</summary>
     public static string LimitKey(LibraryItem item)
     {
+        // A plugin's own group (the host has put the plugin id in front) comes first: it never meets a store id or an install folder.
+        if (!string.IsNullOrEmpty(item.LimitGroup)) return "plugin:" + item.LimitGroup;
         if (SteamStore.AppIdOf(item) is { } id) return $"steam:{id}";
         if (item.Launch.Kind == LaunchKind.Url && item.Launch.Target is { } t && SteamRun().Match(t) is { Success: true } m) return $"steam:{m.Groups[1].Value}";
         if (!string.IsNullOrWhiteSpace(item.InstallDir)) return "dir:" + item.InstallDir.Trim().TrimEnd((char)92, '/').ToLowerInvariant();

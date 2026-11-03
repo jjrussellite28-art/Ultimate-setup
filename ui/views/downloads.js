@@ -8,7 +8,7 @@ import { iconEl } from '../core/glyph-icons.js';
 import { plainBackground } from '../core/art.js';
 import { attempt, toast } from '../core/feedback.js';
 import { isBusy, markBusy, prefersReducedMotion, runBusy } from '../core/busy.js';
-import { bar, currentView, move, push, render, renderHints, showChipFocus } from '../core/nav.js';
+import { bar, currentView, move, render, renderHints, showChipFocus } from '../core/nav.js';
 import { activateChip } from '../core/bar-chips.js';
 import { state } from '../core/state.js';
 import { SOURCE_LABEL } from '../core/library.js';
@@ -23,8 +23,7 @@ import { sound } from '../sound.js';
 import { fmtPercent, t } from '../core/i18n.js';
 import { timeAgo } from './news.js';
 import { searchOutcome, searchStatus, searchSucceeded } from '../core/update-search.js';
-import { downloadHints, downloadRows, downloadShortcuts, finishedMenu, isFinished, pressPending, pressSearch } from '../core/downloads-rules.js';
-import { uninstalledPage } from './uninstalled.js';
+import { downloadHints, downloadSections, downloadShortcuts, finishedMenu, isFinished, pressPending, pressSearch, sharedUnlock, withUnlock } from '../core/downloads-rules.js';
 import { areaOn } from '../core/areas.js';
 import { stepLine } from '../core/update-progress.js';
 
@@ -163,8 +162,9 @@ function pendingRow(p) {
     case 'windows': {
       const s = updateSummary(u.windows);
       return {
-        kind: 'pending', icon: '🪟', label: t('updates.windows.install'),
-        detail: [t('downloads.source.windows'), s.size ? t('updates.windows.countSize', { count: s.count, size: formatSize(s.size) }) : t('updates.windows.count', { count: s.count })].join(' · '),
+        kind: 'pending', group: 'windows', icon: '🪟', label: t('updates.windows.install'),
+        // The section's heading names the source ("Windows updates"); the line tells how many and how big.
+        detail: s.size ? t('updates.windows.countSize', { count: s.count, size: formatSize(s.size) }) : t('updates.windows.count', { count: s.count }),
         hint: t('updates.install'), busyKey: 'update:windows', hostBusy: !!u.busy,
         run: () => startUpdate('windows', null, t('updates.windows.confirm', { count: u.windows.length }), t('updates.install'))
       };
@@ -172,14 +172,14 @@ function pendingRow(p) {
     case 'apps': {
       const apps = t('updates.apps.count', { count: u.apps.length });
       return {
-        kind: 'pending', icon: '⤓', label: t('updates.apps.updateAll'), detail: [t('downloads.source.winget'), apps].join(' · '), hint: t('updates.apps.update'),
+        kind: 'pending', group: 'apps', icon: '⤓', label: t('updates.apps.updateAll'), detail: apps, hint: t('updates.apps.update'),
         busyKey: 'update:apps', hostBusy: !!u.busy, run: () => startUpdate('apps', null, t('updates.apps.confirm', { apps }), t('updates.apps.update'))
       };
     }
     case 'self': {
       const s = state.selfUpdate;
       return {
-        kind: 'pending', icon: '↻', label: t('updates.self.install', { version: s.version }),
+        kind: 'pending', group: 'couchhud', icon: '↻', label: t('updates.self.install', { version: s.version }),
         detail: s.ready ? t('updates.self.installDetail', { current: s.current }) : (s.problem ?? t('updates.self.notReady')),
         hint: t('updates.install'), busyKey: 'update:self', hostBusy: !!s.busy, run: installSelfUpdate
       };
@@ -187,7 +187,7 @@ function pendingRow(p) {
     default: {
       const c = p.entry;
       return {
-        kind: 'pending', icon: c.kind === 'skin' ? '🎨' : '🔌', label: c.name,
+        kind: 'pending', group: 'plugins', icon: c.kind === 'skin' ? '🎨' : '🔌', label: c.name,
         detail: [c.kind === 'skin' ? t('downloads.source.skin') : t('downloads.source.plugin'), `${c.installedVersion ?? '?'} → ${c.version}`].join(' · '),
         hint: t('updates.install'), busyKey: `catalog:${c.id}`, run: () => installFromCatalog(c)
       };
@@ -199,13 +199,16 @@ function pendingRow(p) {
 function appRow(a) {
   const u = state.updates;
   return {
-    kind: 'pending', icon: '▣', label: a.name, detail: `${a.version ?? '?'} → ${a.available}`, hint: t('updates.apps.update'),
+    kind: 'pending', group: 'apps', icon: '▣', label: a.name, detail: `${a.version ?? '?'} → ${a.available}`, hint: t('updates.apps.update'),
     busyKey: `update:app:${a.id}`, hostBusy: !!u?.busy, run: () => startUpdate('apps', a.id, null)
   };
 }
 
 /** A start row is busy while its own press runs or while the host reports that it is at work on that kind. */
 const rowBusy = (row) => row.kind === 'pending' && (!!row.hostBusy || (!!row.busyKey && isBusy(row.busyKey)));
+
+/** The heading's text key of a section (core/downloads-rules.js SECTIONS). */
+const sectionKey = (id) => `downloads.section.${id}`;
 
 /** What is waiting to be installed: Windows and app updates, CouchHUD itself, plugins and skins. */
 const pendingCount = (u, s) => (u?.windows?.length ?? 0) + (u?.apps?.length ?? 0) + (s?.available ? 1 : 0) + (state.catalogUpdates?.length ?? 0);
@@ -219,7 +222,11 @@ async function searchUpdates() {
   // On the locked couch nothing that starts a request is fired (the host would turn it away); asked before X looks busy.
   return pressSearch(SEARCH, async () => {
     outcome = null;
-    const [windows, self] = await Promise.all([attempt(() => api.checkUpdates(), t('updates.searchFailed')), attempt(() => api.checkSelfUpdate?.())]);
+    // The unlock may have run out in between: one code entry, then both calls again (withUnlock).
+    const [windows, self] = await Promise.all([
+      attempt(() => withUnlock(() => api.checkUpdates(), unlockForDownloads), t('updates.searchFailed')),
+      attempt(() => withUnlock(() => api.checkSelfUpdate?.(), unlockForDownloads))
+    ]);
     const ok = searchSucceeded(windows, self, !!api.checkSelfUpdate);
     const nowU = windows ?? state.updates;
     const nowS = self ?? state.selfUpdate;
@@ -228,13 +235,20 @@ async function searchUpdates() {
   }, pressDeps(searchBusy()));
 }
 
+/**
+ * The unlock for what this page starts (the search, an update, a cancel): the code entry, or the Windows sign-in. One at a time: the search's
+ * two calls refused together share one entry.
+ */
+const unlockForDownloads = sharedUnlock(() => ensureUnlocked(t('downloads.unlockReason')));
+
 /** What a press on this page touches (core/downloads-rules.js decides the order). */
 function pressDeps(busy) {
   return {
     busy,
     locked: isLocked,
     run: (key, fn) => runBusy(key, fn, { onChange: redraw, onIgnored: () => sound.bump() }),
-    unlocked: () => toast(t('downloads.unlockFirst')),
+    // On the locked couch the code entry (or the Windows sign-in) opens, and the press goes on once it opened.
+    unlock: unlockForDownloads,
     bump: () => sound.bump(),
     select: () => sound.select()
   };
@@ -250,7 +264,7 @@ function updateNotes() {
   const first = [];
   if (u.rebootRequired) {
     first.push({
-      kind: 'pending', open: true, icon: '↻', label: t('updates.reboot.title'), detail: t('updates.reboot.detail'), hint: t('updates.reboot.confirm'),
+      kind: 'pending', group: 'windows', open: true, icon: '↻', label: t('updates.reboot.title'), detail: t('updates.reboot.detail'), hint: t('updates.reboot.confirm'),
       run: async () => (await confirmDialog(t('updates.reboot.question'), t('updates.reboot.confirm'))) && api.power('restart')
     });
   }
@@ -286,7 +300,7 @@ async function lineMenu(entry) {
     return toast(entry.kind === 'game' ? t('downloads.controlInClient', { client: sourceLabel(entry) }) : t('downloads.running'));
   }
   const choice = await chooseDialog(entry.name, actions.map((a) => ACTION[a](entry)));
-  if (choice === 'cancel') return accept(await attempt(() => api.cancelDownload(entry.id), t('downloads.cancelFailed')));
+  if (choice === 'cancel') return accept(await attempt(() => withUnlock(() => api.cancelDownload(entry.id), unlockForDownloads), t('downloads.cancelFailed')));
   if (choice === 'openClient') return openClient(entry);
   if (choice === 'remove') return accept(await attempt(() => api.dismissDownload(entry.id), t('downloads.removeFailed')));
   if (choice === 'clearFinished') accept(await attempt(() => api.dismissDownload(null), t('downloads.removeFailed')));
@@ -313,11 +327,14 @@ export const downloadsView = {
     }
     watch();
     const entries = data.entries;
-    // Only what loads or waits to be installed: running lines first, then what can be started (pending updates), then the finished
-    // lines. The search for updates and the games that are not installed are the page's footer actions (X, Y), not rows.
+    // Only what loads or waits to be installed: running lines first, then what can be started (pending updates, by kind), then the
+    // finished lines. The search for updates is the page's footer action (X), not a row; new games are installed from the Games tab (View).
     const pending = pendingDownloads({ updates: state.updates, selfUpdate: state.selfUpdate, catalogUpdates: state.catalogUpdates, seen: state.updatesSeen }, entries)
       .flatMap((p) => (p.kind === 'apps' ? [pendingRow(p), ...(state.updates?.apps ?? []).map(appRow)] : [pendingRow(p)]));
-    this.rows = downloadRows({ entries, first: updateNotes().first, pending });
+    // In sections, each under its heading: what runs now, the updates that can be started by kind (CouchHUD, apps, Windows, plugins and
+    // skins), what has finished. The headings are no stops: up and down go from row to row across them.
+    const sections = downloadSections({ entries, first: updateNotes().first, pending });
+    this.rows = sections.flatMap((s) => s.rows);
     this.index = Math.max(0, Math.min(this.index, this.rows.length - 1));
     this.items = this.rows.map((r) => {
       if (r.kind !== 'entry') {
@@ -338,7 +355,18 @@ export const downloadsView = {
           // Running without a known progress: a calm moving bar instead of a number.
           isActive(e) && !bar ? el('span', { className: 'progress progress-unknown' }, el('i')) : null));
     });
-    this.scroller = el('ul', { className: 'check-list list-scroll' }, this.items);
+    // Each section's heading before its first row, with how many lines it holds; the first row of a section keeps it in view.
+    // i18n-used: downloads.section.running downloads.section.couchhud downloads.section.apps downloads.section.windows downloads.section.plugins downloads.section.finished
+    this.heads = new Map();
+    let at = 0;
+    const children = sections.flatMap((s) => {
+      const head = el('li', { className: 'update-section downloads-section', role: 'presentation', textContent: t('downloads.section.count', { name: t(sectionKey(s.id)), count: s.rows.length }) });
+      this.heads.set(at, head);
+      const items = this.items.slice(at, at + s.rows.length);
+      at += s.rows.length;
+      return [head, ...items];
+    });
+    this.scroller = el('ul', { className: 'check-list list-scroll downloads-list' }, children);
     // The search's state stands by the heading: running, its outcome, a problem, or when it last searched.
     const status = state.updates ? searchStatus({ searching: isBusy(SEARCH), updates: state.updates, selfUpdate: state.selfUpdate, outcome, ago: timeAgo }, t) : null;
     const wingetMissing = state.updates && !state.updates.apps?.length && state.updates.wingetAvailable === false;
@@ -361,7 +389,9 @@ export const downloadsView = {
   update({ instant = false } = {}) {
     if (!this.items?.length) return;
     setFocused(this.items, this.index);
-    keepInView(this.scroller, this.items[this.index], { instant });
+    // The first row of a section brings its heading along (a wider margin above it).
+    const head = this.heads?.get(this.index);
+    keepInView(this.scroller, this.items[this.index], { instant, margin: head ? 24 + head.offsetHeight : 24 });
   },
   async handle(action) {
     const count = this.rows?.length ?? 0;
@@ -381,26 +411,25 @@ export const downloadsView = {
       }
       case 'x':
         return state.updates ? searchUpdates() : sound.bump();
-      case 'y':
-        if (!areaOn('games')) return sound.bump();
-        sound.select();
-        return push(uninstalledPage());
     }
   },
   pointer(node, index, dispatch) {
-    this.index = index;
+    // The headings sit between the rows: the row's own place among the rows, not among the list's children.
+    const row = this.items?.indexOf(node) ?? -1;
+    if (row < 0) return;
+    this.index = row;
     this.update();
     dispatch('a');
   },
   hints() {
     const row = this.rows?.[this.index];
     // The page's own actions sit between A and B, like a plugin page's footer actions; X is busy while the search runs, A on a busy row.
-    const shortcuts = downloadShortcuts({ canSearch: !!state.updates, searching: searchBusy(), gamesOn: areaOn('games') });
+    const shortcuts = downloadShortcuts({ canSearch: !!state.updates, searching: searchBusy() });
     return downloadHints({
       hasRow: !!row,
       rowBusy: !!row && rowBusy(row),
       shortcuts,
-      labels: { a: row?.kind === 'pending' ? row.hint : t('downloads.hintMenu'), search: t('updates.check'), uninstalled: t('downloads.uninstalled'), back: t('downloads.hintHome') }
+      labels: { a: row?.kind === 'pending' ? row.hint : t('downloads.hintMenu'), search: t('updates.check'), back: t('downloads.hintHome') }
     });
   }
 };

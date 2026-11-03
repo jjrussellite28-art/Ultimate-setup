@@ -1,0 +1,9 @@
+{
+  "name": "couchhud-checks",
+  "private": true,
+  "description": "Dev tooling for the UI checks only. ui/ itself has no build.",
+  "devDependencies": {
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0"
+  }
+}

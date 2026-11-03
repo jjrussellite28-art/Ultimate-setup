@@ -1,0 +1,15 @@
+/* For scripts/tabs-check.mjs, never for the catalog: the runtime has to fall back to the default skin. */
+/* A black layer that shows up eight seconds after the skin is applied: the check has to look again (it does after 3 and 10 seconds). */
+[data-skin="user:hostile-delayed"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: #000;
+  opacity: 0;
+  animation: hostile-late 0s 8s forwards;
+}
+@keyframes hostile-late {
+  to { opacity: 1; }
+}

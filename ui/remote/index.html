@@ -2,14 +2,16 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b0d14">
+  <meta name="referrer" content="no-referrer">
   <title>CouchHUD</title>
   <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCIgeTE9IjAiIHgyPSI1MTIiIHkyPSI1MTIiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjM2Q4YmZmIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMC41NSIgc3RvcC1jb2xvcj0iIzZhNGNmZiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNiMDNkZmYiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8cmFkaWFsR3JhZGllbnQgaWQ9InNoaW5lIiBjeD0iMC4zIiBjeT0iMC4xNSIgcj0iMC43NSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2ZmZiIgc3RvcC1vcGFjaXR5PSIwLjM1Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI2ZmZiIgc3RvcC1vcGFjaXR5PSIwIi8+CiAgICA8L3JhZGlhbEdyYWRpZW50PgogICAgPGZpbHRlciBpZD0ic29mdCIgeD0iLTIwJSIgeT0iLTIwJSIgd2lkdGg9IjE0MCUiIGhlaWdodD0iMTQwJSI+CiAgICAgIDxmZURyb3BTaGFkb3cgZHg9IjAiIGR5PSIxMCIgc3RkRGV2aWF0aW9uPSIxMiIgZmxvb2QtY29sb3I9IiMxYTBiNGQiIGZsb29kLW9wYWNpdHk9IjAuNDUiLz4KICAgIDwvZmlsdGVyPgogIDwvZGVmcz4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExNiIgZmlsbD0idXJsKCNiZykiLz4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExNiIgZmlsbD0idXJsKCNzaGluZSkiLz4KICA8Zz4KICAgIDwhLS0gY291Y2g6IGJhY2tyZXN0LCBhcm1yZXN0cywgc2VhdCwgbGVncyAtLT4KICAgIDxyZWN0IHg9IjEwNCIgeT0iMTU2IiB3aWR0aD0iMzA0IiBoZWlnaHQ9IjE0NCIgcng9IjQ2IiBmaWxsPSIjZmZmIi8+CiAgICA8cmVjdCB4PSI1NiIgeT0iMjMyIiB3aWR0aD0iOTIiIGhlaWdodD0iMTUwIiByeD0iNDAiIGZpbGw9IiNmZmYiIHN0cm9rZT0idXJsKCNiZykiIHN0cm9rZS13aWR0aD0iMjIiLz4KICAgIDxyZWN0IHg9IjM2NCIgeT0iMjMyIiB3aWR0aD0iOTIiIGhlaWdodD0iMTUwIiByeD0iNDAiIGZpbGw9IiNmZmYiIHN0cm9rZT0idXJsKCNiZykiIHN0cm9rZS13aWR0aD0iMjIiLz4KICAgIDxyZWN0IHg9IjEzNiIgeT0iMjg4IiB3aWR0aD0iMjQwIiBoZWlnaHQ9Ijc0IiByeD0iMjQiIGZpbGw9IiNmZmYiIHN0cm9rZT0idXJsKCNiZykiIHN0cm9rZS13aWR0aD0iMjIiLz4KICAgIDxyZWN0IHg9IjkyIiB5PSIzNzgiIHdpZHRoPSIyNiIgaGVpZ2h0PSIzNiIgcng9IjEwIiBmaWxsPSIjZmZmIi8+CiAgICA8cmVjdCB4PSIzOTQiIHk9IjM3OCIgd2lkdGg9IjI2IiBoZWlnaHQ9IjM2IiByeD0iMTAiIGZpbGw9IiNmZmYiLz4KICA8L2c+Cjwvc3ZnPgo=">
   <style>
     :root {
       --bg: #0b0d14;
       --panel: #161a26;
+      --panel2: #1d2232;
       --line: #262b3b;
       --fg: #f2f5fa;
       --muted: #9aa3b8;
@@ -30,22 +32,23 @@
       padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 16px;
+      -webkit-user-select: none;
       user-select: none;
     }
-    header { display: flex; align-items: center; justify-content: space-between; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .brand { font-weight: 800; font-size: 20px; letter-spacing: -0.01em; }
     .brand span { color: var(--accent); }
-    .status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .status span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
     .dot.on { background: var(--a); box-shadow: 0 0 8px var(--a); }
     .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+    main > .card + .card, .view > .card + .card { margin-top: 16px; }
     .field-title { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
     .field-title strong { color: var(--fg); }
-    textarea {
+    textarea, input[type="search"], input[type="text"] {
       width: 100%;
-      min-height: 64px;
-      resize: vertical;
       padding: 12px;
       border-radius: 12px;
       border: 1px solid var(--line);
@@ -53,23 +56,28 @@
       color: var(--fg);
       font: inherit;
       font-size: 17px;
+      -webkit-user-select: text;
       user-select: text;
     }
-    textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    textarea { min-height: 64px; resize: vertical; }
+    textarea:focus, input:focus { outline: 2px solid var(--accent); border-color: transparent; }
     .row { display: flex; gap: 10px; margin-top: 10px; }
     button {
       font: inherit;
       color: var(--fg);
       border: 1px solid var(--line);
-      background: #1d2232;
+      background: var(--panel2);
       border-radius: 12px;
       padding: 12px 14px;
       font-weight: 600;
       touch-action: manipulation;
+      min-height: 44px;
     }
     button:active { transform: scale(0.96); filter: brightness(1.2); }
+    button:disabled { opacity: 0.45; }
     .primary { background: var(--accent); border-color: var(--accent); color: #fff; flex: 1; }
     .ghost { flex: 1; }
+    .danger { color: #ffb3b1; border-color: #4a2b33; }
     .pad { --k: min(56px, 12.5vw); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; }
     .dpad { display: grid; grid-template-columns: repeat(3, var(--k)); grid-template-rows: repeat(3, var(--k)); gap: 6px; justify-content: center; }
     .dpad button { padding: 0; font-size: 22px; }
@@ -86,8 +94,69 @@
     .shoulders { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
     .message { text-align: center; color: var(--muted); padding: 24px 8px; }
     .message h1 { color: var(--fg); font-size: 22px; margin: 0 0 8px; }
-    .toast { position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: #262c3f; padding: 10px 16px; border-radius: 999px; font-size: 14px; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+    .toast { position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: #262c3f; padding: 10px 16px; border-radius: 999px; font-size: 14px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 30; max-width: calc(100vw - 32px); text-align: center; }
     .toast.show { opacity: 1; }
+    .section-title { font-size: 13px; color: var(--muted); margin-bottom: 10px; font-weight: 600; letter-spacing: 0.02em; }
+    .power { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .power button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 6px; font-size: 14px; }
+    .power .glyph { font-size: 22px; line-height: 1; }
+    .power .off { color: #ffb3b1; border-color: #4a2b33; }
+    .timer-now { font-size: 15px; margin-bottom: 10px; }
+    .seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 8px; }
+    .seg + .seg { margin-top: 8px; }
+    .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    /* Tabs: the parts this phone may use (Steuerung always; Bibliothek and Downloads from the library level on). */
+    .tabs { display: flex; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 4px; overflow-x: auto; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tabs button { flex: 1 0 auto; border: none; background: transparent; padding: 10px 8px; font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .tabs button[aria-selected="true"] { background: var(--panel2); color: var(--fg); box-shadow: inset 0 -2px 0 var(--accent); }
+    .chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 4px; margin-top: 10px; scrollbar-width: none; }
+    .chips::-webkit-scrollbar { display: none; }
+    .chips button { flex: none; border-radius: 999px; padding: 8px 14px; min-height: 38px; font-size: 14px; }
+    .chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .entry { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); min-height: 64px; text-align: left; font-weight: 400; }
+    .entry .cover { width: 48px; height: 64px; border-radius: 8px; flex: none; object-fit: cover; background: #232a3d; display: grid; place-items: center; font-weight: 800; color: var(--muted); font-size: 20px; overflow: hidden; }
+    .entry .text { flex: 1; min-width: 0; }
+    .entry .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .entry .meta { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .entry.hiddenEntry { opacity: 0.6; }
+    .star { flex: none; width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 20px; color: var(--muted); background: transparent; border-color: transparent; }
+    .star[aria-pressed="true"] { color: var(--y); }
+    .empty { color: var(--muted); text-align: center; padding: 24px 8px; }
+    .bar { height: 6px; border-radius: 3px; background: #232a3d; overflow: hidden; margin-top: 6px; }
+    .bar > span { display: block; height: 100%; background: var(--accent); }
+    .sheet-back { position: fixed; inset: 0; background: rgba(4, 6, 12, 0.72); display: flex; align-items: flex-end; justify-content: center; padding: 16px; z-index: 10; }
+    .sheet { width: 100%; max-width: 480px; max-height: calc(100dvh - 32px); overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-bottom: max(0px, env(safe-area-inset-bottom)); }
+    .sheet h2 { margin: 0 0 8px; font-size: 20px; overflow-wrap: anywhere; }
+    .sheet p { margin: 0 0 10px; color: var(--muted); font-size: 15px; }
+    .sheet .warn { color: #ffd38a; background: #3a2c12; border: 1px solid #5c4519; border-radius: 10px; padding: 10px 12px; }
+    /* Cancel is the big button on top, the action sits below it: the tap that opened the question never lands on the action. */
+    .sheet .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    .sheet .cancel { background: var(--accent); border-color: var(--accent); color: #fff; padding: 14px; }
+    .sheet .confirm { background: transparent; border-color: var(--b); color: #ffb3b1; padding: 14px; }
+    .sheet .confirm:disabled { opacity: 0.45; }
+    .sheet .close { padding: 14px; background: transparent; }
+    .panel-body { display: flex; flex-direction: column; gap: 10px; }
+    .panel-body .check { display: flex; align-items: center; justify-content: space-between; text-align: left; font-weight: 400; }
+    .panel-body .check[aria-pressed="true"]::after { content: "✓"; color: var(--a); font-weight: 800; }
+    /* Settings: one card per group, a title per setting, choices as the same segments as the sleep timer's. */
+    .setting + .setting { margin-top: 16px; }
+    .setting .label { font-size: 15px; font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 8px; }
+    .setting .label span:last-child { color: var(--muted); font-weight: 400; }
+    .setting .check { display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; font-weight: 400; }
+    .setting .check[aria-pressed="true"]::after { content: "✓"; color: var(--a); font-weight: 800; }
+    .setting input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--accent); }
+    .skins { display: flex; flex-direction: column; gap: 8px; }
+    .code-dots { display: flex; gap: 8px; justify-content: center; min-height: 20px; margin: 4px 0 12px; }
+    .code-dots span { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); }
+    .code-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .code-pad button { padding: 0; height: 52px; font-size: 18px; }
+    .sf-detail { margin: 0 0 8px; font-weight: 600; }
+    .sf-digits { display: flex; justify-content: center; gap: 12px; font-size: 40px; font-weight: 700; min-height: 56px; margin-bottom: 8px; }
+    .sf-digits span { width: 48px; border-bottom: 3px solid currentColor; text-align: center; }
+    .sf-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .sf-pad button { height: 64px; font-size: 26px; font-weight: 700; }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -103,55 +172,145 @@
   </section>
 
   <main id="app" hidden>
-    <section class="card">
-      <div class="field-title" id="fieldTitle"></div>
-      <textarea id="text" rows="3" data-r-ph="placeholder" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
-      <div class="row">
-        <button class="ghost" id="paste" data-r="paste"></button>
-        <button class="ghost" id="send" data-r="send"></button>
-        <button class="primary" id="sendEnter" data-r="done"></button>
-      </div>
-    </section>
+    <nav class="tabs" id="tabs" role="tablist" hidden>
+      <button role="tab" data-tab="control" aria-selected="true" data-r="tabControl"></button>
+      <button role="tab" data-tab="library" aria-selected="false" data-r="tabLibrary"></button>
+      <button role="tab" data-tab="downloads" aria-selected="false" data-r="tabDownloads"></button>
+      <button role="tab" data-tab="settings" id="tabSettings" aria-selected="false" data-r="tabSettings" hidden></button>
+    </nav>
 
-    <section class="card" style="margin-top: 18px">
-      <div class="shoulders">
-        <button data-b="lb">LB</button>
-        <button data-b="guide">⌂</button>
-        <button data-b="start">≡</button>
-        <button data-b="rb">RB</button>
-      </div>
-      <div class="pad" style="margin-top: 16px">
-        <div class="dpad">
-          <button class="u" data-b="up" data-r-aria="up">▲</button>
-          <button class="l" data-b="left" data-r-aria="left">◀</button>
-          <button class="r" data-b="right" data-r-aria="right">▶</button>
-          <button class="d" data-b="down" data-r-aria="down">▼</button>
+    <div class="view" id="view-control">
+      <section class="card" style="margin-top: 16px">
+        <div class="field-title" id="fieldTitle"></div>
+        <textarea id="text" rows="3" data-r-ph="placeholder" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+        <div class="row">
+          <button class="ghost" id="paste" data-r="paste"></button>
+          <button class="ghost" id="send" data-r="send"></button>
+          <button class="primary" id="sendEnter" data-r="done"></button>
         </div>
-        <div class="face">
-          <button class="y" data-b="y">Y</button>
-          <button class="x" data-b="x">X</button>
-          <button class="b" data-b="b">B</button>
-          <button class="a" data-b="a">A</button>
+      </section>
+
+      <section class="card">
+        <div class="shoulders">
+          <button data-b="lb">LB</button>
+          <button data-b="guide" data-r-aria="guide">⌂</button>
+          <button data-b="start" data-r-aria="menu">≡</button>
+          <button data-b="rb">RB</button>
         </div>
+        <div class="pad" style="margin-top: 16px">
+          <div class="dpad">
+            <button class="u" data-b="up" data-r-aria="up">▲</button>
+            <button class="l" data-b="left" data-r-aria="left">◀</button>
+            <button class="r" data-b="right" data-r-aria="right">▶</button>
+            <button class="d" data-b="down" data-r-aria="down">▼</button>
+          </div>
+          <div class="face">
+            <button class="y" data-b="y">Y</button>
+            <button class="x" data-b="x">X</button>
+            <button class="b" data-b="b">B</button>
+            <button class="a" data-b="a">A</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="timerCard" aria-labelledby="timerTitle" hidden>
+        <div class="section-title" id="timerTitle" data-r="sleepTimer"></div>
+        <div class="timer-now" id="timerNow"></div>
+        <!-- First what happens, then a tap on the minutes starts it. -->
+        <div class="seg" id="timerActions">
+          <button data-ta="shutdown" aria-pressed="true" data-r="shutdown"></button>
+          <button data-ta="standby" aria-pressed="false" data-r="sleep"></button>
+        </div>
+        <div class="seg" id="timerMinutes"></div>
+        <div class="row"><button class="ghost" id="timerOff" data-r="timerOff"></button></div>
+      </section>
+
+      <section class="card" id="powerCard" aria-labelledby="powerTitle" hidden>
+        <div class="section-title" id="powerTitle" data-r="power"></div>
+        <div class="power">
+          <button data-p="sleep"><span class="glyph" aria-hidden="true">☾</span><span data-r="sleep"></span></button>
+          <button data-p="restart"><span class="glyph" aria-hidden="true">↻</span><span data-r="restart"></span></button>
+          <button data-p="shutdown" class="off"><span class="glyph" aria-hidden="true">⏻</span><span data-r="shutdown"></span></button>
+        </div>
+      </section>
+
+      <section class="card message" id="legacyNote" hidden>
+        <p data-r="legacyNote"></p>
+      </section>
+
+      <section class="card message" id="pcModeNote" hidden>
+        <p data-r="pcModeNote"></p>
+      </section>
+    </div>
+
+    <div class="view" id="view-library" hidden>
+      <div style="margin-top: 16px">
+        <input type="search" id="search" data-r-ph="search" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
       </div>
-    </section>
+      <div class="chips" id="filters"></div>
+      <div class="list" id="libraryList"></div>
+      <div class="row" id="collectionTools" hidden>
+        <button class="ghost" id="collectionNew" data-r="collectionNew"></button>
+        <button class="ghost" id="collectionEdit" data-r="collectionEdit" hidden></button>
+      </div>
+    </div>
+
+    <div class="view" id="view-downloads" hidden>
+      <div class="list" id="downloadList"></div>
+    </div>
+
+    <!-- Settings: only for a phone with the level Full; what is listed comes from the PC (the positive list), nothing else can be changed from here. -->
+    <div class="view" id="view-settings" hidden>
+      <div id="settingsBody"></div>
+    </div>
   </main>
 
-  <div class="toast" id="toast"></div>
+  <div class="sheet-back" id="sheet" hidden>
+    <div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="sheetTitle" aria-describedby="sheetText">
+      <h2 id="sheetTitle"></h2>
+      <p class="warn" id="sheetGame" hidden></p>
+      <p id="sheetText"></p>
+      <div class="actions">
+        <button class="cancel" id="sheetCancel" data-r="cancel"></button>
+        <button class="confirm" id="sheetConfirm"></button>
+      </div>
+    </div>
+  </div>
 
-  <script>
+  <!-- One panel for everything else: an entry's actions, a name, the parents' code, a question. -->
+  <div class="sheet-back" id="panel" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+      <h2 id="panelTitle"></h2>
+      <p id="panelText" hidden></p>
+      <div class="panel-body" id="panelBody"></div>
+      <div class="actions">
+        <button class="close" id="panelClose" data-r="close"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module">
+    // The phone remote. Phones paired since 0.7 talk to the PC over an encrypted channel (seal.js: the key comes from the QR code, which
+    // the browser never sends; every request and answer is sealed and numbered). Phones paired before keep their token and the
+    // buttons until they are paired again. Names from the PC are always set as text, never as markup.
+    import * as S from './seal.js';
+
     // Tiny dictionary: this page stands alone (phone browser), German for de-*, English otherwise.
     const R = {
       de: {
         connecting: 'Verbinde …', // i18n-ignore
         unpairedTitle: 'Nicht gekoppelt',
         unpairedText: 'Öffne am TV <b>Einstellungen › Handy › Handy koppeln</b> und scanne den QR-Code.', // i18n-ignore
+        oldLink: 'Dieser Link ist veraltet. Bitte den QR-Code am TV neu scannen.', // i18n-ignore
+        pairFailed: 'Kopplung fehlgeschlagen. Bitte am TV einen neuen QR-Code zeigen und scannen.', // i18n-ignore
         sendToTv: 'Text an den TV senden',
         placeholder: 'Tippen, diktieren oder einfügen …', // i18n-ignore
         paste: 'Einfügen', // i18n-ignore
         send: 'Senden',
         done: 'Fertig ⏎', // i18n-ignore
-        up: 'Hoch', left: 'Links', right: 'Rechts', down: 'Runter',
+        up: 'Hoch', left: 'Links', right: 'Rechts', down: 'Runter', guide: 'Home', menu: 'Menü', // i18n-ignore
         phone: 'Handy',
         error: 'Fehler {status}',
         paired: 'Gekoppelt',
@@ -163,18 +322,130 @@
         noConnection: 'Keine Verbindung',
         sent: 'Gesendet',
         transferred: 'Übertragen', // i18n-ignore
-        pasteHint: 'Lange auf das Feld tippen und „Einfügen“ wählen' // i18n-ignore
+        pasteHint: 'Lange auf das Feld tippen und „Einfügen“ wählen', // i18n-ignore
+        power: 'Energie',
+        sleep: 'Standby',
+        restart: 'Neu starten',
+        shutdown: 'Herunterfahren',
+        cancel: 'Abbrechen',
+        close: 'Schließen', // i18n-ignore
+        sleepTitle: 'PC in den Standby?',
+        restartTitle: 'PC neu starten?',
+        shutdownTitle: 'PC herunterfahren?',
+        sleepText: 'Der PC schläft ein. Aufwecken mit einer Taste am PC oder Controller.', // i18n-ignore
+        lossText: 'Nicht gespeicherte Arbeit in offenen Programmen geht verloren.', // i18n-ignore
+        gameRunning: 'Ein Spiel läuft: {name}', // i18n-ignore
+        gameRunningNoName: 'Ein Spiel läuft', // i18n-ignore
+        sleepDone: 'PC geht in den Standby',
+        restartDone: 'PC startet neu',
+        shutdownDone: 'PC wird heruntergefahren',
+        working: 'Wird ausgeführt …', // i18n-ignore
+        pcModeNote: 'Der PC ist im PC-Modus: Das Handy ist gerade nur eine Fernbedienung. Bibliothek und Änderungen gehen wieder, wenn der PC zurück auf der Couch ist (mit Sperre und Jugendschutz).', // i18n-ignore
+        legacyNote: 'Dieses Handy wurde vor CouchHUD 0.7 gekoppelt und kann nur steuern. Für die Bibliothek am TV entkoppeln und den QR-Code neu scannen.', // i18n-ignore
+        tabControl: 'Steuerung',
+        tabLibrary: 'Bibliothek',
+        tabDownloads: 'Downloads',
+        tabSettings: 'Einstellungen',
+        reloadArt: 'Grafiken neu laden',
+        artRunning: 'Suche Grafiken …', // i18n-ignore
+        artFound: 'Neue Grafiken gefunden',
+        artNothing: 'Noch keine neuen Grafiken',
+        artBusy: 'Gerade nicht möglich (im Spiel oder zu viele Anfragen), bitte später noch einmal', // i18n-ignore
+        gLook: 'Aussehen',
+        gFavorites: 'Favoriten',
+        gScreensaver: 'Bildschirmschoner',
+        gSound: 'Ton',
+        sSkin: 'Skin',
+        sLanguage: 'Sprache',
+        sFavoritesMode: 'Favoriten zeigen',
+        sFavoritesRecentDays: 'Zuletzt verwendet: Zeitraum',
+        sFavoritesSites: 'Webseiten in den Favoriten',
+        sScreensaverMinutes: 'Start nach',
+        sScreensaverStyle: 'Stil',
+        sAudioMode: 'Töne und Musik', // i18n-ignore
+        sSoundVolume: 'Lautstärke der Menütöne', // i18n-ignore
+        sMusicVolume: 'Lautstärke der Musik', // i18n-ignore
+        oLanguage_auto: 'Automatisch', oLanguage_de: 'Deutsch', oLanguage_en: 'English',
+        oFavoritesMode_favorites: 'Nur Favoriten', oFavoritesMode_recent: 'Nur zuletzt verwendet', oFavoritesMode_combined: 'Beides',
+        oScreensaverStyle_art: 'Bilder', oScreensaverStyle_clock: 'Uhr', oScreensaverStyle_dim: 'Abdunkeln', oScreensaverStyle_black: 'Schwarz',
+        oAudioMode_off: 'Aus', oAudioMode_ui: 'Menütöne', oAudioMode_music: 'Töne und Musik', // i18n-ignore
+        off: 'Aus',
+        days: '{n} Tage',
+        year: '1 Jahr',
+        unlimited: 'Unbegrenzt',
+        settingSaved: 'Gespeichert',
+        sleepTimer: 'Sleep-Timer',
+        timerOffNow: 'Aus',
+        timerIn: '{action} in {n} Min.',
+        inMinutes: '{n} Min.',
+        timerOff: 'Timer aus',
+        timerSet: 'Sleep-Timer gestellt',
+        timerStopped: 'Sleep-Timer aus',
+        search: 'Suchen …', // i18n-ignore
+        all: 'Alle',
+        games: 'Spiele',
+        apps: 'Apps',
+        favorites: 'Favoriten',
+        hidden: 'Ausgeblendet',
+        nothing: 'Nichts gefunden',
+        loading: 'Wird geladen …', // i18n-ignore
+        start: 'Starten',
+        favOn: 'Zu Favoriten', // i18n-ignore
+        favOff: 'Aus Favoriten entfernen',
+        rename: 'Umbenennen',
+        hide: 'Ausblenden',
+        unhide: 'Wieder einblenden',
+        collections: 'Sammlungen',
+        collectionNew: 'Neue Sammlung',
+        collectionEdit: 'Sammlung bearbeiten',
+        collectionRename: 'Sammlung umbenennen',
+        collectionDelete: 'Sammlung löschen', // i18n-ignore
+        collectionDeleteAsk: '„{name}“ löschen? Die Spiele bleiben in der Bibliothek.', // i18n-ignore
+        delete: 'Löschen', // i18n-ignore
+        name: 'Name',
+        save: 'Speichern',
+        started: '{name} startet',
+        startAnyway: 'Trotzdem starten',
+        runningAsk: 'Am TV fragt CouchHUD, ob das laufende Spiel beendet werden soll.', // i18n-ignore
+        parentTitle: 'Eltern-Code',
+        sfTitle: 'Bestätigung',
+        sfText: '„{action}“, angefragt um {time} Uhr. Auf dem Fernseher steht eine Zahl: gib sie hier ein. Steht dort keine, schließe das Fenster.',
+        sfBack: 'Letzte Ziffer löschen',
+        sfDone: 'Bestätigt',
+        sfWrong: 'Falsche Zahl. Die Anfrage ist beendet, eine Weile geht es nur mit Windows-Administrator.',
+        sfLocked: 'Zu viele Fehlversuche. Eine Weile geht es nur mit Windows-Administrator.',
+        sfGone: 'Die Anfrage gibt es nicht mehr.',
+        parentText: 'Den Eltern-Code mit den Tasten eingeben.',
+        confirmCode: 'Bestätigen', // i18n-ignore
+        clear: 'Löschen', // i18n-ignore
+        wrongCode: 'Code falsch',
+        waitCode: 'Code falsch. Bitte {n} s warten.',
+        played: 'Zuletzt {date}',
+        never: 'Noch nicht gespielt',
+        downloadsEmpty: 'Gerade lädt nichts.',
+        dlWaiting: 'Wartet',
+        dlDownloading: 'Lädt',
+        dlInstalling: 'Installiert',
+        dlPaused: 'Pausiert',
+        dlQueued: 'In der Warteschlange',
+        dlInClient: 'Im Launcher',
+        dlDone: 'Fertig',
+        dlFailed: 'Fehlgeschlagen',
+        dlUpdate: 'Update',
+        levelChanged: 'Die Rechte dieses Handys wurden geändert' // i18n-ignore
       },
       en: {
         connecting: 'Connecting …',
         unpairedTitle: 'Not paired',
         unpairedText: 'On the TV open <b>Settings › Phone › Pair phone</b> and scan the QR code.',
+        oldLink: 'This link is out of date. Please scan the QR code on the TV again.',
+        pairFailed: 'Pairing failed. Show a new QR code on the TV and scan it.',
         sendToTv: 'Send text to the TV',
         placeholder: 'Type, dictate or paste …',
         paste: 'Paste',
         send: 'Send',
         done: 'Done ⏎',
-        up: 'Up', left: 'Left', right: 'Right', down: 'Down',
+        up: 'Up', left: 'Left', right: 'Right', down: 'Down', guide: 'Home', menu: 'Menu',
         phone: 'Phone',
         error: 'Error {status}',
         paired: 'Paired',
@@ -186,13 +457,124 @@
         noConnection: 'No connection',
         sent: 'Sent',
         transferred: 'Transferred',
-        pasteHint: 'Long-press the field and choose "Paste"'
+        pasteHint: 'Long-press the field and choose "Paste"',
+        power: 'Power',
+        sleep: 'Standby',
+        restart: 'Restart',
+        shutdown: 'Shut down',
+        cancel: 'Cancel',
+        close: 'Close',
+        sleepTitle: 'Put the PC to sleep?',
+        restartTitle: 'Restart the PC?',
+        shutdownTitle: 'Shut down the PC?',
+        sleepText: 'The PC goes to sleep. Press a key on the PC or controller to wake it.',
+        lossText: 'Unsaved work in open programs will be lost.',
+        gameRunning: 'A game is running: {name}',
+        gameRunningNoName: 'A game is running',
+        sleepDone: 'The PC goes to sleep',
+        restartDone: 'The PC restarts',
+        shutdownDone: 'Shutting down the PC',
+        working: 'Working …',
+        pcModeNote: 'The PC is in PC mode: the phone is only a remote control for now. Library and changes work again when the PC is back on the couch (with the lock and parental controls).',
+        legacyNote: 'This phone was paired before CouchHUD 0.7 and can only control. For the library, unpair it on the TV and scan the QR code again.',
+        tabControl: 'Control',
+        tabLibrary: 'Library',
+        tabDownloads: 'Downloads',
+        tabSettings: 'Settings',
+        reloadArt: 'Reload artwork',
+        artRunning: 'Looking for artwork …',
+        artFound: 'New artwork found',
+        artNothing: 'No new artwork yet',
+        artBusy: 'Not possible right now (in a game or too many requests), please try again later',
+        gLook: 'Look',
+        gFavorites: 'Favourites',
+        gScreensaver: 'Screensaver',
+        gSound: 'Sound',
+        sSkin: 'Skin',
+        sLanguage: 'Language',
+        sFavoritesMode: 'Show in Favourites',
+        sFavoritesRecentDays: 'Recently used: period',
+        sFavoritesSites: 'Websites in Favourites',
+        sScreensaverMinutes: 'Starts after',
+        sScreensaverStyle: 'Style',
+        sAudioMode: 'Sounds and music',
+        sSoundVolume: 'Menu sound volume',
+        sMusicVolume: 'Music volume',
+        oLanguage_auto: 'Automatic', oLanguage_de: 'Deutsch', oLanguage_en: 'English',
+        oFavoritesMode_favorites: 'Favourites only', oFavoritesMode_recent: 'Recently used only', oFavoritesMode_combined: 'Both',
+        oScreensaverStyle_art: 'Artwork', oScreensaverStyle_clock: 'Clock', oScreensaverStyle_dim: 'Dim', oScreensaverStyle_black: 'Black',
+        oAudioMode_off: 'Off', oAudioMode_ui: 'Menu sounds', oAudioMode_music: 'Sounds and music',
+        off: 'Off',
+        days: '{n} days',
+        year: '1 year',
+        unlimited: 'Unlimited',
+        settingSaved: 'Saved',
+        sleepTimer: 'Sleep timer',
+        timerOffNow: 'Off',
+        timerIn: '{action} in {n} min',
+        inMinutes: '{n} min',
+        timerOff: 'Timer off',
+        timerSet: 'Sleep timer set',
+        timerStopped: 'Sleep timer off',
+        search: 'Search …',
+        all: 'All',
+        games: 'Games',
+        apps: 'Apps',
+        favorites: 'Favourites',
+        hidden: 'Hidden',
+        nothing: 'Nothing found',
+        loading: 'Loading …',
+        start: 'Start',
+        favOn: 'Add to favourites',
+        favOff: 'Remove from favourites',
+        rename: 'Rename',
+        hide: 'Hide',
+        unhide: 'Show again',
+        collections: 'Collections',
+        collectionNew: 'New collection',
+        collectionEdit: 'Edit collection',
+        collectionRename: 'Rename collection',
+        collectionDelete: 'Delete collection',
+        collectionDeleteAsk: 'Delete "{name}"? The games stay in the library.',
+        delete: 'Delete',
+        name: 'Name',
+        save: 'Save',
+        started: '{name} is starting',
+        startAnyway: 'Start anyway',
+        runningAsk: 'On the TV, CouchHUD asks whether to end the running game.',
+        parentTitle: 'Parents\' code',
+        sfTitle: 'Confirmation',
+        sfText: '“{action}”, asked at {time}. The TV shows a number: type it here. If there is none, close this window.',
+        sfBack: 'Delete the last digit',
+        sfDone: 'Confirmed',
+        sfWrong: 'Wrong number. The request is over, for a while only a Windows administrator works.',
+        sfLocked: 'Too many failed tries. For a while only a Windows administrator works.',
+        sfGone: 'That request is gone.',
+        parentText: 'Enter the parents\' code with the buttons.',
+        confirmCode: 'Confirm',
+        clear: 'Clear',
+        wrongCode: 'Wrong code',
+        waitCode: 'Wrong code. Please wait {n} s.',
+        played: 'Last played {date}',
+        never: 'Not played yet',
+        downloadsEmpty: 'Nothing is loading right now.',
+        dlWaiting: 'Waiting',
+        dlDownloading: 'Downloading',
+        dlInstalling: 'Installing',
+        dlPaused: 'Paused',
+        dlQueued: 'Queued',
+        dlInClient: 'In the launcher',
+        dlDone: 'Done',
+        dlFailed: 'Failed',
+        dlUpdate: 'Update',
+        levelChanged: 'This phone\'s rights were changed'
       }
     };
     const LANG = /^de/i.test(navigator.language || 'de') ? 'de' : 'en';
     const tr = (key, params = {}) => R[LANG][key].replace(/\{(\w+)\}/g, (m, n) => (n in params ? params[n] : m));
     document.documentElement.lang = LANG;
     for (const n of document.querySelectorAll('[data-r]')) n.textContent = tr(n.dataset.r);
+    // Only the page's own fixed texts (bold menu path), never anything from the PC.
     for (const n of document.querySelectorAll('[data-r-html]')) n.innerHTML = tr(n.dataset.rHtml);
     for (const n of document.querySelectorAll('[data-r-ph]')) n.placeholder = tr(n.dataset.rPh);
     for (const n of document.querySelectorAll('[data-r-aria]')) n.setAttribute('aria-label', tr(n.dataset.rAria));
@@ -200,32 +582,166 @@
     document.getElementById('fieldTitle').textContent = tr('sendToTv');
 
     const KEY = 'couchhud-token';
+    const CHANNEL_KEY = 'couchhud-channel';
     const $ = (id) => document.getElementById(id);
+    const LEVELS = ['control', 'library', 'full'];
     let token = null;
+    let channel = null; // { id, key (bytes) } of a phone paired since 0.7
+    let session = null; // { sid, key, seq, stream }
     let keyboardOpen = false;
     let lastTitle = '';
+    let phone = { level: 'control', parentOnPhone: false, minutes: [30, 60, 90, 120], sleepTimer: null, power: false };
 
     try { token = localStorage.getItem(KEY); } catch { /* private mode: pair again next time */ }
+    try {
+      const stored = JSON.parse(localStorage.getItem(CHANNEL_KEY) || 'null');
+      const key = S.fromB64url(stored?.key);
+      if (typeof stored?.id === 'string' && key?.length === 32) channel = { id: stored.id, key };
+    } catch { /* nothing stored */ }
+
+    function el(tag, props = {}, ...children) {
+      const n = document.createElement(tag);
+      for (const [k, v] of Object.entries(props)) {
+        if (k === 'text') n.textContent = v;
+        else if (k === 'on') for (const [ev, fn] of Object.entries(v)) n.addEventListener(ev, fn);
+        else if (k.startsWith('aria') || k.startsWith('data-') || k === 'role') n.setAttribute(k.replace(/^aria([A-Z])/, (m, c) => `aria-${c.toLowerCase()}`), v);
+        else n[k] = v;
+      }
+      for (const c of children) if (c != null && c !== false) n.append(c);
+      return n;
+    }
 
     function toast(text) {
       const t = $('toast');
       t.textContent = text;
       t.classList.add('show');
       clearTimeout(toast.timer);
-      toast.timer = setTimeout(() => t.classList.remove('show'), 1800);
+      toast.timer = setTimeout(() => t.classList.remove('show'), 2400);
     }
 
-    async function api(path, body) {
+    // ---- Transport -------------------------------------------------------------------------------------------------------------------
+
+    class RemoteError extends Error {
+      constructor(message, extra = {}) {
+        super(message);
+        Object.assign(this, extra);
+      }
+    }
+
+    function forget() {
+      channel = null;
+      session = null;
+      token = null;
+      try { localStorage.removeItem(CHANNEL_KEY); localStorage.removeItem(KEY); } catch { /* ignore */ }
+    }
+
+    async function post(path, headers, body, signal) {
+      return fetch(path, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8', ...headers }, body, signal, credentials: 'omit', cache: 'no-store' });
+    }
+
+    async function openSession() {
+      const nonce = S.randomBytes(16);
+      const aad = `session|${channel.id}`;
+      const res = await post('/api/session', { 'X-CouchHud-Device': channel.id }, S.seal(channel.key, S.DIR.request, 0, aad, JSON.stringify({ c: S.b64url(nonce) })));
+      if (res.status === 401) {
+        forget();
+        throw new RemoteError(tr('notPaired'), { unpaired: true });
+      }
+      if (!res.ok) throw new RemoteError(tr('error', { status: res.status }));
+      const opened = S.open(channel.key, S.DIR.response, aad, await res.text());
+      const answer = opened && JSON.parse(opened.text);
+      // The answer names our own nonce: it belongs to this request and no other.
+      if (!answer || answer.c !== S.b64url(nonce)) throw new RemoteError(tr('noConnection'));
+      session = { sid: answer.sid, key: S.sessionKey(channel.key, nonce, S.fromB64url(answer.n)), seq: 0, streams: 0 };
+      phone.level = answer.level;
+      startEvents();
+      return session;
+    }
+
+    /** One sealed operation; the answer must carry the request's number. Errors keep the PC's text and code. */
+    async function rpc(op, args = {}, signal, retried = false) {
+      if (!channel) throw new RemoteError(tr('notPaired'), { unpaired: true });
+      const s = session ?? (await openSession());
+      const seq = ++s.seq;
+      const aad = `rpc|${s.sid}`;
+      const res = await post('/api/rpc', { 'X-CouchHud-Session': s.sid }, S.seal(s.key, S.DIR.request, seq, aad, JSON.stringify({ op, args })), signal);
+      if (res.status === 401 || res.status === 400) {
+        // The session ran out (or the PC restarted): one new session, one more try.
+        if (session === s) { stopEvents(); session = null; }
+        if (!retried) return rpc(op, args, signal, true);
+        throw new RemoteError(tr('noConnection'));
+      }
+      if (res.status === 429) throw new RemoteError(tr('error', { status: 429 }));
+      if (!res.ok) throw new RemoteError(tr('error', { status: res.status }));
+      const opened = S.open(s.key, S.DIR.response, aad, await res.text());
+      if (!opened || opened.seq !== seq) throw new RemoteError(tr('noConnection'));
+      const answer = JSON.parse(opened.text);
+      if (answer.ok) return answer.result ?? {};
+      throw new RemoteError(answer.error || tr('error', { status: answer.status ?? 400 }), { code: answer.code, parent: answer.parent, status: answer.status });
+    }
+
+    // The page's calls by their old paths: over the channel when this phone has one, else the old token endpoints.
+    const ROUTES = { '/api/state': 'state', '/api/button': 'button', '/api/text': 'text', '/api/power/prepare': 'powerPrepare', '/api/power': 'power' };
+
+    async function api(path, body, signal) {
+      if (channel) return rpc(ROUTES[path], body ?? {}, signal);
       const res = await fetch(path, {
         method: body ? 'POST' : 'GET',
         headers: { 'Content-Type': 'application/json', 'X-CouchHUD-Token': token ?? '' },
-        body: body ? JSON.stringify(body) : undefined
+        body: body ? JSON.stringify(body) : undefined,
+        signal
       });
       if (res.status === 401) throw Object.assign(new Error('unpaired'), { unpaired: true });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || tr('error', { status: res.status }));
       return data;
     }
+
+    // Events: signals only ("the library changed"), sealed with the session key; the page fetches what changed itself.
+    let source = null;
+    let lastEvent = 0;
+    let reconnect = 0;
+
+    function stopEvents() {
+      source?.close();
+      source = null;
+    }
+
+    function startEvents() {
+      stopEvents();
+      if (!session || typeof EventSource === 'undefined') return;
+      const s = session;
+      const n = ++s.streams;
+      lastEvent = 0;
+      const url = `/api/events?sid=${encodeURIComponent(s.sid)}&seq=${n}&p=${S.urlProof(s.key, 'events', `${s.sid}|${n}`)}`;
+      const es = new EventSource(url);
+      source = es;
+      es.onmessage = (e) => {
+        const opened = S.open(s.key, S.DIR.event, `event|${s.sid}`, e.data);
+        if (!opened || opened.seq <= lastEvent) return;
+        lastEvent = opened.seq;
+        try { onEvent(JSON.parse(opened.text)); } catch { /* not for us */ }
+      };
+      es.onerror = () => {
+        // A refused or broken stream is not opened again with the same URL: a new number (and maybe a new session) after a moment.
+        es.close();
+        if (source !== es) return;
+        source = null;
+        clearTimeout(reconnect);
+        reconnect = setTimeout(() => { if (session === s) startEvents(); else poll(); }, 4000);
+      };
+    }
+
+    function onEvent({ type }) {
+      if (type === 'secondFactor') return checkSecondFactor();
+      if (type === 'keyboard' || type === 'sleepTimer' || type === 'session') return poll();
+      if (type === 'level') return poll(true);
+      if (type === 'library' || type === 'collections') return loadLibrary();
+      if (type === 'settings') return loadSettings();
+      if (type === 'downloads') return loadDownloads();
+    }
+
+    // ---- Pairing -----------------------------------------------------------------------------------------------------------------------
 
     function deviceName() {
       const ua = navigator.userAgent;
@@ -236,19 +752,34 @@
     }
 
     async function pairFromLink() {
-      const m = location.hash.match(/pair=([A-Za-z0-9]+)/);
-      if (!m) return;
-      // The code is single use; keep it out of the history and screenshots.
+      const hash = location.hash;
+      if (!hash) return;
+      // The secret is single use; keep it out of the history and screenshots.
       history.replaceState(null, '', location.pathname);
+      const m = hash.match(/^#k=([A-Za-z0-9_-]{43})$/);
+      if (!m) {
+        if (/pair=/.test(hash)) toast(tr('oldLink'));
+        return;
+      }
+      const secret = S.fromB64url(m[1]);
+      if (!secret || secret.length !== 32) return;
+      const pk = S.pairKey(secret);
       try {
-        const r = await api('/api/pair', { code: m[1], name: deviceName() });
-        token = r.token;
-        try { localStorage.setItem(KEY, token); } catch { /* ignore */ }
+        const res = await post('/api/pair', {}, S.seal(pk, S.DIR.request, 0, 'pair', JSON.stringify({ name: deviceName() })));
+        const opened = res.ok ? S.open(pk, S.DIR.response, 'pair', await res.text()) : null;
+        const answer = opened && JSON.parse(opened.text);
+        const key = S.fromB64url(answer?.key);
+        if (!answer?.id || key?.length !== 32) return toast(tr('pairFailed'));
+        forget();
+        channel = { id: answer.id, key };
+        try { localStorage.setItem(CHANNEL_KEY, JSON.stringify({ id: answer.id, key: answer.key })); } catch { /* private mode */ }
         toast(tr('paired'));
-      } catch (e) {
-        toast(e.message);
+      } catch {
+        toast(tr('noConnection'));
       }
     }
+
+    // ---- State -------------------------------------------------------------------------------------------------------------------------
 
     function show(paired) {
       $('app').hidden = !paired;
@@ -257,13 +788,15 @@
       $('status').textContent = paired ? (keyboardOpen ? tr('keyboardOpen') : tr('connected')) : tr('notPaired');
     }
 
-    async function poll() {
-      if (!token) return show(false);
+    const atLeast = (level) => LEVELS.indexOf(phone.level) >= LEVELS.indexOf(level);
+
+    async function poll(levelChanged = false) {
+      if (!token && !channel) return show(false);
       try {
         const s = await api('/api/state');
         keyboardOpen = !!s.keyboard?.open;
         const title = keyboardOpen ? s.keyboard.title : '';
-        $('fieldTitle').innerHTML = '';
+        $('fieldTitle').textContent = '';
         if (keyboardOpen) {
           $('fieldTitle').append(tr('tvInput'));
           const strong = document.createElement('strong');
@@ -276,17 +809,60 @@
           $('fieldTitle').textContent = tr('sendHint');
         }
         lastTitle = title;
+        // The owner may switch power from the phone off (Settings › Phone); the PC refuses it then anyway.
+        $('powerCard').hidden = s.power !== true;
+        if (!s.power) closeSheet();
+        const before = phone.level;
+        phone = { ...phone, ...s, level: channel ? (LEVELS.includes(s.level) ? s.level : 'control') : 'control' };
+        applyLevel(levelChanged && before !== phone.level);
+        renderTimer();
         show(true);
+        checkSecondFactor();
       } catch (e) {
         if (e.unpaired) {
-          token = null;
-          try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+          forget();
           return show(false);
         }
         $('dot').classList.remove('on');
         $('status').textContent = tr('noConnection');
       }
     }
+
+    let tab = 'control';
+
+    function applyLevel(changed) {
+      const library = channel && atLeast('library');
+      $('tabs').hidden = !library;
+      $('legacyNote').hidden = !!channel;
+      // PC mode lowers the phone to a plain remote control (no couch lock or parental controls there): say why the tabs are gone.
+      $('pcModeNote').hidden = !(channel && phone.pcMode === true);
+      $('collectionTools').hidden = !atLeast('full');
+      // The settings page is for the level Full alone (and goes with PC mode, which lowers the level).
+      const full = channel && atLeast('full');
+      $('tabSettings').hidden = !full;
+      if (!full) { settingsState = null; $('settingsBody').replaceChildren(); }
+      if (!library && tab !== 'control') selectTab('control');
+      else if (!full && tab === 'settings') selectTab('library');
+      if (changed) {
+        toast(tr('levelChanged'));
+        if (library) loadLibrary();
+      }
+    }
+
+    function selectTab(name) {
+      tab = name;
+      for (const b of document.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      // On a narrow phone the row of tabs scrolls: the chosen one comes into view.
+      document.querySelector(`[data-tab="${name}"]`)?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+      for (const v of ['control', 'library', 'downloads', 'settings']) $(`view-${v}`).hidden = v !== name;
+      if (name === 'library' && !lib.items) loadLibrary();
+      if (name === 'downloads') loadDownloads();
+      if (name === 'settings') loadSettings();
+    }
+
+    for (const b of document.querySelectorAll('[data-tab]')) b.addEventListener('click', () => selectTab(b.dataset.tab));
+
+    // ---- Text and buttons --------------------------------------------------------------------------------------------------------------
 
     async function send(submit) {
       try {
@@ -320,10 +896,571 @@
       });
     }
 
+    // ---- Sleep timer (channel only: the TV runs it, the PC checks the same gates as for the power action) ---------------------------
+
+    let timerAction = 'shutdown';
+
+    function renderTimer() {
+      $('timerCard').hidden = !channel || phone.power !== true;
+      const t = phone.sleepTimer;
+      const left = t?.at ? Math.max(1, Math.round((t.at - Date.now()) / 60000)) : 0;
+      $('timerNow').textContent = left ? tr('timerIn', { action: tr(t.action === 'standby' ? 'sleep' : 'shutdown'), n: left }) : tr('timerOffNow');
+      $('timerOff').hidden = !left;
+      const minutes = Array.isArray(phone.minutes) ? phone.minutes.filter((m) => Number.isInteger(m) && m > 0 && m <= 600) : [];
+      if ($('timerMinutes').dataset.list !== minutes.join(',')) {
+        $('timerMinutes').dataset.list = minutes.join(',');
+        $('timerMinutes').replaceChildren(...minutes.map((m) => el('button', { text: tr('inMinutes', { n: m }), on: { click: () => setTimer(m) } })));
+      }
+    }
+
+    for (const b of document.querySelectorAll('[data-ta]')) {
+      b.addEventListener('click', () => {
+        timerAction = b.dataset.ta;
+        for (const o of document.querySelectorAll('[data-ta]')) o.setAttribute('aria-pressed', String(o === b));
+      });
+    }
+
+    async function setTimer(minutes) {
+      try {
+        await rpc('sleepTimer', minutes ? { minutes, action: timerAction } : { minutes: 0 });
+        toast(minutes ? tr('timerSet') : tr('timerStopped'));
+        poll();
+      } catch (e) {
+        toast(e.message);
+      }
+    }
+
+    $('timerOff').onclick = () => setTimer(0);
+
+    // ---- Power ---------------------------------------------------------------------------------------------------------------------------
+
+    // Power: the tap only asks the PC (the same rules as the couch's power menu, a one-time ticket), the question here needs a second
+    // tap on another place, and that button waits a moment, so a stray tap or a double tap never switches anything off.
+    const POWER = ['sleep', 'restart', 'shutdown'];
+    const CONFIRM_DELAY_MS = 1000;
+    // Standby answers after waking up; a connection that died with the PC must not keep the page waiting for good.
+    const POWER_TIMEOUT_MS = 90000;
+    let pending = null;
+
+    function hideSheet() {
+      clearTimeout(closeSheet.timer);
+      $('sheet').hidden = true;
+      $('sheetCancel').disabled = false;
+    }
+
+    // While the confirmed request runs, the question stays (nothing in it reacts) and no new one opens.
+    function closeSheet() {
+      if (pending?.running) return;
+      pending = null;
+      hideSheet();
+    }
+
+    async function askPower(action) {
+      if (!POWER.includes(action) || pending) return;
+      // One question at a time: a second prepare would replace this ticket.
+      pending = { busy: true };
+      let r;
+      try {
+        r = await api('/api/power/prepare', { action });
+      } catch (e) {
+        pending = null;
+        return toast(e.unpaired ? tr('notPaired') : e.message);
+      }
+      pending = { action, ticket: r.ticket };
+      $('sheetTitle').textContent = tr(`${action}Title`);
+      $('sheetText').textContent = tr(action === 'sleep' ? 'sleepText' : 'lossText');
+      // The name only if the host sent it (a phone without the library level learns no titles): else just that a game runs.
+      $('sheetGame').hidden = !r.game && !r.gameRunning;
+      $('sheetGame').textContent = r.game ? tr('gameRunning', { name: r.game }) : r.gameRunning ? tr('gameRunningNoName') : '';
+      const confirm = $('sheetConfirm');
+      confirm.textContent = tr(action);
+      confirm.disabled = true;
+      closeSheet.timer = setTimeout(() => { confirm.disabled = false; }, CONFIRM_DELAY_MS);
+      $('sheet').hidden = false;
+      $('sheetCancel').focus();
+    }
+
+    async function runPower() {
+      if (!pending || pending.running || $('sheetConfirm').disabled) return;
+      const { action, ticket } = pending;
+      pending.running = true;
+      $('sheetConfirm').disabled = true;
+      $('sheetCancel').disabled = true;
+      $('sheetConfirm').textContent = tr('working');
+      navigator.vibrate?.(30);
+      // Standby answers only after the PC woke up again, and a shutdown may cut the connection: a request that takes a moment is on its
+      // way (the question goes, a new one still waits for the answer).
+      let said = false;
+      const early = setTimeout(() => { said = true; hideSheet(); toast(tr(`${action}Done`)); }, 1500);
+      const abort = new AbortController();
+      const giveUp = setTimeout(() => abort.abort(), POWER_TIMEOUT_MS);
+      try {
+        await api('/api/power', { action, ticket }, abort.signal);
+        if (!said) toast(tr(`${action}Done`));
+      } catch (e) {
+        if (e.unpaired) toast(tr('notPaired'));
+        else if (e instanceof TypeError || e.name === 'AbortError') { if (!said) toast(tr('noConnection')); }
+        else toast(e.message);
+      } finally {
+        clearTimeout(early);
+        clearTimeout(giveUp);
+        pending = null;
+        hideSheet();
+      }
+    }
+
+    for (const btn of document.querySelectorAll('[data-p]')) btn.addEventListener('click', () => askPower(btn.dataset.p));
+    $('sheetCancel').onclick = closeSheet;
+    $('sheetConfirm').onclick = runPower;
+    $('sheet').addEventListener('click', (e) => { if (e.target === $('sheet')) closeSheet(); });
+
+    // ---- Panel (entry actions, names, the parents' code, questions) -----------------------------------------------------------------
+
+    let panelDone = null;
+
+    function openPanel(title, text, ...body) {
+      $('panelTitle').textContent = title;
+      $('panelText').hidden = !text;
+      $('panelText').textContent = text || '';
+      $('panelBody').replaceChildren(...body.filter(Boolean));
+      $('panel').hidden = false;
+      return new Promise((resolve) => { panelDone = resolve; });
+    }
+
+    function closePanel(value) {
+      $('panel').hidden = true;
+      $('panelBody').replaceChildren();
+      const done = panelDone;
+      panelDone = null;
+      done?.(value);
+    }
+
+    $('panelClose').onclick = () => closePanel(undefined);
+    $('panel').addEventListener('click', (e) => { if (e.target === $('panel')) closePanel(undefined); });
+
+    /** A name: the input, Save. Resolves to the trimmed text or undefined. */
+    function askName(title, value = '') {
+      const input = el('input', { type: 'text', value, maxLength: 100, autocomplete: 'off', enterKeyHint: 'done' });
+      const save = el('button', { className: 'primary', text: tr('save'), on: { click: () => input.value.trim() && closePanel(input.value.trim()) } });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save.click(); });
+      const result = openPanel(title, '', input, save);
+      setTimeout(() => input.focus(), 50);
+      return result;
+    }
+
+    function askYes(title, text, label) {
+      return openPanel(title, text, el('button', { className: 'confirm danger', text: label, on: { click: () => closePanel(true) } }));
+    }
+
+    // The parents' code, typed with the couch's buttons. Only offered when the PC says it may be typed here (encrypted channel, not a
+    // child's phone, the CouchHUD code as couch lock) and only right after the PC asked for it for this very action.
+    const CODE_BUTTONS = [['a', 'A'], ['b', 'B'], ['x', 'X'], ['y', 'Y'], ['lb', 'LB'], ['rb', 'RB'], ['up', '▲'], ['down', '▼'], ['left', '◀'], ['right', '▶']];
+
+    function askParentCode() {
+      const code = [];
+      const dots = el('div', { className: 'code-dots', 'aria-live': 'polite' });
+      const draw = () => dots.replaceChildren(...code.map(() => el('span')));
+      const pad = el('div', { className: 'code-pad' }, ...CODE_BUTTONS.map(([id, label]) => el('button', {
+        text: label, 'aria-label': label, on: { click: () => { if (code.length < 16) { code.push(id); draw(); navigator.vibrate?.(8); } } }
+      })));
+      const clear = el('button', { className: 'ghost', text: tr('clear'), on: { click: () => { code.length = 0; draw(); } } });
+      const ok = el('button', { className: 'primary', text: tr('confirmCode'), on: { click: () => code.length && closePanel([...code]) } });
+      return openPanel(tr('parentTitle'), tr('parentText'), dots, pad, el('div', { className: 'row' }, clear, ok));
+    }
+
+    // ---- The second factor (0.7) ---------------------------------------------------------------------------------------------------
+    // The TV asked for a critical action after the code: this phone (level Full, not a child's) gets the question with the action, a line of detail and a keypad;
+    // the TV shows a two-digit number that is read there and typed here (the phone is never told it and gets no choices). Only the same number
+    // confirms; a wrong one ends the request and locks this phone for a while. The PC decides again who may answer and what it counts for.
+
+    let sfShown = null;
+    let sfDismissed = null;
+
+    async function checkSecondFactor() {
+      if (!channel || !atLeast('full')) return;
+      let q;
+      try { q = await rpc('secondFactor'); } catch { return; }
+      if (!q?.pending) {
+        if (sfShown) { sfShown = null; closePanel(undefined); }
+        return;
+      }
+      if (sfShown === q.requestId || sfDismissed === q.requestId) return;
+      sfShown = q.requestId;
+      if (!$('panel').hidden) closePanel(undefined);
+      const time = new Date(Number(q.asked) || Date.now()).toLocaleTimeString(LANG === 'de' ? 'de-DE' : 'en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      // A keypad, not choices: the number is read on the TV and typed here, so a blind tap finds nothing. Two digits, then Confirm.
+      const typed = [];
+      const shownDigits = el('div', { className: 'sf-digits', 'aria-live': 'polite' });
+      const draw = () => shownDigits.replaceChildren(...[0, 1].map((i) => el('span', { text: typed[i] ?? '' })));
+      const confirm = el('button', { className: 'primary', text: tr('confirmCode'), disabled: true, on: { click: () => typed.length === 2 && closePanel(Number(typed.join(''))) } });
+      const refresh = () => { draw(); confirm.disabled = typed.length !== 2; };
+      const key = (digit) => el('button', { text: String(digit), on: { click: () => { if (typed.length < 2) { typed.push(digit); refresh(); navigator.vibrate?.(8); } } } });
+      const back = el('button', { text: '⌫', 'aria-label': tr('sfBack'), on: { click: () => { typed.pop(); refresh(); } } });
+      refresh();
+      const pad = el('div', { className: 'sf-pad' }, ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(key), back, key(0), confirm);
+      const detail = q.detail ? el('p', { className: 'sf-detail', text: String(q.detail) }) : null;
+      const choice = await openPanel(tr('sfTitle'), tr('sfText', { action: String(q.label ?? ''), time }), detail, shownDigits, pad);
+      if (sfShown !== q.requestId) return;
+      sfShown = null;
+      if (choice === undefined) { sfDismissed = q.requestId; return; }
+      try {
+        const r = await rpc('secondFactorAnswer', { requestId: q.requestId, number: choice });
+        toast(tr(r.result === 'Confirmed' ? 'sfDone' : r.result === 'Wrong' ? 'sfWrong' : r.result === 'LockedOut' ? 'sfLocked' : 'sfGone'));
+      } catch (e) {
+        toast(e.message);
+      }
+    }
+
+    /**
+     * A library operation with the couch's questions: a game already running (ask, then once more with confirm), the parents' code
+     * (on the phone only where the PC allows it, else the PC's text "am Fernseher bestätigen").
+     */
+    async function act(op, args) {
+      for (let round = 0; round < 3; round++) {
+        try {
+          return await rpc(op, args);
+        } catch (e) {
+          if (e.code === 'running' && !args.confirm) {
+            const go = await askYes(e.message, tr('runningAsk'), tr('startAnyway'));
+            if (!go) return undefined;
+            args = { ...args, confirm: true };
+            continue;
+          }
+          if (e.code === 'parent' && e.parent && phone.parentOnPhone) {
+            const code = await askParentCode();
+            if (!code) return undefined;
+            let answer;
+            try {
+              answer = await rpc('parentCode', { code, action: e.parent.action, item: e.parent.item ?? null });
+            } catch (err) {
+              toast(err.message);
+              return undefined;
+            }
+            if (!answer.ok) {
+              toast(answer.waitSeconds ? tr('waitCode', { n: answer.waitSeconds }) : tr('wrongCode'));
+              return undefined;
+            }
+            continue;
+          }
+          toast(e.message);
+          return undefined;
+        }
+      }
+      return undefined;
+    }
+
+    // ---- Library -------------------------------------------------------------------------------------------------------------------------
+
+    const lib = { items: null, collections: [], filter: 'all', query: '' };
+
+    async function loadLibrary() {
+      if (!channel || !atLeast('library')) return;
+      try {
+        const [items, collections] = await Promise.all([rpc('library'), rpc('collections')]);
+        lib.items = Array.isArray(items) ? items : [];
+        lib.collections = Array.isArray(collections) ? collections : [];
+        renderLibrary();
+      } catch (e) {
+        if (tab === 'library') toast(e.message);
+      }
+    }
+
+    function coverUrl(hash) {
+      if (!session || !/^[0-9a-f]{64}$/.test(hash ?? '')) return null;
+      return `/art/${hash}?sid=${encodeURIComponent(session.sid)}&p=${S.urlProof(session.key, 'art', hash)}`;
+    }
+
+    function filters() {
+      const list = [['all', tr('all')], ['game', tr('games')], ['app', tr('apps')], ['fav', tr('favorites')]];
+      for (const c of lib.collections) list.push([`c:${c.id}`, c.name]);
+      if (atLeast('full')) list.push(['hidden', tr('hidden')]);
+      return list;
+    }
+
+    function shown() {
+      const q = lib.query.trim().toLocaleLowerCase();
+      const collection = lib.filter.startsWith('c:') ? lib.collections.find((c) => `c:${c.id}` === lib.filter) : null;
+      const members = collection ? new Set(collection.items) : null;
+      return (lib.items ?? []).filter((i) => {
+        if (lib.filter === 'hidden' ? !i.hidden : i.hidden) return false;
+        if (lib.filter === 'game' && i.type !== 'game') return false;
+        if (lib.filter === 'app' && i.type === 'game') return false;
+        if (lib.filter === 'fav' && !i.favorite) return false;
+        if (members && !members.has(i.id)) return false;
+        return !q || String(i.name).toLocaleLowerCase().includes(q);
+      }).sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0) || String(a.name).localeCompare(String(b.name)));
+    }
+
+    function renderLibrary() {
+      if (!filters().some(([id]) => id === lib.filter)) lib.filter = 'all';
+      $('filters').replaceChildren(...filters().map(([id, label]) => el('button', {
+        text: label, 'aria-pressed': String(id === lib.filter), on: { click: () => { lib.filter = id; renderLibrary(); } }
+      })));
+      $('collectionEdit').hidden = !lib.filter.startsWith('c:');
+      if (!lib.items) return $('libraryList').replaceChildren(el('div', { className: 'empty', text: tr('loading') }));
+      const items = shown();
+      if (!items.length) return $('libraryList').replaceChildren(el('div', { className: 'empty', text: tr('nothing') }));
+      $('libraryList').replaceChildren(...items.map(entryRow));
+    }
+
+    function cover(item) {
+      const url = coverUrl(item.cover);
+      if (url) {
+        const img = el('img', { className: 'cover', alt: '', loading: 'lazy', decoding: 'async', src: url });
+        img.addEventListener('error', () => img.replaceWith(el('div', { className: 'cover', text: initial(item.name) })), { once: true });
+        return img;
+      }
+      return el('div', { className: 'cover', text: initial(item.name) });
+    }
+
+    const initial = (name) => (Array.from(String(name ?? '').trim())[0] ?? '?').toLocaleUpperCase();
+
+    function playedText(item) {
+      if (!item.lastPlayed) return tr('never');
+      return tr('played', { date: new Date(item.lastPlayed).toLocaleDateString(LANG, { day: 'numeric', month: 'short' }) });
+    }
+
+    function entryRow(item) {
+      const star = el('button', {
+        className: 'star', text: '★', 'aria-pressed': String(!!item.favorite), 'aria-label': item.favorite ? tr('favOff') : tr('favOn'),
+        on: { click: (e) => { e.stopPropagation(); toggleFavorite(item); } }
+      });
+      const row = el('div', { className: `entry${item.hidden ? ' hiddenEntry' : ''}`, role: 'button', tabIndex: 0 },
+        cover(item),
+        el('div', { className: 'text' }, el('div', { className: 'name', text: item.name }), el('div', { className: 'meta', text: `${item.source} · ${playedText(item)}` })),
+        star);
+      row.addEventListener('click', () => openEntry(item));
+      return row;
+    }
+
+    async function toggleFavorite(item) {
+      const r = await act('favorite', { id: item.id, favorite: !item.favorite });
+      if (r && typeof r.favorite === 'boolean') {
+        item.favorite = r.favorite;
+        renderLibrary();
+      }
+    }
+
+    async function openEntry(item) {
+      const full = atLeast('full');
+      const buttons = [
+        el('button', { className: 'primary', text: tr('start'), on: { click: () => closePanel('start') } }),
+        el('button', { text: item.favorite ? tr('favOff') : tr('favOn'), on: { click: () => closePanel('fav') } }),
+        full && el('button', { text: tr('rename'), on: { click: () => closePanel('rename') } }),
+        full && el('button', { text: item.hidden ? tr('unhide') : tr('hide'), on: { click: () => closePanel('hide') } }),
+        full && el('button', { text: tr('reloadArt'), on: { click: () => closePanel('art') } }),
+        full && lib.collections.length && el('div', { className: 'section-title', text: tr('collections'), style: 'margin: 6px 0 0' }),
+        ...(full ? lib.collections.map((c) => el('button', {
+          className: 'check', text: c.name, 'aria-pressed': String(c.items.includes(item.id)), on: { click: () => closePanel(`c:${c.id}`) }
+        })) : [])
+      ];
+      const choice = await openPanel(item.name, `${item.source} · ${playedText(item)}`, ...buttons);
+      if (choice === 'start') {
+        const r = await act('launch', { id: item.id });
+        if (r) toast(tr('started', { name: r.name ?? item.name }));
+      } else if (choice === 'fav') {
+        await toggleFavorite(item);
+      } else if (choice === 'rename') {
+        const name = await askName(tr('rename'), item.name);
+        if (name && name !== item.name && (await act('rename', { id: item.id, name }))) loadLibrary();
+      } else if (choice === 'art') {
+        toast(tr('artRunning'));
+        const found = await act('reloadArtwork', { id: item.id });
+        if (found) {
+          toast(tr(found === 'found' ? 'artFound' : found === 'busy' ? 'artBusy' : 'artNothing'));
+          // The list is read again either way (a cover that appeared shows).
+          loadLibrary();
+        }
+      } else if (choice === 'hide') {
+        if (await act('hide', { id: item.id, hidden: !item.hidden })) loadLibrary();
+      } else if (choice?.startsWith('c:')) {
+        const c = lib.collections.find((x) => `c:${x.id}` === choice);
+        if (!c) return;
+        const list = await act('collectionMember', { collection: c.id, id: item.id, member: !c.items.includes(item.id) });
+        if (Array.isArray(list)) { lib.collections = list; renderLibrary(); openEntry(item); }
+      }
+    }
+
+    $('search').addEventListener('input', () => { lib.query = $('search').value; renderLibrary(); });
+
+    $('collectionNew').onclick = async () => {
+      const name = await askName(tr('collectionNew'));
+      if (!name) return;
+      const list = await act('collectionCreate', { name });
+      if (Array.isArray(list)) { lib.collections = list; renderLibrary(); }
+    };
+
+    $('collectionEdit').onclick = async () => {
+      const c = lib.collections.find((x) => `c:${x.id}` === lib.filter);
+      if (!c) return;
+      const choice = await openPanel(c.name, '',
+        el('button', { text: tr('collectionRename'), on: { click: () => closePanel('rename') } }),
+        el('button', { className: 'danger', text: tr('collectionDelete'), on: { click: () => closePanel('delete') } }));
+      let list;
+      if (choice === 'rename') {
+        const name = await askName(tr('collectionRename'), c.name);
+        if (name && name !== c.name) list = await act('collectionRename', { collection: c.id, name });
+      } else if (choice === 'delete') {
+        if (await askYes(tr('collectionDelete'), tr('collectionDeleteAsk', { name: c.name }), tr('delete'))) list = await act('collectionDelete', { collection: c.id });
+      }
+      if (Array.isArray(list)) { lib.collections = list; renderLibrary(); }
+    };
+
+    // ---- Downloads -------------------------------------------------------------------------------------------------------------------------
+
+    const DL_STATES = { waiting: 'dlWaiting', downloading: 'dlDownloading', installing: 'dlInstalling', paused: 'dlPaused', queued: 'dlQueued', inClient: 'dlInClient', done: 'dlDone', failed: 'dlFailed' };
+
+    function size(bytes) {
+      if (!(bytes > 0)) return '';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let i = 0;
+      let n = bytes;
+      while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+      return `${n.toLocaleString(LANG, { maximumFractionDigits: n < 10 ? 1 : 0 })} ${units[i]}`;
+    }
+
+    async function loadDownloads() {
+      if (!channel || !atLeast('library') || tab !== 'downloads') return;
+      let d;
+      try {
+        d = await rpc('downloads');
+      } catch (e) {
+        return toast(e.message);
+      }
+      const entries = Array.isArray(d?.entries) ? d.entries : [];
+      if (!entries.length) return $('downloadList').replaceChildren(el('div', { className: 'empty', text: tr('downloadsEmpty') }));
+      $('downloadList').replaceChildren(...entries.map((e) => {
+        const pct = typeof e.progress === 'number' ? Math.max(0, Math.min(1, e.progress)) : null;
+        const bits = [DL_STATES[e.state] ? tr(DL_STATES[e.state]) : '', e.isUpdate ? tr('dlUpdate') : '', pct !== null ? `${Math.round(pct * 100)} %` : '',
+          e.bytesTotal > 0 ? `${size(e.bytesDone)} / ${size(e.bytesTotal)}` : ''].filter(Boolean);
+        return el('div', { className: 'entry' },
+          el('div', { className: 'text' },
+            el('div', { className: 'name', text: e.name }),
+            el('div', { className: 'meta', text: bits.join(' · ') }),
+            pct !== null ? el('div', { className: 'bar' }, el('span', { style: `width: ${(pct * 100).toFixed(1)}%` })) : null));
+      }));
+    }
+
+    // ---- Settings (level Full) ---------------------------------------------------------------------------------------------------------
+    // The PC sends the values and the list of what may be changed (key, kind, choices or range); the page shows what it knows by name and
+    // ignores the rest. A change goes back as {key, value}; the PC checks it against its own list again and runs the TV page's setter, so a
+    // protected setting asks for the parents' code exactly as on the TV (act() handles that question).
+
+    let settingsState = null; // { values, skin, skins, schema }
+    let settingsLoading = false;
+    let settingsAgain = false;
+    const GROUPS = [
+      ['gLook', ['skin', 'language']],
+      ['gFavorites', ['favoritesMode', 'favoritesRecentDays', 'favoritesSites']],
+      ['gScreensaver', ['screensaverMinutes', 'screensaverStyle']],
+      ['gSound', ['audioMode', 'soundVolume', 'musicVolume']]
+    ];
+    const cap = (key) => key[0].toUpperCase() + key.slice(1);
+
+    function optionLabel(key, value) {
+      if (key === 'screensaverMinutes') return value === 0 ? tr('off') : tr('inMinutes', { n: value });
+      if (key === 'favoritesRecentDays') return value === 0 ? tr('unlimited') : value === 365 ? tr('year') : tr('days', { n: value });
+      const name = `o${cap(key)}_${value}`;
+      return name in R[LANG] ? tr(name) : String(value);
+    }
+
+    async function loadSettings() {
+      if (!channel || !atLeast('full')) return;
+      // A signal that comes while the values are on their way asks once more afterwards (the answer may be older than the signal).
+      if (settingsLoading) { settingsAgain = true; return; }
+      settingsLoading = true;
+      try {
+        const r = await rpc('settings');
+        if (r && typeof r === 'object' && r.values && Array.isArray(r.schema)) {
+          settingsState = r;
+          renderSettings();
+        }
+      } catch (e) {
+        if (tab === 'settings') toast(e.message);
+      } finally {
+        settingsLoading = false;
+        if (settingsAgain) { settingsAgain = false; loadSettings(); }
+      }
+    }
+
+    async function saveSetting(key, value) {
+      const ok = await act('setting', { key, value });
+      if (ok) {
+        if (settingsState) settingsState.values[key] = value;
+        toast(tr('settingSaved'));
+      }
+      // Either way the PC's own value is read again (a refused change snaps back, a changed profile shows its values).
+      await loadSettings();
+    }
+
+    async function saveSkin(id) {
+      if (await act('skin', { id })) {
+        if (settingsState) settingsState.skin = id;
+        toast(tr('settingSaved'));
+      }
+      await loadSettings();
+    }
+
+    function settingControl(def) {
+      const v = settingsState.values[def.key];
+      if (def.kind === 'bool') {
+        return el('button', { className: 'check', text: tr(`s${cap(def.key)}`), 'aria-pressed': String(v === true), on: { click: () => saveSetting(def.key, v !== true) } });
+      }
+      if (def.kind === 'range') {
+        const value = Number.isInteger(v) ? v : def.min;
+        const shown = el('span', { text: `${value} %` });
+        const input = el('input', { type: 'range', min: String(def.min), max: String(def.max), step: '5', value: String(value), 'aria-label': tr(`s${cap(def.key)}`) });
+        input.addEventListener('input', () => { shown.textContent = `${input.value} %`; });
+        input.addEventListener('change', () => saveSetting(def.key, Number(input.value)));
+        return el('div', {}, el('div', { className: 'label' }, el('span', { text: tr(`s${cap(def.key)}`) }), shown), input);
+      }
+      const options = Array.isArray(def.options) ? def.options : [];
+      return el('div', {}, el('div', { className: 'label', text: tr(`s${cap(def.key)}`) }),
+        el('div', { className: 'seg' }, ...options.map((o) => el('button', {
+          text: optionLabel(def.key, o), 'aria-pressed': String(o === v), on: { click: () => o !== v && saveSetting(def.key, o) }
+        }))));
+    }
+
+    function skinControl() {
+      const st = settingsState;
+      const list = (st.skins ?? []).filter((x) => typeof x?.id === 'string');
+      return el('div', {}, el('div', { className: 'label', text: tr('sSkin') }),
+        el('div', { className: 'skins' }, ...list.map((x) => el('button', {
+          className: 'check', text: String(x.name ?? x.id), 'aria-pressed': String(x.id === st.skin), on: { click: () => x.id !== st.skin && saveSkin(x.id) }
+        }))));
+    }
+
+    function renderSettings() {
+      const st = settingsState;
+      if (!st) return;
+      const defs = new Map((st.schema ?? []).map((d) => [d.key, d]));
+      const cards = [];
+      for (const [title, keys] of GROUPS) {
+        const controls = [];
+        for (const key of keys) {
+          if (key === 'skin') { if (Array.isArray(st.skins)) controls.push(skinControl()); continue; }
+          const def = defs.get(key);
+          if (!def || !(key in st.values)) continue;
+          // The period only matters when "recently used" is part of the tab.
+          if (key === 'favoritesRecentDays' && st.values.favoritesMode === 'favorites') continue;
+          controls.push(settingControl(def));
+        }
+        if (controls.length) cards.push(el('section', { className: 'card', style: 'margin-top: 16px' }, el('div', { className: 'section-title', text: tr(title) }), ...controls.map((c) => el('div', { className: 'setting' }, c))));
+      }
+      $('settingsBody').replaceChildren(...cards);
+    }
+
+    // ---- Start ---------------------------------------------------------------------------------------------------------------------------
+
     (async () => {
       await pairFromLink();
       await poll();
-      setInterval(poll, 1500);
+      if (channel && atLeast('library')) loadLibrary();
+      // With the channel the events say when something changed; the slow poll keeps the session alive and notices a lost stream.
+      setInterval(() => { if (!channel || !source) poll(); }, channel ? 5000 : 1500);
+      setInterval(() => { if (channel) poll(); }, 60000);
+      setInterval(() => { if (tab === 'downloads') loadDownloads(); }, 5000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) { poll(); if (channel && !source && session) startEvents(); } });
     })();
   </script>
 </body>

@@ -39,6 +39,12 @@ public sealed class UpdateService
 
     public UpdateState State => _state;
 
+    /// <summary>
+    /// Follows a running <c>winget upgrade</c> by its process id (the HUD steps aside for an elevation prompt or an installer window
+    /// it starts); disposed when the run ends.
+    /// </summary>
+    public Func<int, IDisposable?>? WatchUpgrade { get; set; }
+
     private void Set(UpdateState state)
     {
         _state = state;
@@ -80,6 +86,8 @@ public sealed class UpdateService
     public async Task<UpdateRun> UpgradeAppsAsync(string? id, Action? started = null, Action<AppUpgradeProgress>? progress = null)
     {
         if (Blocked?.Invoke() is { } why) throw new InvalidOperationException(why);
+        // The id goes back to winget as an argument: only one from the list winget gave us, and only one of the allowed shape.
+        if (id is not null && (!Winget.IsValidId(id) || _state.Apps.All(a => a.Id != id))) throw new InvalidOperationException(Strings.Get("update.unknownApp"));
         if (!await _gate.WaitAsync(0)) throw new InvalidOperationException(Strings.Get("update.busy"));
         try
         {
@@ -92,7 +100,12 @@ public sealed class UpdateService
             int exit;
             try
             {
-                (exit, _) = await RunWingetAsync(Winget.UpgradeArguments(id), TimeSpan.FromMinutes(60), reporter is null ? null : chunk => reporter.Feed(chunk.Span), keepOutput: false);
+                exit = await RunUpgradeAsync(Winget.UpgradeArguments(id), TimeSpan.FromMinutes(60), reporter);
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                Console.Error.WriteLine($"[updates] winget not started: {ex.NativeErrorCode}");
+                return new(Strings.Get("update.wingetMissing"), false);
             }
             catch (TimeoutException)
             {
@@ -130,7 +143,7 @@ public sealed class UpdateService
                 var (done, total) = UpdateSize.Transfer(job.BytesDone, job.BytesTotal);
                 progress?.Invoke(Math.Clamp(job.Percent, 0, 100) / 100.0, done, total);
             });
-            var result = await AdminService.Ops.InstallWindowsUpdatesAsync(jobProgress);
+            var result = await AdminService.WithGrantJobAsync(CouchHud.Service.Contracts.Operation.InstallWindowsUpdates, () => AdminService.Ops.InstallWindowsUpdatesAsync(jobProgress));
             if (!result.Result.Ok) return new($"Windows Update: {AdminService.Message(result.Result)}", false);
             if (result.Job is not { } job) return new(Strings.Get("update.noResult"), false);
             if (job.State != "done") return new($"Windows Update: {Strings.Get("update.windowsJobFailed")}", false);
@@ -169,6 +182,69 @@ public sealed class UpdateService
         }
     }
 
+    /// <summary>
+    /// <c>winget upgrade</c> under a pseudo console, where winget draws its progress (bars, percent, the taskbar progress); its screen
+    /// goes through <see cref="ConsoleScreen"/> to the parser. When the pseudo console is not there or does not start, the redirected
+    /// start as before (counter, phases and sizes when winget prints them, no bars).
+    /// </summary>
+    private async Task<int> RunUpgradeAsync(IReadOnlyList<string> args, TimeSpan timeout, WingetProgressReporter? reporter)
+    {
+        var winget = ResolveWinget();
+        IDisposable? watch = null;
+        try
+        {
+            var screen = new ConsoleScreen(PseudoConsoleRun.Columns, PseudoConsoleRun.Rows);
+            Action<ReadOnlyMemory<char>>? onScreen = reporter is null ? null : chunk =>
+            {
+                if (chunk.IsEmpty)
+                {
+                    reporter.Feed(ReadOnlySpan<char>.Empty);
+                    return;
+                }
+                foreach (var line in screen.Feed(chunk.Span)) reporter.Feed((line + "\n").AsSpan());
+            };
+            var exit = await PseudoConsoleRun.TryStartAsync(winget, args, timeout, onScreen, pid => watch = Watch(pid));
+            if (exit is { } code) return code;
+            Console.Error.WriteLine("[updates] winget upgrade without a pseudo console (no progress bars)");
+            var (redirected, _) = await RunWingetAsync(args, timeout, reporter is null ? null : chunk => reporter.Feed(chunk.Span), keepOutput: false,
+                started: pid => watch = Watch(pid));
+            return redirected;
+        }
+        finally
+        {
+            watch?.Dispose();
+        }
+    }
+
+    private IDisposable? Watch(int pid)
+    {
+        try
+        {
+            return WatchUpgrade?.Invoke(pid);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Console.Error.WriteLine($"[updates] upgrade watch failed: {ex.GetType().Name}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// winget.exe as a full path (<see cref="WingetLocator"/>): PATH, else the App Execution Alias in this account's WindowsApps folder;
+    /// only from places a standard user cannot write to, or the real alias. Not found: the same exception as a failed start.
+    /// </summary>
+    private static string ResolveWinget()
+    {
+        var path = WingetLocator.Resolve(
+            Environment.GetEnvironmentVariable("PATH"),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            [Environment.GetFolderPath(Environment.SpecialFolder.Windows), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)],
+            File.Exists,
+            PseudoConsoleRun.IsAppExecutionAlias);
+        return path ?? throw new System.ComponentModel.Win32Exception(2, "winget not found");
+    }
+
     /// <summary>Output kept for the update list (a table of some KB); more is dropped.</summary>
     private const int MaxKeptOutput = 4 * 1024 * 1024;
 
@@ -177,10 +253,12 @@ public sealed class UpdateService
         OutputPump.ReadAsync(reader, onOutput, keep, MaxKeptOutput, ex => Console.Error.WriteLine($"[updates] progress callback failed, reading on: {ex.GetType().Name}"));
 
     private static async Task<(int Exit, string Output)> RunWingetAsync(IReadOnlyList<string> args, TimeSpan timeout,
-        Action<ReadOnlyMemory<char>>? onOutput = null, bool keepOutput = true)
+        Action<ReadOnlyMemory<char>>? onOutput = null, bool keepOutput = true, Action<int>? started = null)
     {
-        var info = new ProcessStartInfo("winget")
+        // A full path: never a winget.exe from CouchHUD's own folder or the current directory.
+        var info = new ProcessStartInfo(ResolveWinget())
         {
+            WorkingDirectory = Environment.SystemDirectory,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
@@ -189,6 +267,7 @@ public sealed class UpdateService
         };
         foreach (var a in args) info.ArgumentList.Add(a);
         using var process = Process.Start(info) ?? throw new System.ComponentModel.Win32Exception("winget not started");
+        started?.Invoke(process.Id);
         var stdout = ReadOutputAsync(process.StandardOutput, onOutput, keepOutput);
         var stderr = process.StandardError.ReadToEndAsync();
         using var cts = new CancellationTokenSource(timeout);

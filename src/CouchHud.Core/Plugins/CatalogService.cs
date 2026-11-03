@@ -7,7 +7,8 @@ namespace CouchHud.Core.Plugins;
 public sealed record CatalogResult(IReadOnlyList<CatalogEntry> Entries, bool FromCache, long? FetchedAt, string? Error, string? ErrorCode = null);
 
 /// <summary>What an install did; plugins always need a restart because loaded DLLs cannot be replaced or unloaded.</summary>
-public sealed record InstallOutcome(string Message, bool RestartNeeded);
+/// <param name="StartNow">The plugin folder that was installed new and may be started right away (<see cref="PluginManager.LoadNowAsync"/>); null for a skin, a staged update or nothing to start.</param>
+public sealed record InstallOutcome(string Message, bool RestartNeeded, string? StartNow = null);
 
 /// <summary>
 /// What is about to be installed, for the host's gate (unlock, expert mode, the parents' code). <see cref="Statement"/> is null for a
@@ -254,7 +255,7 @@ public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOn
         }
         if (entry.Kind != CatalogKind.Plugin) return entry;
         var own = FirstPartyIds();
-        return PluginNames.IsReserved(entry.Id, own) || PluginNames.IsReserved(entry.Folder, own)
+        return PluginNames.IsReserved(entry.Id, own) || PluginNames.IsReserved(entry.Folder, own) || PluginNames.NameImitatesBrand(entry.Name)
             ? entry with { Problem = Strings.Get("catalog.source.reserved"), DownloadUrl = null }
             : entry;
     }
@@ -531,7 +532,7 @@ public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOn
         if (entry.Kind == CatalogKind.Plugin)
         {
             var before = new PluginTrust(dataDir).Entry(entry.Folder);
-            var adds = statement is not null && installed && CouchHud.Core.Updates.CapabilityCompare.Added(before?.Capabilities ?? (IEnumerable<string>)PluginPolicy.Legacy, statement.Statement.Capabilities).Count > 0;
+            var adds = statement is not null && installed && CouchHud.Core.Updates.CapabilityCompare.AddsRights(before, statement.Statement);
             var request = new PluginInstallRequest(entry, statement, installed, adds);
             var ok = approve is null ? request.Origin != PluginOrigin.ThirdParty : approve(request);
             if (!ok) throw new CatalogException(Strings.Get("plugin.gate.thirdParty"));
@@ -603,10 +604,13 @@ public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOn
         }
 
         // What the code references must be covered by what the statement declares; a package without a statement only gets its file types checked.
-        PluginLint.CheckZip(held, statement?.Origin ?? PluginOrigin.Local, statement?.Statement.Capabilities ?? [], legacy: statement is null, sdk: statement?.Statement.Sdk ?? int.MaxValue);
+        PluginLint.CheckZip(held, statement?.Origin ?? PluginOrigin.Local, statement?.Statement.Capabilities ?? [], legacy: statement is null, sdk: statement?.Statement.Sdk ?? int.MaxValue, declaresServices: statement?.Statement.Services.Count > 0);
         held.Position = 0;
         var trust = new PluginTrust(dataDir);
         var pluginRoot = Path.Combine(dataDir, "plugins");
+        // Uninstalled but its files are still held: nothing is installed or staged over it (the mark would be lifted for the old files).
+        if (Directory.Exists(Path.Combine(pluginRoot, entry.Folder)) && trust.IsRemoved(entry.Folder))
+            throw new CatalogException(Strings.Get("catalog.removing", entry.Name));
         if (!Directory.Exists(Path.Combine(pluginRoot, entry.Folder)) && !trust.IsRemoved(entry.Folder))
         {
             var target = PackageInstaller.Install(held, entry.Folder, pluginRoot, PackageInstaller.Kind.Plugin, entry.Folder, out var folderHash);
@@ -614,7 +618,7 @@ public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOn
             // Installed on purpose, from a verified package: the files as they were unpacked are the trusted ones.
             trust.Record(entry.Folder, folderHash, statement is null ? new PluginTrustEntry { Hash = "", Origin = PluginOrigin.Local } : statement.ToTrustEntry());
             registry.Set(entry, pending: false);
-            return new InstallOutcome(Strings.Get("catalog.pluginInstalled", entry.Name, entry.Version), true);
+            return new InstallOutcome(Strings.Get("catalog.pluginInstalled", entry.Name, entry.Version), true, entry.Folder);
         }
 
         // An older copy may be loaded (and its DLLs locked): replace it before the next start loads anything. What was verified waits in the

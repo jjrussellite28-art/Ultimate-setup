@@ -27,8 +27,6 @@ let last = 0;
 let lastFocused = null;
 const pointer = { x: 0, y: 0, moved: false, over: false };
 
-export const motionEnabled = () => enabled;
-
 function evaluate() {
   const next = !query?.matches && !state.info.reduceMotion;
   document.documentElement.dataset.motion = next ? 'on' : 'off';

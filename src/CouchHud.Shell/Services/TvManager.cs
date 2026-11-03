@@ -5,13 +5,14 @@ using System.Text.Json;
 using CouchHud.Core.Config;
 using CouchHud.Core.Integrations.Tv;
 using CouchHud.Core.Localization;
+using CouchHud.Sdk;
 
 namespace CouchHud.Shell.Services;
 
 /// <summary>
-/// The TV on the couch (LG webOS first): the bridge's tv* calls, the pairing kept in config.json with the key under DPAPI, and "TV follows
-/// CouchHUD". All the protocol is <see cref="TvController"/> and <see cref="WebOsClient"/> in Core (tested against a fake TV); this class
-/// only wires it to the config, the UI and the lock. Nothing blocks the UI thread: every call is awaited, the TV is never polled.
+/// The TV on the couch: the bridge's tv* calls, the pairing kept in config.json with the key under DPAPI, and "TV follows CouchHUD". The
+/// protocols are plugins (SDK 5, "tv.control": LG webOS, Samsung Tizen); everything around them is <see cref="TvController"/> and
+/// <see cref="TvLink"/> in Core (tested against fake TVs). This class only wires it to the config, the UI, the plugins and the lock. Nothing blocks the UI thread: every call is awaited, the TV is never polled.
 /// Not on the phone remote and not an MCP tool (deliberately, see SECURITY.md).
 /// </summary>
 public sealed class TvManager : IDisposable
@@ -24,13 +25,21 @@ public sealed class TvManager : IDisposable
 
     /// <param name="locked">The couch is locked right now (checked again here, not only in the bridge).</param>
     /// <param name="requireInputChange">Unlock and, with parental controls, the parents' release for exactly this input id.</param>
-    public TvManager(ConfigStore config, Func<bool> locked, Action<string> requireInputChange, Action<string, object?> emit)
+    public TvManager(ConfigStore config, TvProviderRegistry providers, Func<bool> locked, Action<string> requireInputChange, Action<string, object?> emit)
     {
         _config = config;
+        _providers = providers;
         _locked = locked;
         _requireInputChange = requireInputChange;
-        _controller = new TvController(new WebOsClient(), new ConfigStoreTv(config), status => emit("tv", status));
+        _controller = new TvController(providers, new ConfigStoreTv(config), status => emit("tv", status));
+        // A TV plugin loaded (or came back): the page and the Guide menu see it without asking.
+        providers.Changed += () =>
+        {
+            if (Volatile.Read(ref _disposed) == 0) emit("tv", _controller.Status());
+        };
     }
+
+    private readonly TvProviderRegistry _providers;
 
     public bool Paired => _controller.Paired;
 
@@ -70,18 +79,32 @@ public sealed class TvManager : IDisposable
                     return status;
                 }
                 case "tvDiscover":
-                    return (await _controller.DiscoverAsync()).Select(d => new { address = d.Address, name = d.Name, provider = d.Provider }).ToList();
+                {
+                    // Every TV found carries its kind; "plugin" names CouchHUD's own plugin for it when that is not running (the page offers it).
+                    var available = _providers.Available();
+                    return (await _controller.DiscoverAsync()).Select(d =>
+                    {
+                        var ready = available.FirstOrDefault(p => p.Id == d.Provider);
+                        var known = TvProviderRegistry.KnownById(d.Provider);
+                        return new { address = d.Address, name = d.Name, provider = d.Provider, providerName = ready?.Name ?? known?.Name ?? d.Provider, ready = ready is not null, plugin = ready is null ? known?.Plugin : null };
+                    }).ToList();
+                }
                 case "tvPair":
                 {
                     var address = TvAddressPolicy.ParseManual(StringArg(0)) ?? throw new ArgumentException(Strings.Get("tv.notLocal"));
-                    // Unencrypted (old TVs without port 3001) only when asked for explicitly, and only in expert mode.
+                    // Unencrypted (old TVs without a TLS port) only when asked for explicitly, and only in expert mode.
                     var allowPlain = BoolArg(1) == true;
                     if (allowPlain && !_config.Current.ExpertMode) throw new InvalidOperationException(Strings.Get("tv.err.plainOnly"));
-                    Console.WriteLine($"[tv] pairing with {address}{(allowPlain ? " (unencrypted allowed)" : "")}");
+                    // The kind of TV: as the page chose it; without a choice the only one there is.
+                    var available = _providers.Available();
+                    var provider = Arg(2).ValueKind == JsonValueKind.String ? Arg(2).GetString()!
+                        : available.Count == 1 ? available[0].Id : throw new TvException(TvError.NoProvider);
+                    if (!TvProviderRegistry.IsValidId(provider)) throw new ArgumentException(Strings.Get("tv.badInput"));
+                    Console.WriteLine($"[tv] pairing with {address} ({provider}){(allowPlain ? " (unencrypted allowed)" : "")}");
                     TvStatus status;
                     try
                     {
-                        status = await _controller.PairAsync(address, ArpCache.MacOf, allowPlain);
+                        status = await _controller.PairAsync(address, provider, ArpCache.MacOf, allowPlain);
                     }
                     catch (TvException ex) when (ex.Code == TvError.PlainOnly)
                     {
@@ -89,7 +112,7 @@ public sealed class TvManager : IDisposable
                         Console.WriteLine("[tv] the TV has no TLS port");
                         return _controller.Status();
                     }
-                    Console.WriteLine($"[tv] paired ({(status.Secure ? "TLS, key pinned" : "plain port 3000")}, Wake-on-LAN {(status.MacKnown ? "possible" : "no MAC")})");
+                    Console.WriteLine($"[tv] paired ({(status.Secure ? "TLS, key pinned" : "unencrypted")}, Wake-on-LAN {(status.MacKnown ? "possible" : "no MAC")})");
                     return status;
                 }
                 case "tvCancelPair":

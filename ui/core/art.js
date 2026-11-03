@@ -1,7 +1,7 @@
 import { el, loadFirst } from './dom.js';
 import { iconHue, setAmbient } from './media.js';
 import { cssUrl, heroKey } from './hero-rules.js';
-import { squareArt, tileArtMode } from './square-rules.js';
+import { createTiles } from './tiles.js';
 
 export function hue(str) {
   let h = 0;
@@ -17,22 +17,12 @@ export function initials(name) {
   return letters.toUpperCase();
 }
 
-let tileModeNow = null;
-/** The skin's --tile-art, read once per render (from the root; the cache is dropped right after the synchronous render pass). */
-function tileMode() {
-  if (tileModeNow === null) {
-    tileModeNow = tileArtMode(getComputedStyle(document.documentElement).getPropertyValue('--tile-art'));
-    queueMicrotask(() => { tileModeNow = null; });
-  }
-  return tileModeNow;
-}
-
 /**
  * Artwork box. Without an image it is a generated banner (no network): a color from the exe icon or the
  * name, a monogram or the icon itself, and the name. The first URL that loads replaces it.
+ * A tile ({ tile: true }) shows the artwork its skin asks for with --tile-art, again after every skin change (see tileBox below).
  */
 export function artwork(item, kind, className, { tile = false } = {}) {
-  const square = tile && kind === 'cover' && tileMode() === 'square';
   const box = el('div', { className: `art ${className}` });
   box.style.setProperty('--h', hue(item.name));
   const iconUrl = item.art?.icon?.[0];
@@ -42,21 +32,44 @@ export function artwork(item, kind, className, { tile = false } = {}) {
     icon ?? el('span', { className: 'gen-mark', textContent: initials(item.name) }),
     el('span', { className: 'gen-name', textContent: item.name })));
   if (iconUrl) iconHue(iconUrl).then((h) => h != null && box.style.setProperty('--h', h));
-  // A skin with square tiles: the square picture, or the cover cropped to a square (background-size: cover, centred) when there is none.
-  const wanted = square ? squareArt(item) : null;
-  if (square) box.classList.add('art-square');
-  loadFirst(wanted ? wanted.urls : item.art?.[kind], (url, img) => {
+  if (tile) return tileBox(box, item, kind);
+  loadFirst(item.art?.[kind], (url, img) => {
     box.style.backgroundImage = cssUrl(url);
     box.classList.add('loaded');
-    if (wanted) return box.classList.toggle('art-cropped', wanted.isCropped(url));
     // A landscape picture (a store header standing in for a cover) would lose its sides, and with them the
-    // logo: show it whole over a blurred copy of itself instead.
-    // A skin whose tiles are not 2:3 (a square row) can show a portrait cover whole the same way: the picture is at hand as --art-img.
+    // logo: show it whole over a blurred copy of itself instead (the picture is at hand as --art-img).
     if (kind === 'cover') box.style.setProperty('--art-img', cssUrl(url));
     if (kind === 'cover' && img && img.naturalWidth / img.naturalHeight > 1.15) box.classList.add('art-wide');
   });
   return box;
 }
+
+// Tiles and what each one shows, so a skin change can switch them in place (no new render, no new scan, nothing fetched but pictures).
+const tiles = createTiles({
+  // The computed --tile-art (its own, its row's or :root's) and aspect-ratio; the size on screen only when there is no aspect-ratio.
+  read: (box) => {
+    const css = getComputedStyle(box);
+    return {
+      tileArt: css.getPropertyValue('--tile-art'),
+      aspectRatio: css.aspectRatio,
+      get width() { return box.clientWidth; },
+      get height() { return box.clientHeight; }
+    };
+  },
+  load: loadFirst,
+  frame: (fn) => requestAnimationFrame(fn),
+  cssUrl
+});
+
+/** Marks the box as a tile; what it shows is decided once it is in the page (see tiles.js). */
+const tileBox = (box, item, kind) => tiles.add(box, item, kind);
+
+/** The skin changed and its stylesheet has loaded: every tile on screen asks again and switches its artwork when the answer changed. */
+export function refreshTiles() {
+  tiles.refresh(document.querySelectorAll('.art[data-tile-art]'));
+}
+
+window.addEventListener('couchhud:skin-styled', refreshTiles);
 
 const bgLayers = () => [...document.querySelectorAll('.bg-layer')];
 let bgFront = 0;

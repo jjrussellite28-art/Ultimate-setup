@@ -1,0 +1,11 @@
+/* A skin that blurs everything under a transparent layer on top of the screen, for scripts/tabs-check.mjs: the tab labels are unreadable
+   without any colour being painted over them, so it has to fall back to the default skin. Never for the catalog. */
+
+[data-skin="user:hostile-blur"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  backdrop-filter: blur(1.2rem);
+}

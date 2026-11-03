@@ -45,7 +45,7 @@ public static partial class AntiCheat
     ];
 
     // Short names that would be too common as parts: the whole name (without extension) only.
-    [GeneratedRegex(@"^(vgk|vgc|vgtray|x3|ace-(base|game|ats|core|safe|guard)\w*|gamemon(64)?|ucldr_\w+|tp3helper|tpsvc)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^(vgk|vgc|vgtray|x3|ace-(base|game|ats|core|safe|guard)\w*|gamemon(64)?|ucldr_\w+|tp3helper|tpsvc)\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex WholeNames();
 
     /// <summary>The marker a file, folder or process name gives away, else null.</summary>

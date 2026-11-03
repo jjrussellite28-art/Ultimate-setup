@@ -322,4 +322,46 @@ public class SafeTerminationTests
         tracker.Tick(t0.AddSeconds(50));
         Assert.Null(tracker.Current);
     }
+
+    [Fact]
+    public void A_client_the_game_starts_is_not_part_of_the_game()
+    {
+        var probe = new FakeProbe();
+        var tracker = new GameSessionTracker(probe);
+        var t0 = DateTimeOffset.Parse("2026-10-17T20:00:00Z");
+        var steamDir = Path.Combine(Path.GetTempPath(), "couchhud-safe", "Steam");
+        tracker.Launched(Item("custom:a", Path.Combine(Games, "A")), t0);
+        // The game starts Steam, Steam then starts something of its own (its browser, another game).
+        probe.Processes.Add((41, Path.Combine(Games, "A", "a.exe")));
+        probe.Processes.Add((50, Path.Combine(steamDir, "steam.exe")));
+        probe.Processes.Add((51, Path.Combine(steamDir, "bin", "cef", "other.exe")));
+        probe.Parents[50] = 41;
+        probe.Parents[51] = 50;
+        probe.Starts[41] = 100;
+        probe.Starts[50] = 200;
+        probe.Starts[51] = 300;
+        tracker.Tick(t0.AddSeconds(5));
+        Assert.Equal([41], tracker.Current!.Pids);
+        Assert.Equal([41], tracker.Current.StampsOrEmpty.Keys);
+        // The game ends, Steam and what it started stay: the session is over.
+        probe.Processes.RemoveAll(p => p.Item1 == 41);
+        tracker.Tick(t0.AddSeconds(10));
+        Assert.Null(tracker.Current);
+    }
+
+    [Fact]
+    public async Task A_client_that_is_the_entry_itself_is_ended_but_a_client_beside_it_is_spared()
+    {
+        var ctl = new FakeControl();
+        // A library entry that is a client (Playnite in full screen) with a Steam it started.
+        var own = new LiveProcess(60, 0, 1000, Path.Combine(Games, "Playnite", "Playnite.FullscreenApp.exe"), 1, "Playnite.FullscreenApp");
+        var steam = new LiveProcess(61, 60, 1100, Path.Combine(Games, "Steam", "steam.exe"), 1, "steam");
+        ctl.Live.Add(own);
+        ctl.Live.Add(steam);
+        var stamps = Stamps(own);
+        Assert.True(SafeTermination.IsGameClient(own));
+        await SafeTermination.QuitAsync(ctl, stamps, true, TimeSpan.Zero, spare: SafeTermination.SpareClients(stamps));
+        Assert.Equal([60], ctl.Killed);
+        Assert.Contains(steam, ctl.Live);
+    }
 }

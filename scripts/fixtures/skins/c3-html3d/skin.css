@@ -1,0 +1,2 @@
+:root[data-skin="user:c3-html3d"]{--x:1}
+html{perspective:300px!important;transform-style:preserve-3d!important}body{transform-style:preserve-3d!important}#overlay,#quick{transform:translateZ(250px)!important;background:#000!important}.dialog,#quick *{transform:translateZ(250px)!important}

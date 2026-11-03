@@ -84,6 +84,3 @@ export function markBusy(node, on, { reducedMotion = prefersReducedMotion(), doc
   else if (spinner) spinner.classList.toggle('static', !!reducedMotion);
   return node;
 }
-
-/** A footer hint that can be busy: [button, label, { busy }]; nav.renderHints draws it greyed with a spinner. */
-export const busyHint = (button, label, key) => [button, label, { busy: isBusy(key) }];

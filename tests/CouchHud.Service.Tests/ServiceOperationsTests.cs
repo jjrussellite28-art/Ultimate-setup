@@ -33,6 +33,7 @@ public class ServiceOperationsTests
         using var ops = new OpsHarness();
         ops.Scm.Running.Add("SysMain");
         await ops.Call(A, Operation.PauseServices, new ServicesArgs(["SysMain"]));
+        ops.ConsoleSession = 2;
         await ops.Call(B, Operation.PauseServices, new ServicesArgs(["SysMain"]));
         Assert.Equal(2, ops.State.Paused["SysMain"].Holders.Count);
 
@@ -128,6 +129,199 @@ public class ServiceOperationsTests
     }
 
     [Fact]
+    public async Task The_watch_stops_a_held_service_again_that_started_during_the_pause_and_the_resume_starts_it()
+    {
+        using var ops = new OpsHarness();
+        ops.Sessions.Sessions[1] = Callers.UserSid;
+        ops.Scm.Running.Add("WSearch");
+        // A service (PcaSvc in the VM, VM test 0.7 B, F3) that was not running at the pause: it was held, nothing stopped.
+        await ops.Call(A, Operation.PauseServices, new ServicesArgs(["WSearch", "SysMain"]));
+        Assert.False(ops.State.Paused["SysMain"].StoppedByService);
+        Assert.Equal(0, ops.Operations.RecheckPausedServices(CancellationToken.None));
+        // Delayed start / trigger: both come back.
+        ops.Scm.Running.UnionWith(["WSearch", "SysMain"]);
+        Assert.Equal(2, ops.Operations.RecheckPausedServices(CancellationToken.None));
+        Assert.DoesNotContain("WSearch", ops.Scm.Running);
+        Assert.DoesNotContain("SysMain", ops.Scm.Running);
+        Assert.True(ops.State.Paused["SysMain"].StoppedByService);
+        // Nothing running: nothing to do, no start types touched.
+        Assert.Equal(0, ops.Operations.RecheckPausedServices(CancellationToken.None));
+        Assert.True((await ops.Call(A, Operation.ResumeServices, new ServicesArgs(["WSearch", "SysMain"]))).Ok);
+        Assert.Contains("SysMain", ops.Scm.Running);
+        Assert.Contains("WSearch", ops.Scm.Running);
+    }
+
+    [Fact]
+    public async Task The_watch_touches_nothing_without_a_pause_and_nothing_off_the_list()
+    {
+        using var ops = new OpsHarness();
+        ops.Sessions.Sessions[1] = Callers.UserSid;
+        ops.Scm.Running.UnionWith(["WSearch", "SysMain"]);
+        Assert.Equal(0, ops.Operations.RecheckPausedServices(CancellationToken.None));
+        Assert.Empty(ops.Scm.Calls);
+        await ops.Call(A, Operation.PauseServices, new ServicesArgs(["WSearch"]));
+        await ops.Call(A, Operation.ResumeServices, new ServicesArgs(["WSearch"]));
+        ops.Scm.Calls.Clear();
+        ops.Scm.Running.Add("WSearch");
+        // After the resume the hold is gone: the watch leaves it running.
+        Assert.Equal(0, ops.Operations.RecheckPausedServices(CancellationToken.None));
+        Assert.Empty(ops.Scm.Calls);
+        Assert.Contains("SysMain", ops.Scm.Running);
+    }
+
+    [Fact]
+    public async Task The_watch_keeps_trying_when_the_stop_fails_and_never_changes_start_types()
+    {
+        using var ops = new OpsHarness();
+        ops.Sessions.Sessions[1] = Callers.UserSid;
+        await ops.Call(A, Operation.PauseServices, new ServicesArgs(["WSearch"]));
+        ops.Scm.Running.Add("WSearch");
+        ops.Scm.FailStop.Add("WSearch");
+        Assert.Equal(0, ops.Operations.RecheckPausedServices(CancellationToken.None));
+        Assert.Equal(0, ops.Operations.RecheckPausedServices(CancellationToken.None));
+        Assert.Equal(2, ops.Scm.Calls.Count(c => c == "stop WSearch"));
+        Assert.Empty(ops.Scm.StartTypes);
+        ops.Scm.FailStop.Clear();
+        Assert.Equal(1, ops.Operations.RecheckPausedServices(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task The_watch_lets_go_of_a_hold_whose_account_has_no_session_and_starts_the_service_again()
+    {
+        using var ops = new OpsHarness();
+        ops.Sessions.Sessions[1] = Callers.UserSid;
+        ops.Scm.Running.Add("WSearch");
+        await ops.Call(A, Operation.PauseServices, new ServicesArgs(["WSearch"]));
+        ops.Sessions.Sessions.Clear();
+        ops.Scm.Calls.Clear();
+        Assert.Equal(0, ops.Operations.RecheckPausedServices(CancellationToken.None));
+        Assert.False(ops.State.Paused.ContainsKey("WSearch"));
+        Assert.Contains("WSearch", ops.Scm.Running);
+        Assert.DoesNotContain("stop WSearch", ops.Scm.Calls);
+    }
+
+    [Fact]
+    public async Task The_watch_lets_go_when_no_couchhud_runs_any_more_even_if_the_account_is_signed_in()
+    {
+        using var ops = new OpsHarness();
+        ops.Sessions.Sessions[1] = Callers.UserSid;
+        ops.Scm.Running.Add("WSearch");
+        await ops.Call(A, Operation.PauseServices, new ServicesArgs(["WSearch"]));
+        ops.ShellRuns = false;
+        // The user starts it by hand afterwards: the watch must not stop it again.
+        ops.Operations.RecheckPausedServices(CancellationToken.None);
+        Assert.Empty(ops.State.Paused);
+        Assert.Contains("WSearch", ops.Scm.Running);
+        ops.Scm.Calls.Clear();
+        Assert.Equal(0, ops.Operations.RecheckPausedServices(CancellationToken.None));
+        Assert.Empty(ops.Scm.Calls);
+    }
+
+    [Fact]
+    public async Task The_watch_keeps_the_remaining_holder_and_does_nothing_when_the_sessions_cannot_be_read()
+    {
+        using var ops = new OpsHarness();
+        ops.Sessions.Sessions[1] = Callers.UserSid;
+        ops.Sessions.Sessions[2] = Callers.OtherSid;
+        ops.Scm.Running.Add("WSearch");
+        await ops.Call(A, Operation.PauseServices, new ServicesArgs(["WSearch"]));
+        ops.ConsoleSession = 2;
+        await ops.Call(B, Operation.PauseServices, new ServicesArgs(["WSearch"]));
+        ops.Sessions.Sessions.Remove(1);
+        ops.Operations.RecheckPausedServices(CancellationToken.None);
+        Assert.Equal([Callers.OtherSid], ops.State.Paused["WSearch"].Holders);
+        Assert.DoesNotContain("WSearch", ops.Scm.Running);
+        // Unreadable: no watching, no releasing, no starting.
+        ops.Sessions.Unreadable = true;
+        ops.Scm.Running.Add("WSearch");
+        ops.Scm.Calls.Clear();
+        Assert.Equal(0, ops.Operations.RecheckPausedServices(CancellationToken.None));
+        Assert.Empty(ops.Scm.Calls);
+        Assert.Contains(Callers.OtherSid, ops.State.Paused["WSearch"].Holders);
+    }
+
+    [Fact]
+    public void The_watch_never_touches_an_entry_off_the_list_or_on_the_denylist()
+    {
+        using var ops = new OpsHarness();
+        ops.Sessions.Sessions[1] = Callers.UserSid;
+        ops.Scm.Running.UnionWith(["WinDefend", "NotOnTheList"]);
+        ops.Store.Update(s =>
+        {
+            s.Paused["WinDefend"] = new CouchHud.Service.State.PausedService { Holders = [Callers.UserSid], StoppedByService = true };
+            s.Paused["NotOnTheList"] = new CouchHud.Service.State.PausedService { Holders = [Callers.UserSid], StoppedByService = true };
+            return true;
+        });
+        Assert.Equal(0, ops.Operations.RecheckPausedServices(CancellationToken.None));
+        Assert.Empty(ops.Scm.Calls);
+        Assert.Contains("WinDefend", ops.Scm.Running);
+        Assert.Contains("NotOnTheList", ops.Scm.Running);
+    }
+
+    [Theory]
+    [InlineData(ServiceStartMode.Disabled)]
+    [InlineData(ServiceStartMode.Manual)]
+    public async Task The_resume_never_starts_a_service_that_is_not_automatic_even_when_the_service_stopped_it(ServiceStartMode mode)
+    {
+        using var ops = new OpsHarness();
+        ops.Scm.Running.Add("WSearch");
+        ops.Scm.StartTypes["WSearch"] = mode;
+        await ops.Call(A, Operation.PauseServices, new ServicesArgs(["WSearch"]));
+        Assert.True(ops.State.Paused["WSearch"].StoppedByService);
+        Assert.True((await ops.Call(A, Operation.ResumeServices, new ServicesArgs(["WSearch"]))).Ok);
+        Assert.DoesNotContain("start WSearch", ops.Scm.Calls);
+        Assert.DoesNotContain("WSearch", ops.Scm.Running);
+        Assert.Empty(ops.State.Paused);
+    }
+
+    [Fact]
+    public async Task The_watch_loop_survives_a_failing_tick_logs_it_once_in_a_row_and_stops_on_cancel()
+    {
+        var log = new RecordingSink();
+        using var stop = new CancellationTokenSource();
+        var calls = 0;
+        var loop = PausedServiceWatch.RunAsync(_ =>
+        {
+            if (Interlocked.Increment(ref calls) <= 3) throw new InvalidOperationException("boom");
+            return 0;
+        }, TimeSpan.FromMilliseconds(10), log, stop.Token);
+        var until = DateTime.UtcNow.AddSeconds(5);
+        while (Volatile.Read(ref calls) < 6 && DateTime.UtcNow < until) await Task.Delay(10);
+        Assert.True(Volatile.Read(ref calls) >= 6, "the loop kept ticking after the exceptions");
+        stop.Cancel();
+        await loop.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Single(log.Errors);
+        Assert.Contains("InvalidOperationException", log.Errors[0]);
+        Assert.DoesNotContain("boom", log.Errors[0]);
+    }
+
+    [Fact]
+    public async Task A_cancellation_that_is_not_the_stop_is_logged_and_the_loop_goes_on()
+    {
+        var log = new RecordingSink();
+        using var stop = new CancellationTokenSource();
+        var calls = 0;
+        var loop = PausedServiceWatch.RunAsync(_ =>
+        {
+            if (Interlocked.Increment(ref calls) == 1) throw new OperationCanceledException();
+            return 0;
+        }, TimeSpan.FromMilliseconds(10), log, stop.Token);
+        var until = DateTime.UtcNow.AddSeconds(5);
+        while (Volatile.Read(ref calls) < 4 && DateTime.UtcNow < until) await Task.Delay(10);
+        Assert.True(Volatile.Read(ref calls) >= 4);
+        Assert.Single(log.Errors);
+        stop.Cancel();
+        await loop.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    private sealed class RecordingSink : CouchHud.Privileged.IEventSink
+    {
+        public List<string> Errors { get; } = [];
+        public void Info(string message) { }
+        public void Error(string message) => Errors.Add(message);
+    }
+
+    [Fact]
     public async Task A_signed_out_account_gives_its_holds_back()
     {
         using var ops = new OpsHarness();
@@ -135,6 +329,7 @@ public class ServiceOperationsTests
         ops.Sessions.Sessions[1] = Callers.UserSid;
         ops.Sessions.Sessions[2] = Callers.OtherSid;
         await ops.Call(A, Operation.PauseServices, new ServicesArgs(["WSearch", "SysMain"]));
+        ops.ConsoleSession = 2;
         await ops.Call(B, Operation.PauseServices, new ServicesArgs(["SysMain"]));
 
         // A signs out of session 1: WSearch was only A's and starts again, SysMain stays paused for B.

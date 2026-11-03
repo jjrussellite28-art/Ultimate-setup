@@ -43,6 +43,21 @@ public static class RecoveryRules
     }
 
     /// <summary>
+    /// The fall back to the desktop (the HUD cannot run): with the lock required (a lock is on and CouchHud is the shell) the
+    /// desktop opens only after Windows is locked. While locking fails, <paramref name="askAgain"/> tells the user and says whether to
+    /// try again (true) or to stop (false, e.g. restart or shutdown was chosen). True: go on to the desktop; false: keep it closed.
+    /// </summary>
+    public static async Task<bool> LockBeforeDesktopAsync(bool lockRequired, Func<Task<bool>> tryLock, Func<Task<bool>> askAgain)
+    {
+        if (!lockRequired) return true;
+        while (true)
+        {
+            if (await tryLock()) return true;
+            if (!await askAgain()) return false;
+        }
+    }
+
+    /// <summary>
     /// Parental controls rest on a code only the parents know. Both the code lock and the Windows sign-in can be got
     /// around from the Windows lock screen (recovery, restart) when the account has no password: parental controls
     /// only on accounts with one.

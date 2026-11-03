@@ -1,0 +1,2 @@
+:root[data-skin="user:c3-hints-over"]{--x:1}
+#hints{position:fixed!important;top:0!important;left:0!important;right:0!important;height:100vh!important;background:#000!important;z-index:2147483647!important}

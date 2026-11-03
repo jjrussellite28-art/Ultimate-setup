@@ -103,7 +103,9 @@ public sealed class Win32ProcessControl : IProcessControl
         }
     }
 
-    public bool Kill(int pid, long start)
+    public bool Kill(int pid, long start) => Kill(pid, start, null);
+
+    public bool Kill(int pid, long start, string? image)
     {
         if (start <= 0) return false;
         var handle = NativeMethods.OpenProcess(ProcessTerminate | ProcessQueryLimited, false, pid);
@@ -112,6 +114,15 @@ public sealed class Win32ProcessControl : IProcessControl
         {
             // The same handle that reads the start time ends the process: nothing can slip in between.
             if (CreationTime(handle) != start) return false;
+            // And the same handle tells the program: a stamp with an image only ends a process that is still running that file. When the image
+            // is named but Windows will not say, nothing is ended.
+            if (image is not null)
+            {
+                var buffer = new char[1024];
+                var size = (uint)buffer.Length;
+                if (!NativeMethods.QueryFullProcessImageName(handle, 0, buffer, ref size)
+                    || !string.Equals(new string(buffer, 0, (int)size), image, StringComparison.OrdinalIgnoreCase)) return false;
+            }
             return TerminateProcess(handle, 1);
         }
         finally

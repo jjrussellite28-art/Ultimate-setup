@@ -1,0 +1,2 @@
+:root[data-skin="user:c3-body-filter"]{--x:1}
+body{filter:brightness(0)!important}html{filter:brightness(0)!important;background:#000!important}

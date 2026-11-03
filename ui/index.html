@@ -22,12 +22,9 @@
     <div class="bg-shade"></div>
   </div>
 
-  <header id="top">
-    <nav id="tabs">
-      <span class="glyph shoulder" data-glyph="LB">LB</span>
-      <ol id="tab-list"></ol>
-      <span class="glyph shoulder" data-glyph="RB">RB</span>
-    </nav>
+  <!-- The tab bar: this header becomes the host of a closed shadow root shown in the top layer (core/tab-bar.js); only the status area stays
+       here, slotted into it. #top-gap keeps the room of the bar free in the page flow. -->
+  <header id="top" popover="manual">
     <div id="status">
       <span id="session-status" hidden></span>
       <span id="parental-status" hidden></span>
@@ -37,6 +34,7 @@
       <time id="clock"></time>
     </div>
   </header>
+  <div id="top-gap" aria-hidden="true"></div>
 
   <main id="view"></main>
 

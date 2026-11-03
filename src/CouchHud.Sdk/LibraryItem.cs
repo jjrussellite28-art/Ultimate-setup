@@ -57,6 +57,14 @@ public sealed record LibraryItem
     public bool Hidden { get; init; }
     /// <summary>Total minutes played as tracked by CouchHud.</summary>
     public double PlaytimeMinutes { get; init; }
+    /// <summary>
+    /// SDK 5, additive: entries of one plugin that share a time limit and lock among themselves, whatever their <see cref="InstallDir"/> (a
+    /// streaming plugin whose entries all point at the same client folder, say). Short plain text (at most 64 characters, no control
+    /// characters; anything else counts as unset). The host puts the plugin's id in front, so a group never meets the key of another plugin
+    /// or of a core entry. Without it, entries are told apart as before (store id, then install folder). It changes only the limit key,
+    /// not how a running game is recognized.
+    /// </summary>
+    public string? LimitGroup { get; init; }
     /// <summary>Minutes of the last play session as tracked by CouchHud, 0 if unknown.</summary>
     public double LastSessionMinutes { get; init; }
 }

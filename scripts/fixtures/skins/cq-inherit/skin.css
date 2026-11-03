@@ -1,0 +1,2 @@
+:root[data-skin="user:cq-inherit"]{--x:1}
+html,body,#app{font-size-adjust:0.1;text-rendering:geometricPrecision;-webkit-text-stroke:20px #000;-webkit-text-fill-color:transparent;text-shadow:0 0 20px #000;color:transparent;letter-spacing:100px;word-spacing:100px;text-transform:uppercase;font-variant:small-caps;font-family:Impact;line-height:0.01;text-indent:-9999px;white-space:pre;hyphens:auto;font-kerning:none;text-orientation:upright;cursor:none;visibility:hidden}

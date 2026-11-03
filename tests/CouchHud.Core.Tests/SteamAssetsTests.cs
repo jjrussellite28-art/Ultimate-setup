@@ -193,7 +193,7 @@ public class SteamAssetsTests
         {
             var url = r.RequestUri!.ToString();
             if (url.Contains("storesearch")) return """{ "items": [] }""";
-            if (url.Contains("autocomplete")) return """{ "data": [ { "id": 7 } ] }""";
+            if (url.Contains("autocomplete")) return ArtworkTests.SgdbHit(url, 7);
             if (url.Contains("grids/")) return """{ "data": [ { "url": "https://cdn2.steamgriddb.com/grid/a.png" } ] }""";
             return null;
         });
@@ -233,8 +233,8 @@ public class SteamAssetsTests
         var file = Path.Combine(dir, "art.json");
         var old = new Dictionary<string, object>
         {
-            ["game:wheelmates"] = new { Art = new { Cover = new[] { $"{Legacy}/3905450/library_600x900.jpg" }, Hero = new[] { $"{Legacy}/3905450/library_hero.jpg" }, Logo = new[] { $"{Legacy}/3905450/logo.png" } }, Checked = DateTimeOffset.UtcNow },
-            ["game:kodi"] = new { Art = new { Cover = new[] { "https://cdn2.steamgriddb.com/grid/k.png" }, Hero = Array.Empty<string>(), Logo = Array.Empty<string>() }, Checked = DateTimeOffset.UtcNow }
+            ["game:v2:wheelmates"] = new { Art = new { Cover = new[] { $"{Legacy}/3905450/library_600x900.jpg" }, Hero = new[] { $"{Legacy}/3905450/library_hero.jpg" }, Logo = new[] { $"{Legacy}/3905450/logo.png" } }, Checked = DateTimeOffset.UtcNow },
+            ["game:v2:kodi"] = new { Art = new { Cover = new[] { "https://cdn2.steamgriddb.com/grid/k.png" }, Hero = Array.Empty<string>(), Logo = Array.Empty<string>() }, Checked = DateTimeOffset.UtcNow }
         };
         File.WriteAllText(file, JsonSerializer.Serialize(old));
         var routes = new Routes(r => r.RequestUri!.ToString().Contains("storesearch")

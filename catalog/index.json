@@ -1,43 +1,16 @@
 {
   "version": 1,
-  "serial": 4,
+  "serial": 5,
   "name": "CouchHUD Katalog",
   "entries": [
-    {
-      "id": "wand",
-      "folder": "CouchHud.Plugin.Wand",
-      "name": "Wand",
-      "type": "plugin",
-      "version": "1.1.0",
-      "minCouchHud": "0.6.0",
-      "author": "kewe87",
-      "description": {
-        "de": "Cheats und Mods für deine Spiele über Wand (früher WeMod), mit Eintrag im Guide-Menü und Assistenten-Werkzeug",
-        "en": "Cheats and mods for your games through Wand (formerly WeMod), with a guide menu entry and an assistant tool"
-      },
-      "homepage": "https://github.com/kewe87/CouchHUD/tree/master/plugins/CouchHud.Plugin.Wand",
-      "icon": "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/icons/wand.png",
-      "iconSha256": "a1080a42220783ec2e1db960d6eaeea557aa7476d1b7fcdd75de5a669828fb6e",
-      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/wand-1.1.0/CouchHud.Plugin.Wand-1.1.0.zip",
-      "sha256": "b1551753953cb423908abcd7cb077626f4ffa6a3ff7164f836cde7930a42e9ef",
-      "license": "GPL-3.0-or-later",
-      "capabilities": [
-        "pages",
-        "quickActions",
-        "assistant",
-        "browser",
-        "process"
-      ],
-      "statement": "eyJpZCI6IndhbmQiLCJmb2xkZXIiOiJDb3VjaEh1ZC5QbHVnaW4uV2FuZCIsInZlcnNpb24iOiIxLjEuMCIsInNoYTI1NiI6ImIxNTUxNzUzOTUzY2I0MjM5MDhhYmNkN2NiMDc3NjI2ZjRmZmE2YTNmZjcxNjRmODM2Y2RlNzkzMGE0MmU5ZWYiLCJzZGsiOjMsIm1pbkNvdWNoSHVkIjoiMC42LjAiLCJjYXBhYmlsaXRpZXMiOlsicGFnZXMiLCJxdWlja0FjdGlvbnMiLCJhc3Npc3RhbnQiLCJicm93c2VyIiwicHJvY2VzcyJdLCJwdWJsaXNoZXJLZXkiOiIyNDdiYmE2Mjg0OWRkZmVhYjg3NDlhMzg0ODg3OTE4MDdiZmZhMzNjNzIzNDdlYTIwOTMxODcwZGJiYjc3MDlmIiwibGljZW5zZSI6IkdQTC0zLjAtb3ItbGF0ZXIiLCJhdXRob3IiOiJrZXdlODciLCJuYW1lIjoiV2FuZCIsInN1bW1hcnkiOiJDaGVhdHMgYW5kIG1vZHMgZm9yIHlvdXIgZ2FtZXMgdGhyb3VnaCBXYW5kIChmb3JtZXJseSBXZU1vZCksIHdpdGggYSBndWlkZSBtZW51IGVudHJ5IGFuZCBhbiBhc3Npc3RhbnQgdG9vbCIsImljb24iOnsic2hhMjU2IjoiYTEwODBhNDIyMjA3ODNlYzJlMWRiOTYwZDZlYWVlYTU1N2FhNzQ3NmQxYjdmY2RkNzVkZTVhNjY5ODI4ZmI2ZSIsImJ5dGVzIjo3MTcyfSwic2l6ZSI6MTY0NDB9",
-      "signature": "CPQVgPJtjT+/dARVEOEhDB05vhR5fY1BEXhkKOR1OH0Fe2Xm2yE8MnZ30ASDa+o2toLrmKYHy4n+jI7u02SwsA=="
-    },
     {
       "id": "homeassistant",
       "folder": "CouchHud.Plugin.HomeAssistant",
       "name": "Home Assistant",
       "type": "plugin",
-      "version": "1.1.1",
-      "minCouchHud": "0.6.3",
+      "category": "smartHome",
+      "version": "1.2.0",
+      "minCouchHud": "0.7.0",
       "author": "kewe87",
       "description": {
         "de": "Lichter, Szenen und Sensoren aus Home Assistant am Fernseher schalten, mit Anmeldung über Home Assistant",
@@ -51,25 +24,27 @@
         "assistant",
         "notify",
         "browser.signin",
-        "network:lan"
+        "network:lan",
+        "host.state"
       ],
       "suggestWhen": {
         "feature": "homeAssistant"
       },
       "icon": "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/icons/homeassistant.png",
-      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/homeassistant-1.1.1/CouchHud.Plugin.HomeAssistant-1.1.1.zip",
-      "sha256": "73699fe970d345d117de3c50d89f241bb5bb5f1c8fb48a52daa89a5a5356a2ab",
-      "statement": "eyJpZCI6ImhvbWVhc3Npc3RhbnQiLCJmb2xkZXIiOiJDb3VjaEh1ZC5QbHVnaW4uSG9tZUFzc2lzdGFudCIsInZlcnNpb24iOiIxLjEuMSIsInNoYTI1NiI6IjczNjk5ZmU5NzBkMzQ1ZDExN2RlM2M1MGQ4OWYyNDFiYjViYjVmMWM4ZmI0OGE1MmRhYTg5YTVhNTM1NmEyYWIiLCJzZGsiOjQsIm1pbkNvdWNoSHVkIjoiMC42LjMiLCJjYXBhYmlsaXRpZXMiOlsicGFnZXMiLCJ0YWJzIiwicXVpY2tBY3Rpb25zIiwiYXNzaXN0YW50Iiwibm90aWZ5IiwiYnJvd3Nlci5zaWduaW4iLCJuZXR3b3JrOmxhbiJdLCJwdWJsaXNoZXJLZXkiOiIyNDdiYmE2Mjg0OWRkZmVhYjg3NDlhMzg0ODg3OTE4MDdiZmZhMzNjNzIzNDdlYTIwOTMxODcwZGJiYjc3MDlmIiwibGljZW5zZSI6IkdQTC0zLjAtb25seSIsImF1dGhvciI6Imtld2U4NyIsIm5hbWUiOiJIb21lIEFzc2lzdGFudCIsInN1bW1hcnkiOiJMaWdodHMsIHNjZW5lcyBhbmQgc2Vuc29ycyBmcm9tIEhvbWUgQXNzaXN0YW50IG9uIHRoZSBUViwgd2l0aCBzaWduLWluIHRocm91Z2ggSG9tZSBBc3Npc3RhbnQsIGd1aWRlIG1lbnUgZW50cmllcyBhbmQgYXNzaXN0YW50IHRvb2xzIiwiaWNvbiI6eyJzaGEyNTYiOiI3NThlNmIyYzUzNzdkZGU0NTIwNjk3ZTMzYmQ0MjRiYzNmNmViZDI5NzI3MzE4MjRlNGVkMjExMjA4NDA0ZWViIiwiYnl0ZXMiOjM5MzIyfSwic2l6ZSI6ODUzMzB9",
-      "signature": "/DvNDgXDqBcA/Cli8KpL334Zqqkx0Sz/m22Lal29mG1IGkakdejIWF+qsogww9dpAwbhGe23emtOmw8f58Dvtw==",
-      "sdk": 4
+      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/homeassistant-1.2.0/CouchHud.Plugin.HomeAssistant-1.2.0.zip",
+      "sdk": 5,
+      "sha256": "d008547ae78ac273a186c3a5ced65470d369f222e3c3e419a3f3312c3c6b1abf",
+      "statement": "eyJpZCI6ImhvbWVhc3Npc3RhbnQiLCJmb2xkZXIiOiJDb3VjaEh1ZC5QbHVnaW4uSG9tZUFzc2lzdGFudCIsInZlcnNpb24iOiIxLjIuMCIsInNoYTI1NiI6ImQwMDg1NDdhZTc4YWMyNzNhMTg2YzNhNWNlZDY1NDcwZDM2OWYyMjJlM2MzZTQxOWEzZjMzMTJjM2M2YjFhYmYiLCJzZGsiOjUsIm1pbkNvdWNoSHVkIjoiMC43LjAiLCJjYXBhYmlsaXRpZXMiOlsicGFnZXMiLCJ0YWJzIiwicXVpY2tBY3Rpb25zIiwiYXNzaXN0YW50Iiwibm90aWZ5IiwiYnJvd3Nlci5zaWduaW4iLCJuZXR3b3JrOmxhbiIsImhvc3Quc3RhdGUiXSwic2VydmljZXMiOlt7ImlkIjoiaG9tZS1hc3Npc3RhbnQiLCJuYW1lIjp7ImRlIjoiSG9tZSBBc3Npc3RhbnQ6IFN0YXR1cyBtZWxkZW4gKEhlaW1uZXR6LCBhdWNoIFRhaWxzY2FsZSAxMDAuNjQvMTApIiwiZW4iOiJIb21lIEFzc2lzdGFudDogcmVwb3J0IHN0YXR1cyAoaG9tZSBuZXR3b3JrLCBhbHNvIFRhaWxzY2FsZSAxMDAuNjQvMTApIn0sImhvc3RzIjpbImxhbiJdfV0sInB1Ymxpc2hlcktleSI6IjI0N2JiYTYyODQ5ZGRmZWFiODc0OWEzODQ4ODc5MTgwN2JmZmEzM2M3MjM0N2VhMjA5MzE4NzBkYmJiNzcwOWYiLCJsaWNlbnNlIjoiR1BMLTMuMC1vbmx5IiwiYXV0aG9yIjoia2V3ZTg3IiwibmFtZSI6IkhvbWUgQXNzaXN0YW50Iiwic3VtbWFyeSI6IkxpZ2h0cywgc2NlbmVzIGFuZCBzZW5zb3JzIGZyb20gSG9tZSBBc3Npc3RhbnQgb24gdGhlIFRWLCB3aXRoIHNpZ24taW4gdGhyb3VnaCBIb21lIEFzc2lzdGFudCwgZ3VpZGUgbWVudSBlbnRyaWVzIGFuZCBhc3Npc3RhbnQgdG9vbHMiLCJpY29uIjp7InNoYTI1NiI6Ijc1OGU2YjJjNTM3N2RkZTQ1MjA2OTdlMzNiZDQyNGJjM2Y2ZWJkMjk3MjczMTgyNGU0ZWQyMTEyMDg0MDRlZWIiLCJieXRlcyI6MzkzMjJ9LCJzaXplIjoxMTY4NTh9",
+      "signature": "JNle/PIWiCuHwjuFb0EJheL3mSdCqRBzlA2aTUpMOS7J0LE/U9Iuv5P3dKI06qo7SxdMpFiy3P60HDCPBUmwlw=="
     },
     {
       "id": "casehud",
       "folder": "CouchHud.Plugin.CaseHud",
       "name": "CaseHUD",
       "type": "plugin",
-      "version": "1.0.1",
-      "minCouchHud": "0.6.0",
+      "category": "hardware",
+      "version": "1.1.0",
+      "minCouchHud": "0.7.0",
       "author": "kewe87",
       "description": {
         "de": "Schaltet die LCDs in Lüftern und Pumpen von CaseHUD: Szenen, Helligkeit, Beleuchtung, Automatik",
@@ -91,24 +66,26 @@
         "registry",
         "native",
         "network:loopback",
-        "network:internet"
+        "network:internet",
+        "sensors.publish"
       ],
       "suggestWhen": {
         "uninstallEntry": "CaseHUD"
       },
       "icon": "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/icons/casehud.png",
-      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/casehud-1.0.1/CouchHud.Plugin.CaseHud-1.0.1.zip",
-      "sha256": "b752a572f2ad8a748bf8dbc055c9fdd62e003be652f9ab596200a1d72b56b423",
-      "statement": "eyJpZCI6ImNhc2VodWQiLCJmb2xkZXIiOiJDb3VjaEh1ZC5QbHVnaW4uQ2FzZUh1ZCIsInZlcnNpb24iOiIxLjAuMSIsInNoYTI1NiI6ImI3NTJhNTcyZjJhZDhhNzQ4YmY4ZGJjMDU1YzlmZGQ2MmUwMDNiZTY1MmY5YWI1OTYyMDBhMWQ3MmI1NmI0MjMiLCJzZGsiOjMsIm1pbkNvdWNoSHVkIjoiMC42LjAiLCJjYXBhYmlsaXRpZXMiOlsicGFnZXMiLCJxdWlja0FjdGlvbnMiLCJkb3dubG9hZHMiLCJzZXR1cC5ydW4iLCJsb2NrLnJlc3RyaWN0Iiwic3RhcnR1cC5hcmdzIiwicHJvY2VzcyIsInJlZ2lzdHJ5IiwibmF0aXZlIiwibmV0d29yazpsb29wYmFjayIsIm5ldHdvcms6aW50ZXJuZXQiXSwicHVibGlzaGVyS2V5IjoiMjQ3YmJhNjI4NDlkZGZlYWI4NzQ5YTM4NDg4NzkxODA3YmZmYTMzYzcyMzQ3ZWEyMDkzMTg3MGRiYmI3NzA5ZiIsImxpY2Vuc2UiOiJHUEwtMy4wLW9ubHkiLCJhdXRob3IiOiJrZXdlODciLCJuYW1lIjoiQ2FzZUhVRCIsInN1bW1hcnkiOiJTd2l0Y2ggYW5kIG9wZXJhdGUgdGhlIExDRHMgaW4geW91ciBmYW5zIGFuZCBwdW1wcyB0aHJvdWdoIENhc2VIVUQ6IHNjZW5lcywgYnJpZ2h0bmVzcywgbGlnaHRpbmcsIGF1dG9tYXRpb24sIHdpdGggZ3VpZGUgbWVudSBlbnRyaWVzIiwiaWNvbiI6eyJzaGEyNTYiOiIxYTM1ZDU1MDM0YzE2ZmNmZWJmZDMwODZjOThiMTgxMmQwMmQ3YWE2OTI0MjI3NTI5MTBmNmY3Y2RkNGI2MjNmIiwiYnl0ZXMiOjI3OTk2fSwic2l6ZSI6MTM2MzQ3fQ==",
-      "signature": "NrSSMx0DchN3JDc4HDGmcMjR9o1gI9H6tM5LplB935hYhpj2nhoaFnpeuXYrjcVTJq6Y31pU8qcXbsD/Jdp9xw==",
-      "sdk": 3
+      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/casehud-1.1.0/CouchHud.Plugin.CaseHud-1.1.0.zip",
+      "sdk": 3,
+      "sha256": "2142ffa5996c9c67096db4b35456751bf8aef7dd6e35a409477568f71fba5e5b",
+      "statement": "eyJpZCI6ImNhc2VodWQiLCJmb2xkZXIiOiJDb3VjaEh1ZC5QbHVnaW4uQ2FzZUh1ZCIsInZlcnNpb24iOiIxLjEuMCIsInNoYTI1NiI6IjIxNDJmZmE1OTk2YzljNjcwOTZkYjRiMzU0NTY3NTFiZjhhZWY3ZGQ2ZTM1YTQwOTQ3NzU2OGY3MWZiYTVlNWIiLCJzZGsiOjMsIm1pbkNvdWNoSHVkIjoiMC43LjAiLCJjYXBhYmlsaXRpZXMiOlsicGFnZXMiLCJxdWlja0FjdGlvbnMiLCJkb3dubG9hZHMiLCJzZXR1cC5ydW4iLCJsb2NrLnJlc3RyaWN0Iiwic3RhcnR1cC5hcmdzIiwicHJvY2VzcyIsInJlZ2lzdHJ5IiwibmF0aXZlIiwibmV0d29yazpsb29wYmFjayIsIm5ldHdvcms6aW50ZXJuZXQiLCJzZW5zb3JzLnB1Ymxpc2giXSwicHVibGlzaGVyS2V5IjoiMjQ3YmJhNjI4NDlkZGZlYWI4NzQ5YTM4NDg4NzkxODA3YmZmYTMzYzcyMzQ3ZWEyMDkzMTg3MGRiYmI3NzA5ZiIsImxpY2Vuc2UiOiJHUEwtMy4wLW9ubHkiLCJhdXRob3IiOiJrZXdlODciLCJuYW1lIjoiQ2FzZUhVRCIsInN1bW1hcnkiOiJTd2l0Y2ggYW5kIG9wZXJhdGUgdGhlIExDRHMgaW4geW91ciBmYW5zIGFuZCBwdW1wcyB0aHJvdWdoIENhc2VIVUQ6IHNjZW5lcywgYnJpZ2h0bmVzcywgbGlnaHRpbmcsIGF1dG9tYXRpb24sIHdpdGggZ3VpZGUgbWVudSBlbnRyaWVzIiwiaWNvbiI6eyJzaGEyNTYiOiIxYTM1ZDU1MDM0YzE2ZmNmZWJmZDMwODZjOThiMTgxMmQwMmQ3YWE2OTI0MjI3NTI5MTBmNmY3Y2RkNGI2MjNmIiwiYnl0ZXMiOjI3OTk2fSwic2l6ZSI6MTgyNTgzfQ==",
+      "signature": "F6IDZ9k9XP6tDGnt74idOYE8KaCKHBP4IR/+17x4ecXQKaALJr7lLQMyWQ0FYJuC0ijp501YWqQQ6EGIy8bW/A=="
     },
     {
       "id": "vpn",
       "folder": "CouchHud.Plugin.Vpn",
       "name": "VPN",
       "type": "plugin",
-      "version": "1.0.0",
+      "category": "other",
+      "version": "1.0.1",
       "minCouchHud": "0.6.0",
       "author": "kewe87",
       "description": {
@@ -131,15 +108,239 @@
         "uninstallEntry": "NordVPN"
       },
       "icon": "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/icons/vpn.png",
-      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/vpn-1.0.0/CouchHud.Plugin.Vpn-1.0.0.zip",
-      "sha256": "a48a60144a6b946f3a489cea3e38636782105e5b45f2c81aa931466990225cf2",
-      "statement": "eyJpZCI6InZwbiIsImZvbGRlciI6IkNvdWNoSHVkLlBsdWdpbi5WcG4iLCJ2ZXJzaW9uIjoiMS4wLjAiLCJzaGEyNTYiOiJhNDhhNjAxNDRhNmI5NDZmM2E0ODljZWEzZTM4NjM2NzgyMTA1ZTViNDVmMmM4MWFhOTMxNDY2OTkwMjI1Y2YyIiwic2RrIjozLCJtaW5Db3VjaEh1ZCI6IjAuNi4wIiwiY2FwYWJpbGl0aWVzIjpbInBhZ2VzIiwicXVpY2tBY3Rpb25zIiwicHJvY2VzcyIsInJlZ2lzdHJ5IiwibmF0aXZlIl0sInB1Ymxpc2hlcktleSI6IjI0N2JiYTYyODQ5ZGRmZWFiODc0OWEzODQ4ODc5MTgwN2JmZmEzM2M3MjM0N2VhMjA5MzE4NzBkYmJiNzcwOWYiLCJsaWNlbnNlIjoiR1BMLTMuMC1vbmx5IiwiYXV0aG9yIjoia2V3ZTg3IiwibmFtZSI6IlZQTiIsInN1bW1hcnkiOiJTd2l0Y2ggdGhlIFZQTiBmcm9tIHRoZSBjb3VjaDogc2VlIHRoZSBzdGF0dXMsIGNvbm5lY3QsIGRpc2Nvbm5lY3QgYW5kIGNob29zZSBhIGNvdW50cnkgKE5vcmRWUE4pLCB3aXRoIGd1aWRlIG1lbnUgZW50cmllcyIsImljb24iOnsic2hhMjU2IjoiYjQ1ZmM1N2IxMjIzMWY3ZjlhOTk4ZjE4N2Y1YTkyNjNjNmE1NjdjMDUzZjY4NTFkMDJlNjJlNDVkOTdkYTU0YSIsImJ5dGVzIjo0MTU0MH0sInNpemUiOjcyOTc2fQ==",
-      "signature": "zzf41n7UyNqmnQ9wl0/oITmIFT1FiEJSB7cFSOTo5+cM9HOolQ56zN+T9SlHK6YG90zb4JX3TgYlDnEpvaTNCg=="
+      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/vpn-1.0.1/CouchHud.Plugin.Vpn-1.0.1.zip",
+      "sdk": 3,
+      "sha256": "be44443b72bb61eadded761d3d65b645bfb76bf1aa46fa4398e4943ddf3150b9",
+      "statement": "eyJpZCI6InZwbiIsImZvbGRlciI6IkNvdWNoSHVkLlBsdWdpbi5WcG4iLCJ2ZXJzaW9uIjoiMS4wLjEiLCJzaGEyNTYiOiJiZTQ0NDQzYjcyYmI2MWVhZGRlZDc2MWQzZDY1YjY0NWJmYjc2YmYxYWE0NmZhNDM5OGU0OTQzZGRmMzE1MGI5Iiwic2RrIjozLCJtaW5Db3VjaEh1ZCI6IjAuNi4wIiwiY2FwYWJpbGl0aWVzIjpbInBhZ2VzIiwicXVpY2tBY3Rpb25zIiwicHJvY2VzcyIsInJlZ2lzdHJ5IiwibmF0aXZlIl0sInB1Ymxpc2hlcktleSI6IjI0N2JiYTYyODQ5ZGRmZWFiODc0OWEzODQ4ODc5MTgwN2JmZmEzM2M3MjM0N2VhMjA5MzE4NzBkYmJiNzcwOWYiLCJsaWNlbnNlIjoiR1BMLTMuMC1vbmx5IiwiYXV0aG9yIjoia2V3ZTg3IiwibmFtZSI6IlZQTiIsInN1bW1hcnkiOiJTd2l0Y2ggdGhlIFZQTiBmcm9tIHRoZSBjb3VjaDogc2VlIHRoZSBzdGF0dXMsIGNvbm5lY3QsIGRpc2Nvbm5lY3QgYW5kIGNob29zZSBhIGNvdW50cnkgKE5vcmRWUE4pLCB3aXRoIGd1aWRlIG1lbnUgZW50cmllcyIsImljb24iOnsic2hhMjU2IjoiYjQ1ZmM1N2IxMjIzMWY3ZjlhOTk4ZjE4N2Y1YTkyNjNjNmE1NjdjMDUzZjY4NTFkMDJlNjJlNDVkOTdkYTU0YSIsImJ5dGVzIjo0MTU0MH0sInNpemUiOjc1MDI0fQ==",
+      "signature": "4fRg9bKGnxciP0DUCdsv81VNnRnr14yRCDKTbR/zZOYHkaPHJRYp4Z6RN5C6dGGWAPLIao2REAhqx5rsD0XbjA=="
+    },
+    {
+      "id": "weather",
+      "folder": "CouchHud.Plugin.Weather",
+      "name": "Weather",
+      "type": "plugin",
+      "category": "information",
+      "version": "1.0.0",
+      "minCouchHud": "0.7.0",
+      "author": "kewe87",
+      "description": {
+        "de": "Das Wetter in der Kopfzeile von CouchHUD: aktuelle Lage und die nächsten Tage für einen gewählten Ort von Open-Meteo (ohne Konto, ohne Schlüssel), mit Ortssuche in den Einstellungen und einem Werkzeug für den Assistenten",
+        "en": "The weather in CouchHUD's header: current conditions and the next days for a chosen place from Open-Meteo (no account, no key), with a place search in the settings and a tool for the assistant"
+      },
+      "license": "GPL-3.0-only",
+      "capabilities": [
+        "weather",
+        "assistant",
+        "network:internet"
+      ],
+      "suggestWhen": {
+        "feature": "weather"
+      },
+      "icon": "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/icons/weather.png",
+      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/weather-1.0.0/CouchHud.Plugin.Weather-1.0.0.zip",
+      "sdk": 5,
+      "sha256": "9165588d13a7f345bddef9c8a363390d4831060645fc495350d5170ee68eb6ca",
+      "statement": "eyJpZCI6IndlYXRoZXIiLCJmb2xkZXIiOiJDb3VjaEh1ZC5QbHVnaW4uV2VhdGhlciIsInZlcnNpb24iOiIxLjAuMCIsInNoYTI1NiI6IjkxNjU1ODhkMTNhN2YzNDViZGRlZjljOGEzNjMzOTBkNDgzMTA2MDY0NWZjNDk1MzUwZDUxNzBlZTY4ZWI2Y2EiLCJzZGsiOjUsIm1pbkNvdWNoSHVkIjoiMC43LjAiLCJjYXBhYmlsaXRpZXMiOlsid2VhdGhlciIsImFzc2lzdGFudCIsIm5ldHdvcms6aW50ZXJuZXQiXSwic2VydmljZXMiOlt7ImlkIjoib3Blbi1tZXRlbyIsIm5hbWUiOnsiZGUiOiJXZXR0ZXJkaWVuc3QgKE9wZW4tTWV0ZW8pIiwiZW4iOiJXZWF0aGVyIHNlcnZpY2UgKE9wZW4tTWV0ZW8pIn0sImhvc3RzIjpbImdlb2NvZGluZy1hcGkub3Blbi1tZXRlby5jb20iLCJhcGkub3Blbi1tZXRlby5jb20iXX1dLCJwdWJsaXNoZXJLZXkiOiIyNDdiYmE2Mjg0OWRkZmVhYjg3NDlhMzg0ODg3OTE4MDdiZmZhMzNjNzIzNDdlYTIwOTMxODcwZGJiYjc3MDlmIiwibGljZW5zZSI6IkdQTC0zLjAtb25seSIsImF1dGhvciI6Imtld2U4NyIsIm5hbWUiOiJXZWF0aGVyIiwic3VtbWFyeSI6IlRoZSB3ZWF0aGVyIGluIHRoZSBoZWFkZXIgZnJvbSBPcGVuLU1ldGVvIGZvciBhIGNob3NlbiBwbGFjZSwgd2l0aCBhIHBsYWNlIHNlYXJjaCBpbiB0aGUgc2V0dGluZ3MgYW5kIGEgdG9vbCBmb3IgdGhlIGFzc2lzdGFudCIsImljb24iOnsic2hhMjU2IjoiMzFlMzI0NzA5NzhmYWUyZTQwY2YzNjUzMGI1ZDgyNTZiYzA1MTA4YTg4ZGM1NmViZTI3ZmVjOWQ1MmNmOTQ1NSIsImJ5dGVzIjo0MTA3M30sInNpemUiOjI2MzgwfQ==",
+      "signature": "aNMUNRYqlDtBPDwqtIS0QTo2Qm9hbHuasjqAisX3RcjAHtuQpLlKaC+UtSULEd+AURO95NGb59RyaQnQh8qEQw=="
+    },
+    {
+      "id": "news",
+      "folder": "CouchHud.Plugin.News",
+      "name": "News",
+      "type": "plugin",
+      "category": "information",
+      "version": "1.0.0",
+      "minCouchHud": "0.7.0",
+      "author": "kewe87",
+      "description": {
+        "de": "Nachrichten aus RSS- und Atom-Feeds im Tab Nachrichten, mit einem Werkzeug für den Assistenten",
+        "en": "News from RSS and Atom feeds in the News tab, with a tool for the assistant"
+      },
+      "license": "GPL-3.0-only",
+      "capabilities": [
+        "news",
+        "assistant",
+        "network:internet"
+      ],
+      "suggestWhen": {
+        "feature": "news"
+      },
+      "icon": "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/icons/news.png",
+      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/news-1.0.0/CouchHud.Plugin.News-1.0.0.zip",
+      "sdk": 5,
+      "sha256": "8d13d4656a6406d00c9d461e76925ed1c68348924279f2aa550386e4a2f0b976",
+      "statement": "eyJpZCI6Im5ld3MiLCJmb2xkZXIiOiJDb3VjaEh1ZC5QbHVnaW4uTmV3cyIsInZlcnNpb24iOiIxLjAuMCIsInNoYTI1NiI6IjhkMTNkNDY1NmE2NDA2ZDAwYzlkNDYxZTc2OTI1ZWQxYzY4MzQ4OTI0Mjc5ZjJhYTU1MDM4NmU0YTJmMGI5NzYiLCJzZGsiOjUsIm1pbkNvdWNoSHVkIjoiMC43LjAiLCJjYXBhYmlsaXRpZXMiOlsibmV3cyIsImFzc2lzdGFudCIsIm5ldHdvcms6aW50ZXJuZXQiXSwic2VydmljZXMiOlt7ImlkIjoiZmVlZHMiLCJuYW1lIjp7ImRlIjoiTmFjaHJpY2h0ZW4tRmVlZHMiLCJlbiI6Ik5ld3MgZmVlZHMifSwiaG9zdHMiOlsiKiJdfV0sInB1Ymxpc2hlcktleSI6IjI0N2JiYTYyODQ5ZGRmZWFiODc0OWEzODQ4ODc5MTgwN2JmZmEzM2M3MjM0N2VhMjA5MzE4NzBkYmJiNzcwOWYiLCJsaWNlbnNlIjoiR1BMLTMuMC1vbmx5IiwiYXV0aG9yIjoia2V3ZTg3IiwibmFtZSI6Ik5ld3MiLCJzdW1tYXJ5IjoiTmV3cyBmcm9tIFJTUyBhbmQgQXRvbSBmZWVkcyBpbiB0aGUgTmV3cyB0YWIsIHdpdGggYSB0b29sIGZvciB0aGUgYXNzaXN0YW50IiwiaWNvbiI6eyJzaGEyNTYiOiIyNjFhMjdhMDE2NDI3MjFkZDc2YjY0NzM0YTA0MmY4ODA3YWRkNDQzNTJmYTNjOGVlOWMwNjU2NzQwZjNmNDcwIiwiYnl0ZXMiOjMzNjI2fSwic2l6ZSI6MzQ4OTN9",
+      "signature": "etYAQhTFla8evehjwgvAGSEOey0NXZed9x1zdgITZz1MbOrXFJtv7nShkSyvwGZKNx5nDRFnNm61jsRHozczAQ=="
+    },
+    {
+      "id": "anthropic",
+      "folder": "CouchHud.Plugin.Anthropic",
+      "name": "Anthropic",
+      "type": "plugin",
+      "category": "ai",
+      "version": "1.0.0",
+      "minCouchHud": "0.7.0",
+      "author": "kewe87",
+      "description": {
+        "de": "Claude-Modelle von Anthropic als Anbieter für den Assistenten",
+        "en": "Anthropic's Claude models as a provider for the assistant"
+      },
+      "license": "GPL-3.0-only",
+      "capabilities": [
+        "assistant.provider",
+        "network:internet"
+      ],
+      "suggestWhen": {
+        "feature": "assistantAnthropic"
+      },
+      "icon": "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/icons/anthropic.png",
+      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/anthropic-1.0.0/CouchHud.Plugin.Anthropic-1.0.0.zip",
+      "sdk": 5,
+      "sha256": "8147f755e9c83002c0fbea824964765aab4c72d3e1cbc6ddff471aed6e3855f8",
+      "statement": "eyJpZCI6ImFudGhyb3BpYyIsImZvbGRlciI6IkNvdWNoSHVkLlBsdWdpbi5BbnRocm9waWMiLCJ2ZXJzaW9uIjoiMS4wLjAiLCJzaGEyNTYiOiI4MTQ3Zjc1NWU5YzgzMDAyYzBmYmVhODI0OTY0NzY1YWFiNGM3MmQzZTFjYmM2ZGRmZjQ3MWFlZDZlMzg1NWY4Iiwic2RrIjo1LCJtaW5Db3VjaEh1ZCI6IjAuNy4wIiwiY2FwYWJpbGl0aWVzIjpbImFzc2lzdGFudC5wcm92aWRlciIsIm5ldHdvcms6aW50ZXJuZXQiXSwic2VydmljZXMiOlt7ImlkIjoiYXBpIiwibmFtZSI6eyJkZSI6IkFudGhyb3BpYy1BUEkgKEFzc2lzdGVudCkiLCJlbiI6IkFudGhyb3BpYyBBUEkgKGFzc2lzdGFudCkifSwiaG9zdHMiOlsiYXBpLmFudGhyb3BpYy5jb20iXX1dLCJwdWJsaXNoZXJLZXkiOiIyNDdiYmE2Mjg0OWRkZmVhYjg3NDlhMzg0ODg3OTE4MDdiZmZhMzNjNzIzNDdlYTIwOTMxODcwZGJiYjc3MDlmIiwibGljZW5zZSI6IkdQTC0zLjAtb25seSIsImF1dGhvciI6Imtld2U4NyIsIm5hbWUiOiJBbnRocm9waWMiLCJzdW1tYXJ5IjoiQW50aHJvcGljJ3MgQ2xhdWRlIG1vZGVscyBhcyBhIHByb3ZpZGVyIGZvciB0aGUgYXNzaXN0YW50IiwiaWNvbiI6eyJzaGEyNTYiOiI4ZWIwYTA3NDg1MDIyOGZjOGVlMzgwNWQ2YmFkZGY5ZGU1ZTgxZThkZmVhZTgxZjA2MDAxYzRiODIwYjI0OGRiIiwiYnl0ZXMiOjM3OTgyfSwic2l6ZSI6MjM4MDJ9",
+      "signature": "4YNu+GvDlvBy9OhzObQwq4+KrHS9WcYvUBRG1q2rqFNmRQMNVEcn5N01IEmjv6/8HEjBaNUJTSJVR0tGi1mkhA=="
+    },
+    {
+      "id": "openai",
+      "folder": "CouchHud.Plugin.OpenAi",
+      "name": "OpenAI",
+      "type": "plugin",
+      "category": "ai",
+      "version": "1.0.0",
+      "minCouchHud": "0.7.0",
+      "author": "kewe87",
+      "description": {
+        "de": "GPT-Modelle von OpenAI als Anbieter für den Assistenten",
+        "en": "OpenAI's GPT models as a provider for the assistant"
+      },
+      "license": "GPL-3.0-only",
+      "capabilities": [
+        "assistant.provider",
+        "network:internet"
+      ],
+      "suggestWhen": {
+        "feature": "assistantOpenAi"
+      },
+      "icon": "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/icons/openai.png",
+      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/openai-1.0.0/CouchHud.Plugin.OpenAi-1.0.0.zip",
+      "sdk": 5,
+      "sha256": "32b0609f63f1df9cc558b8b97d927559badb46385b42358f1b579ace684832e7",
+      "statement": "eyJpZCI6Im9wZW5haSIsImZvbGRlciI6IkNvdWNoSHVkLlBsdWdpbi5PcGVuQWkiLCJ2ZXJzaW9uIjoiMS4wLjAiLCJzaGEyNTYiOiIzMmIwNjA5ZjYzZjFkZjljYzU1OGI4Yjk3ZDkyNzU1OWJhZGI0NjM4NWI0MjM1OGYxYjU3OWFjZTY4NDgzMmU3Iiwic2RrIjo1LCJtaW5Db3VjaEh1ZCI6IjAuNy4wIiwiY2FwYWJpbGl0aWVzIjpbImFzc2lzdGFudC5wcm92aWRlciIsIm5ldHdvcms6aW50ZXJuZXQiXSwic2VydmljZXMiOlt7ImlkIjoiYXBpIiwibmFtZSI6eyJkZSI6Ik9wZW5BSS1BUEkgKEFzc2lzdGVudCkiLCJlbiI6Ik9wZW5BSSBBUEkgKGFzc2lzdGFudCkifSwiaG9zdHMiOlsiYXBpLm9wZW5haS5jb20iXX1dLCJwdWJsaXNoZXJLZXkiOiIyNDdiYmE2Mjg0OWRkZmVhYjg3NDlhMzg0ODg3OTE4MDdiZmZhMzNjNzIzNDdlYTIwOTMxODcwZGJiYjc3MDlmIiwibGljZW5zZSI6IkdQTC0zLjAtb25seSIsImF1dGhvciI6Imtld2U4NyIsIm5hbWUiOiJPcGVuQUkiLCJzdW1tYXJ5IjoiT3BlbkFJJ3MgR1BUIG1vZGVscyBhcyBhIHByb3ZpZGVyIGZvciB0aGUgYXNzaXN0YW50IiwiaWNvbiI6eyJzaGEyNTYiOiJiZWM2MmMxYjVmMTUzMDVjOGE2N2ZhOWZiYTQ4N2IzNDc1NGQ2ODM4OTkzNzFlODU3YWJlY2NlODMzYjE2ODdmIiwiYnl0ZXMiOjM5MDgxfSwic2l6ZSI6MjM4Mzh9",
+      "signature": "LAm5Blo64BOffXAhQ6qnK8DHp0rl/6gsyeV5pRD8yrCYaB8/eLQG1Xq7X0mFhcceIMOc+098tIkQUamJOigEjg=="
+    },
+    {
+      "id": "streaming",
+      "folder": "CouchHud.Plugin.Streaming",
+      "name": "Streaming",
+      "type": "plugin",
+      "category": "streaming",
+      "version": "1.1.0",
+      "minCouchHud": "0.7.0",
+      "author": "kewe87",
+      "description": {
+        "de": "Streams mit Moonlight direkt aus der Bibliothek starten und den Sunshine-Host am eigenen PC im Blick behalten: Status, ein und aus, Link zur Weboberfläche",
+        "en": "Start Moonlight streams straight from the library and keep an eye on the Sunshine host on this PC: status, on and off, a link to its web interface"
+      },
+      "license": "GPL-3.0-only",
+      "capabilities": [
+        "library",
+        "pages",
+        "browser",
+        "process",
+        "registry",
+        "native",
+        "network:loopback"
+      ],
+      "icon": "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/icons/streaming.png",
+      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/streaming-1.1.0/CouchHud.Plugin.Streaming-1.1.0.zip",
+      "sdk": 5,
+      "sha256": "69c2b7e4c9a21aa1496635d524c60d95caec2775ad8b5776ad1ccdbc8a460ed9",
+      "statement": "eyJpZCI6InN0cmVhbWluZyIsImZvbGRlciI6IkNvdWNoSHVkLlBsdWdpbi5TdHJlYW1pbmciLCJ2ZXJzaW9uIjoiMS4xLjAiLCJzaGEyNTYiOiI2OWMyYjdlNGM5YTIxYWExNDk2NjM1ZDUyNGM2MGQ5NWNhZWMyNzc1YWQ4YjU3NzZhZDFjY2RiYzhhNDYwZWQ5Iiwic2RrIjo1LCJtaW5Db3VjaEh1ZCI6IjAuNy4wIiwiY2FwYWJpbGl0aWVzIjpbImxpYnJhcnkiLCJwYWdlcyIsImJyb3dzZXIiLCJwcm9jZXNzIiwicmVnaXN0cnkiLCJuYXRpdmUiLCJuZXR3b3JrOmxvb3BiYWNrIl0sInB1Ymxpc2hlcktleSI6IjI0N2JiYTYyODQ5ZGRmZWFiODc0OWEzODQ4ODc5MTgwN2JmZmEzM2M3MjM0N2VhMjA5MzE4NzBkYmJiNzcwOWYiLCJsaWNlbnNlIjoiR1BMLTMuMC1vbmx5IiwiYXV0aG9yIjoia2V3ZTg3IiwibmFtZSI6IlN0cmVhbWluZyIsInN1bW1hcnkiOiJTdGFydCBNb29ubGlnaHQgc3RyZWFtcyBzdHJhaWdodCBmcm9tIHRoZSBsaWJyYXJ5IGFuZCBrZWVwIGFuIGV5ZSBvbiB0aGUgU3Vuc2hpbmUgaG9zdCBvbiB0aGlzIFBDOiBzdGF0dXMsIG9uIGFuZCBvZmYsIGEgbGluayB0byBpdHMgd2ViIGludGVyZmFjZSIsImljb24iOnsic2hhMjU2IjoiMDMwOGMwMjY4MTQ2YzhhZDdkZTk0ZjMxZTU0NmFmMmE2NDBhNGRkZWQyY2M5OTMxZGQ4M2EwYmI3ZGY4ZTQ1OSIsImJ5dGVzIjozNTkzNX0sInNpemUiOjg1ODc0fQ==",
+      "signature": "A8ADYMinYuDeetQ3mqXj+gS0TfzKaqRTkr0Lxc8qzLO/K/gpaS92ooB1LHScUPYCRMlCI24eSLs4wshDF9OUzQ=="
+    },
+    {
+      "id": "fancontrol",
+      "folder": "CouchHud.Plugin.FanControl",
+      "name": "FanControl",
+      "type": "plugin",
+      "category": "hardware",
+      "version": "1.0.0",
+      "minCouchHud": "0.7.0",
+      "author": "kewe87",
+      "description": {
+        "de": "Wählt das Lüfterprofil von FanControl vom Sofa aus: aktuelles Profil sehen, ein Profil aus dem Ordner von FanControl wählen und auf Wunsch ein eigenes Profil pro Spiel",
+        "en": "Choose FanControl's fan profile from the couch: see the profile in use, pick one from FanControl's folder and, if you like, a profile of its own per game"
+      },
+      "license": "GPL-3.0-only",
+      "capabilities": [
+        "pages",
+        "process",
+        "registry",
+        "native"
+      ],
+      "icon": "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/icons/fancontrol.png",
+      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/fancontrol-1.0.0/CouchHud.Plugin.FanControl-1.0.0.zip",
+      "sdk": 3,
+      "sha256": "b6938b49348392d5c23901ebc642afb23d0e9d2712302e1b8c0befa7b10e56cd",
+      "statement": "eyJpZCI6ImZhbmNvbnRyb2wiLCJmb2xkZXIiOiJDb3VjaEh1ZC5QbHVnaW4uRmFuQ29udHJvbCIsInZlcnNpb24iOiIxLjAuMCIsInNoYTI1NiI6ImI2OTM4YjQ5MzQ4MzkyZDVjMjM5MDFlYmM2NDJhZmIyM2QwZTlkMjcxMjMwMmUxYjhjMGJlZmE3YjEwZTU2Y2QiLCJzZGsiOjMsIm1pbkNvdWNoSHVkIjoiMC43LjAiLCJjYXBhYmlsaXRpZXMiOlsicGFnZXMiLCJwcm9jZXNzIiwicmVnaXN0cnkiLCJuYXRpdmUiXSwicHVibGlzaGVyS2V5IjoiMjQ3YmJhNjI4NDlkZGZlYWI4NzQ5YTM4NDg4NzkxODA3YmZmYTMzYzcyMzQ3ZWEyMDkzMTg3MGRiYmI3NzA5ZiIsImxpY2Vuc2UiOiJHUEwtMy4wLW9ubHkiLCJhdXRob3IiOiJrZXdlODciLCJuYW1lIjoiRmFuQ29udHJvbCIsInN1bW1hcnkiOiJDaG9vc2UgRmFuQ29udHJvbCdzIGZhbiBwcm9maWxlIGZyb20gdGhlIGNvdWNoOiBzZWUgdGhlIHByb2ZpbGUgaW4gdXNlLCBwaWNrIG9uZSBmcm9tIEZhbkNvbnRyb2wncyBmb2xkZXIgYW5kLCBpZiB5b3UgbGlrZSwgYSBwcm9maWxlIG9mIGl0cyBvd24gcGVyIGdhbWUiLCJpY29uIjp7InNoYTI1NiI6IjZjMDdmZjQxM2NlY2NjMWVmODNmNDY2MWEwNzA1NWVkMWQ0MjA1N2U1YWY3OTBiMjRiMWQzNmZiOGNhYTM2NmEiLCJieXRlcyI6NDI2MDB9LCJzaXplIjo2NDEyN30=",
+      "signature": "FlrVpngG2MSn85qw3yx/CM01H5NbMDAebymmejJpdaUlnUFE9GsvZnaScKMd1kNhJ1xE0+QzZecZvrhJpZlBbA=="
+    },
+    {
+      "id": "webostv",
+      "folder": "CouchHud.Plugin.WebOsTv",
+      "name": "LG webOS",
+      "type": "plugin",
+      "category": "hardware",
+      "version": "1.0.0",
+      "minCouchHud": "0.7.0",
+      "author": "kewe87",
+      "description": {
+        "de": "LG-Fernseher mit webOS koppeln und steuern: Ein/Aus, Lautstärke und HDMI-Eingänge. Verbindet sich nur über CouchHUD mit dem gekoppelten Fernseher, verschlüsselt mit dem beim Koppeln festgehaltenen Zertifikat",
+        "en": "Pair and control LG TVs with webOS: on/off, volume and HDMI inputs. Connects only through CouchHUD to the paired TV, encrypted with the certificate pinned at pairing"
+      },
+      "license": "GPL-3.0-only",
+      "capabilities": [
+        "tv.control"
+      ],
+      "suggestWhen": {
+        "feature": "lgTv"
+      },
+      "icon": "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/icons/webostv.png",
+      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/webostv-1.0.0/CouchHud.Plugin.WebOsTv-1.0.0.zip",
+      "sdk": 5,
+      "sha256": "cb967cde5d47327e82765951b3c631ee71ab25779475cb08a00dc133118ac78e",
+      "statement": "eyJpZCI6IndlYm9zdHYiLCJmb2xkZXIiOiJDb3VjaEh1ZC5QbHVnaW4uV2ViT3NUdiIsInZlcnNpb24iOiIxLjAuMCIsInNoYTI1NiI6ImNiOTY3Y2RlNWQ0NzMyN2U4Mjc2NTk1MWIzYzYzMWVlNzFhYjI1Nzc5NDc1Y2IwOGEwMGRjMTMzMTE4YWM3OGUiLCJzZGsiOjUsIm1pbkNvdWNoSHVkIjoiMC43LjAiLCJjYXBhYmlsaXRpZXMiOlsidHYuY29udHJvbCJdLCJwdWJsaXNoZXJLZXkiOiIyNDdiYmE2Mjg0OWRkZmVhYjg3NDlhMzg0ODg3OTE4MDdiZmZhMzNjNzIzNDdlYTIwOTMxODcwZGJiYjc3MDlmIiwibGljZW5zZSI6IkdQTC0zLjAtb25seSIsImF1dGhvciI6Imtld2U4NyIsIm5hbWUiOiJMRyB3ZWJPUyIsInN1bW1hcnkiOiJQYWlyIGFuZCBjb250cm9sIExHIFRWcyB3aXRoIHdlYk9TOiBvbi9vZmYsIHZvbHVtZSBhbmQgSERNSSBpbnB1dHMsIG9ubHkgdGhyb3VnaCBDb3VjaEhVRCBhbmQgb25seSB0aGUgcGFpcmVkIFRWIiwiaWNvbiI6eyJzaGEyNTYiOiJmZGIyMzBhYzU0N2ZmOGFjOGY4OGQ4ZmU3NTJjMTg1MzFiZmY1ZDc3ZWIxYjI4M2IxYjRiZjlhZWI2OGFmOWVkIiwiYnl0ZXMiOjM3MzA4fSwic2l6ZSI6MzQ0MzV9",
+      "signature": "szOBQdw3WTPeDOXk0DM2bmJNBNMRk0FRVfC9i2dQ6AVUUpqgjiIhMNv8QTmUBtSDJRt044NTOEV9ANFCKmMT3w=="
+    },
+    {
+      "id": "samsungtv",
+      "folder": "CouchHud.Plugin.SamsungTv",
+      "name": "Samsung Tizen",
+      "type": "plugin",
+      "category": "hardware",
+      "version": "1.0.0",
+      "minCouchHud": "0.7.0",
+      "author": "kewe87",
+      "description": {
+        "de": "Samsung-Fernseher mit Tizen (ab 2018) koppeln und steuern: Ein/Aus, Lautstärke und HDMI-Eingänge. Verbindet sich nur über CouchHUD mit dem gekoppelten Fernseher, die Fernbedienung verschlüsselt mit dem beim Koppeln festgehaltenen Zertifikat",
+        "en": "Pair and control Samsung TVs with Tizen (2018 and later): on/off, volume and HDMI inputs. Connects only through CouchHUD to the paired TV, the remote control encrypted with the certificate pinned at pairing"
+      },
+      "license": "GPL-3.0-only",
+      "capabilities": [
+        "tv.control"
+      ],
+      "icon": "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/icons/samsungtv.png",
+      "download": "https://github.com/kewe87/CouchHUD-Catalog/releases/download/samsungtv-1.0.0/CouchHud.Plugin.SamsungTv-1.0.0.zip",
+      "sdk": 5,
+      "sha256": "2bdfa33ce0215b804ad5c6811a6ca8ca19f917f793e0328468aa8759ae35e83c",
+      "statement": "eyJpZCI6InNhbXN1bmd0diIsImZvbGRlciI6IkNvdWNoSHVkLlBsdWdpbi5TYW1zdW5nVHYiLCJ2ZXJzaW9uIjoiMS4wLjAiLCJzaGEyNTYiOiIyYmRmYTMzY2UwMjE1YjgwNGFkNWM2ODExYTZjYThjYTE5ZjkxN2Y3OTNlMDMyODQ2OGFhODc1OWFlMzVlODNjIiwic2RrIjo1LCJtaW5Db3VjaEh1ZCI6IjAuNy4wIiwiY2FwYWJpbGl0aWVzIjpbInR2LmNvbnRyb2wiXSwicHVibGlzaGVyS2V5IjoiMjQ3YmJhNjI4NDlkZGZlYWI4NzQ5YTM4NDg4NzkxODA3YmZmYTMzYzcyMzQ3ZWEyMDkzMTg3MGRiYmI3NzA5ZiIsImxpY2Vuc2UiOiJHUEwtMy4wLW9ubHkiLCJhdXRob3IiOiJrZXdlODciLCJuYW1lIjoiU2Ftc3VuZyBUaXplbiIsInN1bW1hcnkiOiJQYWlyIGFuZCBjb250cm9sIFNhbXN1bmcgVFZzIHdpdGggVGl6ZW46IG9uL29mZiwgdm9sdW1lIGFuZCBIRE1JIGlucHV0cywgb25seSB0aHJvdWdoIENvdWNoSFVEIGFuZCBvbmx5IHRoZSBwYWlyZWQgVFYiLCJpY29uIjp7InNoYTI1NiI6ImE0MzU2N2I1ZDA1YjMzZjg3NWRlYWZmZTAyODk0ZDlhOWNjNGU0YzZmZmFmYzBlY2U2MDZjOTkxMmNjNTQzNDciLCJieXRlcyI6MzU0MzF9LCJzaXplIjozNDM4M30=",
+      "signature": "lV9SUvg4z0abwEH4wEkA6jO/h+2GWaQ2mnL+POGVgL0FBmLQ7G0zs7HZqUoEXFSEt/FisJn2sSaiu67mR/TcPQ=="
     },
     {
       "id": "synthwave",
       "name": "Synthwave",
       "type": "skin",
+      "category": "skins",
       "version": "1.0.0",
       "minCouchHud": "0.3.0",
       "author": "kewe87",
@@ -161,6 +362,7 @@
         "en": "Stardust"
       },
       "type": "skin",
+      "category": "skins",
       "version": "1.0.2",
       "minCouchHud": "0.6.0",
       "author": "kewe87",
@@ -182,6 +384,7 @@
         "en": "Deep Sea"
       },
       "type": "skin",
+      "category": "skins",
       "version": "1.0.0",
       "minCouchHud": "0.6.0",
       "author": "kewe87",
@@ -203,6 +406,7 @@
         "en": "Greenlight"
       },
       "type": "skin",
+      "category": "skins",
       "version": "1.0.0",
       "minCouchHud": "0.6.0",
       "author": "kewe87",
@@ -224,6 +428,7 @@
         "en": "Neon City"
       },
       "type": "skin",
+      "category": "skins",
       "version": "1.0.0",
       "minCouchHud": "0.6.0",
       "author": "kewe87",
@@ -245,6 +450,7 @@
         "en": "Nova"
       },
       "type": "skin",
+      "category": "skins",
       "version": "1.0.0",
       "minCouchHud": "0.6.0",
       "author": "kewe87",

@@ -25,8 +25,7 @@ export const SETTING_AREAS = {
   maximizeBrowser: 'browser',
   browserHistory: 'browser',
   favoritesSites: 'browser',
-  netSaves: 'games',
-  netNews: 'news'
+  netSaves: 'games'
 };
 
 /** Main tabs that belong to an area (by the view's id). Favorites (the home view), downloads, assistant and settings are always there. */

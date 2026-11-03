@@ -14,9 +14,11 @@ public sealed class KeepSessionPolicy(ICodeState codes, IGrantStore grants, Func
     /// <summary>Keeps no session (every caller's session is disconnected during the update).</summary>
     public static readonly KeepSessionPolicy Never = new(AssumeCodeEnrolled.Instance, NoGrants.Instance);
 
-    public bool MayKeep(CallerInfo caller, ValidatedRequest request)
+    /// <param name="approved">The grant the dispatcher already used up for this request (a parent's or an administrator's approval asked for by a state check): it is not used twice, and it keeps the session.</param>
+    public bool MayKeep(CallerInfo caller, ValidatedRequest request, GrantKinds approved = GrantKinds.None)
     {
         if (caller.IsElevatedAdmin) return true;
+        if ((approved & GrantKinds.ParentOrAdmin) != GrantKinds.None) return true;
         bool enrolled;
         try
         {

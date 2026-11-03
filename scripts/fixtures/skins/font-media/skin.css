@@ -1,0 +1,8 @@
+/* For scripts/tabs-check.mjs, never for the catalog: @font-face rules under the names of system fonts that only apply after a media query turns on (tabs-check
+   switches prefers-contrast on while the page runs). The bar has to read the fonts again at once, not at its next 30 second round. */
+:root[data-skin="user:font-media"] { --tab-font: "Segoe UI Variable Display", "Segoe UI", "Bahnschrift"; }
+@media (prefers-contrast: more) {
+  @font-face { font-family: "Segoe UI Variable Display"; src: local("Arial"); size-adjust: 5%; ascent-override: 500%; descent-override: 500%; }
+  @font-face { font-family: "Segoe UI"; src: local("Arial"); size-adjust: 5%; }
+  @font-face { font-family: "Bahnschrift"; src: local("Arial"); size-adjust: 5%; }
+}

@@ -129,7 +129,7 @@ public sealed class Dispatcher(DispatcherParts parts)
         }
 
         var used = GrantKinds.None;
-        if (decision.Verdict == Verdict.NeedGrant && (request.Grant is null || !parts.Grants.TryConsume(who, request.Grant, op, AcceptedGrants(who, request), out used)))
+        if (decision.Verdict == Verdict.NeedGrant && (request.Grant is null || !parts.Grants.TryConsume(who, request.Grant, op, AcceptedGrants(who, request, decision.ApprovalOnly), out used)))
         {
             lease.Dispose();
             return Refuse(who, op, ErrorCodes.NeedGrant, request.Grant is null ? "none given" : "not valid");
@@ -207,7 +207,12 @@ public sealed class Dispatcher(DispatcherParts parts)
     }
 
     /// <summary>The kinds of grant the request accepts by the caller's lock (P9 review H1); when that cannot be read, the strictest view.</summary>
-    private GrantKinds AcceptedGrants(CallerInfo caller, ValidatedRequest request) => OperationPolicy.AcceptedGrants(request, ViewOf(parts.LockViews, caller.Sid));
+    private GrantKinds AcceptedGrants(CallerInfo caller, ValidatedRequest request, bool approvalOnly = false)
+    {
+        var accepted = OperationPolicy.AcceptedGrants(request, ViewOf(parts.LockViews, caller.Sid));
+        // A state check can ask for a parent's or an administrator's approval only (a standard account acting on the whole machine).
+        return approvalOnly ? accepted & GrantKinds.ParentOrAdmin : accepted;
+    }
 
     /// <summary>The account's lock as the service keeps it; <see cref="LockView.Closed"/> without a source or on any failure.</summary>
     public static LockView ViewOf(Func<string, LockView>? views, string sid)

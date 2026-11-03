@@ -2,7 +2,9 @@
 // The order and the wrapping are the pure rules of tab-cycle.js; this module only reads the bar and acts.
 
 import { $ } from './dom.js';
-import { bar, clearStack, push, showChipFocus, switchTab, tabViews } from './nav.js';
+import { bar, clearStack, currentView, push, showChipFocus, switchTab, tabViews } from './nav.js';
+import { tabClickAllowed } from './input-help.js';
+import { chipAction } from './stack-rules.js';
 import { barStops, chipsBlocked, nextStop } from './tab-cycle.js';
 import { state } from './state.js';
 import { sound } from '../sound.js';
@@ -17,6 +19,8 @@ export function chipIds() {
 
 /** LB (-1) and RB (+1): the next tab or chip, wrapping around. */
 export function cycleBar(delta) {
+  // A page that holds the screen (code prompt, time-up page, required profile picker) is not left by the bar.
+  if (!tabClickAllowed(currentView(), state)) return;
   // A chip that went away while it had the focus.
   if (bar.chip && !chipIds().includes(bar.chip)) bar.chip = null;
   const stops = barStops(tabViews().length, chipIds());
@@ -32,7 +36,7 @@ export function cycleBar(delta) {
 
 /** A on the focused chip, or a click on it: the bell opens the notifications, the downloads chip the Downloads tab. */
 export function activateChip(id) {
-  if (chipsBlocked(state)) return false;
+  if (chipsBlocked(state) || chipAction(state, currentView(), id) === 'blocked') return false;
   bar.chip = null;
   showChipFocus();
   if (id === 'bell') {

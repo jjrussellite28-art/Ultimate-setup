@@ -1,0 +1,5 @@
+:root[data-skin="user:hostile-top-others"]{--x:1}
+
+#top-gap{height:0 !important}
+#view{margin-top:0}
+#top{display:none !important; visibility:hidden !important; opacity:0 !important; clip-path:circle(0) !important}

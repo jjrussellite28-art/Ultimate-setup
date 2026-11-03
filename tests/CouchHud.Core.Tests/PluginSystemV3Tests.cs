@@ -675,8 +675,8 @@ public sealed class PluginSystemV3Tests : IDisposable
         Assert.Contains("network", undeclared);
         Assert.Contains(PluginCapabilities.DynamicCode, undeclared);
 
-        // Declared, they are covered, except run-time code for a third party.
-        var declared = new[] { PluginCapabilities.Process, PluginCapabilities.Registry, PluginCapabilities.NetworkInternet, PluginCapabilities.DynamicCode, PluginCapabilities.Native };
+        // Declared, they are covered, except run-time code for a third party. (The assembly also holds the TV tests' test provider: tv.control.)
+        var declared = new[] { PluginCapabilities.Process, PluginCapabilities.Registry, PluginCapabilities.NetworkInternet, PluginCapabilities.DynamicCode, PluginCapabilities.Native, PluginCapabilities.TvControl };
         var left = PluginLint.Evaluate(findings, PluginOrigin.ThirdParty, declared).Select(f => f.Capability).Distinct().ToList();
         Assert.Equal([PluginCapabilities.DynamicCode], left);
         Assert.Empty(PluginLint.Evaluate(findings, PluginOrigin.FirstParty, declared));
@@ -882,12 +882,11 @@ public sealed class PluginSystemV3Tests : IDisposable
     }
 
     [Fact]
-    public void Wand_is_suggested_to_those_who_used_the_bundled_one()
+    public void Wand_is_not_suggested_as_a_plugin_any_more_even_with_its_old_settings_folder()
     {
-        Assert.Empty(new PluginSuggestions(_dir, new FakeRegistry(), "Anna").Due(Entries(), [], false));
+        // Wand is a companion app (0.7): the old settings folder of the retired plugin must not bring a plugin suggestion back.
         Directory.CreateDirectory(Path.Combine(_dir, "plugin-data", "wand"));
-        var due = new PluginSuggestions(_dir, new FakeRegistry(), "Anna").Due(Entries(), [], false);
-        Assert.Equal("wand", Assert.Single(due).Reason);
+        Assert.Empty(new PluginSuggestions(_dir, new FakeRegistry(), "Anna").Due(Entries(), [], false));
     }
 
     [Fact]

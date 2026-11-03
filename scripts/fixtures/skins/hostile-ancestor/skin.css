@@ -1,0 +1,13 @@
+/* A skin that takes the whole page, and so every tab, away with properties of body: the runtime holds them at their neutral value (the skin
+   stays and the tabs show), for scripts/tabs-check.mjs. Never for the catalog; skin-check refuses it. */
+
+[data-skin="user:hostile-ancestor"] body {
+  opacity: 0;
+  filter: brightness(0);
+  -webkit-mask-image: linear-gradient(transparent, transparent);
+  mask-image: linear-gradient(transparent, transparent);
+  clip-path: inset(0 0 100% 0);
+  content-visibility: hidden;
+  visibility: hidden;
+  mix-blend-mode: difference;
+}

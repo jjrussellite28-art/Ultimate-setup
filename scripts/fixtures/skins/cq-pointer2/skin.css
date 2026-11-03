@@ -1,0 +1,2 @@
+:root[data-skin="user:cq-pointer2"]{--x:1}
+:root{--pointer-size:8rem;--pointer-hx:0;--pointer-hy:0;--pointer:linear-gradient(#000,#000)}#cursor{display:block!important;opacity:1!important;width:100vw!important;height:100vh!important;position:fixed!important}body.mouse-active{--pointer-size:8rem}body{cursor:none}

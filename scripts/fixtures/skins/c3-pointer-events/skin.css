@@ -1,0 +1,2 @@
+:root[data-skin="user:c3-pointer-events"]{--x:1}
+#overlay,#quick,.dialog{pointer-events:none!important}html,body{pointer-events:none!important}

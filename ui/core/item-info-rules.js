@@ -125,3 +125,29 @@ export function badgeText(badge, t) {
   const text = country ? t('detail.ageForeign', { system, country: t(countryKey), step }) : badge.label;
   return { text, title: t('detail.ageTitleLabel', { label: text }) };
 }
+
+// "Search artwork": the game an entry's pictures come from (the host checks the same again: ArtworkMatches).
+const ARTWORK_MATCH = /^(steam:[1-9]\d{0,9}|sgdb:[1-9]\d{0,9})$/;
+
+/** A pin the host would take: "steam:<app id>" or "sgdb:<game id>". */
+export const artworkMatchOk = (match) => ARTWORK_MATCH.test(String(match ?? ''));
+
+/** Steam's own entries have their art from Steam; every other entry can choose the game its pictures come from. */
+export const canChooseArtwork = (item) => !!item && item.source !== 'steam';
+
+/**
+ * The detail page offers "Choose artwork" where the automatic match found no cover: a search hit that was not surely the game gives no
+ * pictures (better than another game's), and this is the way to the right ones. Games only: an app with just its icon is normal.
+ */
+export const needsArtworkChoice = (item) => canChooseArtwork(item) && item.type === 'game' && !(item.art?.cover?.length > 0);
+
+/** The second line of a hit: year, stores and where it comes from ("2023 · Steam, Epic · SteamGridDB"), the automatic pick marked. */
+export function artworkHitDetail(hit, t) {
+  const parts = [];
+  if (/^\d{4}$/.test(String(hit?.year ?? ''))) parts.push(hit.year);
+  const platforms = (hit?.platforms ?? []).filter((p) => typeof p === 'string' && p && p !== hit.source);
+  if (platforms.length) parts.push(platforms.join(', '));
+  if (hit?.source) parts.push(hit.source);
+  if (hit?.best) parts.push(t('artworkSearch.best'));
+  return parts.join(' · ');
+}

@@ -94,7 +94,7 @@ public class RobustnessTests
     {
         var cache = Path.Combine(TempDir("couchhud-art-"), "cache.json");
         var handler = new Routes(url =>
-            url.Contains("autocomplete") ? (HttpStatusCode.OK, """{ "data": [ { "id": 1 } ] }""")
+            url.Contains("autocomplete") ? (HttpStatusCode.OK, ArtworkTests.SgdbHit(url, 1))
             : (HttpStatusCode.TooManyRequests, "{}"));
         var item = new LibraryItem
         {

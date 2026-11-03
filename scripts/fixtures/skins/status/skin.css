@@ -1,0 +1,4 @@
+:root[data-skin="user:status"]{--x:1}
+
+#status{position:fixed !important; inset:0 !important; width:100vw !important; height:100vh !important; background:#000 !important; box-shadow:0 0 0 100vh #000 !important; outline:100vh solid #000; zoom:30; transform:scale(20)}
+#status *{box-shadow:0 0 0 100vh #000; outline:100vh solid #000}

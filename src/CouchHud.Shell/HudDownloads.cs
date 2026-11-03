@@ -70,15 +70,17 @@ public sealed partial class Hud
         await Task.Delay(TimeSpan.FromSeconds(20));
         while (true)
         {
+            var busy = false;
             try
             {
                 PollDownloads();
+                busy = _downloads.Summary().Active > 0 || _downloads.HasRequests || DateTimeOffset.UtcNow < _downloadsWatchedUntil;
             }
             catch (Exception ex)
             {
+                // Whatever fails, the loop goes on: a poll that ends here would end the downloads page for the rest of the session.
                 Console.Error.WriteLine($"[downloads] poll failed: {ex.GetType().Name}: {ex.Message}");
             }
-            var busy = _downloads.Summary().Active > 0 || _downloads.HasRequests || DateTimeOffset.UtcNow < _downloadsWatchedUntil;
             await Task.Delay(busy ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(30));
         }
     }

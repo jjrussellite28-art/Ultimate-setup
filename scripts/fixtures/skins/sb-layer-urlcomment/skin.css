@@ -1,0 +1,5 @@
+:root[data-skin="user:sb-layer-urlcomment"]{--x:1}
+x{b:url(/*)}
+.settings-divider{background:red!important}
+@layer ch{.settings-divider{background:rgb(0,255,0)!important}}
+/* */

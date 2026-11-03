@@ -4,7 +4,8 @@ import { iconEl } from '../core/glyph-icons.js';
 import { api } from '../core/api.js';
 import { el, formatSize, keepInView, setFocused } from '../core/dom.js';
 import { attempt, toast } from '../core/feedback.js';
-import { findItem, setLibrary } from '../core/library.js';
+import { SOURCE_LABEL, findItem, setLibrary } from '../core/library.js';
+import { refreshFavorites } from '../core/favorites.js';
 import { move, pop, push, render } from '../core/nav.js';
 import { state } from '../core/state.js';
 import { sound } from '../sound.js';
@@ -12,13 +13,17 @@ import { chooseDialog, confirmDialog, openOverlay } from './overlay.js';
 import { openFileBrowser } from './file-browser.js';
 import { openKeyboard } from './keyboard.js';
 import { detailPage } from '../views/detail.js';
-import { ensureParentGrant, parental } from './parental.js';
+import { ensureParentGrant, parental, refreshParental } from './parental.js';
+import { withParentGrant } from '../core/parent-retry.js';
 import { ensureUnlocked, guarded } from './passcode.js';
 import { artworkPickerPage } from './artwork-picker.js';
 import { infoMenu, storeMatchMenu } from './item-info.js';
+import { artworkSearchMenu, searchFlow as artworkSearchFlow } from './artwork-search.js';
+import { canChooseArtwork, needsArtworkChoice } from '../core/item-info-rules.js';
 import { isWebUrl } from '../core/links.js';
 import { lower, t } from '../core/i18n.js';
 import { TARGET_EXTENSIONS, isScript, launchRows, scriptArgsProblem, targetLabel } from '../core/launch-rules.js';
+import { canGuide, guideRowKey, inGuide } from '../core/companion-rules.js';
 
 const PROGRAM_EXTENSIONS = ['.exe', '.lnk', '.url', '.bat', '.cmd'];
 
@@ -290,6 +295,61 @@ function scanResultsPage(folder, rows) {
   };
 }
 
+/**
+ * Hiding and showing again is a library change: the unlock, and with parental controls on the parents' code for exactly this entry, so a
+ * child can neither hide a game nor bring back one the parents hid. The host checks the same again (Hud.SetHidden).
+ */
+async function guardHide(item, reason) {
+  if (!(await ensureUnlocked(reason))) return false;
+  return !parental.status?.enabled
+    || !!(await ensureParentGrant(t('libraryTools.hide.guardParental', { name: item.name }), { action: 'editHidden', item: item.id }));
+}
+
+/**
+ * "Hide" (puts the entry on the ignore list): the same action in every library view (Y menu of Games, Apps, collections and Favorites,
+ * and the Edit menu of the detail page), with a short confirmation. It stays hidden after rescans; Settings › Library › Hidden entries
+ * shows it again. Resolves to whether it was hidden.
+ */
+export async function hideEntry(item) {
+  if (!(await confirmDialog(t('libraryTools.hide.confirm', { name: item.name }), t('libraryTools.hide.button'),
+    { message: t('libraryTools.hide.confirmText'), focusCancel: true }))) return false;
+  if (!(await guardHide(item, t('libraryTools.hide.guard')))) return false;
+  const updated = await attempt(() => api.hideEntry(item.id), t('libraryTools.hide.failed'));
+  if (!updated) return false;
+  // The library's own object too (a shelf may hold a copy): every list leaves it out right away.
+  Object.assign(item, updated);
+  const known = findItem(item.id);
+  if (known && known !== item) Object.assign(known, updated);
+  sound.tab();
+  toast(t('libraryTools.edit.hidden', { name: item.name }));
+  refreshFavorites();
+  render();
+  return true;
+}
+
+/** "Remove" for a record of the ignore list no entry matches any more (same gate as showing again). Resolves to the records left, or null. */
+async function removeOrphan(orphan) {
+  if (!(await ensureUnlocked(t('libraryTools.hide.guardShow')))) return null;
+  if (parental.status?.enabled
+    && !(await ensureParentGrant(t('libraryTools.hide.guardParental', { name: orphan.name }), { action: 'editHidden', item: orphan.key }))) return null;
+  const left = await attempt(() => api.removeIgnoredOrphan(orphan.key), t('libraryTools.hide.failed'));
+  if (!left) return null;
+  toast(t('libraryTools.hidden.removed', { name: orphan.name }));
+  return left;
+}
+
+/** "Show again" on the hidden entries page (same gate as hiding). */
+async function showEntry(item) {
+  if (!(await guardHide(item, t('libraryTools.hide.guardShow')))) return false;
+  const updated = await attempt(() => api.showEntry(item.id), t('libraryTools.hide.failed'));
+  if (!updated) return false;
+  Object.assign(item, updated);
+  toast(t('libraryTools.hidden.shown', { name: item.name }));
+  refreshFavorites();
+  render();
+  return true;
+}
+
 async function applyEdit(item, changes, message) {
   const updated = await attempt(() => api.editItem(item.id, changes), t('libraryTools.edit.failed'));
   if (!updated) return;
@@ -308,13 +368,18 @@ export const formatArgs = (args = []) => args.map(quoteArg).join(' ');
 
 /**
  * Changing what an entry starts runs any program: the unlock, and with parental controls on the parents' code for exactly this entry
- * (games and apps alike). The host checks the same again (Hud.RequireLaunchChange).
+ * (games and apps alike). The host checks the same again (Hud.RequireLaunchChange); when it still wants the code (the status was not
+ * loaded yet, the grant ran out), the save asks for it and repeats once (launchChange).
  */
 async function guardLaunchChange(item) {
   if (!(await ensureUnlocked(t('libraryTools.edit.guardLaunch')))) return false;
-  return !parental.status?.enabled
+  const status = parental.status ?? (await refreshParental());
+  return !status?.enabled
     || !!(await ensureParentGrant(t('libraryTools.edit.guardLaunchParental'), { action: 'startOptions', item: item.id }));
 }
+
+/** A start change through the host: refused for the parents' code, the code entry opens and the change is made once more. */
+const launchChange = (call) => withParentGrant(call, t('libraryTools.edit.guardLaunchParental'));
 
 /** The detail page shows that own startup options are on. */
 function markCustomLaunch(custom) {
@@ -326,7 +391,7 @@ function markCustomLaunch(custom) {
 /** An entry the user added keeps its parameters and folder in its own fields. */
 async function saveOwnLaunch(item, args, cwd) {
   if (!(await guardLaunchChange(item))) return false;
-  const updated = await attempt(() => api.editLaunch(item.id, args, cwd), t('libraryTools.edit.failed'));
+  const updated = await attempt(() => launchChange(() => api.editLaunch(item.id, args, cwd)), t('libraryTools.edit.failed'));
   if (!updated) return false;
   Object.assign(item, updated);
   toast(t('libraryTools.edit.launchSaved'));
@@ -337,7 +402,7 @@ async function saveOwnLaunch(item, args, cwd) {
 /** Every other entry: an override ({ args, cwd, target }: a string sets, null goes back to automatic). */
 async function saveLaunchOverride(item, changes, message = t('libraryTools.edit.launchSaved')) {
   if (!(await guardLaunchChange(item))) return null;
-  const view = await attempt(() => api.setLaunchOverride(item.id, changes), t('libraryTools.edit.failed'));
+  const view = await attempt(() => launchChange(() => api.setLaunchOverride(item.id, changes)), t('libraryTools.edit.failed'));
   if (!view) return null;
   toast(message);
   markCustomLaunch(view.custom);
@@ -459,6 +524,8 @@ async function reloadArtwork(item) {
  */
 export async function editItemMenu(item) {
   const expert = !!(await attempt(() => api.getSettings()))?.expertMode;
+  // Apps can sit in the Guide menu as a quick start during a game (the start itself keeps every check of the library).
+  const guide = canGuide(item) ? await attempt(() => api.getGuideApps()) : null;
   const entries = [
     {
       label: t('libraryTools.edit.rename'),
@@ -469,10 +536,28 @@ export async function editItemMenu(item) {
       }
     },
     { label: t('artworkPicker.action'), icon: '🖼', run: guarded(t('artworkPicker.title'), () => push(artworkPickerPage(item))) },
+    ...(canChooseArtwork(item)
+      ? [{ label: t('artworkSearch.action'), detail: t('artworkSearch.actionDetail'), icon: '🔍', run: () => artworkSearchMenu(item) }]
+      : []),
     { label: t('artworkReload.action'), detail: t('artworkReload.detail'), icon: '↻', run: () => reloadArtwork(item) },
     { label: t('itemInfo.action'), detail: t('itemInfo.actionDetail'), icon: 'ℹ', run: () => infoMenu(item) },
     ...(item.source !== 'steam'
       ? [{ label: t('itemInfo.store.action'), detail: t('itemInfo.store.actionDetail'), icon: '🛒', run: () => storeMatchMenu(item) }]
+      : []),
+    ...(guide
+      ? [{
+        label: t(guideRowKey(guide.ids, item.id)),
+        detail: t('guideApps.detail'),
+        icon: '≡',
+        run: async () => {
+          if (!(await ensureUnlocked(t('guideApps.guard')))) return;
+          // Read again after the unlock: on a locked couch the host sends no ids.
+          const current = (await attempt(() => api.getGuideApps())) ?? guide;
+          const on = !inGuide(current.ids, item.id);
+          const next = await attempt(() => api.setGuideApp(item.id, on), t('guideApps.failed'));
+          if (next) toast(on ? t('guideApps.added', { name: item.name }) : t('guideApps.removed', { name: item.name }));
+        }
+      }]
       : []),
     ...(expert && item.launch?.embedded !== true
       ? [{ label: t('libraryTools.edit.launchOptions'), detail: t('libraryTools.edit.launchOptionsDetail'), icon: '⚙', run: () => startOptionsMenu(item) }]
@@ -490,8 +575,7 @@ export async function editItemMenu(item) {
       label: t('libraryTools.edit.hide'),
       detail: t('libraryTools.edit.hideDetail'),
       run: async () => {
-        await applyEdit(item, { hidden: true }, t('libraryTools.edit.hidden', { name: item.name }));
-        pop();
+        if (await hideEntry(item)) pop();
       }
     }
   ];
@@ -526,6 +610,10 @@ export async function editItemMenu(item) {
 }
 
 detailPage.extraActions.push((item) => ({ label: t('libraryTools.edit.action'), icon: '✎', run: () => editItemMenu(item) }));
+// No cover: the automatic match was not sure of the game (or found none). The way to the right pictures, right on the page.
+detailPage.extraActions.push((item) => (needsArtworkChoice(item)
+  ? { label: t('artworkSearch.choose'), icon: '🖼', run: async () => { if (await ensureUnlocked(t('artworkSearch.guard'))) await artworkSearchFlow(item); } }
+  : null));
 
 /** Lists hidden entries; A shows one again. */
 export function hiddenItemsPage() {
@@ -533,12 +621,25 @@ export function hiddenItemsPage() {
     id: 'hidden',
     name: t('libraryTools.hidden.name'),
     index: 0,
+    orphans: null,
+    async loadOrphans() {
+      this.orphans = (await attempt(() => api.getIgnoredOrphans(), t('libraryTools.hidden.orphansLoadFailed'))) ?? [];
+      render();
+    },
     build(root) {
-      this.list = state.library.filter((i) => i.hidden);
+      if (this.orphans === null) {
+        this.orphans = [];
+        this.loadOrphans();
+      }
+      // Hidden entries of the library first; then records no entry matches any more (uninstalled, folder removed): name only, A removes them.
+      this.list = [
+        ...state.library.filter((i) => i.hidden).map((item) => ({ item, name: item.name, small: SOURCE_LABEL[item.source] || item.source })),
+        ...this.orphans.map((orphan) => ({ orphan, name: orphan.name || orphan.key, small: t('libraryTools.hidden.orphan') }))
+      ];
       this.index = Math.min(this.index, Math.max(0, this.list.length - 1));
-      this.items = this.list.map((i) => el('li', { className: 'check-row' },
-        el('span', { className: 'check-box', textContent: '👁' }),
-        el('span', { className: 'check-main' }, el('strong', { textContent: i.name }), el('small', { textContent: i.source }))));
+      this.items = this.list.map((row) => el('li', { className: 'check-row' },
+        el('span', { className: 'check-box', textContent: row.orphan ? '·' : '👁' }),
+        el('span', { className: 'check-main' }, el('strong', { textContent: row.name }), el('small', { textContent: row.small }))));
       this.scroller = el('ul', { className: 'check-list list-scroll' }, this.items);
       root.append(el('div', { className: 'files' },
         el('div', { className: 'files-head' }, el('h2', { textContent: t('libraryTools.hidden.title') })),
@@ -555,13 +656,24 @@ export function hiddenItemsPage() {
         case 'up': return move(this, -1, this.list.length, true);
         case 'down': return move(this, 1, this.list.length, true);
         case 'a': {
-          const item = findItem(this.list[this.index]?.id);
-          if (item) await applyEdit(item, { hidden: false }, t('libraryTools.hidden.shown', { name: item.name }));
+          const row = this.list[this.index];
+          if (row?.orphan) {
+            const left = await removeOrphan(row.orphan);
+            if (left) {
+              this.orphans = left;
+              render();
+            }
+            return;
+          }
+          const item = findItem(row?.item?.id);
+          if (item) await showEntry(item);
         }
       }
     },
     hints() {
-      return this.list?.length ? [['A', t('libraryTools.hidden.show')], ['B', t('libraryTools.hidden.back')]] : [['B', t('libraryTools.hidden.back')]];
+      if (!this.list?.length) return [['B', t('libraryTools.hidden.back')]];
+      const action = this.list[this.index]?.orphan ? t('libraryTools.hidden.remove') : t('libraryTools.hidden.show');
+      return [['A', action], ['B', t('libraryTools.hidden.back')]];
     }
   };
 }

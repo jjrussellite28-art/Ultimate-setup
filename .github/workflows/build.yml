@@ -14,12 +14,21 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      # Only a tag build is a release build: its assemblies carry exactly <Version> (Directory.Build.props). Every other build is
+      # <Version>-dev+commit, a pre-release the updater sees as older than the release.
+      CouchHudRelease: ${{ startsWith(github.ref, 'refs/tags/v') }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: 10.0.x
+
+      # Node 22 or later: the browser UI check uses Node's built-in WebSocket; ESLint 10 (scripts/package.json) needs Node 20.19 or 22.13 and newer.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
 
       # The app's own version (Directory.Build.props) is what an installed CouchHUD compares with the release.
       # A tag that says something else would make every install update to itself again and again.
@@ -48,17 +57,34 @@ jobs:
       - name: Test
         run: dotnet test CouchHud.slnx --no-build -c Release --logger "console;verbosity=normal"
 
-      # Same UI checks as scripts/check.sh: every file parsed as an ES module, de/en kept in step.
+      # Same UI checks as scripts/check.sh: every file parsed as an ES module, ESLint (eslint.config.mjs), de/en kept in step.
+      # The C# analyzer rules (.editorconfig) are part of the Build step: a new finding fails it.
       - name: UI checks
         shell: bash
         run: |
-          find ui scripts -name '*.js' -o -name '*.mjs' | while read -r f; do
+          find ui scripts \( -name '*.js' -o -name '*.mjs' \) -not -path '*/node_modules/*' | while read -r f; do
             node --input-type=module --check < "$f" || { echo "in $f"; exit 1; }
           done
+          npm ci --ignore-scripts --prefix scripts --no-audit --no-fund --loglevel=error
+          scripts/node_modules/.bin/eslint
           node scripts/ui-logic-check.mjs
           node scripts/css-check.mjs
           node scripts/skin-check.mjs
           node scripts/i18n-check.mjs
+
+      # Headless Edge (no window, muted). In CI (CI=true) a missing Edge or Node 22 fails instead of skipping; the script's own
+      # watchdog ends it after 180 s, the step's limit is the last net.
+      - name: Browser UI check
+        shell: bash
+        timeout-minutes: 5
+        run: node scripts/browser-ui-check.mjs
+
+      # The tab bar in the default skin at 1280 and 1920 with the plugin tabs (headless, muted, free ports); like the check above a
+      # missing Edge fails in CI. The catalog skins are not in this repository, the lint of them runs where they are.
+      - name: Tab bar check
+        shell: bash
+        timeout-minutes: 10
+        run: node scripts/tabs-check.mjs
 
       - name: Publish
         run: dotnet publish src/CouchHud.Shell/CouchHud.Shell.csproj -c Release -r win-x64 --self-contained true -o publish
@@ -66,6 +92,17 @@ jobs:
       # CouchHud.Service (LocalSystem): self-contained single file in its own folder (two self-contained apps in one folder collide).
       # Single file without any self-extraction is set in CouchHud.Service.csproj (extraction would unpack DLLs into a temp folder at
       # run time); everything stays in the protected {app}\service. Debug symbols embedded, so the folder holds exactly the one exe.
+      - name: Published version matches the build kind
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content Directory.Build.props
+          $version = $props.Project.PropertyGroup.Version
+          $product = (Get-Item publish/CouchHud.exe).VersionInfo.ProductVersion
+          $release = $env:GITHUB_REF -like 'refs/tags/v*'
+          if ($release -and $product -notmatch "^$([regex]::Escape($version))(\+[0-9a-f]+)?$") { throw "Release build carries '$product', expected exactly $version" }
+          if (-not $release -and $product -notmatch "^$([regex]::Escape($version))-dev(\+[0-9a-f]+)?$") { throw "Development build carries '$product', expected $version-dev" }
+          Write-Host "CouchHud.exe version: $product"
+
       - name: Publish service
         shell: pwsh
         run: |

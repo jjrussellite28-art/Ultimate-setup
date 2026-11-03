@@ -1,0 +1,148 @@
+/* A skin that tries what the runtime (ui/core/nav.js, fitTabs) holds back, for scripts/tabs-check.mjs: every tab must still be visible,
+   readable against the dark page (#111) and on top at its middle. Never for the catalog; skin-check would refuse it. */
+
+:root[data-skin="user:hostile"] {
+  --bg: #111;
+  --fg: #f2f5fa;
+}
+
+[data-skin="user:hostile"] body {
+  background: #111;
+}
+
+/* Motion: a slow transition and a delayed animation that would fade, recolour and push the tabs after they are measured. */
+[data-skin="user:hostile"] #tab-list li {
+  color: #121212;
+  transition: color 30s, margin 30s, letter-spacing 30s, opacity 30s;
+  animation: hostile-away 0.2s 1s both;
+  line-height: 0;
+  max-width: 1rem;
+  margin: -3rem 0;
+  /* Squashed to nothing: no width, no minimum, no flex share, no padding. */
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  flex: 0 0 0;
+  /* Labels painted away with a blend mode, blurred, boxed without their content. */
+  mix-blend-mode: difference;
+  backdrop-filter: blur(1rem);
+  isolation: isolate;
+  contain: size;
+  writing-mode: vertical-rl;
+  direction: rtl;
+}
+
+@keyframes hostile-away {
+  to { color: transparent; margin-left: 40rem; letter-spacing: 3em; opacity: 0; }
+}
+
+/* Colours nobody can see in syntaxes beyond rgb(). */
+[data-skin="user:hostile"] #tab-list li[data-tab="0"] { color: oklch(0.5 0.1 200 / 0); }
+[data-skin="user:hostile"] #tab-list li[data-tab="1"] { color: color(srgb 0 0 0 / 0); }
+[data-skin="user:hostile"] #tab-list li[data-tab="2"] { color: color-mix(in srgb, red, transparent 100%); }
+
+/* A one-colour gradient behind letters of the same colour; gradient letters that are transparent, shrunk to nothing or a picture. */
+[data-skin="user:hostile"] #tab-list li[data-tab="3"] { background: linear-gradient(#111, #111); color: #111; }
+[data-skin="user:hostile"] #tab-list li[data-tab="4"] {
+  background: linear-gradient(transparent, transparent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+[data-skin="user:hostile"] #tab-list li[data-tab="5"] {
+  background: linear-gradient(#fff, #fff) 0 0 / 0 0 no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+[data-skin="user:hostile"] #tab-list li[data-tab="6"] {
+  background: url("data:image/gif;base64,R0lGODlhAQABAAAAACw=");
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* The bar moved, squashed, faded and turned. */
+[data-skin="user:hostile"] #top {
+  position: fixed;
+  top: -50rem;
+  translate: 0 -50rem;
+  zoom: 0.1;
+  filter: opacity(0);
+  height: 0;
+  max-height: 0;
+  overflow: hidden;
+  content-visibility: hidden;
+  scale: 0.01;
+  rotate: 90deg;
+}
+
+[data-skin="user:hostile"] #tabs {
+  direction: rtl;
+  flex-direction: column;
+  position: absolute;
+  left: -100rem;
+  max-width: 1px;
+  scale: 0.01;
+  rotate: 180deg;
+}
+
+[data-skin="user:hostile"] #tab-list {
+  direction: rtl;
+  writing-mode: vertical-rl;
+  flex-direction: column-reverse;
+  overflow: hidden;
+  height: 0.1rem;
+  max-height: 0.1rem;
+  translate: 0 -10rem;
+}
+
+/* The moving text of a long label. */
+[data-skin="user:hostile"] #tab-list li span {
+  mix-blend-mode: difference !important;
+  backdrop-filter: blur(1rem) !important;
+  visibility: hidden !important;
+  color: transparent !important;
+  opacity: 0 !important;
+  font-size: 0 !important;
+}
+
+/* Drawings over the tabs. */
+[data-skin="user:hostile"] #tabs::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #111;
+  z-index: 5;
+  pointer-events: none;
+}
+
+[data-skin="user:hostile"] #tab-list li::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #111;
+  pointer-events: none;
+}
+
+/* The core's own overlays, shut, made visible and laid over the whole screen (the runtime holds them off until the app opens them). */
+[data-skin="user:hostile"] #quick,
+[data-skin="user:hostile"] #overlay,
+[data-skin="user:hostile"] #toast,
+[data-skin="user:hostile"] #shot-toast,
+[data-skin="user:hostile"] #notify-stack,
+[data-skin="user:hostile"] #boot.done {
+  position: fixed !important;
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+  z-index: 9999 !important;
+  background: #111 !important;
+  pointer-events: none !important;
+  transform: none !important;
+  transition: none !important;
+}

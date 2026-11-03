@@ -105,6 +105,12 @@ internal sealed class StallingStream(byte[] prefix) : Stream
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) => Written.WriteAsync(buffer, cancellationToken);
 }
 
+/// <summary>Session facts for tests: the caller of <see cref="Callers.User"/> is on the console and alone on the machine.</summary>
+internal static class TestSessions
+{
+    public static readonly SessionFacts AtConsole = new(() => 1, _ => new HashSet<string>());
+}
+
 internal static class Callers
 {
     public const string UserSid = "S-1-5-21-1111111111-2222222222-3333333333-1001";
@@ -140,7 +146,7 @@ internal sealed class Harness
     public Harness(IGrantStore? grants = null, bool codeEnrolled = true, ConnectionLimits? limits = null,
         Action<Dictionary<Operation, Handler>>? extraHandlers = null, Action<StateChecks>? extraChecks = null,
         Func<string, bool>? onServiceList = null, TimeSpan? handlerTimeout = null, ICodeState? codeState = null, FakeClock? clock = null,
-        Func<string, LockView>? lockViews = null)
+        Func<string, LockView>? lockViews = null, SessionFacts? sessions = null)
     {
         Clock = clock ?? new FakeClock();
         Events = new RecentEvents(Clock, () => 1000);
@@ -152,7 +158,7 @@ internal sealed class Harness
         extraHandlers?.Invoke(handlers);
         var onList = onServiceList ?? (n => n == "GamingServices");
         var codes = codeState ?? new FixedCodeState(codeEnrolled);
-        Checks = StateChecks.BuiltIn(onList, codes);
+        Checks = StateChecks.BuiltIn(onList, codes, sessions ?? TestSessions.AtConsole);
         extraChecks?.Invoke(Checks);
         Dispatcher = new Dispatcher(new DispatcherParts(
             new RequestValidator(n => ServicePolicy.IsAllowed(n, onList)), handlers, Checks, Limiter, grants ?? NoGrants.Instance,

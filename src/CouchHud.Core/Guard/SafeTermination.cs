@@ -26,6 +26,12 @@ public interface IProcessControl
 
     /// <summary>Ends the process, but only while it still has this start time (checked on the handle that ends it).</summary>
     bool Kill(int pid, long start);
+
+    /// <summary>
+    /// Ends the process, but only while it still has this start time and, when <paramref name="image"/> is given, this program image, both
+    /// read from the very handle that ends it. The default is the start time alone (implementations that can read the image override it).
+    /// </summary>
+    bool Kill(int pid, long start, string? image) => Kill(pid, start);
 }
 
 /// <summary>
@@ -63,11 +69,32 @@ public static class SafeTermination
         || IsSystemPath(p.Path, ctl.WindowsDir);
 
     /// <summary>
+    /// A game client (Steam, Epic, the Xbox app …, see <see cref="ForegroundPolicy.Classify"/>): never ended together with a game, even when the
+    /// game started it (a Steam game that starts Steam first). Ending the client would cut off downloads and the other games it runs.
+    /// </summary>
+    public static bool IsGameClient(LiveProcess p) =>
+        ForegroundPolicy.Classify(p.Name) is { } family && family != "nuisance" || IsGameClientImage(p.Path);
+
+    /// <summary><see cref="IsGameClient"/> by the program file alone (the session tracker knows only paths).</summary>
+    public static bool IsGameClientImage(string? path) =>
+        ForegroundPolicy.Classify(Path.GetFileNameWithoutExtension(path ?? "")) is { } family && family != "nuisance";
+
+    /// <summary>
+    /// What a game's end spares: game clients, except one that is itself among the remembered processes (same pid, start and image), i.e.
+    /// the session's own entry is a client (Playnite in full screen): that one is ended like any game when the parents' time runs out.
+    /// </summary>
+    public static Func<LiveProcess, bool> SpareClients(IReadOnlyDictionary<int, ProcessStamp> expected) => p =>
+        IsGameClient(p) && !(expected.TryGetValue(p.Pid, out var s) && s.Start > 0 && s.Start == p.Start
+            && string.Equals(s.Path, p.Path, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
     /// The live processes that are still the ones remembered in <paramref name="expected"/> (same pid, same start time, same image),
     /// plus whatever they started since (found by parent pid, but only with a child that is not older than its parent).
     /// Nothing protected is ever in the result, and nothing is trusted whose start time is unknown.
     /// </summary>
-    public static IReadOnlyList<LiveProcess> Resolve(IReadOnlyDictionary<int, ProcessStamp> expected, IReadOnlyList<LiveProcess> live, IProcessControl ctl)
+    /// <param name="spare">Also left alone (with everything below it), e.g. <see cref="IsGameClient"/> when a game is ended. Null: nothing extra.</param>
+    public static IReadOnlyList<LiveProcess> Resolve(IReadOnlyDictionary<int, ProcessStamp> expected, IReadOnlyList<LiveProcess> live, IProcessControl ctl,
+        Func<LiveProcess, bool>? spare = null)
     {
         var byPid = live.GroupBy(p => p.Pid).ToDictionary(g => g.Key, g => g.First());
         var result = new Dictionary<int, LiveProcess>();
@@ -76,7 +103,7 @@ public static class SafeTermination
             if (pid <= 0 || stamp.Start <= 0 || !byPid.TryGetValue(pid, out var p)) continue;
             if (p.Start != stamp.Start) continue;
             if (stamp.Path is not null && !string.Equals(stamp.Path, p.Path, StringComparison.OrdinalIgnoreCase)) continue;
-            if (IsProtected(p, ctl)) continue;
+            if (IsProtected(p, ctl) || spare?.Invoke(p) == true) continue;
             result[pid] = p;
         }
         for (var added = true; added;)
@@ -87,7 +114,7 @@ public static class SafeTermination
                 if (result.ContainsKey(p.Pid) || p.Start <= 0 || p.ParentPid == p.Pid) continue;
                 // A child never starts before its parent: otherwise the parent id belongs to a reused pid.
                 if (!result.TryGetValue(p.ParentPid, out var parent) || p.Start < parent.Start) continue;
-                if (IsProtected(p, ctl)) continue;
+                if (IsProtected(p, ctl) || spare?.Invoke(p) == true) continue;
                 result[p.Pid] = p;
                 added = true;
             }
@@ -108,17 +135,19 @@ public static class SafeTermination
     /// Asks politely (unless <paramref name="force"/>), waits up to <paramref name="grace"/>, then ends what is still the same process.
     /// The identity is checked again right before each step, with a fresh process list.
     /// </summary>
+    /// <param name="spare">See <see cref="Resolve"/>.</param>
+    /// <param name="mayEnd">Asked synchronously right before the first process is ended by force; false: nothing is ended (the caller decides what that means).</param>
     public static async Task<Outcome> QuitAsync(IProcessControl ctl, IReadOnlyDictionary<int, ProcessStamp> expected, bool force, TimeSpan grace,
-        CancellationToken cancel = default, TimeSpan? poll = null)
+        CancellationToken cancel = default, TimeSpan? poll = null, Func<LiveProcess, bool>? spare = null, Func<bool>? mayEnd = null)
     {
-        var targets = Resolve(expected, ctl.List(), ctl);
+        var targets = Resolve(expected, ctl.List(), ctl, spare);
         if (targets.Count == 0) return new Outcome(0, 0);
         if (!force)
         {
             foreach (var p in targets) ctl.RequestClose(p.Pid, p.Start);
             var deadline = DateTime.UtcNow + grace;
             var step = poll ?? TimeSpan.FromMilliseconds(250);
-            while (DateTime.UtcNow < deadline && Resolve(expected, ctl.List(), ctl).Count > 0)
+            while (DateTime.UtcNow < deadline && Resolve(expected, ctl.List(), ctl, spare).Count > 0)
             {
                 // Called off (the parents added time while the game was closing): nothing is ended by force.
                 if (cancel.IsCancellationRequested) return new Outcome(targets.Count, 0);
@@ -126,11 +155,12 @@ public static class SafeTermination
             }
         }
         if (cancel.IsCancellationRequested) return new Outcome(targets.Count, 0);
+        if (mayEnd is not null && !mayEnd()) return new Outcome(targets.Count, 0);
         // Fresh look: the list from the start may be old, a process that ended meanwhile must not be hit through its reused number.
         var killed = 0;
-        foreach (var p in Resolve(expected, ctl.List(), ctl))
+        foreach (var p in Resolve(expected, ctl.List(), ctl, spare))
         {
-            if (ctl.Kill(p.Pid, p.Start)) killed++;
+            if (ctl.Kill(p.Pid, p.Start, p.Path)) killed++;
         }
         return new Outcome(targets.Count, killed);
     }

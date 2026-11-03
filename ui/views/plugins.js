@@ -19,8 +19,9 @@ import { sound } from '../sound.js';
 import { t, fmtDateTime } from '../core/i18n.js';
 import { declarativePage } from './plugin-page.js';
 import { withParentGrant } from '../core/parent-retry.js';
+import { withUnlock } from '../core/downloads-rules.js';
 import {
-  badgeOf, capabilityKeys, cleanKey, entryActions, entryState, grantAction, installBlock, installPlan, installedFor, isDelisted, isRisky,
+  badgeOf, capabilityKeys, categoriesIn, categoryGroups, cleanKey, effectiveFilter, nextCategoryFilter, entryActions, entryState, grantAction, installBlock, installPlan, installedFor, isDelisted, isRisky,
   gateOrigin, grantChange, isPageSetting, isThirdParty, needsCode, publisherOf, runGates, safeImage, sourceAddCheck, sourceErrorKey, sourceRows, sourcesVisible, uninstallPlan
 } from '../core/plugin-rules.js';
 
@@ -128,9 +129,11 @@ async function installZip(kind) {
   // A skin is a stylesheet, not a program, but it can still load pictures from the internet and so tell a server when you are on the couch.
   if (!(await confirmDialog(kind === 'plugin' ? t('plugins.zip.warning') : t('plugins.zip.skinWarning'), t('plugins.install'), { danger: kind === 'plugin' }))) return;
   if (!(await ensureParentGrant(t('plugins.codeReason'), { action: grantAction('install'), item: path.split(/[\\/]/).pop() }))) return;
-  const name = await attempt(() => api.installPackage(path, kind), t('plugins.installFailed'));
-  if (!name) return;
+  const result = await attempt(() => api.installPackage(path, kind), t('plugins.installFailed'));
+  if (!result) return;
+  const name = result.name;
   if (kind === 'skin') toast(t('plugins.zip.skinInstalled', { name }), 5000);
+  else if (result.started) toast(t('plugins.zip.pluginStarted', { name }), 6000);
   else offerRestart(t('plugins.zip.pluginInstalled', { name }));
 }
 
@@ -145,7 +148,8 @@ const STATUS = () => ({
   needsNewer: { icon: '⛔', value: t('plugins.state.needsNewer'), on: false },
   officialFirst: { icon: '⏳', value: t('plugins.state.officialFirst'), on: false },
   unavailable: { icon: '⛔', value: t('plugins.status.unavailable'), on: false },
-  revoked: { icon: '⛔', value: t('plugin.revoked.badge'), on: false }
+  revoked: { icon: '⛔', value: t('plugin.revoked.badge'), on: false },
+  removing: { icon: '↻', value: t('plugins.value.removedAtRestart'), on: false }
 });
 
 /** Update row of the plugin list: the catalog says a newer version exists. */
@@ -202,10 +206,13 @@ function thirdPartyWarning(e) {
   const list = caps.length ? caps.map((k) => `• ${t(k)}`).join('\n') : `• ${t('plugin.capability.none')}`;
   // A skin is not code, but it can load pictures from the internet and so tell a server when you are on the couch.
   const skin = e.kind === 'skin';
+  // The network services it declared, with the hosts they may reach (an update that widens them is treated like a new install).
+  const services = (e.services ?? []).map((sv) => `• ${sv.id}: ${(sv.hosts ?? []).map((h) => (h === '*' ? t('plugin.thirdParty.anyHost') : h === 'lan' ? t('plugin.thirdParty.lanHost') : h)).join(', ')}`);
+  const hosts = services.length ? [t('plugin.thirdParty.hosts'), ...services].join('\n') : null;
   const adds = e.status === 'update' && e.addsCapabilities ? t('plugin.thirdParty.addsPermissions') : null;
   return confirmDialog(t('plugin.thirdParty.title', { name: e.name }), skin ? t('plugin.thirdParty.trustSkin') : t('plugin.thirdParty.trust'), {
     danger: true,
-    message: skin ? [t('plugin.thirdParty.bodySkin', { name: e.name, version: e.version }), t('plugin.thirdParty.author', { author: e.author || '–' })].join('\n') : [adds, t('plugin.thirdParty.body', { name: e.name, version: e.version }), t('plugin.thirdParty.author', { author: e.author || '–' }), e.publisher ? t('plugin.thirdParty.key', { code: e.publisher }) : null, t('plugin.thirdParty.caps'), list].filter(Boolean).join('\n')
+    message: skin ? [t('plugin.thirdParty.bodySkin', { name: e.name, version: e.version }), t('plugin.thirdParty.author', { author: e.author || '–' })].join('\n') : [adds, t('plugin.thirdParty.body', { name: e.name, version: e.version }), t('plugin.thirdParty.author', { author: e.author || '–' }), e.publisher ? t('plugin.thirdParty.key', { code: e.publisher }) : null, t('plugin.thirdParty.caps'), list, hosts].filter(Boolean).join('\n')
   });
 }
 
@@ -239,12 +246,26 @@ export async function installFromCatalog(entry, { expert } = {}) {
   return result;
 }
 
+/**
+ * Says what the switch did. On and off take effect at once; only what the host could not do at once asks for a restart: a plugin that was cut off
+ * but whose own background work ends with the restart (it gave no sign that it stopped), or one that cannot start while the old run is still there.
+ */
+export function tellChange(list, plugin, enabled) {
+  const now = (list ?? []).find((p) => p.folder === plugin.folder);
+  if (now?.stopsAfterRestart) offerRestart(t('plugins.page.stopsAfterRestart', { name: plugin.name }));
+  else if (now?.startsAfterRestart) offerRestart(t('plugins.page.startsAfterRestart', { name: plugin.name }));
+  else if (now?.restartNeeded) offerRestart(t('plugins.page.restartHint'));
+  else if (enabled && now?.error && !now.loaded) toast(t('plugins.page.startFailed', { name: plugin.name, error: now.error }), 7000);
+  else if (enabled) toast(t('plugins.page.startedNow', { name: plugin.name }), 4000);
+  else toast(t('plugins.page.stoppedNow', { name: plugin.name }), 4000);
+}
+
 /** Enable or disable: the code step (the plain unlock for CouchHUD's own plugins), then the call. */
 async function setEnabled(plugin, enabled) {
   if (!(await gateOpen(enabled ? 'enable' : 'disable', gateOrigin(plugin)))) return undefined;
   if (!(await runGates(['code'], { code: () => codeStep(enabled ? 'enable' : 'disable', plugin, plugin.folder) }))) return undefined;
   const list = await attempt(() => api.setPluginEnabled(plugin.folder, enabled), t('plugins.notSaved'));
-  if (list) offerRestart(t('plugins.page.restartHint'));
+  if (list) tellChange(list, plugin, enabled);
   return list;
 }
 
@@ -286,6 +307,7 @@ async function uninstall(plugin) {
   if (!ok) return undefined;
   const result = await attempt(() => api.uninstallPlugin(plugin.folder), t('plugins.notSaved'));
   if (result && result.gone) toast(t('plugins.uninstall.done', { name: plugin.name }), 5000);
+  else if (result && result.stoppedNow) toast(t('plugins.uninstall.stoppedFilesLater', { name: plugin.name }), 6000);
   else if (result) offerRestart(t('plugins.uninstall.atRestart', { name: plugin.name }));
   return result?.plugins;
 }
@@ -300,7 +322,11 @@ async function acceptRevoked(plugin) {
   });
   if (!ok) return undefined;
   const list = await attempt(() => api.acceptRevokedPlugin(plugin.folder), t('plugins.notSaved'));
-  if (list) offerRestart(t('plugin.revoked.accepted', { name: plugin.name }));
+  if (list) {
+    const now = list.find((p) => p.folder === plugin.folder);
+    if (now?.loaded) toast(t('plugin.revoked.acceptedNow', { name: plugin.name }), 5000);
+    else offerRestart(t('plugin.revoked.accepted', { name: plugin.name }));
+  }
   return list;
 }
 
@@ -308,7 +334,7 @@ async function acceptRevoked(plugin) {
 // The page
 
 /** One state the page shares between the lists and the detail pages. */
-const newStore = () => ({ plugins: null, catalog: null, sources: null });
+const newStore = () => ({ plugins: null, catalog: null, sources: null, categoryFilter: 'all' });
 
 const actionLabel = (action) => ({
   install: t('plugins.install'),
@@ -329,6 +355,7 @@ function stateNote(e, installed) {
     case 'officialFirst': return t('plugins.state.officialFirstDetail');
     case 'unavailable': return e.reason || t('plugins.catalog.notInstallable');
     case 'restart': return t('plugins.catalog.alreadyApplied');
+    case 'removing': return t('plugins.removedAtRestart.detail');
     default: return null;
   }
 }
@@ -372,15 +399,15 @@ export function pluginsPage(startTab = 0, { expert = false, openId = null } = {}
       const delisted = isDelisted(p, store.catalog?.entries);
       const badge = p.revoked ? t('plugin.revoked.badge') : badgeText(p);
       return {
-        icon: p.revoked ? '⛔' : p.loaded ? '◆' : p.enabled ? '⚠' : '○',
+        icon: p.removedAtRestart ? '↻' : p.revoked ? '⛔' : p.loaded ? '◆' : p.enabled ? '⚠' : '○',
         label: `${p.name}${p.version ? ` ${p.version}` : ''}`,
-        detail: p.error ? t('plugins.installed.error', { error: p.error }) : [update ? t('plugins.installed.updateAvailable', { version: update.version }) : null, delisted ? t('plugin.delisted.badge') : null, p.description, p.author ? t('plugins.by', { author: p.author }) : null].filter(Boolean).join(' · ') || p.folder,
+        detail: p.removedAtRestart ? t('plugins.removedAtRestart.detail') : p.error ? t('plugins.installed.error', { error: p.error }) : [update ? t('plugins.installed.updateAvailable', { version: update.version }) : null, delisted ? t('plugin.delisted.badge') : null, p.description, p.author ? t('plugins.by', { author: p.author }) : null].filter(Boolean).join(' · ') || p.folder,
         badge,
         badgeClass: p.revoked ? 'danger' : isThirdParty(p) || p.origin === 'local' ? 'warn' : '',
         // i18n-used: plugins.value.pausedOffline plugins.value.pausedOfflineLoaded plugins.value.startsAfterRestart
-        value: p.pausedOffline ? t(p.loaded ? 'plugins.value.pausedOfflineLoaded' : 'plugins.value.pausedOffline') : p.startsAfterRestart ? t('plugins.value.startsAfterRestart') : p.needsApproval ? t('plugins.value.approval') : update ? t('plugins.value.update') : p.loaded ? t('plugins.value.active') : p.enabled ? t('plugins.value.error') : t('plugins.value.off'),
+        value: p.removedAtRestart ? t('plugins.value.removedAtRestart') : p.pausedOffline ? t(p.loaded ? 'plugins.value.pausedOfflineLoaded' : 'plugins.value.pausedOffline') : p.startsAfterRestart ? t('plugins.value.startsAfterRestart') : p.needsApproval ? t('plugins.value.approval') : update ? t('plugins.value.update') : p.loaded ? t('plugins.value.active') : p.enabled ? t('plugins.value.error') : t('plugins.value.off'),
         on: !!update || p.loaded,
-        dim: !p.enabled,
+        dim: !p.enabled || p.removedAtRestart,
         run: () => push(pluginPage(p, store, setPlugins))
       };
     })
@@ -404,7 +431,7 @@ export function pluginsPage(startTab = 0, { expert = false, openId = null } = {}
       badgeClass: badge ? 'warn' : '',
       value: status.value,
       on: status.on,
-      dim: st === 'unavailable' || st === 'needsNewer' || st === 'officialFirst' || st === 'revoked',
+      dim: st === 'unavailable' || st === 'needsNewer' || st === 'officialFirst' || st === 'revoked' || st === 'removing',
       hintLabel: t('plugins.hint.details'),
       primary,
       entry: e,
@@ -445,7 +472,31 @@ export function pluginsPage(startTab = 0, { expert = false, openId = null } = {}
       }
     });
     if (c.fromCache) list.push({ icon: '⚠', label: t('plugins.catalog.offline'), detail: t('plugins.catalog.offlineDetail'), dim: true });
-    for (const e of [...c.entries].sort((a, b) => (a.status === 'update' ? 0 : 1) - (b.status === 'update' ? 0 : 1) || a.name.localeCompare(b.name))) list.push(catalogRow(e, page));
+    // Category filter: A on this row goes through the categories that have entries (their names are the core's, DE/EN). With "all" the list is
+    // grouped under one heading per category; with one category only that group shows.
+    const filter = effectiveFilter(store.categoryFilter, c.entries);
+    const categories = categoriesIn(c.entries);
+    if (categories.length > 1) {
+      const filterAt = list.length;
+      list.push({
+        icon: '☰',
+        label: t('plugins.catalog.category'),
+        detail: t('plugins.catalog.categoryDetail'),
+        hintLabel: t('plugins.catalog.categoryNext'),
+        value: filter === 'all' ? t('plugins.catalog.categoryAll') : categories.find((x) => x.id === filter)?.label ?? t('plugins.catalog.categoryAll'),
+        on: filter !== 'all',
+        run: () => {
+          store.categoryFilter = nextCategoryFilter(store.categoryFilter, c.entries);
+          // The cursor stays on the filter row, so A can be pressed again to go on.
+          page.index = filterAt;
+          render();
+        }
+      });
+    }
+    for (const group of categoryGroups(c.entries, filter)) {
+      if (categories.length > 1 && filter === 'all') list.push({ section: group.label });
+      for (const e of group.entries) list.push(catalogRow(e, page));
+    }
     return list;
   };
 
@@ -729,6 +780,16 @@ function endSettingsVisit(pluginId) {
 }
 
 /**
+ * Before a setting's editor opens (keyboard, choice) or a switch flips: the host's gate for exactly this setting (Hud.CheckPluginSetting).
+ * Locked and an admin setting: the code entry, then the gate once more; a child's profile: the parents' code; "nobody": the refusal, all
+ * before anything is typed (0.6.3 opened the keyboard first). true: the editor may open. The change itself is checked again by the host.
+ */
+async function settingGate(p, s) {
+  const check = () => withParentGrant(() => api.checkPluginSetting(p.id, s.key));
+  return (await attempt(() => withUnlock(check, () => ensureUnlocked(t('plugins.codeReason'))), p.name)) === true;
+}
+
+/**
  * The rows for a plugin's settings: values to change, and entries (kind "page") that open one of the plugin's own pages. Shared by the
  * plugin manager's page and the reduced page of Settings > Plugins. The host decides every press (the lock, the owner's level, the
  * parents' code in a child's profile); the page entry hands back only the page, which is opened on the stack, so B returns here.
@@ -752,6 +813,7 @@ function settingRows(p, refresh) {
     value: s.kind === 'toggle' ? (s.value === 'true' ? t('plugins.value.on') : t('plugins.value.off')) : s.kind === 'secret' ? (s.value ? t('plugins.value.saved') : t('plugins.value.notSet')) : s.value || '–',
     on: s.kind === 'toggle' && s.value === 'true',
     run: async () => {
+      if (!(await settingGate(p, s))) return;
       let value;
       if (s.kind === 'toggle') value = s.value === 'true' ? 'false' : 'true';
       else if (s.kind === 'choice') value = await chooseDialog(s.label, s.choices.map((c) => ({ label: c, value: c })), s.value);
@@ -803,7 +865,11 @@ function pluginPage(plugin, store, onChange) {
     onClose: () => endSettingsVisit(p.id),
     title: () => p.name,
     intro: () => [p.description, p.homepage].filter(Boolean).join(' · '),
-    rows: () => [
+    rows: () => p.removedAtRestart ? [
+      // Uninstalled, files still held: only the note, nothing to switch (the host refuses it as well).
+      { icon: '↻', label: t('plugins.value.removedAtRestart'), detail: t('plugins.removedAtRestart.detail'), wrap: true, highlight: true },
+      { icon: '📁', label: t('plugins.page.folder'), detail: `%APPDATA%\\CouchHud\\plugins\\${p.folder}` }
+    ] : [
       ...(isThirdParty(p) ? [{ icon: '⚠', label: t('plugin.thirdParty.badge'), detail: t('plugin.thirdParty.short'), wrap: true, highlight: true }] : []),
       ...(p.revoked ? [{
         icon: '⛔',
@@ -833,7 +899,8 @@ function pluginPage(plugin, store, onChange) {
           const list = await attempt(() => api.approvePlugin(p.folder, p.approvalHash), t('plugins.notSaved'));
           if (!list) return;
           refresh(list);
-          offerRestart(t('plugins.approve.done', { name: p.name }));
+          if (list.find((x) => x.folder === p.folder)?.loaded) toast(t('plugins.approve.startedNow', { name: p.name }), 5000);
+          else offerRestart(t('plugins.approve.done', { name: p.name }));
         }
       }] : []),
       {

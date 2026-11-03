@@ -35,7 +35,8 @@ public class ArtworkSquareTests
         public string CoverGrids = """{ "data": [ { "url": "https://cdn2.steamgriddb.com/grid/cover.png" } ] }""";
         public Dictionary<string, string> Redirects { get; } = new();
         public Func<string, HttpResponseMessage?>? Image;
-        public string SearchJson = """{ "data": [ { "id": 7 } ] }""";
+        /// <summary>The search answer; null: SteamGridDB knows the game by the very name that was searched (id 7).</summary>
+        public string? SearchJson;
         public HttpStatusCode? SearchStatus;
         public Action<string>? Seen;
 
@@ -51,7 +52,7 @@ public class ArtworkSquareTests
                 return Task.FromResult(r);
             }
             if (url.Contains("storesearch")) return Task.FromResult(Json("""{ "items": [] }"""));
-            if (url.Contains("autocomplete")) return Task.FromResult(SearchStatus is { } status ? new HttpResponseMessage(status) : Json(SearchJson));
+            if (url.Contains("autocomplete")) return Task.FromResult(SearchStatus is { } status ? new HttpResponseMessage(status) : Json(SearchJson ?? ArtworkTests.SgdbHit(url, 7)));
             if (url.Contains("/grids/") && url.Contains("512x512")) return Task.FromResult(SquareGrids is null ? NotFound() : Json(SquareGrids));
             if (url.Contains("/grids/")) return Task.FromResult(Json(CoverGrids));
             if (url.Contains("/icons/")) return Task.FromResult(Icons is null ? NotFound() : Json(Icons));
@@ -161,7 +162,7 @@ public class ArtworkSquareTests
         var dir = Dir();
         // The shape of 0.6.1: no Logo, no Square in the entry.
         File.WriteAllText(Path.Combine(dir, "cache.json"),
-            """{ "game:control resonant": { "Art": { "Cover": ["https://cdn2.steamgriddb.com/grid/old.png"], "Hero": [] }, "Checked": "2026-10-20T10:00:00+00:00" } }""");
+            """{ "game:v2:control resonant": { "Art": { "Cover": ["https://cdn2.steamgriddb.com/grid/old.png"], "Hero": [] }, "Checked": "2026-10-20T10:00:00+00:00" } }""");
         var host = new Host();
         var resolver = Resolver(host, dir);
 
@@ -482,7 +483,7 @@ public class ArtworkSquareTests
 
     private static string OldCacheFor(params string[] names) =>
         "{" + string.Join(",", names.Select(n => $$"""
-            "game:{{n.ToLowerInvariant()}}": { "Art": { "Cover": ["https://cdn2.steamgriddb.com/grid/old.png"], "Hero": [], "Logo": [] }, "Checked": "2026-10-20T10:00:00+00:00" }
+            "game:v2:{{n.ToLowerInvariant()}}": { "Art": { "Cover": ["https://cdn2.steamgriddb.com/grid/old.png"], "Hero": [], "Logo": [] }, "Checked": "2026-10-20T10:00:00+00:00" }
             """)) + "}";
 
     [Fact]
@@ -504,7 +505,7 @@ public class ArtworkSquareTests
         await resolver.ResolveAsync(items);
         Assert.Equal(60, squareAsks);
         Assert.NotNull(savedMidway);
-        Assert.Contains("game:game 39", savedMidway);
+        Assert.Contains("game:v2:game 39", savedMidway);
 
         var second = await resolver.ResolveAsync(items);
         Assert.Equal(70, squareAsks);
@@ -544,7 +545,7 @@ public class ArtworkSquareTests
         var now = Start;
         var cache = new ArtworkCache(Path.Combine(dir, "img"));
         File.WriteAllText(Path.Combine(dir, "cache.json"),
-            """{ "game:control resonant": { "Art": { "Cover": ["https://cdn2.steamgriddb.com/grid/old.png"], "Hero": [], "Logo": [], "Square": [] }, "Checked": "2026-10-20T10:00:00+00:00" } }""");
+            """{ "game:v2:control resonant": { "Art": { "Cover": ["https://cdn2.steamgriddb.com/grid/old.png"], "Hero": [], "Logo": [], "Square": [] }, "Checked": "2026-10-20T10:00:00+00:00" } }""");
         var host = new Host();
         var local = new Artwork { Cover = ["file:///C:/c.png"], Hero = ["file:///C:/h.png"], Logo = ["file:///C:/l.png"] };
         var resolver = Resolver(host, dir, images: cache);

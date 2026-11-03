@@ -86,6 +86,14 @@ export async function admitProtectedChange({ reason, parentReason = reason, pare
 }
 
 /**
+ * A change in the profile management (Settings › Parental controls › Profiles): the unlock first, then the parents' code for exactly this
+ * change (action and profile), as the other protected settings; parental controls count as on there (without a parents' code the grant
+ * falls back to the unlock itself). ensureUnlocked(reason) and ensureParentGrant(reason, scope) are the dialogs (true or false).
+ */
+export const admitProfileChange = ({ reason, id = null, action, ensureUnlocked, ensureParentGrant }) =>
+  admitProtectedChange({ reason, parentalOn: true, scope: { action, item: id }, ensureUnlocked, ensureParentGrant });
+
+/**
  * The console setup's lock step. A lock that is on stays as it is (the Windows sign-in, the code lock with its code). Everything else
  * takes the code in the same step as the switch (enroll: Settings › Console › Couch lock with "code" picked): a code set at the open
  * couch does not survive the lock being switched on in the CouchHUD service, so "keep the code" is not offered there; the person

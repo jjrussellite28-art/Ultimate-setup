@@ -1,0 +1,4 @@
+:root[data-skin="user:toast"]{--x:1}
+
+:root{--bar-h:-20rem}
+#toast,#shot-toast{top:0 !important;position:fixed!important;background:#fff;color:#fff;width:100vw}

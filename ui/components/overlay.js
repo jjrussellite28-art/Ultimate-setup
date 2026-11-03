@@ -11,14 +11,22 @@ import { confirmStartIndex } from '../core/plugin-rules.js';
 import { gridMove, groupRows } from '../core/menu-grid.js';
 
 /**
- * menu: { title, message?, entries: [{ label, detail?, icon?, run }], index?, onMove?(i), onCancel?(), hints?(),
+ * menu: { title, message?, entries: [{ label, detail?, icon?, thumb?, run }], index?, onMove?(i), onCancel?(), hints?(),
  *         preview? (the screen behind stays visible, e.g. the skin picker),
- *         layout? 'list' | 'tiles' (one row of tiles per group, D-pad in two directions),
+ *         layout? 'list' | 'tiles' (one row of tiles per group or per entry `row` key, D-pad in two directions),
+ *         onBack?() (B first asks this; true = handled, e.g. a folded-out section folds back in, the menu stays),
+ *         keys? { x: () => ... } (extra buttons that work anywhere in the menu, e.g. the power menu's timer),
  *         details? 'all' | 'focused' (only the focused row shows its detail) | 'below' (the focused entry's detail under the menu),
  *         refreshMs? (draws itself again this often while it is open, for live values such as a running timer) }
+ * Entries may also carry: row (a key for the tile layout's rows; defaults to group), wide (a full-width row inside tiles),
+ * expanded (true/false: a button that folds something in or out, gets aria-expanded), keepOpen (A runs the entry and leaves the menu open
+ * and drawn again), reveal (a short fade-in, once).
  * Entries may carry group (a heading; a new heading where it changes, the later ones behind a separator) and value (short status
- * text on the right, always shown).
+ * text on the right, always shown). thumb: a small picture in front of the entry (a search hit's cover); as soon as one entry has the key,
+ * every entry gets the place for it (null: an empty frame).
  */
+const rowKey = (e) => e.row ?? e.group;
+
 export function openOverlay(menu) {
   menu.index = menu.index || 0;
   state.overlay = menu;
@@ -79,7 +87,7 @@ export function chooseDialog(title, options, current) {
       title,
       index: Math.max(0, options.findIndex((o) => o.value === current)),
       onCancel: () => resolve(undefined),
-      entries: options.map((o) => ({ label: o.label, detail: o.detail, icon: o.icon, danger: o.danger, run: () => resolve(o.value) }))
+      entries: options.map((o) => ({ label: o.label, detail: o.detail, icon: o.icon, thumb: o.thumb, danger: o.danger, run: () => resolve(o.value) }))
     });
   });
 }
@@ -110,13 +118,15 @@ export function renderOverlay() {
   text.hidden = !menu.message;
   const ul = overlay.querySelector('.menu');
   const hasIcons = menu.entries.some((e) => e.icon);
+  const hasThumbs = menu.entries.some((e) => e.thumb !== undefined);
   const tiles = menu.layout === 'tiles';
   const details = menu.details || 'all';
   ul.classList.toggle('with-icons', hasIcons);
+  ul.classList.toggle('with-thumbs', hasThumbs);
   ul.classList.toggle('grouped', menu.entries.some((e) => e.group));
   ul.classList.toggle('tiles', tiles);
   // As many columns as the longest group has tiles.
-  if (tiles) ul.style.setProperty('--menu-cols', String(Math.max(...groupRows(menu.entries.map((e) => e.group)).map((r) => r.length))));
+  if (tiles) ul.style.setProperty('--menu-cols', String(Math.max(...groupRows(menu.entries.map(rowKey)).map((r) => r.length))));
   else ul.style.removeProperty('--menu-cols');
   const items = [];
   menu.entries.forEach((e, i) => {
@@ -124,14 +134,23 @@ export function renderOverlay() {
     if (e.group && e.group !== menu.entries[i - 1]?.group) items.push(el('li', { className: 'menu-group', role: 'presentation', textContent: e.group }));
     const focused = i === menu.index;
     const showDetail = e.detail && (details === 'all' || (details === 'focused' && focused));
-    items.push(el('li', { className: `${focused ? 'focused' : ''}${e.danger ? ' danger' : ''}`.trim(), dataset: { index: String(i) } },
+    const classes = [focused && 'focused', e.danger && 'danger', e.wide && 'menu-row', e.reveal && 'menu-reveal'].filter(Boolean).join(' ');
+    const item = el('li', { className: classes, dataset: { index: String(i) } },
+      hasThumbs ? el('span', { className: 'menu-thumb' }, e.thumb ? el('img', { src: e.thumb, alt: '', decoding: 'async', loading: 'lazy', referrerPolicy: 'no-referrer' }) : null) : null,
       hasIcons ? el('span', { className: 'menu-icon' }, iconEl(e.icon || '')) : null,
       el('span', { className: 'menu-text' },
         el('span', { className: 'menu-label', textContent: e.label }),
         showDetail ? el('small', { textContent: e.detail }) : null),
-      e.value ? el('span', { className: 'menu-value', textContent: e.value }) : null));
+      e.value ? el('span', { className: 'menu-value', textContent: e.value }) : null);
+    if (e.expanded !== undefined) {
+      item.setAttribute('role', 'button');
+      item.setAttribute('aria-expanded', String(e.expanded));
+    }
+    items.push(item);
   });
   ul.replaceChildren(...items);
+  // The fade-in plays once, not at every redraw (a move, the refresh).
+  for (const e of menu.entries) delete e.reveal;
   // The focused entry's detail in one place under the menu (tiles), so the tiles stay short.
   let below = overlay.querySelector('.menu-detail');
   if (details === 'below') {
@@ -173,7 +192,7 @@ export function handleOverlay(action) {
     case 'down': {
       // Tiles: rows per group, the D-pad moves in two directions. A list only goes up and down.
       if (menu.layout !== 'tiles' && (action === 'left' || action === 'right')) return;
-      const next = menu.layout === 'tiles' ? gridMove(groupRows(menu.entries.map((e) => e.group)), menu.index, action) : menu.index + (action === 'up' ? -1 : 1);
+      const next = menu.layout === 'tiles' ? gridMove(groupRows(menu.entries.map(rowKey)), menu.index, action) : menu.index + (action === 'up' ? -1 : 1);
       if (next < 0 || next >= menu.entries.length) return sound.bump();
       menu.index = next;
       menu.onMove?.(next);
@@ -182,11 +201,26 @@ export function handleOverlay(action) {
     }
     case 'a': {
       const entry = menu.entries[menu.index];
+      if (entry.keepOpen) {
+        sound.select();
+        attempt(() => entry.run());
+        return renderOverlay();
+      }
       closeOverlay({ cancelled: false });
       sound.select();
       return attempt(() => entry.run());
     }
+    case 'x':
+      if (!menu.keys?.x) return;
+      sound.select();
+      return menu.keys.x();
     case 'b':
+      if (menu.onBack?.()) {
+        sound.back();
+        return renderOverlay();
+      }
+      sound.back();
+      return closeOverlay();
     case 'start':
       sound.back();
       return closeOverlay();

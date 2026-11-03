@@ -66,7 +66,17 @@ public enum StateCheck
     /// ResetCodeStore: the code store is unavailable because its file is not valid (not because the data folder was refused, and never
     /// while it works). Refused before any approval is asked for.
     /// </summary>
-    CodeStoreDamaged
+    CodeStoreDamaged,
+    /// <summary>
+    /// PauseServices: the caller's session is the one on the physical console (the couch), or an elevated administrator; anyone else needs a
+    /// parent's or an administrator's approval. Fail-closed: no console session known means an approval is needed. Audit L-1.
+    /// </summary>
+    ConsoleSessionOrApproval,
+    /// <summary>
+    /// InstallWindowsUpdates and InstallCouchHudUpdate: with another account signed in to any session (or the sessions unreadable) a
+    /// parent's or an administrator's approval is needed; alone on the machine, or as an elevated administrator, none. Audit L-2.
+    /// </summary>
+    OtherSessionsNeedApproval
 }
 
 /// <summary>One rule: the requirement from the table, and the state checks the dispatcher runs on top (all must pass).</summary>
@@ -77,7 +87,10 @@ public sealed record Rule(Requirement Requirement, params StateCheck[] Checks);
 /// <list type="bullet">
 /// <item>SetAutoLogon is for the caller's own account with password proof plus the approval of a parent or an administrator:
 /// a grant of kind <see cref="GrantKinds.ParentOrAdmin"/> (P9) or an elevated administrator. So a parent can approve a child's own autologon without the token being the parent's.</item>
-/// <item>PauseServices stays for any interactive caller, but only for the fixed list, and <see cref="ServicePolicy.Denied"/> wins over any list.</item>
+/// <item>PauseServices is for the fixed list only, and <see cref="ServicePolicy.Denied"/> wins over any list. It stops a service for every account, so it
+/// is for the console session (the couch) or an elevated administrator; any other session needs a parent's or an administrator's approval
+/// (<see cref="StateCheck.ConsoleSessionOrApproval"/>). InstallWindowsUpdates and InstallCouchHudUpdate need such an approval as soon as another
+/// account is signed in (<see cref="StateCheck.OtherSessionsNeedApproval"/>).</item>
 /// <item>RDP sessions count as interactive.</item>
 /// </list>
 /// The one place for it: every <see cref="Operation"/> has an entry (a test enumerates them), an operation without one is denied.
@@ -96,7 +109,8 @@ public static class OperationPolicy
         [Operation.ReleaseLockPolicies] = new(Requirement.GrantOrAdminOnceCodeEnrolled, StateCheck.GroupsSetByService),
         [Operation.CleanupPolicyKeys] = new(Requirement.GrantOrAdminOnceCodeEnrolled, StateCheck.KeysOwnedByService),
 
-        [Operation.PauseServices] = new(Requirement.OwnAccount, StateCheck.ServiceAllowlist),
+        // Machine-wide effect: the console (couch) session on its own, any other session with an approval (audit L-1).
+        [Operation.PauseServices] = new(Requirement.OwnAccount, StateCheck.ServiceAllowlist, StateCheck.ConsoleSessionOrApproval),
         [Operation.ResumeServices] = new(Requirement.OwnAccount, StateCheck.ServiceAllowlist, StateCheck.PausedByService),
 
         // Machine-wide (Winlogon, LSA secret), allowPasswordSignIn included: a grant a parent or an administrator confirmed (P9), or
@@ -107,14 +121,16 @@ public static class OperationPolicy
 
         // Machine-wide, but towards "safer" (no reboot is started); one Windows Update job at a time (P6).
         [Operation.SearchWindowsUpdates] = new(Requirement.OwnAccount),
-        [Operation.InstallWindowsUpdates] = new(Requirement.OwnAccount, StateCheck.UpdateIdsFromSearch),
+        // With other accounts signed in, an approval is needed (audit L-2).
+        [Operation.InstallWindowsUpdates] = new(Requirement.OwnAccount, StateCheck.UpdateIdsFromSearch, StateCheck.OtherSessionsNeedApproval),
 
         // Rule name and program are fixed in the handler; the ports are checked by the validator.
         [Operation.SetRemoteFirewall] = new(Requirement.GrantOrAdmin),
         [Operation.RemoveRemoteFirewall] = new(Requirement.OwnAccount),
         [Operation.RemoveLegacyFirewallRules] = new(Requirement.OwnAccount),
 
-        [Operation.InstallCouchHudUpdate] = new(Requirement.OwnAccount, StateCheck.SignedSetupPipeline),
+        // The setup disconnects the other sessions: with other accounts signed in, an approval is needed (audit L-2).
+        [Operation.InstallCouchHudUpdate] = new(Requirement.OwnAccount, StateCheck.SignedSetupPipeline, StateCheck.OtherSessionsNeedApproval),
 
         [Operation.EnrollPasscode] = new(Requirement.OwnAccount, StateCheck.EnrollAllowed),
         // The current code (a grant of that code), a parent's or an administrator's approval, or an elevated administrator; the kinds
@@ -139,8 +155,9 @@ public static class OperationPolicy
 
         [Operation.ReleaseAllAccounts] = new(Requirement.Admin),
         // Sets a damaged state file aside and starts fresh (after releasing what can still be identified, in every account): machine-wide,
-        // so an elevated administrator only; no grant of any kind.
-        [Operation.ResetServiceState] = new(Requirement.Admin),
+        // so an elevated administrator, or an administrator's approval through UAC for exactly this operation (the shell runs without
+        // elevation; owner decision for 0.6.4, like ResetCodeStore); never a parents' code, the couch code or the Windows unlock (AcceptedByLock).
+        [Operation.ResetServiceState] = new(Requirement.ParentGrantOrAdmin),
         // Sets a damaged code file aside and starts with no codes (machine-wide): an elevated administrator, or an administrator's approval
         // through UAC (the shell runs without elevation); never a parents' code or anything of the couch (AcceptedByLock), and only while
         // the file is damaged.
@@ -185,7 +202,7 @@ public static class OperationPolicy
         return request switch
         {
             // Whatever the lock: an administrator's approval only (a parents' code cannot be checked while the codes are damaged anyway).
-            { Operation: Operation.ResetCodeStore } => GrantKinds.WindowsAdmin,
+            { Operation: Operation.ResetCodeStore or Operation.ResetServiceState } => GrantKinds.WindowsAdmin,
             { Operation: Operation.ChangePasscode or Operation.RemovePasscode, Args: PasscodeHashArgs { Kind: CodeKinds.Couch } or CodeKindArgs { Kind: CodeKinds.Couch } } => couchCode,
             { Operation: Operation.EnrollPasscode, Args: PasscodeHashArgs { Kind: CodeKinds.Couch } } when windows && !view.HasParent => GrantKinds.WindowsUnlock | GrantKinds.ParentOrAdmin,
             { Operation: Operation.ChangePasscode or Operation.RemovePasscode or Operation.EnrollPasscode } => GrantKinds.ParentOrAdmin,

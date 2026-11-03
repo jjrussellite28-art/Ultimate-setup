@@ -13,7 +13,8 @@ import { sound } from '../sound.js';
 import { t } from '../core/i18n.js';
 import { activeSystem, ageChoices, ageLabels, limitText, shownLimit } from '../core/age-rating-rules.js';
 import { chooseDialog, closeOverlay, confirmDialog } from './overlay.js';
-import { choosePasscode, enterPasscode } from './passcode.js';
+import { choosePasscode, enterPasscode, ensureUnlocked } from './passcode.js';
+import { admitProfileChange } from '../core/lock-rules.js';
 import { ensureParentGrant, formatRemaining, parental, refreshParental } from './parental.js';
 import { openKeyboard } from './keyboard.js';
 import { addQuickRows, closeQuickMenu } from './quick-menu.js';
@@ -263,7 +264,9 @@ async function childCode(p) {
 // ---------------------------------------------------------------------------
 // Management (Settings): everything with the controller, every change with the parents' code for exactly that change.
 
-const manageGrant = (reason, id = null) => ensureParentGrant(reason, { action: MANAGE, item: id });
+// The host takes a change only from an unlocked couch: the unlock first (couch code or Windows sign-in), then the parents' code for exactly
+// this change, so the save is not refused with "unlock first" after the parents already said yes (same order as the other protected settings).
+const manageGrant = (reason, id = null) => admitProfileChange({ reason, id, action: MANAGE, ensureUnlocked, ensureParentGrant });
 
 async function chooseName(title, value = '') {
   const name = await openKeyboard({ title, value, maxLength: NAME_MAX, hint: t('profiles.nameHint', { count: NAME_MAX }) });
@@ -301,6 +304,8 @@ async function change(reason, id, call, message) {
 async function addProfile() {
   const d = profiles.data;
   if (d && d.profiles.length >= d.max) return toast(t('profiles.max', { count: d.max }), 5000);
+  // The unlock before the name, avatar and colour questions, not after them.
+  if (!(await ensureUnlocked(t('profiles.addReason')))) return;
   const name = await chooseName(t('profiles.newName'));
   if (!name) return;
   const kind = await chooseDialog(t('profiles.kindTitle'), [

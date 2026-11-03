@@ -23,13 +23,13 @@ export function publisherOf(x, fallback) {
   return isThirdParty(x) && x?.publisher ? `${name} · ${x.publisher}` : name;
 }
 
-// i18n-used: plugin.capability.library plugin.capability.pages plugin.capability.quickActions plugin.capability.assistant plugin.capability.notify plugin.capability.browser plugin.capability.downloads plugin.capability.network_state plugin.capability.process plugin.capability.browser_signin plugin.capability.tabs plugin.capability.setup_run plugin.capability.lock_restrict plugin.capability.startup_args plugin.capability.native plugin.capability.registry plugin.capability.network_loopback plugin.capability.network_lan plugin.capability.network_internet plugin.capability.dynamicCode plugin.capability.unknown
+// i18n-used: plugin.capability.library plugin.capability.pages plugin.capability.quickActions plugin.capability.assistant plugin.capability.notify plugin.capability.browser plugin.capability.downloads plugin.capability.network_state plugin.capability.host_state plugin.capability.sensors_publish plugin.capability.sensors_read plugin.capability.tv_control plugin.capability.weather plugin.capability.news plugin.capability.assistant_provider plugin.capability.process plugin.capability.browser_signin plugin.capability.tabs plugin.capability.setup_run plugin.capability.lock_restrict plugin.capability.startup_args plugin.capability.native plugin.capability.registry plugin.capability.network_loopback plugin.capability.network_lan plugin.capability.network_internet plugin.capability.dynamicCode plugin.capability.unknown
 /** The ids of the capabilities as text keys: 'network:loopback' -> 'plugin.capability.network_loopback'. */
 export const capabilityKey = (id) => `plugin.capability.${String(id).replace(/[^A-Za-z0-9]+/g, '_')}`;
 
 const KNOWN_CAPABILITIES = new Set([
-  'library', 'pages', 'quickActions', 'assistant', 'notify', 'browser', 'downloads', 'network.state', 'process', 'browser.signin', 'tabs', 'setup.run', 'lock.restrict',
-  'startup.args', 'native', 'registry', 'network:loopback', 'network:lan', 'network:internet', 'dynamicCode'
+  'library', 'pages', 'quickActions', 'assistant', 'notify', 'browser', 'downloads', 'network.state', 'host.state', 'sensors.publish', 'sensors.read', 'process', 'browser.signin', 'tabs', 'setup.run', 'lock.restrict',
+  'startup.args', 'native', 'registry', 'network:loopback', 'network:lan', 'network:internet', 'dynamicCode', 'tv.control', 'weather', 'news', 'assistant.provider'
 ]);
 
 /** Capability keys to show; an id this version does not know is shown as unknown (never as its raw id inside a sentence). */
@@ -44,6 +44,7 @@ export const isRisky = (cap) => RISKY_CAPABILITIES.has(cap);
  * `installed` is the plugin the host has for it (getPlugins) or undefined.
  */
 export function entryState(entry, installed) {
+  if (installed?.removedAtRestart) return 'removing';
   if (installed?.revoked) return 'revoked';
   if (entry.status === 'unavailable') {
     if (entry.reasonCode === 'needsNewer') return 'needsNewer';
@@ -76,6 +77,8 @@ export const installedFor = (entry, plugins) => (entry.kind === 'skin' ? undefin
 export function entryActions(entry, installed, { expert = false } = {}) {
   const state = entryState(entry, installed);
   const actions = [];
+  // Uninstalled, files still held: cut off for good, gone at the next start. Nothing to offer (no install, no switch, no second uninstall).
+  if (state === 'removing') return [];
   const own = !!installed && entry.kind !== 'skin';
   if (state === 'revoked') actions.push('acceptRevoked');
   else if (state === 'new') {
@@ -325,3 +328,47 @@ export const pluginsWithSettings = (list) =>
 
 /** A page entry opens a page of the plugin; it has no value to change. */
 export const isPageSetting = (s) => s?.kind === 'page';
+
+// ---------------------------------------------------------------------------
+// Catalog categories: the host names one per entry (an id, plus the name in the current language, both from the core), the page groups and
+// filters by it. An id this version does not know reads as "other" (skins: "skins"), so a newer index never breaks the list.
+
+/** The order the catalog lists the categories in; 'other' is always last (the same list as CatalogCategories.All in the core). */
+export const CATEGORY_ORDER = ['smartHome', 'streaming', 'hardware', 'media', 'ai', 'information', 'hud', 'skins', 'other'];
+
+/** The category id of a row: a known one as the host sent it, else 'skins' for a skin and 'other' for anything else. */
+export const categoryOf = (entry) => (CATEGORY_ORDER.includes(entry?.category) ? entry.category : entry?.kind === 'skin' ? 'skins' : 'other');
+
+/** The categories that have at least one entry, in the fixed order: [{ id, label, count }]. The label is the host's (the core's DE/EN name). */
+export function categoriesIn(entries) {
+  const seen = new Map();
+  for (const e of entries ?? []) {
+    const id = categoryOf(e);
+    const known = seen.get(id);
+    if (known) known.count += 1;
+    else seen.set(id, { id, label: e.categoryLabel || id, count: 1 });
+  }
+  return CATEGORY_ORDER.filter((id) => seen.has(id)).map((id) => seen.get(id));
+}
+
+/** The filter that applies: 'all', or a category that still has entries (a category that emptied out after a reload counts as 'all'). */
+export const effectiveFilter = (filter, entries) => (filter && filter !== 'all' && categoriesIn(entries).some((c) => c.id === filter) ? filter : 'all');
+
+/** The next filter on A: all, then each category that exists, then all again. */
+export function nextCategoryFilter(filter, entries) {
+  const order = ['all', ...categoriesIn(entries).map((c) => c.id)];
+  const at = order.indexOf(effectiveFilter(filter, entries));
+  return order[(at + 1) % order.length];
+}
+
+/**
+ * The catalog in the order it is shown: with 'all' one group per category (with its heading), with one category just that group.
+ * Within a group entries with an update come first, then by name. Returns [{ id, label, entries }].
+ */
+export function categoryGroups(entries, filter = 'all') {
+  const wanted = effectiveFilter(filter, entries);
+  const byName = (a, b) => (a.status === 'update' ? 0 : 1) - (b.status === 'update' ? 0 : 1) || String(a.name).localeCompare(String(b.name));
+  return categoriesIn(entries)
+    .filter((c) => wanted === 'all' || c.id === wanted)
+    .map((c) => ({ id: c.id, label: c.label, entries: (entries ?? []).filter((e) => categoryOf(e) === c.id).sort(byName) }));
+}

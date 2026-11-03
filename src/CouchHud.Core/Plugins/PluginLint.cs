@@ -42,16 +42,23 @@ public static class PluginLint
         ("Microsoft.Win32", "Registry", PluginCapabilities.Registry),
         ("Microsoft.Win32", "RegistryKey", PluginCapabilities.Registry),
         ("System.Net.Sockets", null, Network),
-        ("System.Net.Http", "HttpClient", Network),
+        // HttpClient and HttpMessageInvoker count where one is made (see MemberRules): since SDK 5 a plugin also holds one the host made for a
+        // declared service (IPluginContext.Http), and using that one is not raw network access of its own.
         ("System.Net.Http", "HttpClientHandler", Network),
         ("System.Net.Http", "SocketsHttpHandler", Network),
-        ("System.Net.Http", "HttpMessageInvoker", Network),
         ("System.Net", "WebClient", Network),
         ("System.Net", "WebRequest", Network),
         ("System.Net", "HttpWebRequest", Network),
+        ("System.Net.Http", "WinHttpHandler", Network),
+        ("System.Net", "Dns", Network),
+        ("System.Net.NetworkInformation", "Ping", Network),
+        ("System.Net.Mail", "SmtpClient", Network),
         ("System.Net", "HttpListener", Network),
         ("System.Net.WebSockets", "ClientWebSocket", Network),
         ("System.Net.Quic", null, Network),
+        // Named pipes reach other PCs as well (a server name in front of the pipe, over SMB), so they count as network code; a plugin that
+        // talks to a program on this PC through a pipe declares network:loopback. Anonymous pipes are in the same namespace and are counted the same way.
+        ("System.IO.Pipes", null, Network),
         ("System.Reflection.Emit", null, PluginCapabilities.DynamicCode),
         ("System.Runtime.Loader", "AssemblyLoadContext", PluginCapabilities.DynamicCode),
         ("System.Runtime.InteropServices", "NativeLibrary", PluginCapabilities.Native),
@@ -69,6 +76,10 @@ public static class PluginLint
         // Page actions need SDK 4: code that uses them must say so in plugin.json (SdkActions).
         ("CouchHud.Sdk", "PluginPageAction", SdkActions),
         ("CouchHud.Sdk", "PluginPageButton", SdkActions),
+        // TV control needs SDK 5 and the capability "tv.control" (the provider and the link the core hands it).
+        ("CouchHud.Sdk", "ITvProvider", PluginCapabilities.TvControl),
+        ("CouchHud.Sdk", "ITvLink", PluginCapabilities.TvControl),
+        ("CouchHud.Sdk", "ITvProvider", SdkTv),
         // The user's DPAPI: every plugin runs as the same Windows user, so a plugin that calls it can open anything CouchHUD or another
         // plugin protected for that user. Only CouchHUD's own plugins (the host does the encrypting for the others via SetSecret).
         ("System.Security.Cryptography", "ProtectedData", Dpapi),
@@ -78,6 +89,8 @@ public static class PluginLint
     /// <summary>Single members: type → member names → capability.</summary>
     private static readonly (string Namespace, string Type, string[] Members, string Capability)[] MemberRules =
     [
+        ("System.Net.Http", "HttpClient", [".ctor"], Network),
+        ("System.Net.Http", "HttpMessageInvoker", [".ctor"], Network),
         ("System.Reflection", "Assembly", ["Load", "LoadFrom", "LoadFile", "UnsafeLoadFrom", "LoadWithPartialName", "GetType"], PluginCapabilities.DynamicCode),
         ("System.Reflection", "MethodBase", ["Invoke"], PluginCapabilities.DynamicCode),
         ("System.Reflection", "MethodInfo", ["Invoke", "CreateDelegate"], PluginCapabilities.DynamicCode),
@@ -110,8 +123,20 @@ public static class PluginLint
     /// </summary>
     public const string SdkActions = "SDK 4 (page actions)";
 
+    /// <summary>Stands for "brings a TV provider (SDK 5)": counts when the package declares less than <see cref="TvSdk.MinSdk"/> (the host would refuse the registration).</summary>
+    public const string SdkTv = "SDK 5 (TV control)";
+
     /// <summary>Stands for "any network capability" (loopback or internet).</summary>
     private const string Network = "network";
+
+    /// <summary>
+    /// Stands for "makes its own connection" (an HttpClient or handler of its own, sockets, web sockets, WebClient, DNS, ping, mail). Every
+    /// network finding except a listener also counts as one of these; they are refused for a third-party SDK 5 plugin that declares services,
+    /// which must send everything through <see cref="IPluginContext.Http"/> (declared hosts, the service's switch, public addresses only).
+    /// </summary>
+    public const string RawNetwork = "own network connection";
+
+    private static bool IsRawNetwork(string detail) => detail != "System.Net.HttpListener";
 
     /// <summary>
     /// Reflection into code that is not the plugin's own (the host's types reached through any object the SDK hands out, private fields, code
@@ -129,15 +154,16 @@ public static class PluginLint
     /// third-party package may not contain, unreadable code, or code that needs a capability the package did not declare.
     /// </summary>
     /// <param name="legacy">A package without a statement from before SDK 3 (catalog without statement): only the file types are checked.</param>
-    public static void CheckZip(string zipPath, PluginOrigin origin, IReadOnlyCollection<string> capabilities, bool legacy = false, int sdk = int.MaxValue)
+    /// <param name="declaresServices">The signed statement declares network services: a third-party SDK 5 package then may not make a connection of its own.</param>
+    public static void CheckZip(string zipPath, PluginOrigin origin, IReadOnlyCollection<string> capabilities, bool legacy = false, int sdk = int.MaxValue, bool declaresServices = false)
     {
         // Nobody may write to the file while it is read.
         using var file = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        CheckZip(file, origin, capabilities, legacy, sdk);
+        CheckZip(file, origin, capabilities, legacy, sdk, declaresServices);
     }
 
     /// <summary>The same from an open stream, so the caller can check and unpack one and the same handle.</summary>
-    public static void CheckZip(Stream zipStream, PluginOrigin origin, IReadOnlyCollection<string> capabilities, bool legacy = false, int sdk = int.MaxValue)
+    public static void CheckZip(Stream zipStream, PluginOrigin origin, IReadOnlyCollection<string> capabilities, bool legacy = false, int sdk = int.MaxValue, bool declaresServices = false)
     {
         using var zip = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: true);
         var findings = new List<LintFinding>();
@@ -167,7 +193,7 @@ public static class PluginLint
             ScanInto(buffer.ToArray(), name, findings, problems, refs, defs);
         }
         CheckReferences(refs, defs, origin, problems);
-        Throw(Evaluate(findings, origin, capabilities, sdk), problems);
+        Throw(Evaluate(findings, origin, capabilities, sdk, declaresServices), problems);
     }
 
     /// <summary>The same for an unpacked folder (a package installed by hand and approved in expert mode).</summary>
@@ -201,7 +227,7 @@ public static class PluginLint
     private static void Throw(IReadOnlyList<LintFinding> undeclared, List<string> problems)
     {
         foreach (var group in undeclared.GroupBy(f => f.Capability))
-            problems.Add(Strings.Get("plugin.lint.undeclared", group.Key, string.Join(", ", group.Select(f => f.Detail).Distinct().Take(3))));
+            problems.Add(Strings.Get(group.Key == RawNetwork ? "plugin.lint.rawNetwork" : "plugin.lint.undeclared", group.Key, string.Join(", ", group.Select(f => f.Detail).Distinct().Take(3))));
         if (problems.Count > 0) throw new CatalogException(string.Join(" · ", problems.Distinct().Take(6)));
     }
 
@@ -248,13 +274,16 @@ public static class PluginLint
     }
 
     /// <summary>The findings that the declared capabilities do not cover (any network capability covers "network"). Run-time code is never covered for a third party.</summary>
-    public static IReadOnlyList<LintFinding> Evaluate(IEnumerable<LintFinding> findings, PluginOrigin origin, IReadOnlyCollection<string> capabilities, int sdk = int.MaxValue) =>
+    public static IReadOnlyList<LintFinding> Evaluate(IEnumerable<LintFinding> findings, PluginOrigin origin, IReadOnlyCollection<string> capabilities, int sdk = int.MaxValue, bool declaresServices = false) =>
         findings.Where(f => f.Capability switch
         {
+            // A third-party SDK 5 plugin that declares services uses the host's client: no connection of its own, whatever it declared.
+            RawNetwork => origin == PluginOrigin.ThirdParty && declaresServices && sdk >= PluginNetServices.MinSdk,
             Network => !capabilities.Contains(PluginCapabilities.NetworkLoopback) && !capabilities.Contains(PluginCapabilities.NetworkLan) && !capabilities.Contains(PluginCapabilities.NetworkInternet),
             Reflection => origin == PluginOrigin.ThirdParty,
             Dpapi => origin == PluginOrigin.ThirdParty,
             SdkActions => sdk < PluginPageAction.MinSdk,
+            SdkTv => sdk < TvSdk.MinSdk,
             PluginCapabilities.DynamicCode when origin == PluginOrigin.ThirdParty => true,
             var cap => !capabilities.Contains(cap)
         }).Select(f => f.Capability == Reflection ? f with { Capability = PluginCapabilities.DynamicCode } : f).ToList();
@@ -310,7 +339,10 @@ public static class PluginLint
                 foreach (var rule in TypeRules)
                 {
                     if (ns == rule.Namespace && (rule.Type is null || type == rule.Type))
+                    {
                         findings.Add(new LintFinding(name, rule.Capability, $"{ns}.{type}"));
+                        if (rule.Capability == Network && IsRawNetwork($"{ns}.{type}")) findings.Add(new LintFinding(name, RawNetwork, $"{ns}.{type}"));
+                    }
                 }
             }
             foreach (var handle in md.MemberReferences)
@@ -323,7 +355,10 @@ public static class PluginLint
                 foreach (var rule in MemberRules)
                 {
                     if (ns == rule.Namespace && type == rule.Type && rule.Members.Contains(memberName))
+                    {
                         findings.Add(new LintFinding(name, rule.Capability, $"{type}.{memberName}"));
+                        if (rule.Capability == Network) findings.Add(new LintFinding(name, RawNetwork, $"{type}.{memberName}"));
+                    }
                 }
             }
         }

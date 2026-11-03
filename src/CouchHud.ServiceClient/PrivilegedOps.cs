@@ -122,6 +122,13 @@ public interface IPrivilegedOps
     /// <summary>Uninstall (elevated administrator): every account's policies, keys and old tasks go, paused services start again.</summary>
     Task<OpResult> ReleaseAllAccountsAsync(CancellationToken cancellation = default);
 
+    /// <summary>
+    /// Sets a damaged service state aside (after releasing what it still names) or, with a valid state, releases every account and starts
+    /// fresh. Needs an administrator's approval through UAC for exactly this operation (or an elevated caller); may run on after the answer
+    /// timed out (poll <see cref="ReleaseStatusAsync"/>).
+    /// </summary>
+    Task<OpResult> ResetServiceStateAsync(CancellationToken cancellation = default);
+
     /// <summary>The state of the last ReleaseAllAccounts from Status ("none", "running", "done", "failed"), null when the service could not tell.</summary>
     Task<string?> ReleaseStatusAsync(CancellationToken cancellation = default);
 }
@@ -136,7 +143,8 @@ public sealed class ServiceOps : IPrivilegedOps
 {
     // InstallCouchHudUpdate carries the unlock's grant so the update keeps the session (KEEPSESSION). The codes pick theirs themselves.
     private static readonly HashSet<Operation> GrantOperations =
-        [Operation.ReleaseLockPolicies, Operation.CleanupPolicyKeys, Operation.SetRemoteFirewall, Operation.SetAutoLogon, Operation.InstallCouchHudUpdate];
+        [Operation.ReleaseLockPolicies, Operation.CleanupPolicyKeys, Operation.SetRemoteFirewall, Operation.SetAutoLogon, Operation.InstallCouchHudUpdate,
+         Operation.InstallWindowsUpdates, Operation.PauseServices];
 
     private readonly ServiceClient _client;
     private readonly ServiceProbe? _probe;
@@ -156,7 +164,8 @@ public sealed class ServiceOps : IPrivilegedOps
         _delay = delay ?? Task.Delay;
         if (probe is null) _last = new ServiceStatus(ServiceState.NotExpected, null, _now());
         Cache = new GrantCache(_now);
-        Grants = (op, _) => Task.FromResult(Cache.For(op));
+        // Windows Update and PauseServices take a parent's or an administrator's approval only (the service answers ApprovalOnly to any other kind): never the unlock's grant, and no wasted call.
+        Grants = (op, _) => Task.FromResult(op is Operation.InstallWindowsUpdates or Operation.PauseServices ? Cache.Approval(op) : Cache.For(op));
     }
 
     public GrantCache Cache { get; }
@@ -454,6 +463,13 @@ public sealed class ServiceOps : IPrivilegedOps
 
     public Task<OpResult> ReleaseAllAccountsAsync(CancellationToken cancellation = default) =>
         RunAsync(Operation.ReleaseAllAccounts, g => _client.CallAsync(Operation.ReleaseAllAccounts, g, ReleaseWait, cancellation), cancellation);
+
+    public async Task<OpResult> ResetServiceStateAsync(CancellationToken cancellation = default)
+    {
+        var (result, _) = await RunWithReplyAsync(Operation.ResetServiceState,
+            g => _client.CallAsync(Operation.ResetServiceState, g, ReleaseWait, cancellation), () => Cache.Approval(Operation.ResetServiceState), cancellation).ConfigureAwait(false);
+        return result;
+    }
 
     public async Task<string?> ReleaseStatusAsync(CancellationToken cancellation = default)
     {

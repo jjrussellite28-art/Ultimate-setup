@@ -21,6 +21,7 @@ public static class UninstallCleanup
     // Accounts whose lock policies were still in the registry after the direct release: their helper tasks must not be deleted.
     private static readonly HashSet<string> StuckAccounts = new(StringComparer.OrdinalIgnoreCase);
 
+    [SecondFactorExempt("the uninstaller removes everything of CouchHUD, including the shell entry")]
     public static int Run()
     {
         // Elevated: the file of every class a new step calls goes into ElevatedContractTests.Files (no writing state helpers there).

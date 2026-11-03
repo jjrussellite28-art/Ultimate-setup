@@ -5,23 +5,22 @@ using CouchHud.Core.Platform;
 namespace CouchHud.Core.Plugins;
 
 /// <summary>One plugin of the catalog worth pointing out, and why.</summary>
-/// <param name="Reason">"program" (a matching program is installed: <paramref name="Program"/>), "wand" (Wand used to ship with CouchHUD) or "feature" (the household used a feature that is a plugin now: <paramref name="Program"/> names it).</param>
+/// <param name="Reason">"program" (a matching program is installed: <paramref name="Program"/>), "feature" (the household used a feature that is a plugin now: <paramref name="Program"/> names it).</param>
 public sealed record PluginSuggestion(string EntryId, string Name, string Reason, string? Program);
 
 /// <summary>
 /// Suggests catalog plugins: when a program named in an entry's <c>suggestWhen.uninstallEntry</c> is installed (exact display name of an
-/// HKLM uninstall entry), and Wand to those who used it while it shipped with CouchHUD. A suggestion only points at the catalog page: it
+/// HKLM uninstall entry). (Wand is no plugin any more: it is a companion app, see WandSetup.) A suggestion only points at the catalog page: it
 /// never installs anything, and installing goes through the same gates as any other. Each entry is offered once per Windows user; on the
 /// locked couch nothing is offered (the suggestions wait until the next unlocked moment and are not marked).
 /// </summary>
 public sealed class PluginSuggestions(string dataDir, IRegistry registry, string windowsUser, Func<string, bool>? usedFeature = null)
 {
     /// <summary>The features of the core that became plugins; a catalog entry names one in <c>suggestWhen.feature</c>.</summary>
-    public static readonly IReadOnlySet<string> Features = new HashSet<string>(StringComparer.Ordinal) { "homeAssistant" };
+    public static readonly IReadOnlySet<string> Features = new HashSet<string>(StringComparer.Ordinal) { "homeAssistant", "weather", "news", "assistantAnthropic", "assistantOpenAi", "lgTv" };
 
     public const string UninstallRoot = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
     public const string UninstallRoot32 = @"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall";
-    public const string WandId = "wand";
     private const int MaxRemembered = 500;
 
     private readonly object _lock = new();
@@ -41,11 +40,6 @@ public sealed class PluginSuggestions(string dataDir, IRegistry registry, string
         foreach (var entry in entries)
         {
             if (entry.Kind != CatalogKind.Plugin || installed.Contains(entry.Id) || offered.Contains(entry.Id)) continue;
-            if (entry.Id.Equals(WandId, StringComparison.OrdinalIgnoreCase) && UsedBundledWand())
-            {
-                list.Add(new PluginSuggestion(entry.Id, entry.Name, "wand", null));
-                continue;
-            }
             if (entry.SuggestWhenFeature is { } feature && usedFeature?.Invoke(feature) == true)
             {
                 list.Add(new PluginSuggestion(entry.Id, entry.Name, "feature", feature));
@@ -82,9 +76,6 @@ public sealed class PluginSuggestions(string dataDir, IRegistry registry, string
     {
         lock (_lock) return ReadAll().TryGetValue(UserKey, out var ids) ? ids.ToHashSet(StringComparer.OrdinalIgnoreCase) : new HashSet<string>();
     }
-
-    /// <summary>Wand ran while it was bundled: its settings folder exists (its id was always "wand").</summary>
-    private bool UsedBundledWand() => Directory.Exists(Path.Combine(dataDir, "plugin-data", WandId));
 
     /// <summary>
     /// Is a program of this name installed? An uninstall entry is called exactly so ("CaseHUD") or the name followed by its version the way installers
@@ -163,8 +154,116 @@ public static partial class PluginSettingSeeds
                 ["gamingLease"] = Bool(config.CaseHudGamingLease)
             };
         }
-            if (pluginId.Equals(VpnId, StringComparison.OrdinalIgnoreCase)) return Vpn(config);
+        if (pluginId.Equals(VpnId, StringComparison.OrdinalIgnoreCase)) return Vpn(config);
+        if (pluginId.Equals(WeatherId, StringComparison.OrdinalIgnoreCase)) return Weather(config);
+        if (pluginId.Equals(NewsId, StringComparison.OrdinalIgnoreCase)) return News(config);
+        if (pluginId.Equals(AnthropicId, StringComparison.OrdinalIgnoreCase)) return ApiKey(AnthropicId, config.AnthropicApiKey, moveSecret);
+        if (pluginId.Equals(OpenAiId, StringComparison.OrdinalIgnoreCase)) return ApiKey(OpenAiId, config.OpenAiApiKey, moveSecret);
         return pluginId.Equals(HomeAssistantId, StringComparison.OrdinalIgnoreCase) ? HomeAssistant(config, moveSecret) : null;
+    }
+
+    // ---- 0.7: the weather, the news and the assistant's providers ----
+
+    public const string WeatherId = "weather";
+    public const string NewsId = "news";
+    public const string AnthropicId = "anthropic";
+    public const string OpenAiId = "openai";
+
+    /// <summary>The privacy switches of these plugins' declared services (plugin/service), where the old switches of the core went.</summary>
+    public const string WeatherService = "weather/open-meteo";
+    public const string NewsService = "news/feeds";
+    public const string AnthropicService = "anthropic/api";
+    public const string OpenAiService = "openai/api";
+
+    /// <summary>The features of the core that became these plugins (<see cref="PluginSuggestions.Features"/>), by plugin id.</summary>
+    public static readonly IReadOnlyDictionary<string, string> FeatureOf = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        [HomeAssistantId] = "homeAssistant", [WeatherId] = "weather", [NewsId] = "news", [AnthropicId] = "assistantAnthropic", [OpenAiId] = "assistantOpenAi"
+    };
+
+    /// <summary>The two default feed sets of the core before 0.7 (German, English): a list that is still one of them was never the user's choice.</summary>
+    private static readonly string[][] OldDefaultFeeds =
+    [
+        ["https://static.winfuture.de/feeds/WinFuture-News-rss2.0.xml", "https://stadt-bremerhaven.de/feed/"],
+        ["https://www.theverge.com/rss/games/index.xml", "https://www.pcgamer.com/rss/"]
+    ];
+
+    private const int MaxFeeds = 30;
+
+    private static readonly JsonSerializerOptions Camel = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    /// <summary>The place for the weather as the plugin's first setting "place" (JSON); null without a usable place.</summary>
+    private static IReadOnlyDictionary<string, string?>? Weather(AppConfig config)
+    {
+        if (config.WeatherLocation is not { } p || !double.IsFinite(p.Latitude) || !double.IsFinite(p.Longitude)
+            || Math.Abs(p.Latitude) > 90 || Math.Abs(p.Longitude) > 180) return null;
+        var place = new { name = Text(p.Name, 100) ?? "?", region = Text(p.Region, 200) ?? "", latitude = p.Latitude, longitude = p.Longitude };
+        return new Dictionary<string, string?> { ["place"] = JsonSerializer.Serialize(place, Camel) };
+    }
+
+    /// <summary>The user's own feeds as the plugin's first setting "feeds" (JSON list); null for none or a list that is still a default set.</summary>
+    private static IReadOnlyDictionary<string, string?>? News(AppConfig config)
+    {
+        var feeds = UsableFeeds(config);
+        return feeds.Count == 0 ? null : new Dictionary<string, string?> { ["feeds"] = JsonSerializer.Serialize(feeds, Camel) };
+    }
+
+    /// <summary>The feeds the core kept that are the user's own: http(s) addresses, no duplicates, at most 30; none for an old default set.</summary>
+    internal static List<object> UsableFeeds(AppConfig config)
+    {
+        var list = new List<object>();
+        if (config.NewsFeeds is not { Count: > 0 } feeds) return list;
+        var urls = feeds.Select(f => f?.Url ?? "").ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (OldDefaultFeeds.Any(set => urls.SetEquals(set))) return list;
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var f in feeds)
+        {
+            if (list.Count >= MaxFeeds) break;
+            var url = f?.Url?.Trim();
+            if (url is null || url.Length > 2000 || !Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || !seen.Add(url)) continue;
+            list.Add(new { name = Text(f!.Name, 60) ?? uri.Host, url });
+        }
+        return list;
+    }
+
+    /// <summary>An API key the core kept, encrypted again for the provider plugin as its secret "apiKey"; null without one (or when that fails).</summary>
+    private static IReadOnlyDictionary<string, string?>? ApiKey(string pluginId, string stored, SecretMover? moveSecret)
+    {
+        if (string.IsNullOrWhiteSpace(stored) || moveSecret is null) return null;
+        return Move(moveSecret, stored, pluginId) is { } moved ? new Dictionary<string, string?> { ["apiKey"] = moved } : null;
+    }
+
+    /// <summary>
+    /// After the seed of the weather, news or a provider plugin was written into its settings: the copy in config.json goes. A key only when the
+    /// seed really held it (a failed move leaves it, so a later start can try again). Returns whether anything was cleared.
+    /// </summary>
+    public static bool ClearLegacy(AppConfig config, string pluginId, IReadOnlyDictionary<string, string?>? writtenSeed)
+    {
+        if (writtenSeed is null) return false;
+        if (pluginId.Equals(HomeAssistantId, StringComparison.OrdinalIgnoreCase)) return ClearLegacyHomeAssistantSecrets(config, writtenSeed);
+        if (pluginId.Equals(WeatherId, StringComparison.OrdinalIgnoreCase) && writtenSeed.ContainsKey("place"))
+        {
+            config.WeatherLocation = null;
+            return true;
+        }
+        if (pluginId.Equals(NewsId, StringComparison.OrdinalIgnoreCase) && writtenSeed.ContainsKey("feeds"))
+        {
+            config.NewsFeeds = null;
+            return true;
+        }
+        if (!writtenSeed.ContainsKey("apiKey")) return false;
+        if (pluginId.Equals(AnthropicId, StringComparison.OrdinalIgnoreCase)) config.AnthropicApiKey = "";
+        else if (pluginId.Equals(OpenAiId, StringComparison.OrdinalIgnoreCase)) config.OpenAiApiKey = "";
+        else return false;
+        return true;
+    }
+
+    /// <summary>Plain text from the untrusted file: no control characters, trimmed, cut; null when nothing is left.</summary>
+    private static string? Text(string? s, int max)
+    {
+        var clean = new string((s ?? "").Where(c => !char.IsControl(c)).ToArray()).Trim();
+        if (clean.Length > max) clean = clean[..max];
+        return clean.Length == 0 ? null : clean;
     }
 
     /// <summary>
@@ -241,7 +340,7 @@ public static partial class PluginSettingSeeds
         // One credential at a time, as in the core: the sign-in wins over a token that was left behind.
         if (hasSession)
         {
-            if (Move(moveSecret, config.HomeAssistantRefreshToken) is { } refresh)
+            if (Move(moveSecret, config.HomeAssistantRefreshToken, HomeAssistantId) is { } refresh)
             {
                 seed["refreshToken"] = refresh;
                 // The refresh token belongs to the client_id it was issued for (the core's); Home Assistant refuses it for another one.
@@ -249,7 +348,7 @@ public static partial class PluginSettingSeeds
                 seed["clientId"] = LegacyHomeAssistantClientId;
             }
         }
-        else if (hasToken && Move(moveSecret, config.HomeAssistantToken) is { } token)
+        else if (hasToken && Move(moveSecret, config.HomeAssistantToken, HomeAssistantId) is { } token)
         {
             seed["token"] = token;
         }
@@ -271,16 +370,16 @@ public static partial class PluginSettingSeeds
         return had;
     }
 
-    private static string? Move(SecretMover move, string stored)
+    private static string? Move(SecretMover move, string stored, string pluginId)
     {
         try
         {
-            var moved = move(HomeAssistantId, stored);
+            var moved = move(pluginId, stored);
             return moved is not null && moved.Length > StoredPrefix.Length && moved.StartsWith(StoredPrefix, StringComparison.Ordinal) && moved != stored ? moved : null;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            Console.Error.WriteLine($"[plugins] a Home Assistant secret was not taken over: {ex.GetType().Name}");
+            Console.Error.WriteLine($"[plugins] a secret for {pluginId} was not taken over: {ex.GetType().Name}");
             return null;
         }
     }

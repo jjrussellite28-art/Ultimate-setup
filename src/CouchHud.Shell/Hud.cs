@@ -32,14 +32,12 @@ namespace CouchHud.Shell;
 /// <summary>Ties window, controller, library and system functions together. UI thread only.</summary>
 public sealed partial class Hud(ConfigStore config, LibraryService library, ArtworkResolver artwork, StoreInfoService storeInfo, ShellManager shell, XInputPoller pad, CouchHud.Core.Net.NetPolicy net, string dataDir, bool dev, CouchHud.Core.Plugins.PluginManager plugins) : IRemoteTarget
 {
-    private readonly WeatherService _weather = new(CouchHud.Core.Net.NetGate.CreateClient(CouchHud.Core.Net.NetService.Weather, net, TimeSpan.FromSeconds(10)));
-    private readonly NewsService _news = new(CouchHud.Core.Net.NetGate.CreateClient(CouchHud.Core.Net.NetService.News, net, TimeSpan.FromSeconds(10)));
     // The clock check of the parental controls (the one request without a switch of its own: only Offline stops it).
     private readonly HttpClient _timeHttp = CouchHud.Core.Net.NetGate.CreateClient(CouchHud.Core.Net.NetService.Time, net, TimeSpan.FromSeconds(10));
     private MainWindow? _window;
     private System.Windows.Forms.NotifyIcon? _tray;
     private CancellationTokenSource? _homeHold;
-    private bool _pcMode;
+    private volatile bool _pcMode;
     private readonly GameSessionTracker _sessions = new(new Win32ProcessProbe());
     private readonly System.Windows.Threading.DispatcherTimer _sessionTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private int _ticking;
@@ -54,7 +52,6 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     // Whether CouchHud did explorer's autostart job this session (only as the shell).
     private bool _ranStartup;
     // Model answers with several tool rounds take longer than the shared client allows.
-    private readonly HttpClient _aiHttp = CouchHud.Core.Net.NetGate.CreateClient(CouchHud.Core.Net.NetService.Assistant, net, TimeSpan.FromSeconds(120));
     private readonly McpHost _mcp = new();
     private readonly RemoteHost _remote = new();
     private readonly NotificationCenter _notifications = new();
@@ -171,6 +168,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     private ProfileRestore? _profileRestore;
     private ControllerMouse? _mouse;
     private ForegroundGuard? _foreground;
+    private BrowserDialogGuard? _dialogGuard;
     private readonly ForegroundState _fgState = new();
     // A screenshot or clip is being taken through the Game Bar: the guard keeps out of the way.
     private bool _capturing;
@@ -247,6 +245,9 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         // Asked once in the background (the answer is cached): never on the UI thread, never as a failed sign-in if the flags can tell.
         _ = Task.Run(AccountPassword.Refresh);
         plugins.IsLocked = () => Locked;
+        // Plugins with "host.state" read this (read only): the running app only if the user did not hide it and its area is on (PluginHostRules).
+        plugins.HostStateReader = () => new PluginHostSnapshot(CatalogRules.AppVersion.ToString(), _asShell ? PluginShellMode.Shell : PluginShellMode.App, _pcMode,
+            PluginHostRules.RunningApp(_sessions.Current?.Item, Areas));
         plugins.IsChildProfile = () => ChildNow;
         // The owner's choice per plugin function, read fresh on every decision (PluginFunctionRules.Effective ignores a damaged value).
         plugins.StoredLevel = (plugin, function) => PluginFunctionRules.Stored(config.Current.PluginFunctionLevels, plugin, function);
@@ -259,7 +260,6 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         {
             Emit("pluginTabs", null);
         });
-        _ = plugins.Loaded.ContinueWith(_ => Ui(PruneFunctionLevels), TaskScheduler.Default);
         optional.Run("session tracking", StartSessionTracking);
         _sessions.Library = () => config.Current.ParentalEnabled ? library.Items : null;
         optional.Run("parental controls", () => _ = Parental);
@@ -389,6 +389,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 config.ClearRestoredNotice();
             });
         }
+        optional.Run("wand hint", PostWandHintOnce);
         optional.Run("service watch", StartServiceWatch);
         Console.WriteLine($"[hud] started: asShell {_asShell}, integration {config.Current.IntegrationMode}, lock {config.Current.CouchLock}");
         // What a crashed run left behind goes first; a locked start applies the policies again right after.
@@ -414,6 +415,14 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 PluginRestrictions = plugins.Host.IsRestrictedProcess
             };
             _foreground.Start();
+        });
+        // The native backstop of the couch browser: a Windows dialog in the web view's process tree is closed while the couch rules apply.
+        // Failing to start it keeps the browser closed on a locked couch (OpenBrowserAsync).
+        optional.Run("browser dialog guard", () =>
+        {
+            _dialogGuard = new BrowserDialogGuard(BrowserDialogsEnforced, () => _browser?.BrowserProcessId, () => _browser is not null,
+                Console.Error.WriteLine, () => CloseBrowser(_browsing), () => _window is null ? IntPtr.Zero : new System.Windows.Interop.WindowInteropHelper(_window).Handle);
+            _dialogGuard.Start();
         });
         // Without explorer nobody answers the volume keys.
         if (_asShell && _audio is not null)
@@ -504,6 +513,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     }
 
     /// <summary>Puts the shell entry back after a restart into PC mode, when the RunOnce entry did not.</summary>
+    [SecondFactorExempt("puts the shell entry back after PC mode: raises protection")]
     private void RestorePendingShell()
     {
         config.Update(c => c.PendingShellRestore = false);
@@ -521,7 +531,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         }
     }
 
-    private void Emit(string name, object? payload) => _window?.Bridge?.Emit(name, payload);
+    private void Emit(string name, object? payload)
+    {
+        _window?.Bridge?.Emit(name, payload);
+        // The phones' event channel gets a signal of the same change (only kinds of RemoteRights.EventLevel, filtered by each phone's level).
+        PublishToPhones(name);
+    }
 
     /// <summary>Lets helpers (assistant tools) push events to the UI.</summary>
     public void Notify(string name, object? payload) => Ui(() => Emit(name, payload));
@@ -562,6 +577,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
 
     private void OnPadDown(string button, bool stickOnly = false)
     {
+        // The window that keeps the desktop closed when Windows cannot be locked takes the controller for itself.
+        if (_lockFailedWindow is { } failed)
+        {
+            failed.PadButton(button);
+            return;
+        }
         // A person at the controller (on the page, in the bar, or the A that confirms an MCP request): counts as use of the browser
         // for the next 30 s, while it is on screen (WatchBrowserUnlock).
         _browserInput = MonoNow();
@@ -573,6 +594,26 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         // display would go dark while someone browses the library (or a web page) with the pad.
         Display.KeepAwake();
         if (Display.WakeIfOff()) return;
+        // PC mode: the Guide button is the way back to the couch, before anything else could take it (a mouse mode left running,
+        // the browser). A tap returns unless the person gave the tap away; holding always returns.
+        if (_pcMode && (button == "guide" || (button is "back" or "start" && HomeHeld())))
+        {
+            switch (PcModeReturn.OnGuide(_pcMode, _pcModeEntering, GuideTapEffective && button == "guide"))
+            {
+                case PcModeGuide.Return:
+                    Console.WriteLine("[pcmode] guide: back to the couch");
+                    _ = LeavePcModeAsync();
+                    break;
+                case PcModeGuide.ReturnOnHold:
+                    OnHomeHold(() =>
+                    {
+                        Console.WriteLine("[pcmode] guide held: back to the couch");
+                        _ = LeavePcModeAsync();
+                    });
+                    break;
+            }
+            return;
+        }
         // The controller on the browser page: every button has its meaning there (BrowserInput), the guide button always leads out.
         // Not tied to the cursor mode running: if that stopped, the watchdog starts it again, but the buttons keep working meanwhile.
         if (_browsing && _browser is not null)
@@ -611,12 +652,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         }
         if (button == "guide" || (button is "back" or "start" && HomeHeld()))
         {
-            if (_pcMode)
-            {
-                // Long press only: a short tap in PC mode may be meant for another app.
-                OnHomeHold(() => _ = LeavePcModeAsync());
-            }
-            else if (_window?.IsActive == true)
+            // (PC mode was handled above.)
+            if (_window?.IsActive == true)
             {
                 // In front already (a popup of our own window was closed above): the UI opens or closes its quick menu.
                 Emit("input", new { type = "down", button = "guide" });
@@ -656,6 +693,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// <summary>Brings the HUD to the front; target "home" or "quick" (the guide menu).</summary>
     public void ShowHud(string? target = "home")
     {
+        Interlocked.Increment(ref _hudShownCount);
         // Coming from a running game: freeze it while the HUD is up, if wanted.
         // Frozen only once the HUD really is in front: a suspended full-screen game
         // can't hand over the screen, and if the switch fails it must keep running.
@@ -669,7 +707,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         _fgState.ReleaseAll();
         _appsReleased = null;
         ForgetUnlock();
-        _window?.BringToFront();
+        _window?.BringToFront(personCameBack: true);
         // No target: the HUD shows what it showed before (back from the browser to the news article).
         if (target is not null) Emit("nav", target);
     }
@@ -683,9 +721,11 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         {
             Launcher.SessionStarted(s.Item.Id);
             PrepareFreezeCheck(s);
-            plugins.Events.RaiseGameStarted(new GameEvent(s.Item.Id, s.Item.Name, s.Item.InstallDir, 0) { ProcessId = s.Pids.Cast<int?>().FirstOrDefault() });
+            if (PluginHostRules.EventFor(s.Item, Areas, 0, s.Pids.Cast<int?>().FirstOrDefault()) is { } started) plugins.Events.RaiseGameStarted(started);
+            plugins.NotifyHostChanged();
             Ui(() => Emit("session", SessionDto()));
             if (s.External) Ui(() => CheckExternalStart(s));
+            OnCompanionGameStarted(s);
         };
         _sessions.OtherStarted += s =>
         {
@@ -699,8 +739,10 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         _sessions.Ended += (s, minutes) => Ui(() =>
         {
             Launcher.SessionEnded(s.Item.Id, s.Started);
+            OnCompanionGameEnded(s);
             _freezeGuard.Forget(s.Item);
-            plugins.Events.RaiseGameEnded(new GameEvent(s.Item.Id, s.Item.Name, s.Item.InstallDir, minutes) { ProcessId = s.Pids.Cast<int?>().FirstOrDefault() });
+            if (PluginHostRules.EventFor(s.Item, Areas, minutes, s.Pids.Cast<int?>().FirstOrDefault()) is { } ended) plugins.Events.RaiseGameEnded(ended);
+            plugins.NotifyHostChanged();
             GamePause.ResumeAll();
             // After a game the idle threshold back to the profile picker starts again (review NEU-1).
             ProfileActivity();
@@ -780,14 +822,59 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         };
     }
 
+    /// <summary>Resume game from the HUD: the game in front, or an error the page shows.</summary>
+    public async Task ResumeGameAsync()
+    {
+        CancelFrontLoop();
+        RequireProfileChosen();
+        var result = await Win32ProcessProbe.ActivateGameAsync(PrepareResume());
+        if (result != GameFocusResult.InFront)
+        {
+            Console.Error.WriteLine($"[session] resume: {result}");
+            throw new InvalidOperationException(Strings.Get("hud.cannotFocusGame"));
+        }
+    }
+
+    /// <summary>The same for callers that can't wait (a launch of the running game, the Guide button): a failure is only logged.</summary>
     public void ResumeGame()
     {
+        CancelFrontLoop();
         RequireProfileChosen();
+        var pids = PrepareResume();
+        _ = Win32ProcessProbe.ActivateGameAsync(pids).ContinueWith(t =>
+        {
+            if (t.IsFaulted) Console.Error.WriteLine($"[session] resume: failed: {t.Exception?.GetBaseException().Message}");
+            else if (t.Result != GameFocusResult.InFront) Console.Error.WriteLine($"[session] resume: {t.Result}");
+        }, TaskScheduler.Default);
+    }
+
+    /// <summary>Every check of a resume, then the game unfrozen; the processes to bring to the front.</summary>
+    private IReadOnlyList<int> PrepareResume()
+    {
         var s = _sessions.Current ?? throw new InvalidOperationException(Strings.Get("hud.noGameRunning"));
-        if (ParentalEnforced && Parental.Service.Expired) throw new InvalidOperationException(Strings.Get("parental.timeUp"));
+        RequireGameMayBeInFront(s);
+        return BeginResume(s);
+    }
+
+    /// <summary>The side effects of a resume (the unlock is forgotten, the game thawed). Only when the game is really about to be brought forward.</summary>
+    private IReadOnlyList<int> BeginResume(GameSession s)
+    {
         ForgetUnlock();
+        // The game goes in front now: an activation of the HUD that is still on its way must not freeze it again.
+        _pauseOnActivate = false;
         GamePause.ResumeAll();
-        if (!Win32ProcessProbe.Activate(s.Pids)) throw new InvalidOperationException(Strings.Get("hud.cannotFocusGame"));
+        return s.Pids;
+    }
+
+    /// <summary>
+    /// Time up or a game the rules hold (started outside CouchHud, waiting for the parents): it stays behind the HUD. Every way of bringing the
+    /// session's game forward (resume, the task list's switch) asks this.
+    /// </summary>
+    private void RequireGameMayBeInFront(GameSession s)
+    {
+        if (ParentalEnforced && Parental.Service.Expired) throw new InvalidOperationException(Strings.Get("parental.timeUp"));
+        if (ParentalEnforced && Parental.BlocksGame(s.Item.Id))
+            throw new InvalidOperationException(Parental.BlockedMessage ?? Strings.Get("parental.timeUp"));
     }
 
     /// <summary>A game runs, is paused or is starting: background lookups (artwork) stay quiet.</summary>
@@ -1009,8 +1096,11 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// <summary>Rules can be enforced: the couch lock is on, CouchHud is the shell and not in PC mode.</summary>
     private bool ParentalEnforced => config.Current.ParentalEnabled && LockOn && !_pcMode;
 
-    private bool HasParentCode => config.Current.CouchLock == "code" && config.Current.PasscodeHash.Length > 0
-        || config.Current.CouchLock == "windows" && AccountPassword.IsSet();
+    private bool HasParentCode => CouchHud.Core.Security.ParentCodeState.Has(config.Current.CouchLock, config.Current.PasscodeHash,
+        config.Current.CouchLock == "windows" && AccountPassword.IsSet(), config.Current.ParentalEnabled, config.Current.ParentCodeResetPending);
+
+    /// <summary>A new code was set (the service holds one again): the reset's marker ends.</summary>
+    private static void CodeIsSet(AppConfig c, string hash) => CouchHud.Core.Security.ParentCodeState.CodeIsSet(c, hash);
 
     /// <summary>The parents' code was given for starting exactly this entry (used up by <see cref="Launch"/>).</summary>
     private bool GrantFor(LibraryItem item) => _grant.Fits("launch", item.Id);
@@ -1092,6 +1182,10 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             }
             // Locked out: the UI offers the administrator's way.
             if (check.Result.Ok && check.Outcome == CodeCheckResults.LockedOut) return new { ok = false, waitSeconds = Math.Max(1, check.WaitSeconds), admin = "lockedOut" };
+            // The service's code file is damaged (asked now, after the refusal): no code can be checked. The UI offers the administrator's
+            // reset, and the administrator's way for this one action.
+            if (!check.Result.Ok && CodeFlow.RefusedForDamage(check.Result, await FreshServiceCodesAsync()))
+                return new { ok = false, blocked = Strings.Get("codes.storeDamagedHere"), codesDamaged = true, admin = "damaged" };
             return CodeAnswer(check);
         }
         var wait = _parentLockout.Wait;
@@ -1396,9 +1490,13 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         // grant for "passcode" (review F4). The bridge refuses the call on a locked couch: switching parental controls on from there sets no
         // code (the UI says so; set it from an unlocked couch).
         var inChain = MonoNow() < _parentCodeChainUntil;
+        // The chain skips the parents' grant, never the second factor: the code it sets is the key to every protected setting. Asked BEFORE
+        // the chain is used up, so the page's repeat after the confirmation still finds it.
+        if (inChain && config.Current.CouchLock != "off") RequireSecondFactor(SecondFactorActions.Passcode, true, "couch");
         _parentCodeChainUntil = DateTimeOffset.MinValue;
         if (!inChain)
         {
+            RequireSecondFactor(SecondFactorActions.ParentCode, CodeAcceptedFor("passcode"), "parent");
             if (HasParentCode) RequireParentGrant("passcode");
             else RequireUnlocked();
         }
@@ -1408,13 +1506,13 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         if (ServiceCodes.Expected && !AdminService.DevMayRelax(dev))
         {
             await ServiceCodes.StoreAsync(sequence, parental: true);
-            config.Update(c => c.PasscodeHash = Passcode.HeldByService);
+            config.Update(c => CodeIsSet(c, Passcode.HeldByService));
             _ = ServiceCodes.RefreshAsync();
         }
         else
         {
             var hash = Passcode.Hash(sequence);
-            config.Update(c => c.PasscodeHash = hash);
+            config.Update(c => CodeIsSet(c, hash));
         }
         return GetSecurity();
     }
@@ -1446,7 +1544,11 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     public async Task<object> SetParentalAsync(string key, System.Text.Json.JsonElement value)
     {
         RefuseWhileConfigFaulted();
+        RefuseBadSwitchValue(key, value);
         var off = key == "enabled" && value.ValueKind == System.Text.Json.JsonValueKind.False;
+        // Before the service loses the parents' code. The core below asks nothing again: its callers guard (this method for the bridge,
+        // SetParental for every other caller), so one ticket pays for one change.
+        if (off && config.Current.ParentalEnabled) RequireSecondFactor(SecondFactorActions.ParentalOff, CodeAcceptedFor("parentalOff"), "off");
         if (off && config.Current.ParentalEnabled && ServiceCodes.Expected && !AdminService.DevMayRelax(dev))
         {
             if (HasParentCode && !_grant.Fits("parentalOff")) throw new InvalidOperationException(Strings.Get("parental.codeRequired"));
@@ -1454,14 +1556,32 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             await ServiceCodes.RemoveAsync(CodeKinds.Parent);
             _ = ServiceCodes.RefreshAsync();
         }
-        return SetParental(key, value);
+        return SetParentalCore(key, value);
     }
 
-    /// <summary>One setting of the profile. Needs a fresh parents' code each time.</summary>
+    /// <summary>The main switch is a real true or false and nothing else: any other value (a number, a text, null) used to count as "off".</summary>
+    private static void RefuseBadSwitchValue(string key, System.Text.Json.JsonElement value)
+    {
+        if (key == "enabled" && value.ValueKind is not (System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False))
+            throw new ArgumentException(Strings.Get("parental.unknownSetting", key));
+    }
+
+    /// <summary>One setting of the profile. Needs a fresh parents' code each time. The second factor sits here too (this one is public).</summary>
     public object SetParental(string key, System.Text.Json.JsonElement value)
     {
         RefuseWhileConfigFaulted();
+        RefuseBadSwitchValue(key, value);
+        if (key == "enabled" && value.ValueKind == System.Text.Json.JsonValueKind.False && config.Current.ParentalEnabled)
+            RequireSecondFactor(SecondFactorActions.ParentalOff, CodeAcceptedFor("parentalOff"), "off");
+        return SetParentalCore(key, value);
+    }
+
+    [SecondFactorExempt("callers guard", CallersGuard = true)]
+    private object SetParentalCore(string key, System.Text.Json.JsonElement value)
+    {
+        RefuseWhileConfigFaulted();
         if (key == "ratingSystem") return SetRatingSystem(value);
+        if (key != "enabled") RequireSecondFactorFor(SecondFactorActions.ProfileRules, CodeAcceptedFor("profile"), key, key, value.GetRawText());
         RequireParentGrant(key != "enabled" ? "profile" : value.ValueKind == System.Text.Json.JsonValueKind.False ? "parentalOff" : "parentalOn");
         // The rules of the profile the controller enforces (fetched outside the config lambdas: the controller may write the config when it is created).
         var profileId = Parental.ProfileId;
@@ -1474,6 +1594,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 if (on && !RecoveryRules.ParentalControlsAllowed(AccountPassword.IsSet()))
                     throw new InvalidOperationException(Strings.Get("parental.noPassword"));
                 if (on && !HasParentCode) throw new InvalidOperationException(Strings.Get("parental.needsLock"));
+                // The chain that sets the parents' code right after the switch-on (SetParentCodeAsync asks the second factor in it).
                 if (on) _parentCodeChainUntil = MonoNow().AddMinutes(2);
                 // Switched either way: a release of the recent sites from before does not carry over.
                 _browserRecentShown = false;
@@ -1510,6 +1631,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         if (choice is null || !AgeRatings.Choices.Contains(choice)) throw new ArgumentException(Strings.Get("parental.ratingSystemInvalid"));
         RequireUnlocked();
         var withCode = config.Current.ParentalEnabled && HasParentCode;
+        RequireSecondFactor(SecondFactorActions.ProfileRules, withCode ? _grant.Fits("ratingSystem") : IsUnlocked, "ratingSystem", choice);
         if (withCode && !_grant.Fits("ratingSystem")) throw new InvalidOperationException(Strings.Get("parental.codeRequired"));
         var target = AgeRatings.Resolve(choice, WindowsRegion.Current());
         config.UpdateOrThrow(c =>
@@ -1615,6 +1737,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// controller, the others empty unless they have one) and marked as started, so from here on a missing account is tampering in
     /// every profile, not only in the one that was active. A profile whose account could not be written stays unmarked (no false alarm).
     /// </summary>
+    [SecondFactorExempt("bookkeeping: starts the play time accounts of the profiles, no rule is loosened")]
     private void StartAllPlayAccounts()
     {
         var controller = Parental;
@@ -1669,6 +1792,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     }
 
     /// <summary>Windows' time zone was changed on purpose (travel): the day limits follow it from now on.</summary>
+    [SecondFactorExempt("adopts the PC's time zone for the profile after travel, behind the parents' code (SECURITY.md); no limit is loosened")]
     public object ParentalAdoptZone()
     {
         RefuseWhileConfigFaulted();
@@ -1862,14 +1986,37 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         var item = library.Find(id) ?? throw new KeyNotFoundException($"unknown item {id}");
         // A protected profile waiting in the picker for its code starts nothing (MCP and the assistant come through here too).
         RequireProfileChosen();
+        // One game at a time, like a console: the running game is resumed, another one needs the person's yes first (LaunchOrSwitchAsync).
+        var plan = GameSwitch.Decide(item, _sessions.Current, _sessions.IsPending(DateTimeOffset.UtcNow), config.Current.ParentalEnabled, confirmedFrom: null,
+            switching: Volatile.Read(ref _switching) == 1);
+        switch (plan.Action)
+        {
+            case GameSwitchAction.Resume:
+                ResumeGame();
+                return item;
+            case GameSwitchAction.Confirm:
+                throw new InvalidOperationException(Strings.Get("switch.askFirst", _sessions.Current?.Item.Name ?? ""));
+            case GameSwitchAction.Refuse:
+                throw new InvalidOperationException(Strings.Get(plan.Reason == GameSwitchRefusal.Busy ? "switch.busy" : "hud.closeGameFirst"));
+        }
+        return LaunchCore(item, byPerson);
+    }
+
+    /// <summary>
+    /// Everything of a start after the question of the switch: area, lock, parental rules (with the one-time grant), start target. The switch
+    /// calls this for its final start, because <see cref="Launch"/> refuses while a switch runs.
+    /// </summary>
+    private LibraryItem LaunchCore(LibraryItem item, bool byPerson)
+    {
+        var id = item.Id;
         // An entry of a switched off area starts nothing, from anywhere (its effective start too: a program swapped for a browser).
         if (!Areas.Shows(item)) throw new InvalidOperationException(Strings.Get("areas.off"));
         // A locked couch starts games; apps and websites need the unlock.
         if (Locked && !LockPolicy.MayLaunchLocked(item.Type)) throw new LockedException(Strings.Get("lock.unlockFirst"));
-        if (config.Current.ParentalEnabled && (_sessions.Current is not null || _sessions.IsPending(DateTimeOffset.UtcNow)))
-            throw new InvalidOperationException(Strings.Get("hud.closeGameFirst"));
         var check = Parental.CheckLaunch(item, AgeOf(item), GrantFor(item));
         if (!check.Ok) throw new InvalidOperationException(check.Message);
+        // A controller mouse the app upgrade started does not run on into the game or the page (a mouse mode of the person stays).
+        EndUpgradeMouse();
         // The user's start target and parameters, checked again now (moved, swapped, edited config, a batch file's content): refused instead of
         // starting something else, and before the parents' code is used up. Identity stays the entry's (id, install folder): play time, detection
         // and the parental rules count it as this game. The same for MCP and the assistant, which come through here.
@@ -1895,8 +2042,13 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         var windowsBefore = isUrl ? Win32ProcessProbe.WindowSnapshot() : null;
         StartClientForLaunch(item, start);
         Launcher.Launch(item, start, LaunchOverrides.PinFor(start, own));
+        // Only after a start that happened: companion apps of this game are judged as at an open couch when it is open now (the unlock is
+        // forgotten right below).
+        NoteOpenLaunch(item);
         // Used up only by a start that happened (a refused start target keeps it for another try).
         if (check.UsesCode) _grant.TryConsume("launch", item.Id);
+        // A new start ends the hand-over of an earlier switch.
+        CancelFrontLoop();
         _sessions.Launched(item, DateTimeOffset.UtcNow);
         ForgetUnlock();
         if (releaseApp && LockOn)
@@ -1906,6 +2058,299 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         }
         if (windowsBefore is not null) _ = BringNewWindowForwardAsync(id, handler, windowsBefore, LaunchWindowPicker.SchemeOf(start.Target),config.Current.MaximizeBrowser);
         return library.MarkLaunched(id);
+    }
+
+    /// <summary>
+    /// The HUD's start after the person said yes to closing the running game (<paramref name="confirmedFrom"/> is its id): that game is closed
+    /// first and the new one started after. Everything the new start needs is checked before anything is closed; a yes for a game that no
+    /// longer runs closes nothing.
+    /// </summary>
+    public async Task<LibraryItem> SwitchGameAsync(string id, string confirmedFrom, bool byPerson)
+    {
+        var item = library.Find(id) ?? throw new KeyNotFoundException($"unknown item {id}");
+        RequireProfileChosen();
+        // The question may be old: look at what runs now.
+        await Task.Run(() => _sessions.Tick(DateTimeOffset.UtcNow));
+        var current = _sessions.Current;
+        var plan = GameSwitch.Decide(item, current, _sessions.IsPending(DateTimeOffset.UtcNow), config.Current.ParentalEnabled, confirmedFrom, Volatile.Read(ref _switching) == 1);
+        switch (plan.Action)
+        {
+            case GameSwitchAction.Launch:
+                return Launch(id, byPerson);
+            case GameSwitchAction.Resume:
+                await ResumeGameAsync();
+                return item;
+            case GameSwitchAction.Confirm:
+                throw new InvalidOperationException(Strings.Get("switch.askFirst", current?.Item.Name ?? ""));
+            case GameSwitchAction.Refuse:
+                throw new InvalidOperationException(Strings.Get(plan.Reason switch
+                {
+                    GameSwitchRefusal.Changed => "switch.changed",
+                    GameSwitchRefusal.Busy => "switch.busy",
+                    _ => "hud.closeGameFirst"
+                }));
+        }
+        return await CloseAndLaunchAsync(item, current!, byPerson);
+    }
+
+    // 1 while a switch closes the old game and starts the new one.
+    private int _switching;
+
+    /// <summary>How long the old game gets to save and close before it is ended.</summary>
+    private static readonly TimeSpan SwitchGrace = TimeSpan.FromSeconds(10);
+
+    /// <summary>How long the tracker may still see the old game after its processes are gone (Steam lets go of its "running" value late).</summary>
+    private static readonly TimeSpan SwitchSettle = TimeSpan.FromSeconds(15);
+
+    private async Task<LibraryItem> CloseAndLaunchAsync(LibraryItem item, GameSession old, bool byPerson)
+    {
+        if (Interlocked.Exchange(ref _switching, 1) == 1) throw new InvalidOperationException(Strings.Get("switch.busy"));
+        try
+        {
+            return await GameSwitchSequence.RunAsync(new SwitchSteps(this, item, old, byPerson),
+                TimeSpan.FromMilliseconds(500), SwitchSettle, TimeSpan.FromMilliseconds(500));
+        }
+        catch (GameSwitchCalledOffException ex)
+        {
+            Console.Error.WriteLine($"[session] switch: called off, {old.Item.Id} {(ex.OldClosed ? "already closed" : "not ended by force")}");
+            // The old game may be gone by now: the message says so instead of pretending nothing happened.
+            throw new InvalidOperationException(ex.OldClosed ? Strings.Get("switch.calledOffClosed", old.Item.Name, ex.Message) : ex.Message);
+        }
+        catch (GameSwitchStillRunningException)
+        {
+            Console.Error.WriteLine($"[session] switch: {old.Item.Id} still seen running, the new game is not started");
+            throw new InvalidOperationException(Strings.Get("switch.stillRunning", old.Item.Name));
+        }
+        finally
+        {
+            Volatile.Write(ref _switching, 0);
+        }
+    }
+
+    /// <summary>The real steps of a switch. The looks at the new start run on the UI thread, like the checks of a launch.</summary>
+    private sealed class SwitchSteps(Hud hud, LibraryItem item, GameSession old, bool byPerson) : IGameSwitchSteps
+    {
+        public void RequireLaunchable() => hud.RequireLaunchable(item);
+
+        // A frozen game can't save or close its window.
+        public void Thaw()
+        {
+            Console.WriteLine($"[session] switch: closing {old.Item.Id} for {item.Id}");
+            GamePause.ResumeAll();
+        }
+
+        public async Task CloseOldAsync(Action<string> callOff, CancellationToken cancel)
+        {
+            // Only the processes the tracker noted for this game (pid, start time, image) and what they started; never a client, never
+            // Windows or CouchHUD (SafeTermination). Asked to close first, ended after the grace time. Right before the first kill the
+            // checks run once more (on the UI thread), so nothing is ended for a start that would be refused by now.
+            var outcome = await Win32ProcessProbe.QuitAsync(old.StampsOrEmpty, force: false, SwitchGrace, cancel, mayEnd: () =>
+            {
+                var why = Application.Current.Dispatcher.Invoke(() => hud.SwitchObstacle(item, old));
+                if (why is null) return true;
+                callOff(why);
+                return false;
+            });
+            Console.WriteLine($"[session] switch: {outcome.Found} process(es), {outcome.Killed} ended by force");
+        }
+
+        // Explicitly on the UI thread, whatever thread the caller happens to be on.
+        public Task<string?> CheckAsync() => Application.Current.Dispatcher.InvokeAsync(() => hud.SwitchObstacle(item, old)).Task;
+
+        public async Task<bool> OldStillRunningAsync()
+        {
+            await Task.Run(() => hud._sessions.Tick(DateTimeOffset.UtcNow));
+            return hud._sessions.Current is { } still && still.Item.Id == old.Item.Id;
+        }
+
+        // Not through Launch: its question (GameSwitch.Decide) refuses while a switch runs, and this is the switch itself.
+        public LibraryItem StartNew()
+        {
+            var started = hud.LaunchCore(item, byPerson);
+            hud.FrontNewGameAfterSwitch(item.Id);
+            return started;
+        }
+    }
+
+    // Counts the HUD's own ways to the front: ShowHud and the other person-driven fronts (the person-driven BringToFront); automatic ones (guard,
+    // upgrade watch, standby clients) do not count, so a pending hand-over to a new game gives way only to the person coming back. Entering PC
+    // mode, the couch browser or the mouse mode does not count here (it only hides the HUD); LookAtNewGame stops on those states instead, and
+    // the return from them counts through ShowHud. A window the person activates themselves (Alt+Tab, a click) is not seen.
+    private int _hudShownCount;
+    private int FrontStamp => Volatile.Read(ref _hudShownCount) + (_window?.FrontRequests ?? 0);
+
+    // The one hand-over loop of the latest switch (a new switch or launch and the shutdown cancel the old one).
+    private CancellationTokenSource? _frontLoop;
+
+    private void CancelFrontLoop() => Interlocked.Exchange(ref _frontLoop, null)?.Cancel();
+
+    /// <summary>
+    /// After a switch the new game is handed the front as soon as it shows a window: the switch starts it long after the person's last press
+    /// (the question, the old game closing), when the HUD is no longer the program Windows lets pass the right on, so the game used to stay
+    /// behind the HUD. Same gate as Resume (protected profile, parental rules). A poll only looks (gate and window, nothing changed); the
+    /// side effects of a resume (forgotten unlock, thaw) run once, when a window is found and the game is activated. Gives up after a minute,
+    /// when the person came back to the HUD any way meanwhile, or when the rules hold the game.
+    /// </summary>
+    private void FrontNewGameAfterSwitch(string id)
+    {
+        var cts = new CancellationTokenSource();
+        Interlocked.Exchange(ref _frontLoop, cts)?.Cancel();
+        var token = cts.Token;
+        var stamp = FrontStamp;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var until = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(60);
+                var begun = new System.Runtime.CompilerServices.StrongBox<bool>();
+                // When the loop first saw the game's window: the watch after a return counts its two seconds from there.
+                DateTimeOffset? windowSeen = null;
+                while (DateTimeOffset.UtcNow < until)
+                {
+                    await Task.Delay(500, token);
+                    // The person came back to the HUD: the game is not brought forward any more, but its first window is watched.
+                    if (FrontStamp != stamp)
+                    {
+                        await WatchAfterReturn(id, until, token, windowSeen);
+                        return;
+                    }
+                    // One read of the session serves the id check, the gate and the activation.
+                    var session = _sessions.Current;
+                    var look = await Application.Current.Dispatcher.InvokeAsync(() => LookAtNewGame(id, session, stamp, begun, token)).Task;
+                    if (look.Step == NewGameFrontStep.Stop)
+                    {
+                        if (FrontStamp != stamp && !token.IsCancellationRequested) await WatchAfterReturn(id, until, token, windowSeen);
+                        return;
+                    }
+                    if (look.Step == NewGameFrontStep.Activate) windowSeen ??= DateTimeOffset.UtcNow;
+                    if (look.Step != NewGameFrontStep.Activate) continue;
+                    // The person may have come back since the look: then the game is not pulled over the HUD.
+                    if (token.IsCancellationRequested) return;
+                    if (FrontStamp != stamp)
+                    {
+                        await WatchAfterReturn(id, until, token, windowSeen);
+                        return;
+                    }
+                    if (await Win32ProcessProbe.ActivateGameAsync(look.Pids!) == GameFocusResult.InFront) return;
+                }
+                Console.Error.WriteLine("[session] switch: the new game could not be brought to the front");
+            }
+            catch (OperationCanceledException)
+            {
+                // A newer switch or the shutdown took over.
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[session] switch: front failed: {ex.Message}");
+            }
+        });
+    }
+
+    /// <summary>
+    /// After the person came back to the HUD while the new game was still starting: the game is never brought forward again. Its first window
+    /// may still take the front by itself (the launcher granted its process the foreground, and the grant outlives the person's return on the
+    /// switch path), so for the rest of the 60 seconds the HUD takes the front back ONCE if the new game's own processes own the foreground
+    /// within two seconds of their first window. Never over PC mode, the couch browser or the mouse mode, never for another game, and not after a
+    /// resume (which cancels the loop).
+    /// </summary>
+    private async Task WatchAfterReturn(string id, DateTimeOffset until, CancellationToken token, DateTimeOffset? windowSeen)
+    {
+        DateTimeOffset? windowSince = windowSeen;
+        while (DateTimeOffset.UtcNow < until)
+        {
+            await Task.Delay(100, token);
+            var session = _sessions.Current;
+            var look = await Application.Current.Dispatcher.InvokeAsync(() => LookAtWatch(id, session)).Task;
+            if (look.HasWindow) windowSince ??= DateTimeOffset.UtcNow;
+            var since = windowSince is { } first ? DateTimeOffset.UtcNow - first : TimeSpan.Zero;
+            switch (GameFront.WatchStep(look.Elsewhere, look.IsNew, look.HasWindow, since, look.InFront))
+            {
+                case NewGameWatchStep.Stop:
+                    return;
+                case NewGameWatchStep.TakeBack:
+                    if (token.IsCancellationRequested) return;
+                    Console.WriteLine("[session] switch: the new game's window took the front after the person came back to the HUD; the HUD takes it back once");
+                    // Looked at again on the UI thread: a resume a moment earlier (it cancels the loop there) wins.
+                    await Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        if (!token.IsCancellationRequested) _window?.BringToFront(personCameBack: true);
+                    }).Task;
+                    return;
+            }
+        }
+    }
+
+    /// <summary>One look of the watch, on the UI thread: only reads.</summary>
+    private (bool IsNew, bool HasWindow, bool InFront, bool Elsewhere) LookAtWatch(string id, GameSession? session)
+    {
+        var elsewhere = _pcMode || _browsing || _mouse?.Active == true;
+        if (session is null || session.Item.Id != id) return (false, false, false, elsewhere);
+        // Only the game's main window (the one the hand-over counts) is taken back from; a small launcher, EULA or anti-cheat dialog of the same
+        // process in front is not covered.
+        var main = Win32ProcessProbe.GameMainWindow(session.Pids);
+        var inFront = main != 0 && Native.NativeMethods.GetForegroundWindow().ToInt64() == main;
+        return (true, main != 0, inFront, elsewhere);
+    }
+
+    /// <summary>One look of the hand-over, on the UI thread. The side effects of a resume run once, only together with an Activate.</summary>
+    private (NewGameFrontStep Step, IReadOnlyList<int>? Pids) LookAtNewGame(string id, GameSession? session, int stamp, System.Runtime.CompilerServices.StrongBox<bool> begun, CancellationToken token)
+    {
+        // A cancelled loop (a newer switch or launch, the shutdown) does nothing, least of all the side effects of a resume.
+        if (token.IsCancellationRequested) return (NewGameFrontStep.Stop, null);
+        var isNew = session is not null && session.Item.Id == id;
+        var gateRefuses = false;
+        var hasWindow = false;
+        if (isNew)
+        {
+            try
+            {
+                RequireProfileChosen();
+                RequireGameMayBeInFront(session!);
+            }
+            catch (InvalidOperationException)
+            {
+                // ProfileHeldException is one of these too: a refusal, quietly.
+                gateRefuses = true;
+            }
+            hasWindow = !gateRefuses && Win32ProcessProbe.HasGameWindow(session!.Pids);
+        }
+        // PC mode, the couch browser and the controller mouse own the screen: the game is not pulled over them (HudFrontState's facts).
+        var elsewhere = _pcMode || _browsing || _mouse?.Active == true;
+        var step = GameFront.NewGameStep(FrontStamp != stamp, isNew, gateRefuses, hasWindow, elsewhere);
+        if (step != NewGameFrontStep.Activate) return (step, null);
+        var pids = begun.Value ? session!.Pids : BeginResume(session!);
+        begun.Value = true;
+        return (step, pids);
+    }
+
+    /// <summary>Why the running switch has to stop (the new start would be refused now, another game took over), or null. UI thread.</summary>
+    private string? SwitchObstacle(LibraryItem item, GameSession old)
+    {
+        try
+        {
+            RequireLaunchable(item);
+        }
+        catch (Exception ex)
+        {
+            // Fail closed: whatever went wrong, nothing is ended by force for this start.
+            return ex.Message;
+        }
+        return _sessions.Current is { } now && now.Item.Id != old.Item.Id ? Strings.Get("switch.changed") : null;
+    }
+
+    /// <summary>
+    /// The checks of <see cref="LaunchCore"/> (area, lock, parental rules, start target) without starting or using anything up: a switch runs
+    /// them before it closes the running game. The start checks again.
+    /// </summary>
+    private void RequireLaunchable(LibraryItem item)
+    {
+        if (!Areas.Shows(item)) throw new InvalidOperationException(Strings.Get("areas.off"));
+        if (Locked && !LockPolicy.MayLaunchLocked(item.Type)) throw new LockedException(Strings.Get("lock.unlockFirst"));
+        var check = Parental.CheckLaunch(item, AgeOf(item), GrantFor(item));
+        if (!check.Ok) throw new InvalidOperationException(check.Message);
+        var start = library.EffectiveLaunch(item);
+        if (!Areas.Browser && FeatureAreas.NeedsBrowser(start)) throw new InvalidOperationException(Strings.Get("areas.off"));
+        if (Locked && LaunchOverrides.IsUnpinnedScript(start, config.Current.Overrides.GetValueOrDefault(item.Id))) throw new LockedException(Strings.Get("entry.scriptLocked", item.Name));
     }
 
     private async Task OpenEmbeddedEntryAsync(LibraryItem item, bool byPerson)
@@ -2151,6 +2596,39 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         return await GetItemInfoAsync(id);
     }
 
+    /// <summary>The game an entry's artwork comes from (automatic or pinned), for the edit menu: unlocked only, like the other edit rows.</summary>
+    public ArtworkMatchView GetArtworkMatch(string id)
+    {
+        RequireUnlocked();
+        return library.GetArtworkMatch(id);
+    }
+
+    /// <summary>
+    /// "Search artwork": the Steam store's and SteamGridDB's games for the user's search, with year, platforms and a small cover. A library edit:
+    /// unlocked only; nothing goes out while online artwork is off (Settings › Privacy). Bounded query, 20 s at most.
+    /// </summary>
+    public async Task<ArtworkSearchResult> SearchArtworkAsync(string id, string query)
+    {
+        RequireProfileChosen();
+        RequireUnlocked();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        return await library.SearchArtworkAsync(id, query, cts.Token);
+    }
+
+    /// <summary>
+    /// Pins the game an entry's artwork comes from ("steam:&lt;app id&gt;", "sgdb:&lt;game id&gt;", or null for automatic): the same rules as the
+    /// other library edits (a chosen profile and the unlock). Only pictures change, never the store match or the age rating, so no parents' code.
+    /// </summary>
+    public ArtworkMatchView SetArtworkMatch(string id, string? match, string? name)
+    {
+        if (library.Find(id) is null) throw new KeyNotFoundException($"unknown item {id}");
+        ArtworkMatches.Validate(match);
+        RequireProfileChosen();
+        RequireUnlocked();
+        library.SetArtworkMatch(id, match, name);
+        return library.GetArtworkMatch(id);
+    }
+
     public async Task UninstallAsync(string id)
     {
         var item = library.Find(id) ?? throw new KeyNotFoundException($"unknown item {id}");
@@ -2197,7 +2675,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         uiHdr = config.Current.UiHdr,
         hdrOn = SafeHdrOn(),
         trailerPreviews = config.Current.TrailerPreviews,
-        weather = config.Current.WeatherLocation is not null,
+        weather = WeatherAvailable && WeatherPlace() is not null,
+        news = NewsAvailable,
         assistant = AssistantConfigured,
         skin = LookProfile.Skin,
         skinRestore = SkinRestoreState(),
@@ -2210,6 +2689,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         RefuseWhileConfigFaulted();
         if (install) RequireFull();
         if (!install) RequireUnlocked();
+        RequireSecondFactor(SecondFactorActions.Shell, IsUnlocked, install ? "install" : "uninstall");
         if (install) shell.InstallAsShell();
         else shell.UninstallAsShell();
         SignInLock.SyncInBackground(dataDir);
@@ -2231,12 +2711,14 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             guideTapInGame = c.GuideTapInGame,
             autoLogonDeclined = c.AutoLogonDeclined,
             suppressCompetitors = c.SuppressCompetitors,
+            suppressBySetup = c.SuppressBySetup,
             integrationMode = c.IntegrationMode,
             expertMode = c.ExpertMode,
             modeSwitchJournal = c.ModeSwitchJournal,
             areas = FeatureAreas.From(c).Enabled,
             bluetoothAutoOn = c.BluetoothAutoOn,
             language = c.ActiveProfile.Language,
+            skin = SkinCatalog.MigrateSkinId(c.ActiveProfile.Skin),
             closeExplorerInLight = c.CloseExplorerInLight,
             selfUpdateCheck = c.SelfUpdateCheck,
             // TV: the options only; the pairing (never its key) comes through tvStatus.
@@ -2279,18 +2761,18 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             netCatalog = c.NetCatalog,
             netSystemUpdates = c.NetSystemUpdates,
             netSaves = c.NetSaves,
-            netWeather = c.NetWeather,
-            netNews = c.NetNews,
-            netAssistant = c.NetAssistant,
+            // The plugins' declared network services, one switch each (SDK 5).
+            pluginServices = PluginServicesDto(),
             catalogUpdateCheck = c.CatalogUpdateCheck,
             pluginAutoUpdate = c.PluginAutoUpdate,
             artworkCacheBytes = artwork.Images?.TotalBytes ?? 0,
-            weatherPlace = c.WeatherLocation,
+            // Weather, news and the assistant's providers come from plugins (0.7): only offered while one is there.
+            weatherAvailable = WeatherAvailable,
+            weatherPlace = WeatherPlace(),
+            newsAvailable = NewsAvailable,
             aiProvider = c.AiProvider,
             aiModel = c.AiModel,
-            aiModels = ChatProviders.Models,
-            anthropicKeySet = !string.IsNullOrWhiteSpace(c.AnthropicApiKey),
-            openAiKeySet = !string.IsNullOrWhiteSpace(c.OpenAiApiKey),
+            aiProviders = AiProvidersDto(),
             mcpEnabled = c.McpEnabled,
             mcpLan = c.McpLan,
             mcpPort = c.McpPort,
@@ -2300,6 +2782,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             mcpToken = forUi && !Locked && !ProfileHeld ? Secrets.Unprotect(c.McpToken) : null,
             mcpUrls = McpHost.Urls(c.McpPort, c.McpLan),
             remoteEnabled = c.RemoteEnabled,
+            remotePower = c.RemotePower,
             mirrorNotifications = c.MirrorNotifications,
             notificationStatus = _windowsNotifications?.Status ?? "off",
             isShell = shell.IsInstalledAsShell(),
@@ -2312,6 +2795,53 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     private void RequirePrivacyGrant(string key)
     {
         if (config.Current.ParentalEnabled) RequireParentGrant("privacy", key);
+    }
+
+    /// <summary>
+    /// Switching on a listener on the network (phone connection, MCP, MCP in the home network): with parental controls on the parents' code for
+    /// exactly this switch (action "networkListener"), else the unlocked couch the setter already needs. Switching off stays free: it only
+    /// closes a door. <see cref="CouchHud.Core.Remote.NetworkListeners"/> is the whole list.
+    /// </summary>
+    private ParentTicket? CheckNetworkListenerGrant(string key, bool turningOn) =>
+        CouchHud.Core.Remote.NetworkListeners.NeedsParentGrant(key, turningOn, config.Current.ParentalEnabled)
+            ? CheckParentGrant(CouchHud.Core.Remote.NetworkListeners.Action, key)
+            : null;
+
+    /// <summary>
+    /// Uses the parents' grant up after a listener came up. When the grant is gone (used up in between), the change is undone and the listener
+    /// goes down again before the refusal is thrown: fail-closed, a listener never stays on without its grant.
+    /// </summary>
+    private async Task UseListenerGrantAsync(ParentTicket? ticket, Action revert, Func<Task> reapply)
+    {
+        try
+        {
+            UseUp(ticket);
+        }
+        catch (ParentCodeNeededException)
+        {
+            // The listener always goes down, and the refusal of the grant is what the caller gets, whatever happens on the way:
+            // a failure of the undo or of the re-apply is logged (type only, no details) and never replaces it.
+            try
+            {
+                revert();
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                Console.Error.WriteLine($"[settings] listener undo failed: {ex.GetType().Name}");
+            }
+            finally
+            {
+                try
+                {
+                    await reapply();
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    Console.Error.WriteLine($"[settings] listener re-apply failed: {ex.GetType().Name}");
+                }
+            }
+            throw;
+        }
     }
 
     /// <summary>The privacy switches changed: what runs on them follows at once (artwork, plugin tabs of plugins that need the internet).</summary>
@@ -2327,6 +2857,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         if ((art && !was) || offline != _offlineSeen) RescanLibraryInBackground();
         _offlineSeen = offline;
         plugins.RaiseTabsChanged();
+        // Plugins that ask ServiceAllowed hear that Offline or a service switch changed (best effort, off the UI thread's work).
+        plugins.NotifyServicesChanged();
         Emit("netPolicy", new { offline = net.Offline });
     }
 
@@ -2447,8 +2979,14 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 break;
             case "suppressCompetitors":
                 var suppress = Bool();
-                config.UpdateOrThrow(c => c.SuppressCompetitors = suppress);
+                // Any change is a choice of its own: the mark of the shell setup goes (the setup sets it again right after, see below).
+                config.UpdateOrThrow(c => { c.SuppressCompetitors = suppress; c.SuppressBySetup = false; });
                 ApplyCompetitorSuppression();
+                break;
+            case "suppressBySetup":
+                // Only the mode switch's mark (see AppConfig.SuppressBySetup); it can only stand while the setting is on.
+                var bySetup = Bool();
+                config.UpdateOrThrow(c => c.SuppressBySetup = bySetup && c.SuppressCompetitors);
                 break;
             case "pauseGameInMenu":
                 var pause = Bool();
@@ -2586,15 +3124,15 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             case "netCatalog":
             case "netSystemUpdates":
             case "netSaves":
-            case "netWeather":
-            case "netNews":
-            case "netAssistant":
             case "catalogUpdateCheck":
             case "pluginAutoUpdate":
                 // Settings > Privacy: with parental controls on only with the parents' code for exactly this change; never on the locked couch.
                 var netOn = Bool();
                 // The automatic plugin update decides what runs on this PC later: never on the locked couch or in a child profile, whatever else holds.
                 if (key == "pluginAutoUpdate") RequireSkinChange();
+                if (key == "offline" && !netOn) RequireSecondFactor(SecondFactorActions.PrivacyOffline, SiteCodeAccepted("privacy", key), key);
+                // The automatic update decides what runs on this PC later: switching it on is approving future packages.
+                if (key == "pluginAutoUpdate" && netOn) RequireSecondFactor(SecondFactorActions.PluginRights, SiteCodeAccepted("privacy", key), "autoUpdate");
                 RequirePrivacyGrant(key);
                 config.UpdateOrThrow(c =>
                 {
@@ -2604,9 +3142,6 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                         case "netCatalog": c.NetCatalog = netOn; break;
                         case "netSystemUpdates": c.NetSystemUpdates = netOn; break;
                         case "netSaves": c.NetSaves = netOn; break;
-                        case "netWeather": c.NetWeather = netOn; break;
-                        case "netNews": c.NetNews = netOn; break;
-                        case "netAssistant": c.NetAssistant = netOn; break;
                         case "catalogUpdateCheck": c.CatalogUpdateCheck = netOn; break;
                         case "pluginAutoUpdate": c.PluginAutoUpdate = netOn; break;
                     }
@@ -2628,10 +3163,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 config.UpdateOrThrow(c => c.ReturnHoldMs = ms);
                 break;
             case "weatherLocation":
-                var place = value.ValueKind == System.Text.Json.JsonValueKind.Object
-                    ? System.Text.Json.JsonSerializer.Deserialize<Place>(value.GetRawText(), UiBridge.Json)
-                    : null;
-                config.UpdateOrThrow(c => c.WeatherLocation = place);
+                SetWeatherPlace(value);
                 break;
             case "steamGridDbApiKey":
                 var apiKey = value.GetString()?.Trim() ?? "";
@@ -2641,28 +3173,19 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 _ = library.ScanAsync().ContinueWith(t => Ui(() => Emit("library", UiBridge.ToDto(Shown(library.Items)))), TaskScheduler.Default);
                 break;
             case "aiProvider":
-                var provider = value.GetString() ?? "";
-                if (provider.Length > 0 && !ChatProviders.Models.ContainsKey(provider)) throw new ArgumentException(Strings.Get("hud.unknownProvider", provider));
-                config.UpdateOrThrow(c =>
-                {
-                    if (c.AiProvider != provider) c.AiModel = "";
-                    c.AiProvider = provider;
-                });
+                SetAiProvider(value.GetString() ?? "");
                 break;
             case "aiModel":
                 var model = value.GetString()?.Trim() ?? "";
+                if (model.Length > 80) throw new ArgumentException(Strings.Get("assistant.modelNotFound"));
                 config.UpdateOrThrow(c => c.AiModel = model);
                 break;
-            case "anthropicApiKey":
-                var anthropicKey = value.GetString()?.Trim() ?? "";
-                config.UpdateOrThrow(c => c.AnthropicApiKey = Secrets.Protect(anthropicKey));
-                break;
-            case "openAiApiKey":
-                var openAiKey = value.GetString()?.Trim() ?? "";
-                config.UpdateOrThrow(c => c.OpenAiApiKey = Secrets.Protect(openAiKey));
+            case "aiApiKey":
+                SetAiKey(value.GetString() ?? "");
                 break;
             case "mcpEnabled":
                 var enabled = Bool();
+                var enabledTicket = CheckNetworkListenerGrant(key, enabled);
                 config.UpdateOrThrow(c =>
                 {
                     c.McpEnabled = enabled;
@@ -2677,6 +3200,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                     config.UpdateOrThrow(c => c.McpEnabled = false);
                     throw;
                 }
+                await UseListenerGrantAsync(enabledTicket, () => config.UpdateOrThrow(c => c.McpEnabled = false), () => ApplyMcpAsync());
                 if (!enabled) _ = DropFirewallRuleIfUnusedAsync();
                 break;
             case "mirrorNotifications":
@@ -2696,6 +3220,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 break;
             case "remoteEnabled":
                 var remote = Bool();
+                var remoteTicket = CheckNetworkListenerGrant(key, remote);
                 config.UpdateOrThrow(c => c.RemoteEnabled = remote);
                 try
                 {
@@ -2706,12 +3231,28 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                     config.UpdateOrThrow(c => c.RemoteEnabled = false);
                     throw;
                 }
+                await UseListenerGrantAsync(remoteTicket, () => config.UpdateOrThrow(c => c.RemoteEnabled = false), () => ApplyRemoteAsync());
                 if (!remote) _ = DropFirewallRuleIfUnusedAsync();
+                break;
+            case "remotePower":
+                // Read by the phone endpoints on every request (RemotePower.Decide): off takes effect at once.
+                var remotePower = Bool();
+                config.UpdateOrThrow(c => c.RemotePower = remotePower);
                 break;
             case "mcpLan":
                 var lan = Bool();
+                var lanTicket = CheckNetworkListenerGrant(key, lan);
                 config.UpdateOrThrow(c => c.McpLan = lan);
-                await ApplyMcpAsync(throwOnError: true);
+                try
+                {
+                    await ApplyMcpAsync(throwOnError: true);
+                }
+                catch (InvalidOperationException)
+                {
+                    config.UpdateOrThrow(c => c.McpLan = false);
+                    throw;
+                }
+                await UseListenerGrantAsync(lanTicket, () => config.UpdateOrThrow(c => c.McpLan = false), () => ApplyMcpAsync());
                 if (!lan) _ = DropFirewallRuleIfUnusedAsync();
                 break;
             case "mcpToken":
@@ -2722,66 +3263,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             default:
                 throw new ArgumentException($"unknown setting {key}");
         }
+        // A change that took (from the TV page, a tool or a phone): the phones with the settings page see it (RemoteSettings.All only).
+        if (RemoteSettings.Find(key) is not null) _remote.Channel?.Publish("settings");
     }
 
     // -----------------------------------------------------------------------
     // Assistant and MCP
-
-    private bool AssistantConfigured => config.Current.AiProvider switch
-    {
-        ChatProviders.Anthropic => !string.IsNullOrWhiteSpace(config.Current.AnthropicApiKey),
-        ChatProviders.OpenAi => !string.IsNullOrWhiteSpace(config.Current.OpenAiApiKey),
-        _ => false
-    };
-
-    public object AssistantInfo()
-    {
-        var c = config.Current;
-        return new
-        {
-            configured = AssistantConfigured,
-            provider = c.AiProvider,
-            model = string.IsNullOrWhiteSpace(c.AiModel) && ChatProviders.Models.TryGetValue(c.AiProvider, out var models) ? models[0] : c.AiModel
-        };
-    }
-
-    public async Task<string> AskAssistantAsync(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) throw new ArgumentException(Strings.Get("assistant.emptyQuestion"));
-        if (!net.Allows(CouchHud.Core.Net.NetService.Assistant)) throw new InvalidOperationException(Strings.Get(net.Offline ? "net.assistantOffline" : "net.assistantOff"));
-        var c = config.Current;
-        var key = Secrets.Unprotect(c.AiProvider == ChatProviders.OpenAi ? c.OpenAiApiKey : c.AnthropicApiKey);
-        if (!AssistantConfigured || string.IsNullOrEmpty(key)) throw new InvalidOperationException(Strings.Get("assistant.needsProvider"));
-
-        // A new provider, model or key starts a fresh conversation.
-        var identity = $"{c.AiProvider}|{c.AiModel}|{key.GetHashCode()}";
-        if (_assistant is null || _assistantFor != identity)
-        {
-            _assistant = new AssistantSession(ChatProviders.Create(_aiHttp, c.AiProvider, key, c.AiModel), new HudTools(this), () => AllTools);
-            _assistantFor = identity;
-        }
-
-        _assistantCts?.Cancel();
-        _assistantCts = new CancellationTokenSource();
-        try
-        {
-            return await _assistant.AskAsync(text, ConfirmAsync,
-                call => Emit("assistant", new { type = "tool", name = call.Name }),
-                _assistantCts.Token);
-        }
-        catch (AssistantException ex)
-        {
-            throw new InvalidOperationException(ex.Message);
-        }
-        catch (TaskCanceledException)
-        {
-            throw new InvalidOperationException(Strings.Get("assistant.timeout"));
-        }
-        catch (HttpRequestException)
-        {
-            throw new InvalidOperationException(Strings.Get("assistant.noConnection"));
-        }
-    }
 
     /// <summary>Asks the user on screen; the UI answers through <see cref="ConfirmAssistant"/>.</summary>
     private Task<bool> ConfirmAsync(ToolCall call, string text)
@@ -2907,54 +3394,6 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     }
 
     // -----------------------------------------------------------------------
-    // Weather
-
-    public async Task<WeatherReport?> GetWeatherAsync()
-    {
-        var place = config.Current.WeatherLocation;
-        // Switched off in Settings > Privacy (or Offline): no weather in the header, no request.
-        if (place is null || !net.Allows(CouchHud.Core.Net.NetService.Weather)) return null;
-        try
-        {
-            return await _weather.GetAsync(place);
-        }
-        catch (HttpRequestException ex)
-        {
-            Console.Error.WriteLine($"[weather] {ex.Message}");
-            return null;
-        }
-    }
-
-    public Task<IReadOnlyList<NewsItem>> GetNewsAsync()
-    {
-        RequireArea(FeatureAreas.News);
-        // Switched off in Settings > Privacy (or Offline): the empty list, no request.
-        if (!net.Allows(CouchHud.Core.Net.NetService.News)) return Task.FromResult<IReadOnlyList<NewsItem>>([]);
-        return _news.GetAsync(GetFeeds());
-    }
-
-    public IReadOnlyList<NewsFeed> GetFeeds() => NewsService.Effective(config.Current.NewsFeeds, Strings.Language);
-
-    /// <summary>Keeps what the user sees as their own list the moment they change it (default feeds follow the language until then).</summary>
-    private void OwnFeeds() => config.Update(c => c.NewsFeeds = GetFeeds().Select(f => new NewsFeed { Name = f.Name, Url = f.Url }).ToList());
-
-    public void AddFeed(string name, string url)
-    {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) throw new ArgumentException(Strings.Get("hud.needFeedAddress"));
-        OwnFeeds();
-        config.Update(c => c.NewsFeeds.Add(new NewsFeed { Name = string.IsNullOrWhiteSpace(name) ? uri.Host : name.Trim(), Url = url.Trim() }));
-    }
-
-    public void RemoveFeed(string url)
-    {
-        OwnFeeds();
-        config.Update(c => c.NewsFeeds.RemoveAll(f => f.Url == url));
-    }
-
-    public Task<IReadOnlyList<Place>> SearchPlacesAsync(string query) =>
-        net.Allows(CouchHud.Core.Net.NetService.Weather) ? _weather.SearchAsync(query) : Task.FromResult<IReadOnlyList<Place>>([]);
-
-    // -----------------------------------------------------------------------
     // Notifications and Bluetooth
 
     private void StartNotifications()
@@ -2993,9 +3432,6 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
 
     private static string MinutesRef(double minutes) =>
         minutes < 60 ? Strings.Ref("time.minutes", Math.Max(1, (int)Math.Round(minutes))) : Strings.Ref("time.hoursMinutes", (int)(minutes / 60), (int)Math.Round(minutes % 60));
-
-    private static string FormatMinutes(double minutes) =>
-        minutes < 60 ? Strings.Get("time.minutes", Math.Max(1, (int)Math.Round(minutes))) : Strings.Get("time.hoursMinutes", (int)(minutes / 60), (int)Math.Round(minutes % 60));
 
     public object GetNotifications() => new
     {
@@ -3192,7 +3628,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         foreach (var delay in new[] { 10, 25 })
         {
             await Task.Delay(TimeSpan.FromSeconds(delay));
-            if (_pcMode || _mouse?.Active == true || _sessions.Current is not null) return;
+            // Never over a game (also one that is still starting), the desktop, a launcher sign-in or the couch browser.
+            if (!GameFront.HudMayTakeFront(HudFrontRequest.LauncherStandby, HudFrontState.From(ForegroundNow()))) return;
             // Helpers (steamwebhelper …) hold the windows of some clients.
             LauncherControl.MinimizeWindows(started.SelectMany(ForegroundPolicy.FamilyProcesses).Distinct());
             _window?.BringToFront();
@@ -3685,7 +4122,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         p.Homepage,
         // What the user chose; takes effect at the next start (loaded says what runs now).
         enabled = !config.Current.DisabledPlugins.Contains(p.Folder, StringComparer.OrdinalIgnoreCase),
-        restartNeeded = p.Enabled == config.Current.DisabledPlugins.Contains(p.Folder, StringComparer.OrdinalIgnoreCase),
+        // Only what could not be done at once: the choice differs from what runs (a start that is still owed), a plugin that was switched on while its
+        // earlier run could not be stopped for sure, or one that was cut off but whose own background work ends with the restart.
+        restartNeeded = p.RemovedAtRestart || p.Enabled == config.Current.DisabledPlugins.Contains(p.Folder, StringComparer.OrdinalIgnoreCase) || p.NeedsRestartToStart || p.StopsAfterRestart,
+        p.StopsAfterRestart,
+        // Uninstalled, files still held: cut off for good, gone at the next start. The list shows only this note and offers no action.
+        removedAtRestart = p.RemovedAtRestart,
         p.Loaded,
         // Paused by Offline mode (it may reach the internet) and loaded only for the next start because Offline was on: the list says so instead of "active".
         p.PausedOffline,
@@ -3823,7 +4265,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             return new { refused = access.Refused is null ? null : Strings.Get(access.Refused), needsParentCode = access.Refused is null && access.ParentCode };
         }
         // Only a defined name (a number or a list of names parses too); the input is never echoed back.
-        if (!Enum.TryParse<PluginChange>(change, ignoreCase: true, out var ch) || !Enum.IsDefined(ch) || !string.Equals(ch.ToString(), change, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("change");
+        if (!Enum.TryParse<PluginChange>(change, ignoreCase: true, out var ch) || !Enum.IsDefined(ch) || !string.Equals(ch.ToString(), change, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Not a change of a plugin setting.", "change");
         var org = origin switch { "thirdParty" => PluginOrigin.ThirdParty, "firstParty" => PluginOrigin.FirstParty, "skin" => PluginOrigin.FirstParty, _ => PluginOrigin.Local };
         var gate = PluginGateContext();
         var refused = origin == "skin" ? PluginPolicy.SkinChangeRefusal(gate) : PluginPolicy.Decide(gate, ch, org, null).Refused;
@@ -3838,22 +4280,48 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         throw new InvalidOperationException(Strings.Get(refused));
     }
 
-    private PluginOrigin OriginOfFolder(string folder) =>
-        plugins.Trust?.Entry(folder)?.Origin ?? PluginOrigin.Local;
-
-    public void SetPluginEnabled(string folder, bool enabled)
+    public async Task<object> SetPluginEnabledAsync(string folder, bool enabled)
     {
         RefuseWhileConfigFaulted();
+        // Uninstalled and waiting for the next start to lose its files: there is nothing to switch (fail closed, also against a stale list).
+        if (plugins.IsUninstalled(folder)) throw new InvalidOperationException(Strings.Get("plugin.removedPending"));
         var entry = plugins.Trust?.Entry(folder);
         var ticket = RequirePluginChange(enabled ? PluginChange.Enable : PluginChange.Disable, entry?.Origin ?? PluginOrigin.Local, entry?.Capabilities, folder);
+        // Switching a plugin off is a lock a parent may use; switching one that is not CouchHUD's own (or that may reach the network, the
+        // assistant or programs) back on is an approval, so the code alone must not undo it.
+        if (enabled && PluginPolicy.EnableNeedsSecondFactor(entry?.Origin ?? PluginOrigin.Local, entry?.Capabilities))
+            RequireSecondFactorFor(SecondFactorActions.PluginRights, true, folder, "enable", folder);
         config.UpdateOrThrow(c =>
         {
             c.DisabledPlugins.RemoveAll(f => f.Equals(folder, StringComparison.OrdinalIgnoreCase));
             if (!enabled) c.DisabledPlugins.Add(folder);
         });
         UseUp(ticket);
-        // Its tab goes (or comes) at once, though the plugin itself loads or unloads at the next start.
+        // On or off at once, without a restart: the same loader as at the start (on), or cut off first and then asked to stop (off).
+        await ApplyPluginStateAsync(folder, enabled);
         plugins.RaiseTabsChanged();
+        return GetPlugins();
+    }
+
+    /// <summary>Starts (or stops) the plugin of a folder now. A failure is logged and leaves the choice as saved: the next start does what this could not.</summary>
+    private async Task<PluginManager.StopResult?> ApplyPluginStateAsync(string folder, bool start)
+    {
+        try
+        {
+            if (start)
+            {
+                await plugins.LoadNowAsync(folder);
+                return null;
+            }
+            return await plugins.StopAsync(folder);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // After the choice was saved: whatever goes wrong here leaves the state consistent (the list says "restart needed" because what runs
+            // differs from what was chosen) and is told as one clean line, never as an error of the save.
+            Console.Error.WriteLine($"[plugins] {PluginSettingRules.LogLine(folder)}: {(start ? "starting" : "stopping")} now failed: {PluginSettingRules.LogLine(ex.Message)}");
+            return null;
+        }
     }
 
     private static readonly CouchHud.Core.Guard.LogThrottle SettingPageLog = new(TimeSpan.FromMinutes(10));
@@ -3910,20 +4378,35 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         return new { page.Id, Title = PluginText.Safe(page.Title, page.Id, plugins.OriginOf(pluginId) == PluginOrigin.FirstParty), page.Description };
     }
 
+    /// <summary>
+    /// The gate of a plugin's setting before the page opens its editor (keyboard, choice): the same refusals as <see cref="SetPluginSetting"/>
+    /// (the lock for an admin setting, "nobody" always) and, in a child's profile without a visit, the parents' code (ParentCodeNeededException;
+    /// the grant is only looked at here, the change itself uses it up and opens the visit). 0.6.3 opened the keyboard first and refused only the
+    /// typed value. Nothing is changed and the plugin's code is not called; the change checks everything again.
+    /// </summary>
+    public bool CheckPluginSetting(string pluginId, string key)
+    {
+        RefuseWhileConfigFaulted();
+        var found = plugins.Settings.FirstOrDefault(s => s.Plugin == pluginId && s.Setting.Key == key);
+        if (found.Setting is null) throw new ArgumentException(Strings.Get("hud.unknownSetting", key));
+        var refused = SettingGateRefusal(pluginId, found.Setting, out var function);
+        if (refused is not null && refused != PluginSettingRules.NeedVisit)
+            throw refused == "lock.unlockFirst" ? new LockedException(Strings.Get(refused)) : new InvalidOperationException(Strings.Get(refused));
+        if (refused is not null)
+            CheckParentGrant("pluginPage", $"{pluginId}/{PluginSettingRules.SettingsPageId}", UseReason(pluginId, function) ?? Strings.Get("plugin.setting.needCode", found.Setting.Label));
+        return true;
+    }
+
     public void SetPluginSetting(string pluginId, string key, string? value)
     {
         RefuseWhileConfigFaulted();
         var found = plugins.Settings.FirstOrDefault(s => s.Plugin == pluginId && s.Setting.Key == key);
         if (found.Setting is null) throw new ArgumentException(Strings.Get("hud.unknownSetting", key));
-        // The function that covers the setting (its own tag, else the plugin's "settings" function, else none = admin only), at the owner's level:
-        // the same rules as a page or row of that function. In a child's profile an admin setting needs a visit that the parents' code opened
-        // (a page of that function, or the plugin's settings page of the core, still on, same profile). Without one the first change asks for the
-        // parents' code once (after the value was checked) and opens the settings visit.
-        var function = PluginSettingRules.FunctionOf(found.Setting, id => plugins.HasFunction(pluginId, id));
-        var visit = function is not null && plugins.Pages.Any(p => p.Plugin.Equals(pluginId, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(p.Page.Function, function, StringComparison.OrdinalIgnoreCase) && VisitActive(pluginId, p.Page.Id));
-        visit |= VisitActive(pluginId, PluginSettingRules.SettingsPageId);
-        var refused = PluginSettingRules.Refusal(plugins.LevelOf(pluginId, function), Locked, ChildNow, visit);
+        // The same gate as CheckPluginSetting and the page entries (SettingGateRefusal): the function that covers the setting (its own tag, else the
+        // plugin's "settings" function, else none = admin only), at the owner's level; in a child's profile an admin setting needs a visit that the
+        // parents' code opened (a page of that function, or the plugin's settings page of the core, still on, same profile). Without one the first
+        // change asks for the parents' code once (after the value was checked) and opens the settings visit.
+        var refused = SettingGateRefusal(pluginId, found.Setting, out var function);
         if (refused is not null && refused != PluginSettingRules.NeedVisit)
             throw refused == "lock.unlockFirst" ? new LockedException(Strings.Get(refused)) : new InvalidOperationException(Strings.Get(refused));
         var checkedValue = PluginSettingRules.Check(found.Setting, value) ?? throw new ArgumentException(Strings.Get("plugin.setting.valueRefused", found.Setting.Label));
@@ -4052,6 +4535,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         var decision = PluginPolicy.DecideLevelChange(PluginGateContext());
         if (decision.Refused is { } refused) throw refused == "lock.unlockFirst" ? new LockedException(Strings.Get(refused)) : new InvalidOperationException(Strings.Get(refused));
         if (PluginFunctionRules.ParseLevel(level) is not { } chosen || !plugins.TryCanonicalFunction(pluginId, functionId, out var plugin, out var function)) throw new ArgumentException(Strings.Get("plugin.fn.unknown"));
+        RequireSecondFactorFor(SecondFactorActions.PluginRights, CodeAcceptedFor(decision.ParentAction, $"{plugin}/{function}"), $"{plugin}/{function}", "level", plugin, function, chosen.ToString());
         var ticket = CheckParentGrant(decision.ParentAction, $"{plugin}/{function}");
         // Under the ids the plugin declared, whatever case the page sent; a variant of the same key (a hand-edited file) goes.
         config.UpdateOrThrow(c =>
@@ -4062,40 +4546,6 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         UseUp(ticket);
         plugins.RaiseTabsChanged();
         return GetPlugins();
-    }
-
-    /// <summary>
-    /// After the plugins loaded: what the owner chose for a plugin that is not there any more goes, so a later install with the same id does not
-    /// inherit a "restricted too" (a plugin can only start at its suggestion).
-    /// </summary>
-    private void PruneFunctionLevels()
-    {
-        try
-        {
-            if (config.Fault is not null) return;
-            // By what is on the disk, not by what loaded: a plugin that is switched off, waits for its approval, failed or is withdrawn keeps the
-            // owner's choices (PluginInfo.Id is only the folder name for those). Only a plugin that is really gone loses them.
-            var present = plugins.InstalledPluginIds();
-            var map = config.Current.PluginFunctionLevels;
-            if (map is null || map.Keys.All(present.Contains)) return;
-            config.UpdateOrThrow(c => PluginFunctionRules.Prune(c.PluginFunctionLevels, present));
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
-        {
-            Console.Error.WriteLine($"[plugins] stored function levels not cleaned: {ex.GetType().Name}");
-        }
-    }
-
-    /// <summary>Forgets what the owner chose for a plugin's functions (the plugin is gone).</summary>
-    private void ForgetFunctionLevels(IEnumerable<string> pluginIds)
-    {
-        var ids = pluginIds.ToList();
-        if (ids.Count == 0) return;
-        config.UpdateOrThrow(c =>
-        {
-            if (c.PluginFunctionLevels is null) return;
-            foreach (var key in c.PluginFunctionLevels.Keys.Where(k => ids.Contains(k, StringComparer.OrdinalIgnoreCase)).ToList()) c.PluginFunctionLevels.Remove(key);
-        });
     }
 
     public async Task<object> GetPluginPageAsync(string pluginId, string pageId)
@@ -4295,7 +4745,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// Installs a plugin or skin .zip into the user's folder; plugins load at the next start. A plugin from a file has no signature: it
     /// is a local plugin (SDK 2 surface, its file types checked), only in expert mode with the developer switch and the parents' code.
     /// </summary>
-    public string InstallPackage(string zipPath, string kind)
+    public async Task<object> InstallPackageAsync(string zipPath, string kind)
     {
         RefuseWhileConfigFaulted();
         var isSkin = kind == "skin";
@@ -4315,6 +4765,10 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             // Before the code is used up and before a single file is written: an unsigned package never takes over a plugin that is already there.
             plugins.RefuseLocalPackage(zip, zipName, Catalog.FirstPartyIds());
         }
+        // Installing a local package is approving it: bound to the package name and the hash of exactly these bytes.
+        if (!isSkin)
+            RequireSecondFactorFor(SecondFactorActions.PluginRights, true, zipName, "install", zipName,
+                Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(zip.ToArray())));
         // All gates passed: the code pays for exactly this install and is used up before the work starts (a grant lives 90 seconds, an install can take longer).
         UseUp(ticket);
         var target = CouchHud.Core.Plugins.PackageInstaller.Install(
@@ -4324,8 +4778,30 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             isSkin ? CouchHud.Core.Plugins.PackageInstaller.Kind.Skin : CouchHud.Core.Plugins.PackageInstaller.Kind.Plugin,
             null, out var folderHash);
         // Installed on purpose, by the user, through this very call: the files as they were unpacked are the approved ones (as a local plugin, never more).
-        if (!isSkin) plugins.ApproveInstalled(Path.GetFileName(target), folderHash);
-        return Path.GetFileName(target);
+        var started = false;
+        if (!isSkin)
+        {
+            plugins.ApproveInstalled(Path.GetFileName(target), folderHash);
+            // Started at once by the same loader as at the start (it hashes the folder again and compares it with what was just recorded).
+            started = (await ApplyPluginStartAsync(Path.GetFileName(target))) == true;
+        }
+        return new { name = Path.GetFileName(target), started };
+    }
+
+    /// <summary>Starts a folder now; true when a plugin of it runs afterwards.</summary>
+    private async Task<bool> ApplyPluginStartAsync(string folder)
+    {
+        try
+        {
+            var infos = await plugins.LoadNowAsync(folder);
+            plugins.RaiseTabsChanged();
+            return infos.Any(i => i.Loaded);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Console.Error.WriteLine($"[plugins] {PluginSettingRules.LogLine(folder)}: starting now failed: {PluginSettingRules.LogLine(ex.Message)}");
+            return false;
+        }
     }
 
     /// <summary>
@@ -4334,24 +4810,29 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// code (the couch code when there are no parental controls); the plugin loads at the next start. <paramref name="shownHash"/> is the hash
     /// behind the code the dialog showed: the approval holds only for exactly those files.
     /// </summary>
-    public object ApprovePlugin(string folder, string shownHash)
+    public async Task<object> ApprovePluginAsync(string folder, string shownHash)
     {
         RefuseWhileConfigFaulted();
         var ticket = RequirePluginChange(PluginChange.Approve, PluginOrigin.Local, null, folder);
+        RequireSecondFactorFor(SecondFactorActions.PluginRights, true, folder, "approve", folder, shownHash);
         plugins.Approve(folder, shownHash);
         UseUp(ticket);
+        // Approved: it starts now, judged again by the loader on the files it holds (a swap after the approval makes it "changed" again).
+        await ApplyPluginStartAsync(folder);
         plugins.RaiseTabsChanged();
         return GetPlugins();
     }
 
     /// <summary>The parents let a withdrawn plugin run again, for exactly its current files (their code every time).</summary>
-    public object AcceptRevokedPlugin(string folder)
+    public async Task<object> AcceptRevokedPluginAsync(string folder)
     {
         RefuseWhileConfigFaulted();
         var entry = plugins.Trust?.Entry(folder);
         var ticket = RequirePluginChange(PluginChange.AcceptRevoked, entry?.Origin ?? PluginOrigin.Local, entry?.Capabilities, folder);
+        RequireSecondFactorFor(SecondFactorActions.PluginRights, true, folder, "acceptRevoked", folder);
         plugins.AcceptRevocation(folder);
         UseUp(ticket);
+        await ApplyPluginStartAsync(folder);
         plugins.RaiseTabsChanged();
         return GetPlugins();
     }
@@ -4363,13 +4844,14 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         var entry = plugins.Trust?.Entry(folder);
         if (entry?.Capabilities is not { } caps || !caps.Contains(PluginCapabilities.Process)) throw new InvalidOperationException(Strings.Get("plugin.cap.denied", folder, PluginCapabilities.Process));
         var ticket = RequirePluginChange(PluginChange.ConfirmExe, entry.Origin, caps, folder);
+        RequireSecondFactorFor(SecondFactorActions.PluginRights, true, folder, "confirmExe", folder, exe);
         plugins.ConfirmExe(folder, exe);
         UseUp(ticket);
         return GetPlugins();
     }
 
     /// <summary>Removes a user plugin; it is gone at once or, while its DLLs are loaded, at the next start (it never loads again either way).</summary>
-    public object UninstallPlugin(string folder)
+    public async Task<object> UninstallPluginAsync(string folder)
     {
         RefuseWhileConfigFaulted();
         var entry = plugins.Trust?.Entry(folder);
@@ -4385,12 +4867,20 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         {
             ids = [];
         }
-        var gone = Catalog.Uninstall(folder);
+        // Marked as removed first (it never loads again), then cut off and asked to stop, then the folder goes if the files are free by then.
+        var (gone, stop) = await Catalog.UninstallAsync(folder);
         // Only when the plugin really went: a refused removal keeps the owner's choices.
-        if (gone) ForgetFunctionLevels(ids);
+        if (gone)
+        {
+            // The owner's function levels stay keyed by plugin id: a reinstall (a first-party one needs no second factor) must not fall
+            // back to the plugin's defaults and so lift a function lock. Removing them would need the PluginRights second factor.
+            // No key stays behind: the plugin's stored secrets go with it (its other settings stay for a reinstall).
+            plugins.ForgetSecrets(ids);
+        }
         UseUp(ticket);
         plugins.RaiseTabsChanged();
-        return new { gone, plugins = GetPlugins() };
+        // stoppedNow: the plugin's own code is done too (false: it was cut off, but what it started itself ends with the next start).
+        return new { gone, stoppedNow = stop.FullyStopped, plugins = GetPlugins() };
     }
 
     // -----------------------------------------------------------------------
@@ -4400,14 +4890,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
 
     private PluginSuggestions Suggestions => _suggestions ??= new PluginSuggestions(dataDir, new WindowsRegistry(), Environment.UserName, UsedFeature);
 
-    /// <summary>A feature of the core that became a plugin was set up here (so the plugin is worth pointing out).</summary>
-    private bool UsedFeature(string feature) =>
-        feature == "homeAssistant" && PluginSettingSeeds.For(config.Current, PluginSettingSeeds.HomeAssistantId) is not null;
-
     /// <summary>What may be pointed out now (nothing on the locked couch: it waits for the next unlocked look).</summary>
     public async Task<object> GetPluginSuggestionsAsync()
     {
         if (Locked) return new List<object>();
+        // An unlocked look: the one Wand hint may come now (it waits while the couch is locked).
+        PostWandHintOnce();
         await Catalog.PrepareSuggestionsAsync();
         // Installed means a folder is there, loaded or not (a restart pending): that one is not pointed at again.
         var installed = plugins.Plugins.Select(p => p.Id).ToList();
@@ -4428,7 +4916,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             text = s.Reason switch
             {
                 "wand" => Strings.Get("plugin.suggestWand"),
-                "feature" => Strings.Get("plugin.suggestHomeAssistant", s.Name),
+                "feature" => FeatureSuggestionText(s.Program, s.Name),
                 "program" when s.EntryId == PluginSettingSeeds.CaseHudId => Strings.Get("plugin.suggestCaseHud", s.Name),
                 "program" when s.EntryId == PluginSettingSeeds.VpnId => Strings.Get("plugin.suggestVpn", s.Name),
                 _ => Strings.Get("plugin.suggest", s.Program ?? "", s.Name)
@@ -4454,7 +4942,9 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         // The catalog finished loading after the first look: the UI asks for the suggestions again (the host still answers nothing on the locked couch).
         SignedEntriesChanged = () => Ui(() => Emit("pluginSuggestionsReady", null)),
         // The automatic update changes a skin at once only where a manual skin change would be allowed (unlocked couch, no child profile).
-        SkinAutoAllowed = () => PluginPolicy.SkinChangeRefusal(PluginGateContext()) is null
+        SkinAutoAllowed = () => PluginPolicy.SkinChangeRefusal(PluginGateContext()) is null,
+        // Asked again right before a plugin that was just installed starts: the couch may have been locked, or a child's profile switched on, while it downloaded.
+        StartAllowed = origin => PluginPolicy.Decide(PluginGateContext(), PluginChange.Install, origin, null).Refused is null
     };
 
     private SelfUpdateManager? _selfUpdate;
@@ -4468,11 +4958,11 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             Ui(() => Emit("selfUpdate", state));
         }, net);
 
-    // TV control (LG webOS first): pairing, volume, inputs, on/off, all of it in TvManager and Core's TvController.
+    // TV control: pairing, volume, inputs, on/off, all of it in TvManager and Core's TvController; the protocols are plugins (SDK 5).
     private Lazy<TvManager>? _tvLazy;
 
     private Lazy<TvManager> TvLazy => LazyInitializer.EnsureInitialized(ref _tvLazy, () => new Lazy<TvManager>(() =>
-        new TvManager(config, () => Locked, RequireTvInputChange, (name, payload) => Ui(() => Emit(name, payload)))));
+        new TvManager(config, plugins.TvProviders, () => Locked, RequireTvInputChange, (name, payload) => Ui(() => Emit(name, payload)))));
 
     public TvManager Tv => TvLazy.Value;
 
@@ -4515,6 +5005,35 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         }
         Power(action);
     }
+
+    /// <summary>
+    /// The sleep timer's warning a minute before the end (ui/core/power.js): its question (Cancel / Now) is in the HUD, which a game in
+    /// front hides. Then a notice goes over the game (the same non-activating toast as the parental time warnings) and, outside the PC
+    /// mode, the HUD comes to the front without a target, so the open question stays and the controller can answer it. With the HUD in
+    /// front nothing happens (false). Only the two timer actions; the text is the host's own, never one of the page. Defence in depth
+    /// (<see cref="SleepTimerNotice"/>): only for the timer the page armed (<see cref="ArmSleepTimer"/>), only close to its end, at most
+    /// once in 45 s.
+    /// </summary>
+    public bool SleepTimerWarning(string action, int seconds)
+    {
+        var (show, n) = _sleepTimerNotice.Decide(action, seconds, _window is not { } window || window.IsActive);
+        if (!show) return false;
+        try
+        {
+            GameToast.Show(Strings.Get("power.timerWarnTitle"), Strings.Get($"power.timerWarn.{action}", n), TimeSpan.FromSeconds(Math.Min(n, 15)));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            Console.Error.WriteLine($"[power] timer notice: {ex.Message}");
+        }
+        if (!_pcMode) ShowHud(null);
+        return true;
+    }
+
+    private readonly SleepTimerNotice _sleepTimerNotice = new(() => DateTimeOffset.UtcNow);
+
+    /// <summary>The page started a sleep timer (<paramref name="action"/>, ends in <paramref name="secondsLeft"/>) or ended it (null).</summary>
+    public void ArmSleepTimer(string? action, int secondsLeft) => _sleepTimerNotice.Arm(action, secondsLeft);
 
     public SelfUpdateState GetSelfUpdate() => SelfUpdate.State;
 
@@ -4621,8 +5140,16 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         var (message, restartNeeded, state) = await TrackAsync(DownloadIds.Plugin(kind, id), DownloadKind.Plugin, kind == "skin" ? "skin" : "plugin", name,
             started => CatalogInstallFlow.RunAsync(extraSkin,
                 early: () => RequirePluginChange(PluginChange.Install, PluginOrigin.ThirdParty, null, id),
-                gate: request => UseUp(RequirePluginChange(request.IsUpdate && request.Entry.Kind != CatalogKind.Skin ? PluginChange.Update : PluginChange.Install, request.Origin,
-                    request.Statement?.Statement.Capabilities, request.Entry.Id, request.AddsCapabilities)),
+                gate: request =>
+                {
+                    var change = RequirePluginChange(request.IsUpdate && request.Entry.Kind != CatalogKind.Skin ? PluginChange.Update : PluginChange.Install, request.Origin,
+                        request.Statement?.Statement.Capabilities, request.Entry.Id, request.AddsCapabilities);
+                    // Code from another catalog, an unsigned one or an update with new capabilities is approved by installing it (a skin is data):
+                    // bound to the entry and the package hash the download is checked against. CouchHUD's own signed packages stay free.
+                    if (request.Entry.Kind != CatalogKind.Skin && (request.Origin != PluginOrigin.FirstParty || request.AddsCapabilities))
+                        RequireSecondFactorFor(SecondFactorActions.PluginRights, true, request.Entry.Name, "catalog", request.Entry.Id, request.Entry.Sha256 ?? "");
+                    UseUp(change);
+                },
                 install: approve => Catalog.InstallAsync(id, kind, started, approve)));
         return new { message, restartNeeded, state };
     }
@@ -4655,6 +5182,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     {
         RefuseWhileConfigFaulted();
         var ticket = RequireSourceChange(CouchHud.Core.Plugins.CatalogSourceChange.Add, url, publisherKey, name, acknowledgedTrust);
+        RequireSecondFactorFor(SecondFactorActions.PluginRights, true, url, "addSource", url, publisherKey ?? "");
         config.UpdateOrThrow(c => c.ExtraCatalogSources = CouchHud.Core.Plugins.CatalogSourceRules.Apply(
             CouchHud.Core.Plugins.CatalogSourceRules.Effective(c.ExtraCatalogSources), CouchHud.Core.Plugins.CatalogSourceChange.Add, url, publisherKey, name, DateTimeOffset.UtcNow));
         Catalog.Invalidate();
@@ -4663,6 +5191,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     }
 
     /// <summary>Removes a catalog the user added. The official one cannot be removed (refused whatever else is true).</summary>
+    [SecondFactorExempt("removing a catalog source narrows what can be installed")]
     public object RemoveCatalogSource(string url)
     {
         RefuseWhileConfigFaulted();
@@ -4701,7 +5230,10 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         change =>
         {
             lock (_remoteLock) config.Update(c => change(c.RemoteDevices));
-        });
+        },
+        // The channel keys are stored for this Windows user only (DPAPI, own scope).
+        key => Secrets.Protect(key, RemoteKeyScope),
+        stored => Secrets.Unprotect(stored, RemoteKeyScope));
 
     KeyboardState IRemoteTarget.Keyboard => _keyboard;
 
@@ -4779,40 +5311,112 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         Emit("input", new { type = "up", button });
     });
 
+    /// <summary>What the bridge looks at for the couch's power call (RemotePower.Decide applies the same lists), plus PC mode and the owner's setting.</summary>
+    private RemotePowerContext RemotePowerNow() =>
+        new(Locked, ProfileHeld, Areas.AllowsMethod(RemotePower.BridgeMethod), _pcMode, config.Current.RemotePower);
+
+    bool IRemotePowerTarget.PowerEnabled => config.Current.RemotePower;
+
+    Task<(RemotePowerRefusal Refusal, string? Game, bool GameRunning)> IRemotePowerTarget.PowerCheckAsync(string action, RemoteDevice device) =>
+        Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            // The name only as the phone's library would show it (GameForPhone); otherwise just that a game runs.
+            var level = RemoteRights.Effective(device, config.Current.ActiveProfile.Id, _pcMode);
+            return (RemotePower.Decide(action, RemotePowerNow()), GameForPhone(level), _sessions.Current is not null);
+        }).Task;
+
+    async Task<RemotePowerResult> IRemotePowerTarget.PowerAsync(string action, RemoteDevice device)
+    {
+        // Checked again on the UI thread right before it runs: the couch may have been locked or the picker come back since the first step.
+        var dispatcher = Application.Current.Dispatcher;
+        var refusal = await dispatcher.InvokeAsync(() => RemotePower.Decide(action, RemotePowerNow()));
+        if (refusal != RemotePowerRefusal.None)
+        {
+            Console.Error.WriteLine(RemotePower.LogLine(action, device, $"refused ({refusal})"));
+            return new RemotePowerResult(refusal, false);
+        }
+        Console.Error.WriteLine(RemotePower.LogLine(action, device, "runs"));
+        try
+        {
+            // The same host call as the couch's power entries (api.power): the TV may follow first, then Windows. The TV names the
+            // phone only once Windows took the call (standby returns after waking up, hence its text in the past tense).
+            await dispatcher.InvokeAsync(async () =>
+            {
+                await PowerAsync(action);
+                Emit("toast", Strings.Get($"remote.power.{action}", RemotePower.CleanName(device.Name)));
+            }).Task.Unwrap();
+            return RemotePowerResult.Ran;
+        }
+        catch (Exception ex)
+        {
+            // Standby that Windows refuses (some Modern Standby machines) and anything else: the detail goes to the log only, the phone
+            // gets a fixed text.
+            Console.Error.WriteLine(RemotePower.LogLine(action, device, $"failed ({ex.GetType().Name}: {ex.Message})"));
+            return new RemotePowerResult(RemotePowerRefusal.None, true);
+        }
+    }
+
     /// <summary>The on-screen keyboard reports itself so the phone can show the same field.</summary>
-    public void SetKeyboardState(bool open, string title, bool secret, string text) => _keyboard = new KeyboardState(open, title, secret, text);
+    public void SetKeyboardState(bool open, string title, bool secret, string text)
+    {
+        _keyboard = new KeyboardState(open, title, secret, text);
+        _remote.Channel?.Publish("keyboard");
+    }
 
     public object GetRemote(bool newCode = false)
     {
         // A fresh pairing code lets a phone steer CouchHud: not for a locked couch, which also keeps the current code to itself.
         if (newCode) RequireUnlocked();
+        // With the second factor on a new phone is confirmed on a phone that is paired already, before the QR code is shown at all.
+        if (newCode) OpenPairingWindow();
         var c = config.Current;
         var address = Network.LanAddresses().FirstOrDefault();
-        string? url = null, qr = null, code = null;
-        if (c.RemoteEnabled && address is not null && !Locked)
+        string? url = null, qr = null;
+        var pairLocked = PairingWindowClosed();
+        if (c.RemoteEnabled && address is not null && !Locked && !pairLocked)
         {
-            code = newCode ? Pairing.NewCode(DateTimeOffset.UtcNow) : Pairing.CurrentCode(DateTimeOffset.UtcNow);
-            url = $"http://{address}:{c.RemotePort}/#pair={code}";
+            var code = newCode ? Pairing.NewCode(DateTimeOffset.UtcNow) : Pairing.CurrentCode(DateTimeOffset.UtcNow);
+            // The secret only in the fragment (#k=), which the phone's browser never sends: it seals the pairing request with it.
+            url = $"http://{address}:{c.RemotePort}/#k={code}";
             qr = Qr.Svg(url);
         }
         return new
         {
             enabled = c.RemoteEnabled,
             running = _remote.Running,
+            // The second factor is on and no phone confirmed this pairing yet: no QR code, the page asks first.
+            pairLocked,
+            secondFactor = GetSecondFactor(),
             url,
             address = address is null ? null : $"http://{address}:{c.RemotePort}",
-            code,
             qr,
-            devices = RemoteDevicesSnapshot().Select(d => new { d.Id, d.Name, paired = d.Paired.ToUnixTimeMilliseconds(), lastUsed = (d.LastUsed ?? d.Paired).ToUnixTimeMilliseconds() })
+            devices = RemoteDevicesSnapshot().Select(d => new
+            {
+                d.Id, d.Name, paired = d.Paired.ToUnixTimeMilliseconds(), lastUsed = (d.LastUsed ?? d.Paired).ToUnixTimeMilliseconds(),
+                // Phones paired before 0.7 have no channel key: plain remote control until they are paired again.
+                level = RemoteRights.Name(RemoteRights.Parse(d.Level)), channel = d.Key.Length > 0, child = d.Child
+            })
         };
     }
 
-    public void RevokeRemote() => Pairing.RevokeAll();
+    public void RevokeRemote()
+    {
+        // Unpairing the last phone that can confirm ends the second factor: that is switching it off, so it needs it (no downgrade on the side).
+        RequireSecondFactorUnlessStays(_ => true, "all");
+        Pairing.RevokeAll();
+        _remote.Channel?.KeepOnly(new HashSet<string>());
+        ResetSecondFactor();
+        ReconcileSecondFactor();
+    }
 
     /// <summary>Unpairs one phone; its token stops working at once.</summary>
     public void RevokeRemoteDevice(string id)
     {
+        if (Pairing.ById(id) is not null) RequireSecondFactorUnlessStays(d => d.Id == id, "unpair", id);
         if (!Pairing.Revoke(id)) throw new ArgumentException(Strings.Get("remote.noSuchDevice"));
+        _remote.Channel?.Forget(id);
+        ResetSecondFactor();
+        ReconcileSecondFactor();
     }
 
     private List<RemoteDevice> RemoteDevicesSnapshot()
@@ -4932,7 +5536,10 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     // The CouchHUD service: status, fail-closed coupling, repair
 
     private readonly LockWatch _serviceWatch = new(LockWatch.DefaultGrace, LockWatch.DefaultRelock);
+    // Only held so that the timer is not collected: it is never read.
+#pragma warning disable IDE0052 // the field only keeps the timer from being collected
     private System.Threading.Timer? _serviceTimer;
+#pragma warning restore IDE0052
     private string? _lastServiceState;
     private bool _tasksMigrated;
     private bool _codesMigrated;
@@ -5029,23 +5636,128 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// service accepts nothing else; with a damaged file no code can unlock the couch anyway). Afterwards the lock mode of the settings is
     /// raised again in the service, and a code lock asks for its code to be set again. The answer is the security view.
     /// </summary>
+    [SecondFactorExempt("an administrator approval through UAC only, never a code, and only while the code file is damaged")]
     public async Task<object> ResetCodeStoreAsync()
     {
         RefuseWhileConfigFaulted();
         if (!ServiceCodes.Expected || AdminService.DevMayRelax(dev)) throw new InvalidOperationException(Strings.Get("codes.resetNotDamaged"));
-        if (await ServiceCodes.RefreshAsync() is not { Damaged: true }) throw new InvalidOperationException(Strings.Get("codes.resetNotDamaged"));
-        await ServiceCodes.ResetDamagedAsync(config.Current.CouchLock);
+        var reset = await CodeFlow.ResetDamagedStoreAsync(ServiceCodes.RefreshAsync, () => ServiceCodes.ResetDamagedAsync(config.Current.CouchLock),
+            () => ServiceCodes.Known, config.Current.CouchLock == "code");
+        if (!reset.Reset) throw new InvalidOperationException(Strings.Get("codes.resetNotDamaged"));
         // The service holds no code now: the settings keep no marker of one (a code lock asks for a new code). Not when the file was valid
         // again when the service read it right before (it loaded it instead): the code is still there.
-        if (ServiceCodes.Known is not { Couch: true })
+        // One write for both (ParentCodeState.ApplyReset): the hash cleared and the marker set, never one without the other after a crash.
+        // The service holds no parents' code now either (the reset sets the whole file aside): with parental controls on, the parents' releases
+        // must not fall back to "unlocked couch is enough", so the marker keeps them protected until a new code is set (SetParentCodeAsync and
+        // the couch code, CodeIsSet). Also for a service that does not answer (fail closed); not when the file was valid again and the codes are still there.
+        config.Update(c => CouchHud.Core.Security.ParentCodeState.ApplyReset(c, reset.CouchCodeGone, reset.ParentCodeGone, Passcode.HeldByService));
+        // The administrator approved the reset (the service takes nothing else) and the service holds no couch code now: no code could open the
+        // lock, so the approval opens it for the unlock's two minutes, enough to set the new code. Not when the file was valid again (its code
+        // is the way) or the service did not answer (fail closed); later the code entry offers the administrator's way (UnlockByAdminAsync).
+        if (reset.OpensLock)
         {
-            config.Update(c =>
-            {
-                if (c.PasscodeHash == Passcode.HeldByService) c.PasscodeHash = "";
-            });
+            Console.WriteLine("[lock] opened after the reset of the damaged code store: a new code is to be set");
+            _unlockedUntil = MonoNow().AddMinutes(2);
         }
         Ui(SyncLockState);
         return GetSecurity();
+    }
+
+    /// <summary>
+    /// The administrator's reset of the service's state (the way out of a damaged state file, or a fresh start): the service releases what
+    /// its state names in every account, starts paused services again and sets a damaged file aside. Behind the couch lock (not open while
+    /// locked: the bridge refuses it), and Windows' UAC prompt is the real gate (the service accepts an administrator's approval for exactly
+    /// this operation only, never a code). Afterwards this account's lock policies and paused services are applied again as the settings
+    /// say. The answer is the service view; throws with the reason when it did not happen.
+    /// </summary>
+    public async Task<object> ResetServiceStateAsync()
+    {
+        RefuseWhileConfigFaulted();
+        if (!AdminService.Ops.Expected || AdminService.DevMayRelax(dev)) throw new InvalidOperationException(Strings.Get("service.resetNoService"));
+        var outcome = "refused";
+        try
+        {
+            outcome = await UninstallRelease.RunAsync(
+                () => AdminService.WithGrantAsync(ServiceOperation.ResetServiceState, () => AdminService.Ops.ResetServiceStateAsync()),
+                () => AdminService.Ops.ReleaseStatusAsync(), delay => Task.Delay(delay), () => DateTimeOffset.UtcNow, UninstallRelease.DefaultCap);
+            Console.WriteLine($"[service] state reset: {outcome}");
+            if (outcome == "timeout")
+            {
+                // The job still runs in the service: setting the policies now would be undone when it ends. The follow-up waits for the end,
+                // sets them again and looks once more; the user is told it is not finished (below), never "done".
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        // Three minutes at the normal pace, then every 30 s up to 15 minutes in all; the policies are set again when it ends.
+                        var late = await ResetFollowUp.RunAsync(outcome, () => AdminService.Ops.ReleaseStatusAsync(), delay => Task.Delay(delay),
+                            () => DateTimeOffset.UtcNow, ReapplyAfterReset, UninstallRelease.DefaultCap, reapplyIfRunning: false);
+                        if (late == "timeout")
+                        {
+                            late = await ResetFollowUp.RunAsync(outcome, () => AdminService.Ops.ReleaseStatusAsync(), delay => Task.Delay(delay),
+                                () => DateTimeOffset.UtcNow, ReapplyAfterReset, TimeSpan.FromMinutes(12), ResetFollowUp.SlowPoll);
+                        }
+                        Console.WriteLine($"[service] state reset, late end: {late}");
+                        await ResetFollowUp.VerifyAsync(delay => Task.Delay(delay), ReapplyAfterReset);
+                    }
+                    catch (Exception ex) when (ex is not OutOfMemoryException)
+                    {
+                        Console.Error.WriteLine($"[service] state reset follow-up: {ex.Message}");
+                    }
+                });
+            }
+        }
+        finally
+        {
+            // Whatever happened after the service took the job (or before: harmless), this account's policies and paused services are set
+            // again as the settings say. After a timeout the follow-up does it once the job has ended.
+            if (outcome != "timeout")
+            {
+                ReapplyAfterReset();
+                if (outcome == "done") _ = VerifyResetLater();
+            }
+            Ui(SyncLockState);
+        }
+        if (outcome != "done")
+        {
+            throw new InvalidOperationException(Strings.Get(outcome switch
+            {
+                "failed" => "service.reset.failed",
+                "timeout" => "service.reset.timeout",
+                "noService" => "service.resetNoService",
+                "notRunning" => "service.error.notRunning",
+                "unreachable" => "service.error.unreachable",
+                _ => "service.reset.refused"
+            }));
+        }
+        return AdminService.View(await AdminService.Ops.StatusAsync(fresh: true));
+    }
+
+    private async Task VerifyResetLater()
+    {
+        try
+        {
+            await ResetFollowUp.VerifyAsync(delay => Task.Delay(delay), ReapplyAfterReset);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Console.Error.WriteLine($"[service] state reset second look: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// The policies of this account and its paused services as the settings say, after the service's state was reset. Other accounts
+    /// are not reached from here: their policies and paused services come back at their next CouchHUD start.
+    /// </summary>
+    private void ReapplyAfterReset()
+    {
+        PolicyHelper.ForgetFailure();
+        PolicyHelper.Retry();
+        // Paused services are touched on the UI thread like every other caller does (the follow-ups run on pool threads).
+        Ui(() =>
+        {
+            if (Full && !_pcMode && config.Current.CouchServicesInstalled.Count > 0) _services.Apply(StartupMode.Couch, config.Current.CouchServicesInstalled);
+        });
     }
 
     /// <summary>"Repair the service": the installer's repair script with Windows' UAC prompt (allowed while locked: UAC is the gate).</summary>
@@ -5082,6 +5794,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             stuckPolicies = stuck,
             // The selection changed since it was last applied.
             pending = !chosen.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(applied),
+            // What was last applied (paused on the couch): the mode switch records it, so its undo leaves a pending selection pending.
+            installed = applied.Where(GamingServices.IsAllowed).ToList(),
             // Tasks of an earlier version: applying the selection lets the service remove them.
             legacyTask = tasks,
             protectedFolder,
@@ -5113,6 +5827,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     {
         RefuseWhileConfigFaulted();
         if (policies) RequireFull();
+        // The way back gives the lock's Windows policies and the Task Manager back: it takes the second factor (the bridge asks the unlocked couch, no more).
+        if (!policies) RequireSecondFactor(SecondFactorActions.TaskManager, IsUnlocked, "release");
         var status = await AdminService.Ops.StatusAsync(fresh: true);
         if (policies ? status.Health != ServiceHealth.Healthy : !FailClosed.MayRemoveShell(status.State))
         {
@@ -5147,6 +5863,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// The lock's policies and Task Manager back, whatever the lock state is, and checked in the registry afterwards. The "unlock" is
     /// forced first (a lock that is on is turned off with its snapshot), then every group is released through its task.
     /// </summary>
+    [SecondFactorExempt("the callers guard (SetupServiceTaskAsync on the way back, ReleaseLockPoliciesAsync); at the start the same release is done by Hardening.Set, not by this", CallersGuard = true)]
     private PolicyRelease.Verdict ReleaseLockPoliciesNow()
     {
         Hardening.Set(false, force: true);
@@ -5158,6 +5875,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// <summary>First step of the way back: give the lock's Windows policies back before any task is deleted. Reports what stays.</summary>
     public async Task<object> ReleaseLockPoliciesAsync()
     {
+        // The lock's policies and the Task Manager back: protection comes off, so the second factor (the bridge asks the unlocked couch, no more).
+        RequireSecondFactor(SecondFactorActions.TaskManager, IsUnlocked, "release");
         using var freeze = PolicyHelper.Freeze();
         var verdict = await Task.Run(ReleaseLockPoliciesNow);
         // The service wanted a grant this shell does not have (nobody entered the code here): a parent's or an administrator's approval.
@@ -5224,6 +5943,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
 
     public void SwitchToProcess(string name)
     {
+        // The task list must not bring forward what the resume refuses: the session's game while the parental rules hold it.
+        if (_sessions.Current is { } game && ProcessList.PidsOf(name).Any(p => game.Pids.Contains(p))) RequireGameMayBeInFront(game);
         if (!ProcessList.Switch(name)) throw new InvalidOperationException(Strings.Get("hud.cannotFocusWindow"));
     }
 
@@ -5233,6 +5954,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     private void StartUpdateChecks()
     {
         var known = 0;
+        _updates.WatchUpgrade = WatchAppUpgrade;
         _updates.Changed += state => Ui(() =>
         {
             Emit("updates", state);
@@ -5397,7 +6119,10 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     {
         if (!_offeredApps.Contains(id)) throw new ArgumentException(Strings.Get("library.nothingToAdd"));
         var app = new InstalledApp(string.IsNullOrWhiteSpace(name) ? id : name.Trim(), id);
-        return await AddEntriesAsync([InstalledApps.ToEntry(app, "app", AppsFolder.KnownFolder, File.Exists)]);
+        var entry = InstalledApps.ToEntry(app, "app", AppsFolder.KnownFolder, File.Exists);
+        // A known media player (Kodi, Jellyfin …) starts in full screen on the TV: its parameters are the entry's own from the start, changeable later.
+        PlayerProfiles.ApplyDefaults(entry);
+        return await AddEntriesAsync([entry]);
     }
 
     /// <summary>
@@ -5426,7 +6151,9 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         if (!config.Current.ExpertMode) throw new InvalidOperationException(Strings.Get("entry.launchOptions"));
         // Without a parents' code the unlock above is the approval (as RequireParentGrant).
         var withCode = config.Current.ParentalEnabled && HasParentCode;
-        if (withCode && !_grant.Fits("startOptions", id)) throw new InvalidOperationException(Strings.Get("parental.codeRequired"));
+        // Marked as the parents' code for this entry: the page asks for it and repeats the change once (withParentGrant), instead of
+        // only showing the refusal (0.6.3: a stale parental status skipped the page's own question).
+        if (withCode && !_grant.Fits("startOptions", id)) throw new ParentCodeNeededException(Strings.Get("parental.codeRequired"), "startOptions", id);
         var result = change();
         if (withCode) _grant.TryConsume("startOptions", id);
         return result;
@@ -5448,9 +6175,15 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
 
     public LibraryItem EditItem(string id, string? name, string? type, bool? hidden)
     {
+        // Every check first, the parents' grants are used up only once all of them passed: a refused part (assistant, MCP) leaves no half edit
+        // and spends no code. Hiding goes through the same gate as SetHidden.
+        // The type is validated first and exactly as the library does (game or app, lower case), before any grant is looked at.
+        if (type is not null and not ("game" or "app")) throw new ArgumentException("type must be game or app", nameof(type));
+        var hideTicket = hidden is not null ? RequireHideChange(id, hidden.Value).Ticket : null;
         // Game or app decides what counts as play time and which rules apply: the parents' code for that.
+        ParentTicket? typeTicket = null;
         if (type is not null && config.Current.ParentalEnabled && library.Find(id) is { } current
-            && !string.Equals(current.Type.ToString(), type, StringComparison.OrdinalIgnoreCase)) RequireParentGrant("editType", id);
+            && !string.Equals(current.Type.ToString(), type, StringComparison.OrdinalIgnoreCase)) typeTicket = CheckParentGrant("editType", id);
         // The same rule as for a new entry: no shell, browser or Windows tool as a "game".
         // An own start target counts too: it is what runs.
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
@@ -5460,7 +6193,56 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                     : !GameEntryRules.MayBeGameUrl(target.Launch.Target))
                 || config.Current.Overrides.GetValueOrDefault(id)?.LaunchTarget is { } own && !GameEntryRules.MayBeGame(own, windows)))
             throw new ArgumentException(Strings.Get("entry.notAGame", target.Name));
+        // Both checks passed: an unbound grant fits both (a bound one fits one action and would have refused the other check above), and one
+        // code pays for one edit. Using it up twice would fail the second time after the first was spent, with nothing changed.
+        UseUp(hideTicket ?? typeTicket);
         return library.EditItem(id, name, type, hidden);
+    }
+
+    /// <summary>
+    /// "Hide" (on the ignore list, out of every list, also after rescans) or "Show again" for one entry. A library change: never on the
+    /// locked couch (the bridge refuses it first, the assistant's tools too; checked here again for every caller), and with parental controls
+    /// on only with the parents' code for exactly this entry (action "editHidden"), so a child can neither hide a game nor bring back one
+    /// the parents hid. Hidden entries stay in the library: play time, limits and the item lock keep applying to them.
+    /// </summary>
+    public LibraryItem SetHidden(string id, bool hidden)
+    {
+        var check = RequireHideChange(id, hidden);
+        UseUp(check.Ticket);
+        return library.SetHidden(id, hidden);
+    }
+
+    /// <summary>The checked gate of a hide change; <see cref="Ticket"/> is used up only right before the change is stored.</summary>
+    private readonly record struct HideCheck(ParentTicket? Ticket);
+
+    /// <summary>
+    /// Everything that must hold before an entry is hidden or shown again: a chosen profile, the unlocked couch (RequireUnlocked), with
+    /// parental controls the parents' grant for exactly this entry (RequireParentGrant("editHidden", id), checked here and used up by the
+    /// caller once the change can no longer fail), and room on the ignore list. Nothing is used up when a check fails.
+    /// </summary>
+    private HideCheck RequireHideChange(string id, bool hidden)
+    {
+        if (library.Find(id) is null) throw new KeyNotFoundException($"unknown item {id}");
+        RequireProfileChosen();
+        RequireUnlocked();
+        var ticket = config.Current.ParentalEnabled ? CheckParentGrant("editHidden", id) : null;
+        if (hidden) library.EnsureCanHide(id);
+        return new HideCheck(ticket);
+    }
+
+    /// <summary>Records of the ignore list no entry matches any more (Settings › Library › Hidden entries, name only).</summary>
+    public IReadOnlyList<IgnoredOrphan> IgnoredOrphans() => library.IgnoredOrphans();
+
+    /// <summary>"Remove" for such a record: the same gate as showing an entry again (unlocked couch, with parental controls the parents' code).</summary>
+    public IReadOnlyList<IgnoredOrphan> RemoveIgnoredOrphan(string key)
+    {
+        RequireProfileChosen();
+        RequireUnlocked();
+        var ticket = config.Current.ParentalEnabled ? CheckParentGrant("editHidden", key) : null;
+        if (!library.IgnoredOrphans().Any(o => o.Key == key)) throw new KeyNotFoundException($"no orphaned record {key}");
+        UseUp(ticket);
+        library.RemoveIgnoredOrphan(key);
+        return library.IgnoredOrphans();
     }
 
     public Task<ArtworkChoices> GetArtworkChoicesAsync(string id) => library.GetArtworkChoicesAsync(id);
@@ -5522,6 +6304,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         var current = SkinCatalog.MigrateSkinId(id);
         if (!SkinCatalog.IsKnown(current, ListSkins())) throw new ArgumentException(Strings.Get("tools.noSkin", id));
         config.Update(c => c.ActiveProfile.Skin = current!);
+        // The phones with the settings page see the new look (the TV page has its own copy of the change).
+        _remote.Channel?.Publish("settings");
     }
 
     public void Power(string action)
@@ -5531,6 +6315,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         if (action == "restart-pc")
         {
             RequireUnlocked();
+            RequireSecondFactor(SecondFactorActions.PcMode, IsUnlocked, "restart");
             // Fallback if the RunOnce entry does not run at the desktop login: the next CouchHud start restores the shell entry.
             if (shell.IsInstalledAsShell()) config.Update(c => c.PendingShellRestore = true);
             TaskManagerPolicy.Apply(false);
@@ -5545,20 +6330,36 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     public Task EnterPcModeAsync()
     {
         RequireUnlocked();
+        RequireSecondFactor(SecondFactorActions.PcMode, IsUnlocked);
         return EnterPcModeCoreAsync();
     }
 
+    // PC mode is coming up (the desktop starts): the Guide button waits, a return from the tray waits for the end of the start.
+    private bool _pcModeEntering;
+    private bool _leaveAfterEnter;
+
+    [SecondFactorExempt("the guard sits in the callers (EnterPcModeAsync, the recovery paths exempt on their own)", CallersGuard = true)]
     private async Task EnterPcModeCoreAsync()
     {
+        Console.WriteLine("[pcmode] entering");
         _pcMode = true;
-        ApplyCouchSecurity();
-        // The clients CouchHud started are closed (nothing waits); Steam's settings follow as soon as Steam is gone.
-        _ = Task.Run(() => CloseOwnClients(pcMode: true));
-        ApplyCompetitorSuppression();
-        _window?.Hide();
-        EnsureTray();
+        EndUpgradeMouse();
+        _leaveAfterEnter = false;
+        plugins.NotifyHostChanged();
         try
         {
+            // Set inside the try: whatever fails on the way, the finally lets the Guide button and the tray return again.
+            _pcModeEntering = true;
+            ApplyCouchSecurity();
+            // Phones are plain remotes now: a question or a ticket that was open does not carry over.
+            ResetSecondFactor();
+            // Phones are plain remotes now and a running sleep timer ends (before the window hides, so the TV page gets the event).
+            PcModeChangedForPhones(entered: true);
+            // The clients CouchHud started are closed (nothing waits); Steam's settings follow as soon as Steam is gone.
+            _ = Task.Run(() => CloseOwnClients(pcMode: true));
+            ApplyCompetitorSuppression();
+            _window?.Hide();
+            EnsureTray();
             if (_ranStartup && !ShellManager.IsDesktopShellRunning())
             {
                 // CouchHud did the autostart; explorer must not do it a second time.
@@ -5586,41 +6387,121 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             _services.Apply(StartupMode.Pc, config.Current.CouchServicesInstalled);
             await shell.EnterPcModeAsync();
             _taskbarHidden = false;
+            _pcModeEntering = false;
             plugins.Events.RaisePcModeEntered();
+            plugins.NotifyHostChanged();
+            if (_leaveAfterEnter)
+            {
+                await LeavePcModeAsync();
+                return;
+            }
+            // How to come back, once the desktop (and with it the notification area) is there.
+            ShowTrayHint(Strings.Get(PcModeReturn.NoticeKey(GuideTapEffective)));
         }
         catch
         {
             // No desktop came up: never leave the user with a hidden HUD and nothing else.
+            _pcModeEntering = false;
             _pcMode = false;
+            plugins.NotifyHostChanged();
+            PcModeChangedForPhones(entered: false);
             ApplyCouchSecurity();
             ApplyCompetitorSuppression();
             ShowHud();
             throw;
         }
+        finally
+        {
+            _pcModeEntering = false;
+        }
     }
 
     /// <summary>Last resort when the HUD itself can't run (e.g. WebView2 missing): give the user Windows.</summary>
+    [SecondFactorExempt("the safety net when the HUD cannot run: a screen without any shell must never be left behind")]
     public async void FallbackToDesktop(string reason)
     {
+        // RestartWebAsync can ask more than once while the first is still waiting.
+        if (_fallingBack) return;
+        _fallingBack = true;
         Console.Error.WriteLine($"[hud] falling back to the desktop: {reason}");
         // The couch lock (or parental controls, which keep it on anyway) still holds: Windows asks for the account first. The same
         // condition as a web view start that fails closed (RuntimeStrict), so that fallback always ends at the Windows lock.
-        if (RuntimeStrict && _asShell) WindowsLock.Lock();
+        // Windows locks off the UI thread (LockWithRetry waits between tries). If it does not lock, the desktop stays closed: a window
+        // of our own tells the user and offers to try again, restart or shut down; it also tries again by itself. async void has nobody
+        // to catch an exception, hence the try.
         try
         {
-            await EnterPcModeCoreAsync();
+            var enter = await RecoveryRules.LockBeforeDesktopAsync(RuntimeStrict && _asShell,
+                () => Task.Run(() => WindowsLock.LockWithRetry()),
+                AskLockFailedAsync);
+            if (enter)
+            {
+                CloseLockFailedWindow();
+                await EnterPcModeCoreAsync();
+            }
+            // Otherwise restart or shutdown was chosen: the window stays on top until Windows goes down.
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[hud] desktop fallback failed: {ex}");
+            CloseLockFailedWindow();
+        }
+        finally
+        {
+            _fallingBack = false;
         }
     }
 
+    private void CloseLockFailedWindow()
+    {
+        _lockFailedWindow?.Close();
+        _lockFailedWindow = null;
+    }
+
+    private bool _fallingBack;
+    private LockFailedWindow? _lockFailedWindow;
+
+    /// <summary>The Windows lock failed: true to try again, false when the person chose to restart or shut down (the window stays until then).</summary>
+    private async Task<bool> AskLockFailedAsync()
+    {
+        Console.Error.WriteLine("[hud] Windows could not be locked, the desktop stays closed");
+        var choice = await (_lockFailedWindow ??= new LockFailedWindow()).AskAsync();
+        if (choice == LockFailedChoice.Retry) return true;
+        try
+        {
+            ShellManager.Power(choice == LockFailedChoice.Restart ? "restart" : "shutdown");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[hud] {choice} failed: {ex.Message}");
+            return true;
+        }
+    }
+
+    [SecondFactorExempt("leaving PC mode raises protection (the couch lock and the parental controls apply again)")]
     public Task LeavePcModeAsync()
     {
+        if (_pcMode && _pcModeEntering)
+        {
+            // The desktop is still coming up: back to the couch as soon as it is there (ending explorer now would race its start).
+            Console.WriteLine("[pcmode] return asked while entering, after the start");
+            _leaveAfterEnter = true;
+            return Task.CompletedTask;
+        }
         if (_pcMode)
         {
+            Console.WriteLine("[pcmode] back to the couch");
             _pcMode = false;
+            // A controller mouse left running would steer the pointer under the HUD.
+            if (_mouse?.Active == true) _mouse.Stop();
+            plugins.NotifyHostChanged();
+
+            // The tray icon of PC mode goes with it: its "Quit" has no code check, and the couch lock applies again.
+            // Synchronous on the UI thread (never queued): a queued dispose could run after PC mode was entered again and remove the new icon.
+            DisposeTrayNow();
+
+            PcModeChangedForPhones(entered: false);
             ShellManager.LeavePcMode(Full && KillExplorerOnReturn);
             if (_ranStartup && config.Current.ClosePcAppsOnReturn)
             {
@@ -5636,9 +6517,18 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 _ = StartLaunchersAsync();
             }
             plugins.Events.RaiseCouchModeEntered();
+            // Never weaker than before PC mode: any unlock ends, the lock's policies and the guards come back.
             _unlockedUntil = DateTimeOffset.MinValue;
             ApplyCouchSecurity();
             ApplyCompetitorSuppression();
+            ShowHud();
+            // The same press may have opened the Game Bar (its button is the person's own in PC mode) or another overlay that took the
+            // front back: one more try once that has settled. Only the HUD itself, never over a game.
+            _ = Task.Delay(800).ContinueWith(_ => Ui(() =>
+            {
+                if (!_pcMode && !_browsing && _window?.IsActive != true && _sessions.Current is null) _window?.BringToFront();
+            }), TaskScheduler.Default);
+            return Task.CompletedTask;
         }
         ShowHud();
         return Task.CompletedTask;
@@ -5686,6 +6576,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         {
             if (config.Current.ParentalEnabled) throw new InvalidOperationException(Strings.Get("hud.turnOffParentalFirst"));
             RequireUnlocked();
+            // One question for every step that really changes something here (shell, lock, Task Manager), before anything is touched.
+            var steps = new List<(string, string?[])>();
+            if (shell.IsInstalledAsShell()) steps.Add((SecondFactorActions.Shell, ["uninstall"]));
+            if (config.Current.CouchLock != "off") steps.Add((SecondFactorActions.LockMode, ["off"]));
+            if (config.Current.BlockTaskManager) steps.Add((SecondFactorActions.TaskManager, ["off"]));
+            RequireSecondFactorAll(IsUnlocked, steps.ToArray());
             if (shell.IsInstalledAsShell())
             {
                 shell.UninstallAsShell();
@@ -5697,13 +6593,16 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 undone.Add(Strings.Get("hud.undo.lock"));
             }
             if (config.Current.ParentalEnabled) undone.Add(Strings.Get("hud.undo.parental"));
+            ReconcileSecondFactor();
             _guard.Stop();
             // Light mode: CouchHud does not manage the game clients at all. Nothing is closed, nothing is remembered.
             _clients.Forget();
             TaskManagerPolicy.Apply(false);
-            if (config.Current.CouchServices.Count > 0)
+            // What is paused is the applied list, not the selection: a selection emptied but not applied yet (or emptied by an undo before
+            // this step) still leaves the applied services paused, and light mode never resumes them otherwise.
+            if (LightModeServices.ToResume(config.Current) is { Count: > 0 } resume)
             {
-                _services.Apply(StartupMode.Pc, config.Current.CouchServicesInstalled);
+                _services.Apply(StartupMode.Pc, resume);
                 undone.Add(Strings.Get("hud.undo.services"));
             }
             if (AutoLogon.Status().Enabled) undone.Add(Strings.Get("hud.undo.autoLogon"));
@@ -5796,6 +6695,9 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     {
         if (_browser is { } pane) _ = pane.ClearHistoryAsync();
     }
+
+    /// <summary>The couch rules hold for the browser's Windows dialogs (see <see cref="BrowserDialogRules.Enforced"/>).</summary>
+    private bool BrowserDialogsEnforced() => BrowserDialogRules.Enforced(LockOn, _pcMode, dev);
 
     private BrowserPane Browser()
     {
@@ -6086,6 +6988,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             return page;
         }
         _browsing = page;
+        // The browser steers the mouse itself from here on; the upgrade watch no longer owns it.
+        if (page) EndUpgradeMouse(stop: false);
         if (page)
         {
             // No extension of the unlock here: a page's full screen gives it the controller too. The person's input that led here
@@ -6189,6 +7093,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         RequireArea(FeatureAreas.Browser);
         // \\server\share or C:\…: no files in the couch browser, and such a path does not go to a search engine either.
         if (BrowserAddress.IsLocalPath(text)) throw new ArgumentException(Strings.Get("browser.localPath"));
+        // Fail closed: under the couch rules the browser only opens with its dialog backstop running.
+        if (BrowserDialogsEnforced() && _dialogGuard is not { IsActive: true }) throw new InvalidOperationException(Strings.Get("browser.guardMissing"));
         var browser = Browser();
         try
         {
@@ -6197,6 +7103,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 var target = BrowserAddress.Parse(text);
                 await browser.OpenAsync(target.Url, config.Current.BrowserZoom, target.Guessed);
             }
+            // Without the web view's process id the backstop cannot tell the couch browser from other programs: not used blind.
+            if (BrowserDialogsEnforced() && browser.BrowserProcessId is null) throw new InvalidOperationException(Strings.Get("browser.guardMissing"));
         }
         catch
         {
@@ -6235,7 +7143,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         _browser = null;
         Emit("browser", BrowserState());
         Emit("browserui", "closed");
-        if (bringFront) _window?.BringToFront();
+        if (bringFront) _window?.BringToFront(personCameBack: true);
     }
 
     /// <summary>Back to the HUD (home, or its Browser tab for the address); the page stays open in its tab.</summary>
@@ -6548,6 +7456,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     }
 
     /// <summary>Guard and Task Manager policy only while the couch is locked and in front.</summary>
+    [SecondFactorExempt("applies the configured state; changing what is configured (lock, Task Manager block) is guarded where it is written")]
     private void ApplyCouchSecurity()
     {
         var on = LockOn && !_pcMode && !dev;
@@ -6583,6 +7492,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 // Unlocked now: a plugin suggestion that had to wait for the unlock (the host says nothing while locked) is asked for again.
                 else if (!first) Ui(() => Emit("pluginSuggestionsReady", null));
                 plugins.Events.RaiseLockChanged(locked);
+                plugins.NotifyHostChanged();
                 // Third-party plugin tabs are hidden while locked.
                 plugins.RaiseTabsChanged();
                 // No way back to the profile picker here (review N3): the couch also locks on a game start, on the way back to the HUD and
@@ -6671,7 +7581,11 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// A lock of 0.4.0 whose stored code did not match (answer <c>legacyMismatch</c>): the person chose in the HUD's dialog to have an
     /// administrator confirm the code as the lock's new one (UAC only after that explicit choice).
     /// </param>
-    public async Task<object> UnlockAsync(string[]? sequence, bool asNewLegacyCode = false)
+    /// <param name="byAdmin">
+    /// The code lock while the service holds no couch code (after the reset of a damaged code file, before a new code is set): an
+    /// administrator's approval (Windows' UAC prompt) opens it in place of the code (<see cref="UnlockByAdminAsync"/>).
+    /// </param>
+    public async Task<object> UnlockAsync(string[]? sequence, bool asNewLegacyCode = false, bool byAdmin = false)
     {
         if (IsUnlocked) return new { ok = true };
         if (config.Current.CouchLock == "windows")
@@ -6699,10 +7613,11 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         // and hash are only for a copy without a service.
         if (ServiceCodes.Expected && !AdminService.DevMayRelax(dev))
         {
+            if (byAdmin) return await UnlockByAdminAsync();
             if (sequence is null) return new { ok = false };
             var (check, legacy) = await CheckCodeAsync(CodeKinds.Couch, sequence, asNewLegacyCode);
             if (legacy == LegacyConfirm.Mismatch) return new { ok = false, legacyMismatch = true };
-            if (check is not { Granted: true }) return CodeAnswer(check);
+            if (check is not { Granted: true }) return await LockCodeAnswerAsync(check);
             _unlockedUntil = MonoNow().AddMinutes(2);
             SyncLockState();
             // Confirmed with the old code of 0.4.0: it lay readable in the configuration, the UI asks for a new one (review 4).
@@ -6762,6 +7677,46 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         }
         if (!check.Result.Ok) Console.Error.WriteLine($"[lock] {kind} code: the service could not check it ({check.Result})");
         return (check, null);
+    }
+
+    /// <summary>
+    /// The lock's answer after a code that did not open. Two states have a way out besides the code, because no code can open them: the
+    /// service's code file is damaged (asked now, after the refusal: the code entry offers the administrator's reset, <see cref="ResetCodeStoreAsync"/>),
+    /// or the service holds no couch code (after such a reset: the code entry offers an administrator's approval, <see cref="UnlockByAdminAsync"/>).
+    /// Both only flag the offer; what opens is decided again by those calls with the service's state at that moment.
+    /// </summary>
+    private static async Task<object> LockCodeAnswerAsync(CodeCheck? check)
+    {
+        if (check is { Result.Ok: false } && CodeFlow.RefusedForDamage(check.Result, await FreshServiceCodesAsync()))
+            return new { ok = false, blocked = Strings.Get("codes.storeDamagedHere"), codesDamaged = true };
+        if (check is { Result.Ok: true, Outcome: CodeCheckResults.NoCode }) return new { ok = false, blocked = Strings.Get("codes.noCouchCode"), admin = "noCode" };
+        return CodeAnswer(check);
+    }
+
+    /// <summary>
+    /// The code lock opened by an administrator's approval instead of the code (Windows' UAC prompt; on a standard account that means an
+    /// administrator's password, the HUD never sees it): only while the service answers right now that it holds no couch code, its file is not
+    /// damaged and no lock of 0.4.0 waits (<see cref="CodeFlow.AdminOpensCodeLock"/>), asked before and again after the approval. A couch code
+    /// that exists, a damaged file or a service that does not answer leave the lock closed (fail closed). The service's policies stay (it
+    /// gives no couch grant without a code), like after a Windows sign-in without its grant.
+    /// </summary>
+    private async Task<object> UnlockByAdminAsync()
+    {
+        CodeFlow.AdminUnlockOutcome outcome;
+        try
+        {
+            outcome = await CodeFlow.UnlockByAdminAsync(FreshServiceCodesAsync, () => AdminService.ObtainAdminGrantAsync([], AdminService.UnlockNoCodeReason));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new { ok = false, blocked = ex.Message };
+        }
+        if (outcome == CodeFlow.AdminUnlockOutcome.Declined) return new { ok = false };
+        if (outcome != CodeFlow.AdminUnlockOutcome.Opened) return new { ok = false, blocked = Strings.Get("codes.adminUnlockRefused") };
+        Console.WriteLine("[lock] opened by an administrator's approval: the service holds no couch code");
+        _unlockedUntil = MonoNow().AddMinutes(2);
+        SyncLockState();
+        return new { ok = true };
     }
 
     /// <summary>What the UI hears after a code that did not open: why (the service), how long to wait, or just "wrong".</summary>
@@ -6830,13 +7785,13 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             if (_parentAuth.OnUnlocked())
             {
                 _confirm = new(ConfirmKind.Parent, MonoNow() + ConfirmTime, _parentAuthScope.Action, _parentAuthScope.Item);
-                _window?.BringToFront();
+                _window?.BringToFront(personCameBack: true);
                 Emit("parentalAuth", new { confirm = true });
             }
             else if (_windowsUnlock.OnUnlocked())
             {
                 _confirm = new(ConfirmKind.Unlock, MonoNow() + ConfirmTime, null, null);
-                _window?.BringToFront();
+                _window?.BringToFront(personCameBack: true);
                 Emit("unlocked", new { confirm = true });
             }
         });
@@ -6846,6 +7801,9 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     {
         RefuseWhileConfigFaulted();
         // A new code is the key to the couch: never from a locked HUD, also not for the very first code.
+        // The first code (no lock yet) raises protection and needs no second factor.
+        if (config.Current.CouchLock != "off")
+            RequireSecondFactor(SecondFactorActions.Passcode, SiteCodeAccepted("passcode"), "couch");
         if (config.Current.ParentalEnabled) RequireParentGrant("passcode");
         else RequireUnlocked();
         Passcode.Validate(sequence);
@@ -6854,13 +7812,13 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         {
             // The service keeps the code (and, with parental controls, the same buttons as the parents' code); the config only the marker.
             await ServiceCodes.StoreAsync(sequence, config.Current.ParentalEnabled);
-            config.Update(c => c.PasscodeHash = Passcode.HeldByService);
+            config.Update(c => CodeIsSet(c, Passcode.HeldByService));
             // The answer says what the service holds now (the setup assistant checks the code lock by it), like SetParentCode.
             await ServiceCodes.RefreshAsync();
             return GetSecurity();
         }
         var hash = Passcode.Hash(sequence);
-        config.Update(c => c.PasscodeHash = hash);
+        config.Update(c => CodeIsSet(c, hash));
         return GetSecurity();
     }
 
@@ -6891,6 +7849,14 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         if (mode is not ("off" or "code" or "windows")) throw new ArgumentException(Strings.Get("hud.lockInvalid"));
         if (mode != "off") RequireFull();
         if (mode == "windows") RequirePasswordForWindowsLock();
+        // Changing a lock that is on (also to off) takes the second factor; switching one on from "off" raises protection.
+        // A new code under the same mode changes the key to the couch, so it takes the second factor as the code change does (independent of the mode).
+        if (config.Current.CouchLock != "off")
+        {
+            var grant = sequence is null ? "lockMode" : "lockModeCode";
+            if (mode != config.Current.CouchLock) RequireSecondFactor(SecondFactorActions.LockMode, SiteCodeAccepted(grant), mode, sequence is null ? "" : "withCode");
+            else if (sequence is not null) RequireSecondFactor(SecondFactorActions.Passcode, SiteCodeAccepted(grant), "couch");
+        }
         if (config.Current.ParentalEnabled) RequireParentGrant(sequence is null ? "lockMode" : "lockModeCode");
         else RequireUnlocked();
         // Only after the permission (review NEU-2): before it, comparing with the children's codes would test a child's code without
@@ -6912,7 +7878,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         if (!service && sequence is not null)
         {
             var local = Passcode.Hash(sequence);
-            config.Update(c => c.PasscodeHash = local);
+            config.Update(c => CodeIsSet(c, local));
         }
         else if (service && sequence is not null && (config.Current.CouchLock != "off" || plan != CodeFlow.CodeLockPlan.Default))
         {
@@ -6931,7 +7897,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 Console.WriteLine($"[codes] lock mode code with a new code: {outcome}; the config stays at {config.Current.CouchLock}");
                 throw new InvalidOperationException(Strings.Get(outcome == CodeFlow.StoreRaiseOutcome.Unconfirmed ? "hud.codeLockUnconfirmed" : "hud.codeLockWithoutCode"));
             }
-            config.Update(c => c.PasscodeHash = Passcode.HeldByService);
+            config.Update(c => CodeIsSet(c, Passcode.HeldByService));
         }
         else if (service && sequence is not null)
         {
@@ -6951,7 +7917,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 Console.WriteLine($"[codes] lock mode code with a new code: {outcome}; the config stays at {config.Current.CouchLock}");
                 throw new InvalidOperationException(Strings.Get(outcome == CodeFlow.StoreRaiseOutcome.Unconfirmed ? "hud.codeLockUnconfirmed" : "hud.codeLockWithoutCode"));
             }
-            config.Update(c => c.PasscodeHash = Passcode.HeldByService);
+            config.Update(c => CodeIsSet(c, Passcode.HeldByService));
         }
         else if (service && mode != config.Current.CouchLock)
         {
@@ -6983,10 +7949,13 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             // The service no longer holds a code: switching the code lock on again asks for a new one.
             if (service && mode is "off" or "windows") c.PasscodeHash = "";
             // The couch code the service kept from before is the code lock's code again (the config only keeps the marker).
-            else if (service && plan == CodeFlow.CodeLockPlan.KeepHeldCode && c.PasscodeHash.Length == 0) c.PasscodeHash = Passcode.HeldByService;
+            else if (service && plan == CodeFlow.CodeLockPlan.KeepHeldCode && c.PasscodeHash.Length == 0)
+                CouchHud.Core.Security.ParentCodeState.CodeIsSet(c, Passcode.HeldByService, ServiceCodes.Known is { Parent: true });
         });
         ApplyCouchSecurity();
         SignInLock.SyncInBackground(dataDir);
+        // The code check off ends the second factor with it (the dialog warned about it).
+        ReconcileSecondFactor();
         // Awaited, after the policies: the answer below says what the service holds now (the setup assistant checks the code lock by it).
         if (service) await ServiceCodes.RefreshAsync();
         return GetSecurity();
@@ -6997,6 +7966,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         RefuseWhileConfigFaulted();
         if (on) RequireFull();
         RequireUnlocked();
+        if (!on) RequireSecondFactor(SecondFactorActions.TaskManager, IsUnlocked);
         config.Update(c => c.BlockTaskManager = on);
         ApplyCouchSecurity();
         return GetSecurity();
@@ -7027,6 +7997,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         RequireUnlocked();
         // An account without a password signs in without one: nothing to store, and nothing to explain as an error.
         if (!AccountHasPassword()) return new { ok = false, needsLock = false, noPassword = true, error = Strings.Get("autologon.notNeeded") };
+        RequireSecondFactor(SecondFactorActions.Autologon, IsUnlocked, "enable");
         // Automatic sign-in lands every visitor in CouchHud; the couch lock keeps them in.
         if (config.Current.CouchLock == "off" && !acceptNoLock) return new { ok = false, needsLock = true, error = Strings.Get("hud.lockIsOff") };
         // Verifying blocks: never on the UI thread. The check here gives the clear messages and the attempt limit; the service checks again.
@@ -7062,6 +8033,9 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     public void QuitFromUi()
     {
         RequireUnlocked();
+        // As the shell (or with no desktop running) the quit starts the desktop: that is the way into PC mode, without the lock.
+        // The restart below comes straight back without a desktop in between, so it needs nothing extra.
+        if (shell.IsInstalledAsShell() || !ShellManager.IsDesktopShellRunning()) RequireSecondFactor(SecondFactorActions.PcMode, IsUnlocked, "quit");
         Quit();
     }
 
@@ -7098,6 +8072,10 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         Quit(restarting: true);
     }
 
+    /// <summary>The plugins hear that CouchHUD quits (once; they have <see cref="PluginEvents.StoppingTimeout"/> together, a hanging handler holds nothing back).</summary>
+    public void PluginsStopping() => new OptionalSteps(Console.Error.WriteLine).Run("plugins stopping", () => plugins.RaiseHostStopping(), 0);
+
+    [SecondFactorExempt("QuitFromUi asks the second factor when the desktop would appear; the tray and the restart path need none (PC mode, or no desktop in between)")]
     public void Quit(bool restarting = false)
     {
         // Off the UI thread: StopAsync continues on captured contexts otherwise.
@@ -7114,8 +8092,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         Launcher.EndWaitingScripts();
         _saveBackupStop.Cancel();
         _quitting = true;
+        CancelFrontLoop();
+        // The plugins hear that CouchHUD quits: two seconds for all of them together, a handler that hangs holds nothing back.
+        PluginsStopping();
         _guard.Stop();
         _foreground?.Dispose();
+        _dialogGuard?.Dispose();
         // The clients CouchHud started go (asked, not waited for); Steam's settings go back as soon as Steam is gone: a short bounded wait.
         // Short: what does not fit is put back by the Run entry or the next start.
         if (CloseOwnClients(pcMode: false)) SteamSettings.WaitSteamEnded(TimeSpan.FromMilliseconds(1500));
@@ -7162,6 +8144,31 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         Application.Current.Shutdown();
     }
 
+    /// <summary>A short Windows notification from the tray icon (PC mode: how to come back). Without a tray icon nothing is shown.</summary>
+    private void ShowTrayHint(string text)
+    {
+        try
+        {
+            _tray?.ShowBalloonTip(6000, "CouchHUD", text, System.Windows.Forms.ToolTipIcon.None);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Console.Error.WriteLine($"[hud] tray hint: {ex.GetType().Name}");
+        }
+    }
+
+    private void DisposeTrayNow()
+    {
+        void Dispose()
+        {
+            _tray?.Dispose();
+            _tray = null;
+        }
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess()) Dispose();
+        else dispatcher.Invoke(Dispose);
+    }
+
     private void EnsureTray()
     {
         if (_tray is not null) return;
@@ -7170,7 +8177,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             var menu = new System.Windows.Forms.ContextMenuStrip();
             menu.Items.Add(Strings.Get("tray.backToCouch"), null, (_, _) => _ = LeavePcModeAsync());
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-            menu.Items.Add(Strings.Get("tray.quit"), null, (_, _) => Quit());
+            // Only in PC mode (an icon that outlived it would quit a locked couch without any code).
+            menu.Items.Add(Strings.Get("tray.quit"), null, (_, _) => { if (_pcMode) Quit(); });
             var tray = new System.Windows.Forms.NotifyIcon
             {
                 Icon = (Environment.ProcessPath is { } exe ? System.Drawing.Icon.ExtractAssociatedIcon(exe) : null) ?? System.Drawing.SystemIcons.Application,

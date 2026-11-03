@@ -36,7 +36,10 @@ public static class PluginPolicy
     /// <summary>Never for a plugin that is not CouchHUD's own, whatever it declares.</summary>
     public static readonly IReadOnlySet<string> FirstPartyOnly = new HashSet<string>(StringComparer.Ordinal)
     {
-        PluginCapabilities.SetupRun, PluginCapabilities.LockRestrict, PluginCapabilities.StartupArgs, PluginCapabilities.BrowserSignIn
+        PluginCapabilities.SetupRun, PluginCapabilities.LockRestrict, PluginCapabilities.StartupArgs, PluginCapabilities.BrowserSignIn,
+        PluginCapabilities.ChatProvider,
+        // Only CouchHUD's own plugins write the sensor board, so a reader can trust where the numbers come from.
+        PluginCapabilities.SensorsPublish
     };
 
     /// <summary>
@@ -68,8 +71,18 @@ public static class PluginPolicy
         ["AdaptStartupArgs"] = PluginCapabilities.StartupArgs,
         ["RemoveQuickAction"] = PluginCapabilities.QuickActions,
         ["SignIn"] = PluginCapabilities.BrowserSignIn,
+        ["PublishSensors"] = PluginCapabilities.SensorsPublish,
+        ["ReadSensors"] = PluginCapabilities.SensorsRead,
         // Declaring functions grants nothing: it only gives the owner something to restrict.
         ["RegisterFunctions"] = null,
+        ["Http"] = PluginCapabilities.NetworkInternet,
+        ["RegisterWeather"] = PluginCapabilities.Weather,
+        ["RegisterNews"] = PluginCapabilities.News,
+        ["RegisterChatProvider"] = PluginCapabilities.ChatProvider,
+        // Asking whether a declared service may go out is harmless (false for anything undeclared); the state itself needs its capability.
+        ["ServiceAllowed"] = null,
+        ["Host"] = PluginCapabilities.HostState,
+        ["RegisterTvProvider"] = PluginCapabilities.TvControl,
     };
 
     /// <summary>
@@ -84,7 +97,26 @@ public static class PluginPolicy
             if (FirstPartyOnly.Contains(cap) && !IsOwn(origin)) return "plugin.cap.firstPartyOnly";
             if (cap == PluginCapabilities.DynamicCode && origin == PluginOrigin.ThirdParty) return "plugin.cap.dynamicCode";
         }
+        if (!IsOwn(origin) && TvConflicts(declared).Count > 0) return "plugin.cap.tvAlone";
         return null;
+    }
+
+    /// <summary>
+    /// What a plugin that is not CouchHUD's own may not hold together with "tv.control": its own sockets, native code, other programs and
+    /// run-time code. A TV plugin reaches the TV only through the core's link; with any of these it could reach the network around it,
+    /// and the lint (which flags sockets without a network capability) would no longer say so.
+    /// </summary>
+    public static readonly IReadOnlySet<string> TvExclusive = new HashSet<string>(StringComparer.Ordinal)
+    {
+        PluginCapabilities.NetworkLoopback, PluginCapabilities.NetworkLan, PluginCapabilities.NetworkInternet, PluginCapabilities.Native,
+        PluginCapabilities.Process, PluginCapabilities.DynamicCode
+    };
+
+    /// <summary>The declared capabilities that conflict with "tv.control" (empty without it).</summary>
+    public static IReadOnlyList<string> TvConflicts(IEnumerable<string>? declared)
+    {
+        var list = (declared ?? []).ToList();
+        return list.Contains(PluginCapabilities.TvControl) ? list.Where(TvExclusive.Contains).Distinct(StringComparer.Ordinal).ToList() : [];
     }
 
     /// <summary>
@@ -94,7 +126,7 @@ public static class PluginPolicy
     {
         var list = (declared ?? []).ToList();
         if (CheckDeclared(origin, list) is not { } key) return null;
-        var names = list.Where(c => CheckDeclared(origin, [c]) == key).Distinct(StringComparer.Ordinal).Take(8).Select(c => new string(c.Where(ch => char.IsAsciiLetterOrDigit(ch) || ch is '.' or '_' or '-' or ':').Take(64).ToArray()));
+        var names = (key == "plugin.cap.tvAlone" ? TvConflicts(list) : list.Where(c => CheckDeclared(origin, [c]) == key)).Distinct(StringComparer.Ordinal).Take(8).Select(c => new string(c.Where(ch => char.IsAsciiLetterOrDigit(ch) || ch is '.' or '_' or '-' or ':').Take(64).ToArray()));
         return Strings.Get(key) + ": " + string.Join(", ", names);
     }
 
@@ -109,6 +141,8 @@ public static class PluginPolicy
         var set = new HashSet<string>(wanted.Where(c => PluginCapabilities.All.Contains(c)), StringComparer.Ordinal);
         if (!IsOwn(origin)) set.ExceptWith(FirstPartyOnly);
         if (origin == PluginOrigin.ThirdParty) set.Remove(PluginCapabilities.DynamicCode);
+        // Fail closed: a plugin of someone else that holds its own network, native code or programs never controls the TV.
+        if (!IsOwn(origin) && TvConflicts(set).Count > 0) set.Remove(PluginCapabilities.TvControl);
         // A plugin from before the capabilities (recorded null) keeps at most the SDK 2 surface: the migration grants nothing new.
         set.IntersectWith(recorded ?? Legacy);
         return set;
@@ -138,6 +172,17 @@ public static class PluginPolicy
         if (ctx.Caller != PluginCaller.Hud) return "plugin.gate.hudOnly";
         if (ctx.Locked) return "lock.unlockFirst";
         return ctx.ChildProfile ? "plugin.gate.child" : null;
+    }
+
+    /// <summary>
+    /// Switching a plugin back on needs the second factor (PluginRights) when it is not CouchHUD's own, or is and may reach the network,
+    /// the assistant or programs: a parent may use "off" as a lock, and the parents' code alone must not undo it. Switching off stays free.
+    /// </summary>
+    public static bool EnableNeedsSecondFactor(PluginOrigin origin, IReadOnlyCollection<string>? capabilities)
+    {
+        if (!IsOwn(origin)) return true;
+        return (capabilities ?? []).Any(c => c is PluginCapabilities.Assistant or PluginCapabilities.Process or PluginCapabilities.SetupRun
+                                             || c.StartsWith("network:", StringComparison.Ordinal));
     }
 
     /// <param name="addsCapabilities">An update that asks for capabilities the installed version did not have: treated like a new install.</param>

@@ -1,0 +1,3 @@
+:root[data-skin="user:vars-color"]{--x:1}
+
+:root{--tab-color:rgba(255,255,255,0.004); --tab-color-active:rgba(255,255,255,0.004); --tab-glyph-color:rgba(255,255,255,.004); --tab-bg:rgba(255,255,255,0.004); --bar-bg:#fff; --bg:#fff; --fg:#fff}

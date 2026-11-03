@@ -11,8 +11,10 @@ using System.Text.Json;
 namespace CouchHud.Core.Tests;
 
 /// <summary>
-/// A fake LG webOS TV on 127.0.0.1 for the TV tests: a TCP listener (with TLS and a fresh self-signed certificate, or plain), the
-/// WebSocket upgrade by hand, then SSAP like a TV answers it. Nothing leaves the machine.
+/// A fake TV on 127.0.0.1 for the TV tests: a TCP listener (with TLS and a fresh self-signed certificate, or plain), the WebSocket upgrade
+/// by hand, then SSAP like an LG webOS TV answers it (the core's tests drive it through a small test provider and the real
+/// <see cref="CouchHud.Core.Integrations.Tv.TvLink"/>). A request without an upgrade is plain HTTP and gets <see cref="HttpAnswer"/>.
+/// Nothing leaves the machine.
 /// </summary>
 internal sealed class FakeWebOsTv : IAsyncDisposable
 {
@@ -47,6 +49,15 @@ internal sealed class FakeWebOsTv : IAsyncDisposable
     /// <summary>Raw input list JSON (devices array) the TV returns.</summary>
     public string InputsJson { get; set; } =
         """[{"id":"HDMI_1","label":"PlayStation\u0007 5","connected":true},{"id":"HDMI_2","label":"<b>PC</b>","connected":true},{"id":"bad id; rm","label":"x"},{"id":"HDMI_3","connected":false}]""";
+
+    /// <summary>Plain HTTP requests (request line, headers, body) in order.</summary>
+    public ConcurrentQueue<string> HttpRequests { get; } = new();
+    /// <summary>Request lines of the WebSocket upgrades in order (the path the client asked for).</summary>
+    public ConcurrentQueue<string> Upgrades { get; } = new();
+    /// <summary>The raw answer to every plain HTTP request.</summary>
+    public string HttpAnswer { get; set; } = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}";
+    /// <summary>Sends a binary frame instead of the answer to this uri.</summary>
+    public string? Binary { get; set; }
 
     public int Port { get; }
     public X509Certificate2? Certificate => _cert;
@@ -103,8 +114,20 @@ internal sealed class FakeWebOsTv : IAsyncDisposable
                 await ssl.AuthenticateAsServerAsync(new SslServerAuthenticationOptions { ServerCertificate = _cert }, _stop.Token);
                 stream = ssl;
             }
-            var key = await ReadUpgradeAsync(stream);
-            if (key is null) return;
+            var head = await ReadHeadAsync(stream);
+            if (head is null) return;
+            var key = Header(head, "Sec-WebSocket-Key");
+            if (key is null)
+            {
+                var length = int.TryParse(Header(head, "Content-Length"), out var n) ? Math.Clamp(n, 0, 1 << 20) : 0;
+                var body = new byte[length];
+                await stream.ReadExactlyAsync(body, _stop.Token);
+                HttpRequests.Enqueue(head + Encoding.UTF8.GetString(body));
+                await stream.WriteAsync(Encoding.UTF8.GetBytes(HttpAnswer), _stop.Token);
+                await stream.FlushAsync(_stop.Token);
+                return;
+            }
+            Upgrades.Enqueue(head.Split("\r\n")[0]);
             var accept = Convert.ToBase64String(SHA1.HashData(Encoding.ASCII.GetBytes(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")));
             var response = $"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n";
             await stream.WriteAsync(Encoding.ASCII.GetBytes(response), _stop.Token);
@@ -117,7 +140,7 @@ internal sealed class FakeWebOsTv : IAsyncDisposable
         }
     }
 
-    private static async Task<string?> ReadUpgradeAsync(Stream stream)
+    private static async Task<string?> ReadHeadAsync(Stream stream)
     {
         var buffer = new List<byte>();
         var one = new byte[1];
@@ -127,9 +150,14 @@ internal sealed class FakeWebOsTv : IAsyncDisposable
             buffer.Add(one[0]);
             if (buffer.Count >= 4 && buffer[^1] == '\n' && buffer[^2] == '\r' && buffer[^3] == '\n' && buffer[^4] == '\r') break;
         }
-        foreach (var line in Encoding.ASCII.GetString(buffer.ToArray()).Split("\r\n"))
+        return Encoding.ASCII.GetString(buffer.ToArray());
+    }
+
+    private static string? Header(string head, string name)
+    {
+        foreach (var line in head.Split("\r\n"))
         {
-            if (line.StartsWith("Sec-WebSocket-Key:", StringComparison.OrdinalIgnoreCase)) return line["Sec-WebSocket-Key:".Length..].Trim();
+            if (line.StartsWith(name + ":", StringComparison.OrdinalIgnoreCase)) return line[(name.Length + 1)..].Trim();
         }
         return null;
     }
@@ -162,6 +190,11 @@ internal sealed class FakeWebOsTv : IAsyncDisposable
             var uri = root.GetProperty("uri").GetString()!;
             Requests.Enqueue(uri);
             if (Silent.Contains(uri)) continue;
+            if (Binary == uri)
+            {
+                await ws.SendAsync(new byte[] { 1, 2, 3 }, WebSocketMessageType.Binary, true, _stop.Token);
+                continue;
+            }
             if (Oversize == uri)
             {
                 await ws.SendAsync(Encoding.UTF8.GetBytes("{\"type\":\"response\",\"id\":\"" + id + "\",\"payload\":{\"x\":\"" + new string('a', 300 * 1024) + "\"}}"), WebSocketMessageType.Text, true, _stop.Token);

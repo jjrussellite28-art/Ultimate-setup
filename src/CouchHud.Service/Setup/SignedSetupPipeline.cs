@@ -173,7 +173,7 @@ public sealed class SignedSetupPipeline(
                 return Refuse(caller, kind, ErrorCodes.Unavailable, "staging refused (see the alarm)");
             }
             // Decided now, with the request (and its grant) at hand; only CouchHUD setups disconnect sessions.
-            int? keep = kind == SetupKind.CouchHud && (keepSession ?? KeepSessionPolicy.Never).MayKeep(caller, context.Request) ? caller.PipeSessionId : null;
+            int? keep = kind == SetupKind.CouchHud && (keepSession ?? KeepSessionPolicy.Never).MayKeep(caller, context.Request, context.Grant) ? caller.PipeSessionId : null;
             context.AcceptStream(new Receiver(this, caller, plan, staged, streamLease, keep));
             staged = null;
             streamLease = null;

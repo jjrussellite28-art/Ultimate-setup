@@ -114,6 +114,7 @@ public sealed class ProfileContractTests
         Assert.DoesNotContain(held, m => m.StartsWith("caseHud", StringComparison.Ordinal) || m.StartsWith("vpn", StringComparison.Ordinal) || m.StartsWith("tv", StringComparison.Ordinal));
         // Starting, resuming, the assistant and MCP refuse too.
         Assert.Contains("RequireProfileChosen();", Body("Hud.cs", "    public void ResumeGame()"));
+        Assert.Contains("RequireProfileChosen();", Body("Hud.cs", "    public async Task ResumeGameAsync()"));
         var tools = Code("src", "CouchHud.Shell", "Services", "HudTools.cs");
         var guard = tools.IndexOf("hud.RequireProfileChosen();", StringComparison.Ordinal);
         Assert.True(guard >= 0 && guard < tools.IndexOf("object? result = name switch", StringComparison.Ordinal), "the tools refuse before anything runs");
@@ -137,8 +138,8 @@ public sealed class ProfileContractTests
     public void The_page_keeps_everything_else_out_of_a_required_picker()
     {
         string Ui(params string[] path) => File.ReadAllText(Path.Combine([Root(), "ui", .. path])).Replace("\r\n", "\n");
-        Assert.Contains("if (state.pickerHold) return;", Ui("components", "quick-menu.js"));
-        Assert.Contains("if (state.pickerHold) return;", Ui("app.js"));
+        Assert.Contains("if (screenHeld(state)) return;", Ui("components", "quick-menu.js"));
+        Assert.Contains("if (screenHeld(state)) return;", Ui("app.js"));
         Assert.Contains("if (state.pickerHold && page.id !== 'profile-picker') return;", Ui("core", "nav.js"));
         // Review M2 in the page: the parents' way out of a child's code only with a parents' code.
         var profiles = Ui("components", "profiles.js");

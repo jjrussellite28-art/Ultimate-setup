@@ -1,12 +1,13 @@
-// TV control (LG webOS first): switch the TV on and off, volume and mute, choose the input. Settings › TV pairs the TV (search in the
-// network or, in expert mode, its address); the Guide menu has the everyday rows. The host side is src/CouchHud.Shell/Services/TvManager.cs.
+// TV control: switch the TV on and off, volume and mute, choose the input. Settings › TV pairs the TV (search in the network or, in
+// expert mode, its address); the Guide menu has the everyday rows. The host side is src/CouchHud.Shell/Services/TvManager.cs. The
+// protocol of each kind of TV is a plugin (LG webOS, Samsung Tizen from the official catalog): without one the page offers it.
 // Locked couch: state, volume, mute and on/off work; pairing, removing the TV and switching the input need the unlock (with parental
 // controls the input needs the parents' code). Names of inputs come from the TV: only ever shown as text.
 
 import { api } from '../core/api.js';
 import { el, keepInView, setFocused } from '../core/dom.js';
 import { attempt, toast } from '../core/feedback.js';
-import { currentView, move, render } from '../core/nav.js';
+import { currentView, move, push, render } from '../core/nav.js';
 import { state } from '../core/state.js';
 import { chooseDialog, confirmDialog } from '../components/overlay.js';
 import { openKeyboard } from '../components/keyboard.js';
@@ -16,8 +17,12 @@ import { ensureParentGrant, parental, refreshParental } from '../components/pare
 import { sound } from '../sound.js';
 import { t } from '../core/i18n.js';
 import { admitInputSwitch, pairOutcome } from '../core/tv-rules.js';
+import { pluginsPage } from './plugins.js';
 
-/** Last answer of the host: { provider, providerName, paired, address, name, model, secure, macKnown, mac, power, volume, muted, input, pairing, error }. */
+/**
+ * Last answer of the host: { provider, providerName, paired, address, name, model, secure, macKnown, mac, power, volume, muted, input,
+ * pairing, error, providerMissing, installPlugin, providers: [{ id, name, plugin }], migrated }.
+ */
 state.tv = null;
 /** The TV's inputs ({ id, label, connected }), read when they are needed (unlocked). */
 let inputs = null;
@@ -49,6 +54,8 @@ export function tvLine(s = state.tv) {
 /** The hint for a lasting problem (a code from the host), or ''. */
 export function tvHint(s = state.tv) {
   if (!s?.paired) return '';
+  // i18n-used: tv.hint.migrated tv.hint.providerMissing
+  if (s.providerMissing) return t(s.migrated ? 'tv.hint.migrated' : 'tv.hint.providerMissing', { kind: s.providerName || t('tv.title') });
   if (s.error === 'certChanged') return t('tv.hint.certChanged');
   if (s.error === 'unpaired') return t('tv.hint.unpaired');
   if (!s.macKnown) return t('tv.hint.noMac');
@@ -166,18 +173,18 @@ async function chooseInput() {
  * Pairs with the TV at address. allowPlain: the user confirmed an unencrypted pairing (expert mode; the host refuses it anyway for a
  * TV that was paired with encryption before).
  */
-async function pairWith(address, allowPlain = false) {
+async function pairWith(address, allowPlain = false, provider = null) {
   if (!(await ensureUnlocked(t('tv.pairReason')))) return;
   // The TV showed another certificate than the paired one: say plainly what pairing again means before doing it.
   if (!allowPlain && state.tv?.paired && state.tv.error === 'certChanged'
     && !(await confirmDialog(t('tv.certWarnTitle'), t('tv.repair'), { danger: true, focusCancel: true, message: t('tv.certWarnMessage') }))) return;
   toast(t('tv.pairing.hint'), 8000);
-  const s = await attempt(() => api.tvPair(address, allowPlain), t('tv.pairFailed'));
+  const s = await attempt(() => api.tvPair(address, allowPlain, provider), t('tv.pairFailed'));
   if (s) {
     state.tv = s;
     switch (pairOutcome(s, !!page?.expert)) {
       case 'askPlain':
-        if (await confirmDialog(t('tv.plainTitle'), t('tv.plainConfirm'), { danger: true, focusCancel: true, message: s.secureBefore ? `${t('tv.plainSecureBefore')} ${t('tv.plainMessage')}` : t('tv.plainMessage') })) return pairWith(address, true);
+        if (await confirmDialog(t('tv.plainTitle'), t('tv.plainConfirm'), { danger: true, focusCancel: true, message: s.secureBefore ? `${t('tv.plainSecureBefore')} ${t('tv.plainMessage')}` : t('tv.plainMessage') })) return pairWith(address, true, provider);
         break;
       case 'plainRefused':
         toast(t('tv.plainExpertOnly'), 8000);
@@ -197,21 +204,52 @@ async function pairWith(address, allowPlain = false) {
   if (page && currentView() === page) render();
 }
 
+/** The plugins page on the catalog, at the plugin's entry when one is named (CouchHUD's own TV plugins). */
+function openCatalog(pluginId = null) {
+  push(pluginsPage(1, { expert: !!page?.expert, openId: pluginId }));
+}
+
+/** A TV whose plugin is missing: offer the plugin from the catalog (nothing is sent to the TV). */
+async function offerPlugin(kind, pluginId) {
+  if (!pluginId) return toast(t('tv.noPluginFor', { kind }), 8000);
+  if (await confirmDialog(t('tv.pluginTitle', { kind }), t('tv.pluginOpen'), { message: t('tv.pluginMessage', { kind }) })) openCatalog(pluginId);
+}
+
 async function search() {
   if (!(await ensureUnlocked(t('tv.pairReason')))) return;
   toast(t('tv.searching'), 4000);
   const found = await attempt(() => api.tvDiscover(), t('tv.searchFailed'));
   if (!found) return;
   if (!found.length) return toast(t('tv.noneFound'), 6000);
-  const address = await chooseDialog(t('tv.foundTitle'), found.map((d) => ({ label: d.name || t('tv.lgTv'), detail: d.address, icon: '📺', value: d.address })),
-    state.tv?.address ?? null);
-  if (address) await pairWith(address);
+  const chosen = await chooseDialog(t('tv.foundTitle'), found.map((d, i) => ({
+    label: d.name || d.providerName || t('tv.unnamedTv'),
+    detail: [d.address, d.providerName, d.ready === false ? t('tv.needsPlugin') : ''].filter(Boolean).join(' · '),
+    icon: '📺',
+    value: String(i)
+  })), null);
+  const d = chosen == null ? null : found[Number(chosen)];
+  if (!d) return;
+  if (d.ready === false) return offerPlugin(d.providerName || d.provider, d.plugin);
+  await pairWith(d.address, false, d.provider ?? null);
+}
+
+/** The kind of TV for a typed address: the only one there is, else a choice; none: the catalog. */
+async function chooseKind() {
+  const kinds = state.tv?.providers ?? [];
+  if (!kinds.length) {
+    if (await confirmDialog(t('tv.noKindsTitle'), t('tv.pluginOpen'), { message: t('tv.noKindsMessage') })) openCatalog();
+    return null;
+  }
+  if (kinds.length === 1) return kinds[0].id;
+  return chooseDialog(t('tv.kindTitle'), kinds.map((k) => ({ label: k.name, detail: '', icon: '📺', value: k.id })), state.tv?.provider ?? null);
 }
 
 async function enterAddress() {
   if (!(await ensureUnlocked(t('tv.pairReason')))) return;
+  const kind = await chooseKind();
+  if (!kind) return;
   const typed = await openKeyboard({ title: t('tv.addressTitle'), hint: t('tv.addressHint'), placeholder: '192.168.1.20', value: state.tv?.address ?? '', maxLength: 45 });
-  if (typed?.trim()) await pairWith(typed.trim());
+  if (typed?.trim()) await pairWith(typed.trim(), false, kind);
 }
 
 async function enterMac() {
@@ -287,9 +325,17 @@ export function tvPage() {
       const s = state.tv;
       if (!s) return [];
       if (s.pairing !== 'idle') return [{ icon: '✕', label: t('tv.cancelPair'), detail: t('tv.cancelPairDetail'), run: () => attempt(() => api.tvCancelPair()) }];
+      const noKinds = !(s.providers ?? []).length;
       if (!s.paired) {
         const rows = [{ icon: '⌕', label: t('tv.search'), detail: t('tv.searchDetail'), run: () => search() }];
         if (this.expert) rows.push({ icon: '#', label: t('tv.address'), detail: t('tv.addressDetail'), run: () => enterAddress() });
+        if (noKinds) rows.push({ icon: '+', label: t('tv.getPlugin'), detail: t('tv.getPluginDetail'), run: () => openCatalog() });
+        return rows;
+      }
+      if (s.providerMissing) {
+        // The pairing is kept; nothing reaches the TV until its plugin runs again.
+        const rows = [{ icon: '+', label: t('tv.installPlugin', { kind: s.providerName || t('tv.title') }), detail: t('tv.installPluginDetail'), run: () => openCatalog(s.installPlugin ?? null) }];
+        rows.push({ icon: '✕', label: t('tv.forget'), detail: t('tv.forgetDetail'), run: () => forget() });
         return rows;
       }
       const on = s.power === 'on';

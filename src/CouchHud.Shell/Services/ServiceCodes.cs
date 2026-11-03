@@ -60,6 +60,7 @@ public static class ServiceCodes
     /// (security review H-1: a child could have written its own code into the config): "needs approval", no conflict shown; the next code
     /// entry or Windows sign-in asks an administrator (<see cref="ConfirmLegacyCodeAsync"/>, <see cref="ConfirmLegacyWindowsAsync"/>).
     /// </summary>
+    [SecondFactorExempt("moves the own hash into the service; the service decides with its own grants")]
     public static async Task<MigrationResult> MigrateAsync(ConfigStore config)
     {
         if (!Expected) return MigrationResult.NotYet;
@@ -99,6 +100,7 @@ public static class ServiceCodes
     /// administrator") an administrator may confirm it as the lock's new code: the config's code may have been changed by a program of
     /// the account, and the parents must still get in with the code they know (third security review).
     /// </summary>
+    [SecondFactorExempt("the service confirms a code of version 0.4 with its own proof")]
     public static async Task<LegacyConfirm> ConfirmLegacyCodeAsync(ConfigStore config, IReadOnlyList<string> sequence, bool asNewCode = false)
     {
         if (!Expected) return LegacyConfirm.NotConfirmed;

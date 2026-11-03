@@ -1,4 +1,5 @@
 using System.Net;
+using CouchHud.Sdk;
 
 namespace CouchHud.Core.Integrations.Tv;
 
@@ -38,10 +39,26 @@ public sealed record TvStatus(
     /// <summary>The last pairing replaced a TLS pairing of the same TV (address or MAC) whose certificate was a different one.</summary>
     bool CertReplaced = false,
     /// <summary>Some TV was paired with encryption on this PC before (only whether, never which address or MAC).</summary>
-    bool SecureBefore = false);
+    bool SecureBefore = false,
+    /// <summary>A TV is paired, but the plugin of its kind is not there (not installed, switched off, not loaded yet): nothing can reach it.</summary>
+    bool ProviderMissing = false,
+    /// <summary>With <see cref="ProviderMissing"/>: the id of CouchHUD's own plugin that brings it (the page offers it from the catalog), or null.</summary>
+    string? InstallPlugin = null,
+    /// <summary>The kinds of TV that can be paired now (from the plugins that are running).</summary>
+    IReadOnlyList<TvProviderView>? Providers = null,
+    /// <summary>The pairing comes from before 0.7, when the core spoke webOS itself (shown once with the hint about the plugin).</summary>
+    bool Migrated = false);
 
 /// <summary>Options of "TV follows CouchHUD" (expert, both off by default).</summary>
 public sealed record TvFollow(bool OnWithCouchHud, bool OffWithPc);
+
+/// <summary>Bounds around the plugin's calls (the plugin's own timeouts are its business; these hold whatever it does).</summary>
+public sealed record TvTimeouts
+{
+    public TimeSpan Pair { get; init; } = TimeSpan.FromSeconds(90);
+    public TimeSpan Connect { get; init; } = TimeSpan.FromSeconds(15);
+    public TimeSpan Call { get; init; } = TimeSpan.FromSeconds(10);
+}
 
 /// <summary>
 /// The TV for CouchHUD: one pairing, one connection at a time, opened when needed and closed after <see cref="IdleClose"/>. No polling:
@@ -59,7 +76,9 @@ public sealed class TvController : IAsyncDisposable
     /// for automatic reads cannot be got round by another call.</summary>
     public static readonly TimeSpan MinRetry = TimeSpan.FromSeconds(2);
 
-    private readonly ITvProvider _provider;
+    private readonly TvProviderRegistry _providers;
+    private readonly TvLinkOptions? _linkOptions;
+    private readonly TvTimeouts _timeouts;
     private readonly ITvStore _store;
     private readonly Action<TvStatus> _emit;
     private readonly Func<long> _nowMs;
@@ -79,6 +98,8 @@ public sealed class TvController : IAsyncDisposable
     private long _offSentAt = long.MinValue;
     private long _connectFailedAt = long.MinValue;
     private TvError _connectError = TvError.Unreachable;
+    /// <summary>The TV answered last time but said it is in standby (some TVs keep the network up): it can be switched on over the API.</summary>
+    private bool _standby;
     private bool _certReplaced;
     private TvVolume? _volume;
     private string? _input;
@@ -88,10 +109,13 @@ public sealed class TvController : IAsyncDisposable
     private IReadOnlyList<TvInput>? _inputs;
     private int _disposed;
 
-    public TvController(ITvProvider provider, ITvStore store, Action<TvStatus> emit, Func<long>? nowMs = null,
-        Func<byte[], IPAddress, CancellationToken, Task<bool>>? wake = null, Func<CancellationToken, Task<IReadOnlyList<TvDevice>>>? discover = null)
+    public TvController(TvProviderRegistry providers, ITvStore store, Action<TvStatus> emit, Func<long>? nowMs = null,
+        Func<byte[], IPAddress, CancellationToken, Task<bool>>? wake = null, Func<CancellationToken, Task<IReadOnlyList<TvDevice>>>? discover = null,
+        TvLinkOptions? linkOptions = null, TvTimeouts? timeouts = null)
     {
-        _provider = provider;
+        _providers = providers;
+        _linkOptions = linkOptions;
+        _timeouts = timeouts ?? new TvTimeouts();
         _store = store;
         _emit = emit;
         _nowMs = nowMs ?? (() => Environment.TickCount64);
@@ -100,6 +124,8 @@ public sealed class TvController : IAsyncDisposable
         _wakeThrottle = new Throttle(WakeOnLan.MinInterval, _nowMs);
         _idle = new Timer(_ => _ = CloseIdleAsync(), null, Timeout.Infinite, Timeout.Infinite);
         _pairing = SafeLoad();
+        _forgotten = plugin => _ = EndSessionOfAsync(plugin);
+        _providers.PluginForgotten += _forgotten;
         // A TLS pairing from before the history existed counts too.
         if (_pairing is { Secure: true } p) _store.RememberSecure(Ids(p.Address, p.Mac));
     }
@@ -123,8 +149,51 @@ public sealed class TvController : IAsyncDisposable
     private TvPairing? SafeLoad()
     {
         var p = _store.Load();
-        if (p is null || p.Provider != _provider.Id || !IPAddress.TryParse(p.Address, out _) || string.IsNullOrEmpty(p.ClientKey)) return null;
-        return p;
+        if (p is null || !TvProviderRegistry.IsValidId(p.Provider) || !IPAddress.TryParse(p.Address, out _) || !TvText.IsValidKey(p.ClientKey)) return null;
+        // A pairing from before 0.7 belongs to the official plugin of its provider id; one without any plugin cannot be handed to anybody.
+        var plugin = TvConfig.PluginOf(p.Provider, p.Plugin);
+        if (plugin.Length == 0) return null;
+        _migrated = p.Plugin.Length == 0;
+        return p with { Plugin = plugin };
+    }
+
+    private bool _migrated;
+    private readonly Action<string> _forgotten;
+
+    /// <summary>Total time a plugin's unload may spend on closing its session (the plugin dispose budget is 5 s).</summary>
+    private static readonly TimeSpan UnloadBudget = TimeSpan.FromSeconds(4);
+
+    /// <summary>
+    /// A plugin was hot-unloaded: the connection made through it ends now, whatever the plugin's dispose does (a throw is swallowed, a hang is
+    /// cut off at the budget). Waits for a running call a moment; after that the session is closed under it and the call fails.
+    /// </summary>
+    private async Task EndSessionOfAsync(string pluginId)
+    {
+        try
+        {
+            string? owner;
+            lock (_lock) owner = _pairing?.Plugin;
+            if (owner is null || !owner.Equals(pluginId, StringComparison.OrdinalIgnoreCase)) return;
+            using var cts = new CancellationTokenSource(UnloadBudget);
+            var gate = false;
+            try
+            {
+                gate = await _gate.WaitAsync(TimeSpan.FromSeconds(1.5), cts.Token);
+                if (gate) { await DropSessionCoreAsync().WaitAsync(cts.Token); }
+                else
+                {
+                    var s = _session;
+                    if (s is not null) await s.DisposeAsync().AsTask().WaitAsync(cts.Token);
+                }
+            }
+            finally
+            {
+                if (gate) _gate.Release();
+            }
+            lock (_lock) { _volume = null; _input = null; }
+            Publish();
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { }
     }
 
     public bool Paired
@@ -135,13 +204,23 @@ public sealed class TvController : IAsyncDisposable
     public TvStatus Status()
     {
         var secureBefore = _store.SecureSeen().Count > 0;
+        // The plugin side outside the lock (the registry asks the plugin manager whether the plugin runs).
+        TvPairing? paired;
+        lock (_lock) paired = _pairing;
+        var available = _providers.Available();
+        var found = paired is null ? null : _providers.Find(paired.Provider, paired.Plugin);
         lock (_lock)
         {
             var p = _pairing;
+            if (!ReferenceEquals(p, paired)) found = p is null ? null : _providers.Find(p.Provider, p.Plugin);
             var power = _power;
             if (power != "on" && _nowMs() < _wakingUntil) power = "waking";
-            return new TvStatus(_provider.Id, _provider.Name, p is not null, p?.Address, p?.Name, p?.Model, p?.Secure ?? false,
-                p?.Mac is not null, p?.Mac, p is null ? "unknown" : power, _volume?.Volume, _volume?.Muted, _input, _pairingState, Code(_error), _certReplaced, secureBefore);
+            var known = p is null ? null : TvProviderRegistry.KnownById(p.Provider);
+            var missing = p is not null && found is null;
+            var name = found?.Name ?? known?.Name ?? p?.Provider ?? "";
+            return new TvStatus(p?.Provider ?? "", name, p is not null, p?.Address, p?.Name, p?.Model, p?.Secure ?? false,
+                p?.Mac is not null, p?.Mac, p is null ? "unknown" : power, _volume?.Volume, _volume?.Muted, _input, _pairingState, Code(_error), _certReplaced, secureBefore,
+                missing, missing && known is not null && known.Plugin == p!.Plugin ? known.Plugin : null, available, _migrated && p is not null);
         }
     }
 
@@ -164,25 +243,44 @@ public sealed class TvController : IAsyncDisposable
         {
             await WithSessionAsync(async (s, c) =>
             {
-                var volume = await s.GetVolumeAsync(c);
+                bool? power = null;
+                try { power = await s.GetPowerAsync(c); }
+                catch (TvException ex) when (ex.Code is TvError.Refused or TvError.BadAnswer) { }
+                if (power == false)
+                {
+                    // Reachable, but the screen is off (standby with the network up).
+                    lock (_lock)
+                    {
+                        _standby = true;
+                        _volume = null;
+                        _input = null;
+                    }
+                    return false;
+                }
+                TvVolume? volume = null;
                 string? input = null;
+                try { volume = await s.GetVolumeAsync(c); }
+                catch (TvException ex) when (ex.Code is TvError.Refused or TvError.BadAnswer) { }
                 try
                 {
-                    var app = await s.GetForegroundAppAsync(c);
-                    _inputs ??= await s.GetInputsAsync(c);
-                    input = WebOsProtocol.InputOfApp(app, _inputs);
+                    IReadOnlyList<TvInput>? known;
+                    lock (_lock) known = _inputs;
+                    var inputs = known ?? await s.GetInputsAsync(c);
+                    lock (_lock) _inputs = inputs;
+                    input = await s.GetActiveInputAsync(inputs, c);
                 }
                 catch (TvException ex) when (ex.Code is TvError.Refused or TvError.BadAnswer)
                 {
-                    // Not every TV lets every key read the app in front; the volume is enough.
+                    // Not every TV lets every key read the app or input in front; the volume is enough.
                 }
                 lock (_lock)
                 {
+                    _standby = false;
                     _volume = volume;
                     _input = input;
                 }
                 return true;
-            }, ct);
+            }, ct, onAnswer: on => on ? "on" : "off");
         }
         catch (TvException)
         {
@@ -244,7 +342,7 @@ public sealed class TvController : IAsyncDisposable
     /// <summary>Switches to an input of the TV's own list (checked against a fresh list: nothing the UI made up reaches the TV).</summary>
     public async Task<TvStatus> SwitchInputAsync(string inputId, CancellationToken ct = default)
     {
-        if (!WebOsProtocol.IsValidInputId(inputId)) throw new ArgumentException("input");
+        if (!TvInput.IsValidId(inputId)) throw new ArgumentException("input");
         await WithSessionAsync(async (s, c) =>
         {
             var inputs = await s.GetInputsAsync(c);
@@ -286,8 +384,11 @@ public sealed class TvController : IAsyncDisposable
     {
         TvPairing pairing;
         lock (_lock) pairing = _pairing ?? throw new TvException(TvError.NotPaired);
-        // Already on and answering: nothing to send.
-        if (_session is { Open: true }) return Status();
+        bool standby;
+        lock (_lock) standby = _standby;
+        // Already on and answering: nothing to send. Answering in standby: switched on over the API if the plugin can, else Wake-on-LAN.
+        if (_session is { Open: true } && !standby) return Status();
+        if (standby && await TryTurnOnAsync(ct)) return Status();
         if (WakeOnLan.ParseMac(pairing.Mac) is not { } mac || !IPAddress.TryParse(pairing.Address, out var address)) throw new TvException(TvError.NoWake);
         if (!_wakeThrottle.TryTake())
         {
@@ -314,6 +415,31 @@ public sealed class TvController : IAsyncDisposable
         Publish();
         _ = CheckAfterWakeAsync();
         return Status();
+    }
+
+    /// <summary>A TV that answered in standby: switched on over its API (if the plugin can). False when that did not work (Wake-on-LAN then).</summary>
+    private async Task<bool> TryTurnOnAsync(CancellationToken ct)
+    {
+        try
+        {
+            await WithSessionAsync(async (s, c) =>
+            {
+                await s.TurnOnAsync(c);
+                return true;
+            }, ct);
+        }
+        catch (TvException)
+        {
+            return false;
+        }
+        lock (_lock)
+        {
+            _standby = false;
+            _wakingUntil = _nowMs() + (long)WakeWindow.TotalMilliseconds;
+        }
+        Publish();
+        _ = CheckAfterWakeAsync();
+        return true;
     }
 
     /// <summary>Two looks after a wake (8 and 16 s): "waking" turns into "on" without anybody asking. Bounded, never more.</summary>
@@ -397,8 +523,21 @@ public sealed class TvController : IAsyncDisposable
     /// </summary>
     /// <param name="allowPlain">The user confirmed an unencrypted pairing (expert mode) for a TV without TLS port. Still refused
     /// (<see cref="TvError.Downgrade"/>) for an address or MAC that was ever paired over TLS.</param>
-    public async Task<TvStatus> PairAsync(IPAddress address, Func<IPAddress, string?>? macLookup = null, bool allowPlain = false, CancellationToken ct = default)
+    public async Task<TvStatus> PairAsync(IPAddress address, string providerId, Func<IPAddress, string?>? macLookup = null, bool allowPlain = false, CancellationToken ct = default)
     {
+        // The kind of TV first: without its plugin nothing is sent anywhere.
+        if (_providers.PluginOf(providerId) is not { } pluginId || _providers.Find(providerId, pluginId) is not { } kind)
+        {
+            lock (_lock) _error = TvError.NoProvider;
+            Publish();
+            throw new TvException(TvError.NoProvider);
+        }
+        if (!TvAddressPolicy.IsAllowed(address, _linkOptions?.AllowLoopback ?? false))
+        {
+            lock (_lock) _error = TvError.NotLocal;
+            Publish();
+            throw new TvException(TvError.NotLocal);
+        }
         CancellationTokenSource cts;
         lock (_lock)
         {
@@ -425,11 +564,7 @@ public sealed class TvController : IAsyncDisposable
                 await DropSessionCoreAsync();
                 TvPairing? old;
                 lock (_lock) old = _pairing;
-                var pairing = await _provider.PairAsync(address, () =>
-                {
-                    lock (_lock) _pairingState = "prompt";
-                    Publish();
-                }, allowPlain, cts.Token);
+                var pairing = await PairWithPluginAsync(kind.Provider, kind.Ports, providerId, pluginId, address, allowPlain, cts.Token);
                 if (pairing.Mac is null && (lookedUp ?? macLookup?.Invoke(address)) is { } found && WakeOnLan.ParseMac(found) is { } parsed)
                 {
                     pairing = pairing with { Mac = WakeOnLan.Format(parsed) };
@@ -438,13 +573,15 @@ public sealed class TvController : IAsyncDisposable
                 if (!pairing.Secure && WasSecure(pairing.Address, pairing.Mac)) throw new TvException(TvError.Downgrade);
                 var replaced = pairing.Secure && old is { Secure: true, CertPin: { Length: > 0 } oldPin }
                     && (old.Address == pairing.Address || (old.Mac is not null && old.Mac == pairing.Mac))
-                    && (pairing.CertPin is null || !WebOsProtocol.SamePin(oldPin, pairing.CertPin));
+                    && (pairing.CertPin is null || !TvText.SamePin(oldPin, pairing.CertPin));
                 _store.Save(pairing);
                 if (pairing.Secure) _store.RememberSecure(Ids(pairing.Address, pairing.Mac));
                 lock (_lock)
                 {
                     _certReplaced = replaced;
                     _connectFailedAt = long.MinValue;
+                    _migrated = false;
+                    _standby = false;
                     _pairing = pairing;
                     _power = "on";
                     _failedAt = long.MinValue;
@@ -481,6 +618,34 @@ public sealed class TvController : IAsyncDisposable
         return Status();
     }
 
+    /// <summary>
+    /// The plugin's part of pairing, inside the core's bounds: a link to exactly this address and the provider's ports, a hard time limit,
+    /// and the result checked. Whether the pairing is encrypted and which certificate is pinned is what went over the link, never what the
+    /// plugin says; a key that came over no connection, or a link that refused something on the way, is no pairing.
+    /// </summary>
+    private async Task<TvPairing> PairWithPluginAsync(ITvProvider provider, IReadOnlyList<TvPort> ports, string providerId, string pluginId, IPAddress address, bool allowPlain, CancellationToken ct)
+    {
+        await using var link = TvLink.ForPairing(address, ports, allowPlain, _linkOptions);
+        var prompted = 0;
+        var result = await HostedTvSession.GuardAsync(c => provider.PairAsync(link, () =>
+        {
+            // Only the first call counts, and only while this pairing runs.
+            if (Interlocked.Exchange(ref prompted, 1) == 1 || c.IsCancellationRequested) return;
+            lock (_lock)
+            {
+                if (_pairingState == "connecting") _pairingState = "prompt";
+            }
+            Publish();
+        }, c), link, _timeouts.Pair, ct);
+        if (link.Fault is { } fault) throw new TvException(fault, "link");
+        if (result is null || !TvText.IsValidKey(result.Key)) throw new TvException(TvError.BadAnswer, "key");
+        if (!link.UsedTls && !link.UsedPlain) throw new TvException(TvError.BadAnswer, "no connection");
+        if (!link.Secure && !allowPlain) throw new TvException(TvError.PlainOnly);
+        var mac = WakeOnLan.ParseMac(result.Mac) is { } m ? WakeOnLan.Format(m) : null;
+        return new TvPairing(providerId, TvText.Canonical(address), link.Secure, result.Key, link.Secure ? link.Pin : null, mac,
+            TvText.CleanLabel(result.Name), TvText.CleanLabel(result.Model), TvText.CleanAppId(result.PcApp), pluginId);
+    }
+
     public void CancelPair()
     {
         lock (_lock)
@@ -501,6 +666,8 @@ public sealed class TvController : IAsyncDisposable
             lock (_lock)
             {
                 _pairing = null;
+                _migrated = false;
+                _standby = false;
                 _certReplaced = false;
                 _connectFailedAt = long.MinValue;
                 _power = "unknown";
@@ -523,7 +690,7 @@ public sealed class TvController : IAsyncDisposable
     public TvStatus SetMac(string? mac)
     {
         string? value = null;
-        if (!string.IsNullOrWhiteSpace(mac)) value = WakeOnLan.ParseMac(mac) is { } parsed ? WakeOnLan.Format(parsed) : throw new ArgumentException("mac");
+        if (!string.IsNullOrWhiteSpace(mac)) value = WakeOnLan.ParseMac(mac) is { } parsed ? WakeOnLan.Format(parsed) : throw new ArgumentException("Not a MAC address.", "mac");
         lock (_lock)
         {
             if (_pairing is null) throw new TvException(TvError.NotPaired);
@@ -541,7 +708,7 @@ public sealed class TvController : IAsyncDisposable
     /// Runs <paramref name="work"/> on the open connection, opening one if needed (at most one new connection per call). A failure is
     /// recorded in the status; a refused certificate or key keeps its code until the TV is paired again.
     /// </summary>
-    private async Task<T> WithSessionAsync<T>(Func<ITvSession, CancellationToken, Task<T>> work, CancellationToken ct)
+    private async Task<T> WithSessionAsync<T>(Func<ITvSession, CancellationToken, Task<T>> work, CancellationToken ct, Func<T, string>? onAnswer = null)
     {
         TvPairing pairing;
         lock (_lock) pairing = _pairing ?? throw new TvException(TvError.NotPaired);
@@ -558,7 +725,7 @@ public sealed class TvController : IAsyncDisposable
                     if (_connectFailedAt != long.MinValue && _nowMs() - _connectFailedAt < MinRetry.TotalMilliseconds) throw new TvException(_connectError, "retry");
                     try
                     {
-                        _session = await _provider.ConnectAsync(pairing, linked.Token);
+                        _session = await ConnectAsync(pairing, linked.Token);
                     }
                     catch (TvException ex)
                     {
@@ -574,7 +741,7 @@ public sealed class TvController : IAsyncDisposable
                     var result = await work(_session, linked.Token);
                     lock (_lock)
                     {
-                        _power = "on";
+                        _power = onAnswer?.Invoke(result) ?? "on";
                         _wakingUntil = 0;
                         _failedAt = long.MinValue;
                         _error = null;
@@ -612,6 +779,25 @@ public sealed class TvController : IAsyncDisposable
         }
     }
 
+    /// <summary>A session through the pairing's own plugin (and only that one gets the key), on a link to the paired address only.</summary>
+    private async Task<ITvSession> ConnectAsync(TvPairing pairing, CancellationToken ct)
+    {
+        if (_providers.Find(pairing.Provider, pairing.Plugin) is not { } found) throw new TvException(TvError.NoProvider);
+        if (!IPAddress.TryParse(pairing.Address, out var address) || !TvAddressPolicy.IsAllowed(address, _linkOptions?.AllowLoopback ?? false)) throw new TvException(TvError.NotLocal);
+        var link = TvLink.ForSession(address, found.Ports, pairing.Secure, pairing.CertPin, pairing.ClientKey, _linkOptions);
+        try
+        {
+            var inner = await HostedTvSession.GuardAsync(c => found.Provider.ConnectAsync(link, pairing.ClientKey, c), link, _timeouts.Connect, ct)
+                        ?? throw new TvException(TvError.BadAnswer, "no session");
+            return new HostedTvSession(inner, link, _timeouts.Call);
+        }
+        catch
+        {
+            await link.DisposeAsync();
+            throw;
+        }
+    }
+
     private void ArmIdle()
     {
         try { _idle.Change(IdleClose, Timeout.InfiniteTimeSpan); }
@@ -645,6 +831,7 @@ public sealed class TvController : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+        _providers.PluginForgotten -= _forgotten;
         _stop.Cancel();
         await _idle.DisposeAsync();
         var s = _session;

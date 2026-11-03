@@ -70,7 +70,7 @@ public sealed class GameSessionTracker(IProcessProbe probe)
     }
 
     /// <summary>CouchHud can tell when this entry runs (Steam id or an install folder to look for processes in).</summary>
-    public static bool CanDetect(LibraryItem item) => SteamStore.AppIdOf(item) is not null || InstallRoot(item) is not null;
+    public static bool CanDetect(LibraryItem item) => SteamStore.AppIdOf(item) is not null || InstallRoot(item) is not null || PlayerProfiles.TrackableByPackage(item);
 
     /// <summary>Raised when a game shows up as running.</summary>
     public event Action<GameSession>? Started;
@@ -158,7 +158,8 @@ public sealed class GameSessionTracker(IProcessProbe probe)
         foreach (var fresh in found.Where(f => !before.Any(b => b.Item.Id == f.Item.Id))) raise.Add(() => OtherStarted?.Invoke(fresh));
     }
 
-    private static bool SameGame(LibraryItem a, LibraryItem b) => Parental.ParentalService.LimitKey(a) == Parental.ParentalService.LimitKey(b);
+    /// <summary>Two entries count as one game (the same Steam id or install folder, see ParentalService.LimitKey).</summary>
+    public static bool SameGame(LibraryItem a, LibraryItem b) => Parental.ParentalService.LimitKey(a) == Parental.ParentalService.LimitKey(b);
 
     private void TickCurrent(DateTimeOffset now, IReadOnlyList<(int Pid, string? Path)> snapshot, IReadOnlyDictionary<int, int> parents, IReadOnlyDictionary<int, long> starts, int steam, List<Action> raise)
     {
@@ -220,6 +221,13 @@ public sealed class GameSessionTracker(IProcessProbe probe)
             foreach (var p in snapshot.Where(p => p.Path is not null && p.Path.StartsWith(dir, StringComparison.OrdinalIgnoreCase)
                 && !SafeTermination.IsSystemPath(p.Path, WindowsDir))) set[p.Pid] = Stamp(p.Pid, p.Path);
         }
+        // A known media player (Kodi, Emby, Jellyfin, Plex) counts as running while any process of its profile runs: the Store version has no
+        // install folder to look in, and a launcher that hands over to the player (or a player that goes to another process) is one session.
+        if (PlayerProfiles.ForItem(item) is { } player)
+        {
+            foreach (var p in snapshot.Where(p => p.Path is not null && PlayerProfiles.IsProcessOf(player, item, p.Path) && !SafeTermination.IsSystemPath(p.Path, WindowsDir)))
+                set[p.Pid] = Stamp(p.Pid, p.Path);
+        }
         // Seen before and still there with the same image: a launcher in the folder that handed over to the real game
         // (Java, a runtime elsewhere) and ended is no reason to stop counting.
         if (known is { Count: > 0 })
@@ -245,6 +253,10 @@ public sealed class GameSessionTracker(IProcessProbe probe)
                     if (parentStamp.Start > 0 && child.Start > 0 && child.Start < parentStamp.Start) continue;
                     // Windows' own programs that a game starts (cmd, conhost, werfault) are not part of the game.
                     if (SafeTermination.IsSystemPath(p.Path, WindowsDir)) continue;
+                    // Nor a game client it started (a Steam game that starts Steam): the client lives on after the game, and what it
+                    // starts later (another game, its browser) is not this game's. Not walked through either. A client that is the
+                    // entry itself (in its own install folder, e.g. Playnite) was taken above.
+                    if (SafeTermination.IsGameClientImage(p.Path)) continue;
                     set[p.Pid] = child;
                     added = true;
                 }
@@ -259,20 +271,29 @@ public sealed class GameSessionTracker(IProcessProbe probe)
     private static string WindowsDir => Environment.GetFolderPath(Environment.SpecialFolder.Windows);
 
     /// <summary>The install folder with a trailing separator, so "C:\Games\Foo" never matches "C:\Games\Foobar".</summary>
-    internal static string? InstallRoot(LibraryItem item)
+    internal static string? InstallRoot(LibraryItem item) => SaneRoot(item.InstallDir);
+
+    /// <summary>
+    /// A folder as a game's folder, with a trailing separator; null for a whole drive, Windows' own folders, the program folders and the
+    /// user profile (see <see cref="InstallRoot"/>).
+    /// </summary>
+    internal static string? SaneRoot(string? dir)
     {
-        var dir = item.InstallDir;
         if (string.IsNullOrWhiteSpace(dir)) return null;
         // Never treat a whole drive or Windows' own folders (System32 …) as a game folder: every system process would belong to it.
         var full = Path.GetFullPath(dir).TrimEnd('\\', '/');
         if (full.Length <= 3 || full.Equals(WindowsDir, StringComparison.OrdinalIgnoreCase)
             || SafeTermination.IsSystemPath(full + Path.DirectorySeparatorChar, WindowsDir)) return null;
         // Nor the program folders themselves: that would be every installed program.
-        foreach (var folder in new[] { Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.UserProfile })
+        foreach (var folder in new[] { Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.UserProfile,
+                     Environment.SpecialFolder.CommonApplicationData })
         {
             var special = Environment.GetFolderPath(folder).TrimEnd('\\', '/');
             if (special.Length > 0 && full.Equals(special, StringComparison.OrdinalIgnoreCase)) return null;
         }
+        // The folders of all accounts: C:\Users and its shared Public folder (one account's profile folder is excluded above).
+        var users = Path.GetDirectoryName(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).TrimEnd('\\', '/'));
+        if (!string.IsNullOrEmpty(users) && (full.Equals(users, StringComparison.OrdinalIgnoreCase) || full.Equals(Path.Combine(users, "Public"), StringComparison.OrdinalIgnoreCase))) return null;
         return full + Path.DirectorySeparatorChar;
     }
 }

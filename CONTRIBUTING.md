@@ -37,7 +37,8 @@ Das Skript läuft unter Windows (Git Bash), Linux und macOS und macht der Reihe 
 1. `dotnet build` der ganzen Solution (auch die Windows-Projekte, außerhalb von Windows über `EnableWindowsTargeting`),
 2. `dotnet test` aller Tests,
 3. **UI-Syntax**: jede `.js`/`.mjs`-Datei in `ui/` und `scripts/` wird als **ES-Modul** geprüft (`node --input-type=module --check`; ein einfaches `node --check` lässt Modulfehler durch),
-4. **i18n-Prüfung** (`scripts/i18n-check.mjs`): jeder Schlüssel in Deutsch und Englisch mit gleichen Platzhaltern, jeder benutzte Schlüssel existiert, keine verwaisten Schlüssel, kein deutscher Text im Code.
+4. **i18n-Prüfung** (`scripts/i18n-check.mjs`): jeder Schlüssel in Deutsch und Englisch mit gleichen Platzhaltern, jeder benutzte Schlüssel existiert, keine verwaisten Schlüssel, kein deutscher Text im Code,
+5. **Browser-UI** (`scripts/browser-ui-check.mjs`): die HUD-Seite des Couch-Browsers in einem **headless** Edge (`--headless=new --mute-audio`, kein Fenster, kein Ton); ohne Edge (Variable `EDGE` oder die üblichen Installationsorte) oder ohne Node 22 meldet sie „skipped“ und hält nichts auf; in der CI (`CI=true`) ist das ein Fehler. Nach 180 Sekunden ohne Ergebnis bricht sie ab (Fehler). `SKIP_BROWSER_UI=1` lässt den Schritt in `scripts/check.sh` weg.
 
 Es ist mindestens so streng wie die CI (die baut und testet auf Windows). Rot bleibt lokal, nicht im Postfach der anderen.
 
@@ -100,6 +101,7 @@ Die Grundsätze: alles über die GUI, Controller zuerst, nahtloser Fullscreen, F
 Nur für Maintainer. Der private Signaturschlüssel liegt nicht im Repository und nicht in der CI, sondern im Benutzerprofil des Maintainers (`%USERPROFILE%\.couchhud\catalog-signing.key`, DPAPI-geschützt).
 
 1. Version in `Directory.Build.props` anheben, mergen, Tag setzen und pushen: `git tag v0.4.0 && git push origin v0.4.0`. Die CI baut das Setup mit dieser Version (bricht ab, wenn Tag und Version nicht zusammenpassen), erzeugt die Build-Attestierung und hängt `CouchHud-Setup-<v>.exe` und `CouchHud-Setup-<v>.exe.sha256` an ein GitHub-Release.
+   Nur der Tag-Build der CI ist ein Release-Build (`CouchHudRelease=true`, von der CI aus dem Tag gesetzt) und trägt genau diese Nummer. Jeder andere Build, auch ein lokaler, heißt `<Version>-dev+<Commit>` (z. B. `0.7.0-dev+f627fe74`): eine Vorabversion, die der Updater als älter als das Release sieht.
 2. `.\scripts\sign-release.ps1 -Tag v0.4.0` (PowerShell 7, `gh` angemeldet): prüft Commit und Version, lädt das Setup und vergleicht den Hash mit GitHub und der `.sha256`, prüft die Attestierung und signiert erst dann die `.sha256` (Kontext `couchhud-release-v1`). Lädt `.sha256.sig` hoch. **Erst damit bieten installierte CouchHUDs das Update an.**
 3. Release-Notes nach Bedarf im GitHub-Release nachbearbeiten (sie erscheinen gekürzt auf dem TV).
 

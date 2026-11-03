@@ -22,9 +22,9 @@ public static class ModeSwitchJournal
     {
         ["integration"] = new() { ["m"] = Kind.Integration },
         ["autostart"] = new() { ["r"] = Kind.Bool, ["e"] = Kind.Startup },
-        ["services"] = new() { ["k"] = Kind.Bool, ["s"] = Kind.Names },
+        ["services"] = new() { ["k"] = Kind.Bool, ["s"] = Kind.Names, ["i"] = Kind.Names },
         ["xbox"] = new() { ["v"] = Kind.Bool },
-        ["suppress"] = new() { ["v"] = Kind.Bool },
+        ["suppress"] = new() { ["v"] = Kind.Bool, ["b"] = Kind.Bool },
         ["lock"] = new() { ["m"] = Kind.Mode, ["c"] = Kind.Bool },
         ["shell"] = new() { ["s"] = Kind.Bool },
         ["autologon"] = new() { ["on"] = Kind.Bool },

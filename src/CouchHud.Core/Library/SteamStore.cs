@@ -44,7 +44,10 @@ public static class SteamStore
                 ? InfoOverrides.Clip(n.GetString(), StoreMatches.MaxQueryLength)
                 : null;
             if (name is null) continue;
-            result.Add(new StoreCandidate(appId, name));
+            var thumb = candidate.TryGetProperty("tiny_image", out var t) && t.ValueKind == JsonValueKind.String && t.GetString() is { } u && ArtworkSources.IsAllowed(u)
+                ? u
+                : null;
+            result.Add(new StoreCandidate(appId, name, thumb));
             if (result.Count == StoreMatches.MaxResults) break;
         }
         return result;

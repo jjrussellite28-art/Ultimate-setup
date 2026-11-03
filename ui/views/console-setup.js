@@ -20,12 +20,13 @@ import { attempt, toast } from '../core/feedback.js';
 import { currentView, pop, renderHints } from '../core/nav.js';
 import { state } from '../core/state.js';
 import { chooseDialog, confirmDialog } from '../components/overlay.js';
+import { parental } from '../components/parental.js';
 import { ensureUnlocked, isLocked, onApprovalAnnounced } from '../components/passcode.js';
 import { beginSetupHold, codeLockPlan, lockStepStatus, setupCouchLock } from '../core/lock-rules.js';
 import { filterSetupSteps, isConsoleReady } from '../core/wizard-rules.js';
-import { createUndoTables } from '../core/mode-undo.js';
+import { createUndoTables, suppressBackStatus } from '../core/mode-undo.js';
 import { afterRun, closeAction, recoveryChoices, createModeTransaction, describeRollback, describeTargets, manualUndo, parseJournal } from '../core/mode-transaction.js';
-import { applyRollbackToRows, createStepShow, rollbackRowView, runRows, SATISFIED } from '../core/mode-run.js';
+import { applyRollbackToRows, createStepShow, parentalBlocksRun, rollbackRowView, runRows, SATISFIED } from '../core/mode-run.js';
 import { sound } from '../sound.js';
 
 // Open and put back: an empty box (the tick goes away again). In progress: no glyph, the box shows a ring (styles.css).
@@ -113,7 +114,7 @@ function undoersOf(steps) {
 // ---------------------------------------------------------------------------
 // Engine
 
-function stepsPage({ id, title, intro, notes, doneNotes = () => [], startLabel, steps, restartAsk, restartLabel, deps, autoStart = false, onDone = null, from = 'app', carriedEntries = [] }) {
+function stepsPage({ id, title, intro, notes, doneNotes = () => [], startLabel, steps, restartAsk, restartLabel, deps, autoStart = false, onDone = null, from = 'app', carriedEntries = [], blockedBy = null }) {
   // What the switch changed, to undo it on cancel (core/mode-transaction.js). The host keeps a copy: a crash in the middle is found at the next start.
   const tx = createModeTransaction({ from, entries: carriedEntries, persist: (text) => api.setSetting('modeSwitchJournal', text) });
   const undoers = undoersOf(steps);
@@ -133,6 +134,7 @@ function stepsPage({ id, title, intro, notes, doneNotes = () => [], startLabel, 
   // While an undo is shown: what each row shows (the rows themselves get the result at the end), and the pacing of it.
   let shown = null;
   let show = null;
+  let blockedText = ''; // why the run does not start (blockedBy), shown with a way to the setting
   let failedRun = false; // the last run ended with a failed or stopped step: only retry or undo
 
   const page = {
@@ -175,6 +177,19 @@ function stepsPage({ id, title, intro, notes, doneNotes = () => [], startLabel, 
       }
     },
 
+    /** Looks before the run whether something keeps it from starting (blockedBy); only a look, the host keeps its own checks. */
+    async lookBlocked() {
+      blockedText = (await blockedBy?.(rows)) ?? '';
+      return blockedText;
+    },
+
+    /** Leaves this page for the setting that has to change first (Settings › Parental controls). */
+    async openBlockSetting() {
+      pop();
+      const { settingsView } = await import('./settings.js');
+      settingsView.jump('parental');
+    },
+
     async loadNow() {
       // Before anything is read: with the couch locked the reads are refused, and an answer from the refusal would be a guess.
       if (!(await this.unlock())) {
@@ -198,6 +213,7 @@ function stepsPage({ id, title, intro, notes, doneNotes = () => [], startLabel, 
         console.error(err);
         toast(t('consoleSetup.stateNotRead', { error: errorText(err) }), 5000);
       }
+      await this.lookBlocked();
       phase = 'overview';
       // Never start on a button: a second A must not set everything up by accident.
       this.index = 0;
@@ -224,6 +240,13 @@ function stepsPage({ id, title, intro, notes, doneNotes = () => [], startLabel, 
       // The lock step must not lock the HUD in the middle of the setup: the couch stays open until the end. Without that hold, and on the
       // stand-in of broken settings (the host refuses the hold there too), nothing runs: the reason is shown and the overview stays.
       if (!(await this.unlock())) return;
+      // Parental controls on and the way back still to take: it cannot work, so nothing is begun (no steps run and undone for nothing).
+      if (await this.lookBlocked()) {
+        toast(blockedText, 7000);
+        phase = 'overview';
+        this.paint();
+        return;
+      }
       // A record of the other direction would be overwritten by this switch: it has to be settled first (the next start asks about it).
       const older = await readJournal();
       if (older && older.from !== from) {
@@ -405,7 +428,13 @@ function stepsPage({ id, title, intro, notes, doneNotes = () => [], startLabel, 
 
     paint() {
       if (closed || !this.root || currentView() !== this) return;
-      if (phase === 'overview') actions = [{ label: startLabel, run: () => this.start().catch(console.error) }, { label: t('consoleSetup.action.cancel'), run: () => pop() }];
+      if (phase === 'overview') {
+        actions = [
+          ...(blockedText ? [{ label: t('consoleSetup.action.openParental'), run: () => this.openBlockSetting().catch(console.error) }] : []),
+          { label: startLabel, run: () => this.start().catch(console.error) },
+          { label: t('consoleSetup.action.cancel'), run: () => pop() }
+        ];
+      }
       if (phase === 'loading' || phase === 'running') actions = [];
       // Before the first read (code entry, approval) nothing is known yet: no "will be done" for a step that has not been looked at.
       const label = (row) => (phase === 'loading' ? t('consoleSetup.status.pending') : phase === 'overview' && row.status === 'todo' ? t('consoleSetup.status.open') : LABEL()[row.status]);
@@ -427,7 +456,7 @@ function stepsPage({ id, title, intro, notes, doneNotes = () => [], startLabel, 
       const lead = waitText ? waitText : phase === 'rolling' ? t('consoleSetup.rollback.leadRunning') : phase === 'rolled' ? t('consoleSetup.rollback.leadPartial') : phase === 'done' && failedRun && tx.pending ? t('consoleSetup.leadFailedUndo') : phase === 'done'
         ? (rows.some((r) => r.status === 'failed') ? t('consoleSetup.leadFailed') : rows.some((r) => ['skipped', 'aborted'].includes(r.status)) ? t('consoleSetup.leadSkipped') : t('consoleSetup.leadAllDone'))
         : phase === 'running' ? t('consoleSetup.leadRunning') : intro;
-      const extra = phase === 'overview' ? notes(adminPrompts, lastEnv) : phase === 'rolled' ? [t('consoleSetup.rollback.partial', { steps: (rollbackReport ?? []).join(', ') }), t('consoleSetup.rollback.fix')] : phase === 'done' ? doneNotes(rows) : [];
+      const extra = phase === 'overview' ? [...(blockedText ? [blockedText] : []), ...notes(adminPrompts, lastEnv)] : phase === 'rolled' ? [t('consoleSetup.rollback.partial', { steps: (rollbackReport ?? []).join(', ') }), t('consoleSetup.rollback.fix')] : phase === 'done' ? doneNotes(rows) : [];
       this.index = Math.min(this.index, Math.max(0, this.focusNodes().length - 1));
       this.root.replaceChildren(el('div', { className: 'files console-page' },
         el('div', { className: 'files-head' },
@@ -627,6 +656,8 @@ function setupSteps({ pauseServices = true } = {}) {
       check: (env) => (env.settings.suppressCompetitors ? 'done' : 'todo'),
       run: async () => {
         await api.setSetting('suppressCompetitors', true);
+        // Marked as the setup's own: only then does the way back switch it off again (a choice of the user stays).
+        await api.setSetting('suppressBySetup', true);
         return ok(t('consoleSetup.step.suppress.done'));
       }
     },
@@ -687,7 +718,8 @@ export function consoleSetupPage(deps, { skip = [], pauseServices = true, carrie
       ...(env?.security?.accountPassword === false ? [t('consoleSetup.setup.needPassword')] : []),
       (admin === 0 ? t('consoleSetup.setup.adminNone') : admin === 1 ? t('consoleSetup.setup.adminOnce') : t('consoleSetup.setup.adminMany', { count: admin })),
       t('consoleSetup.setup.way'),
-      t('consoleSetup.setup.bitlocker')
+      t('consoleSetup.setup.bitlocker'),
+      ...(env?.security?.couchLock === 'off' && env?.security?.serviceCodes?.parent === true && parental.status?.enabled === true ? [t('consoleSetup.setup.parentCode')] : [])
     ],
     startLabel: t('consoleSetup.setup.start'),
     // Never left out: integration, lock and shell go together, and the services step (at least its lock tasks) belongs to the lock.
@@ -781,7 +813,8 @@ function revertSteps() {
       id: 'suppress',
       title: t('consoleSetup.step.revSuppress.title'),
       detail: t('consoleSetup.step.revSuppress.detail'),
-      check: (env) => (env.settings.suppressCompetitors ? 'todo' : 'done'),
+      // Only what the shell setup switched on goes off again; switched on by the user (or already on before the setup) it stays.
+      check: (env) => suppressBackStatus(env.settings),
       run: async () => {
         await api.setSetting('suppressCompetitors', false);
         return ok(t('consoleSetup.step.revSuppress.done'));
@@ -823,6 +856,8 @@ export function consoleRevertPage(deps, wasShell, { carried = [], autoStart = fa
     ],
     startLabel: t('consoleSetup.revert.start'),
     steps: withUndo(revertSteps(), REVERT_UNDO),
+    // The step "light" is refused by the host while parental controls are on: said before anything runs, with the way to the setting.
+    blockedBy: async (rows) => (parentalBlocksRun(rows, (await attempt(() => api.getParental?.(), undefined, { quietLocked: true }))?.enabled) ? t('consoleSetup.revert.parentalFirst') : ''),
     from: 'shell',
     carriedEntries,
     restartAsk: (rows) => wasShell && rows.some((r) => r.step.id === 'light' && (r.status === 'ok' || r.status === 'done')),

@@ -1,15 +1,16 @@
 import { el, entriesLabel, keepInView, setFocused } from '../core/dom.js';
 import { artwork, plainBackground, setBackground } from '../core/art.js';
-import { SOURCE_LABEL, toggleFavorite } from '../core/library.js';
+import { SOURCE_LABEL } from '../core/library.js';
 import { toast } from '../core/feedback.js';
 import { move, push, render } from '../core/nav.js';
-import { chooseDialog, confirmDialog, openOverlay } from '../components/overlay.js';
+import { chooseDialog } from '../components/overlay.js';
 import { openKeyboard } from '../components/keyboard.js';
-import { collectionMenu, manageCollections } from '../components/collections.js';
-import { changeCollections, collectionById, visibleCount } from '../core/collections.js';
-import { ensureUnlocked, guarded } from '../components/passcode.js';
+import { manageCollections } from '../components/collections.js';
+import { collectionById, visibleCount } from '../core/collections.js';
+import { ensureUnlocked } from '../components/passcode.js';
+import { openItemMenu, itemMenuHint } from '../components/item-menu.js';
 import { uninstalledPage } from './uninstalled.js';
-import { api } from '../core/api.js';
+import { areaOn } from '../core/areas.js';
 import { state } from '../core/state.js';
 import { sound } from '../sound.js';
 import { lang, lower, t } from '../core/i18n.js';
@@ -56,6 +57,8 @@ const openCollection = (id) => window.dispatchEvent(new CustomEvent('couchhud:sh
  */
 export function gridView(name, getItems, { columns, kind, className, empty, collectionId = '', addKind = '' }) {
   const backLabel = () => (collectionId ? t('grid.back') : t('grid.home'));
+  /** The Games tab (not a collection, not Apps) with the Gaming area on: View opens the games that are not installed. */
+  const installsGames = () => addKind === 'game' && !collectionId && areaOn('games');
   return {
     name,
     index: 0,
@@ -186,32 +189,21 @@ export function gridView(name, getItems, { columns, kind, className, empty, coll
       this.index = 0;
       render();
     },
-    /** Y: favorite, collections and details of the focused tile in one menu. */
+    /** Y: favorite, collections, details and hide of the focused tile in one menu (the same menu as on Favorites). */
     itemMenu(item) {
-      const active = collectionById(collectionId);
-      openOverlay({
-        title: item.name,
-        entries: [
-          { label: item.favorite ? t('grid.item.unfavorite') : t('grid.item.favorite'), icon: item.favorite ? '★' : '☆', run: () => toggleFavorite(item) },
-          { label: t('grid.item.collections'), icon: '▤', detail: t('grid.item.collectionsHint'), run: guarded(t('grid.unlock.collections'), () => collectionMenu(item)) },
-          { icon: '▣', label: t('grid.item.details'), run: () => push(detailPage(item)) },
-          ...(active ? [{
-            icon: '🗑',
-            label: t('grid.item.remove', { name: active.name }),
-            danger: true,
-            run: guarded(t('grid.unlock.collections'), async () => {
-              if (!(await confirmDialog(t('grid.item.removeConfirm', { item: item.name, name: active.name }), t('grid.item.removeAction'), { danger: true }))) return;
-              await changeCollections(() => api.setCollectionMember(active.id, item.id, false), t('grid.item.removed', { item: item.name, name: active.name }));
-            })
-          }] : []),
-          { icon: '✕', label: t('grid.cancel'), run: () => {} }
-        ]
-      });
+      openItemMenu(item, { collectionId });
     },
     handle(action) {
       if (action === 'x') {
         sound.select();
         return this.filterMenu();
+      }
+      // View (the controller's back button; "view" from a click on its hint, V on the keyboard): the games that are not installed,
+      // in the Games tab only. Also with an empty or filtered list: installing is the way to fill it.
+      if (action === 'back' || action === 'view') {
+        if (!installsGames()) return sound.bump();
+        sound.select();
+        return push(uninstalledPage());
       }
       if (!this.list.length) return;
       const item = this.list[this.index];
@@ -225,15 +217,17 @@ export function gridView(name, getItems, { columns, kind, className, empty, coll
       }
     },
     hints() {
+      const install = installsGames() ? [['View', t('grid.hint.installGames')]] : [];
       if (!this.list?.length) {
         // Nothing to open or mark; with a filter active X is the way out.
-        return getItems().length ? [['X', t('grid.hint.changeFilter')], ['B', backLabel()]] : [['B', backLabel()]];
+        return getItems().length ? [['X', t('grid.hint.changeFilter')], ...install, ['B', backLabel()]] : [...install, ['B', backLabel()]];
       }
       const item = this.list[this.index];
       return [
         ['A', item?.add ? t('grid.hint.add') : t('grid.hint.open')],
         ['X', t('grid.hint.filter')],
-        ...(item?.builtin ? [] : [['Y', t('grid.hint.menu')]]),
+        ...(item?.builtin ? [] : [itemMenuHint()]),
+        ...install,
         ['B', backLabel()]
       ];
     }

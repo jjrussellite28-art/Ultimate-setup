@@ -1,0 +1,12 @@
+/* For scripts/tabs-check.mjs, never for the catalog: the runtime has to fall back to the default skin. */
+/* A faint white layer with a blend mode that turns the letters into their opposite. */
+[data-skin="user:hostile-blend"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: #fff;
+  opacity: 0.2;
+  mix-blend-mode: difference;
+}

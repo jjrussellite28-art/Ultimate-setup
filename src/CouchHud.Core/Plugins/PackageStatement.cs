@@ -46,6 +46,12 @@ public sealed record PackageStatement(
 
     /// <summary>Size of the package in bytes.</summary>
     public long? Size { get; init; }
+
+    /// <summary>
+    /// The network services the plugin declares (id and hosts, SDK 5), signed with the statement. A statement without the field declares
+    /// none (older statements stay valid): the plugin then gets no host-made client for any service.
+    /// </summary>
+    public IReadOnlyList<PackageService> Services { get; init; } = [];
 }
 
 /// <summary>An image of a package: its SHA-256 and size, signed with the statement; the bytes come from the catalog and are checked against both.</summary>
@@ -70,7 +76,8 @@ public sealed record VerifiedStatement(PackageStatement Statement, PluginOrigin 
         PluginId = Statement.Id,
         Version = Statement.Version,
         KeyFingerprint = KeyFingerprint,
-        Capabilities = Statement.Capabilities
+        Capabilities = Statement.Capabilities,
+        Services = Statement.Services.Count == 0 ? null : Statement.Services
     };
 }
 
@@ -82,15 +89,15 @@ public static class PackageStatements
 {
     public const int MaxStatementBytes = 16 * 1024;
     public const int MaxEnvelopeBytes = 32 * 1024;
-    private static readonly Regex HashPattern = new("^[0-9a-f]{64}$", RegexOptions.Compiled);
-    private static readonly Regex IdPattern = new(@"^[a-z0-9][a-z0-9._-]{0,63}$", RegexOptions.Compiled);
-    private static readonly Regex FolderPattern = new(@"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", RegexOptions.Compiled);
+    private static readonly Regex HashPattern = new(@"^[0-9a-f]{64}\z", RegexOptions.Compiled);
+    private static readonly Regex IdPattern = new(@"^[a-z0-9][a-z0-9._-]{0,63}\z", RegexOptions.Compiled);
+    private static readonly Regex FolderPattern = new(@"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z", RegexOptions.Compiled);
 
     /// <summary>The fields a statement may have; anything else (a price, a licence key …) is refused.</summary>
     private static readonly HashSet<string> Fields = new(StringComparer.Ordinal)
     {
         "id", "folder", "version", "sha256", "sdk", "minCouchHud", "capabilities", "publisherKey", "license", "source", "author",
-        "name", "summary", "description", "icon", "screenshots", "changelog", "size"
+        "name", "summary", "description", "icon", "screenshots", "changelog", "size", "services"
     };
 
     /// <summary>Lower-case hex SHA-256 of the public key (SubjectPublicKeyInfo DER). Throws for anything but a P-256 key.</summary>
@@ -251,9 +258,16 @@ public static class PackageStatements
                 if (sizeEl.ValueKind != JsonValueKind.Number || !sizeEl.TryGetInt64(out var sz) || sz <= 0 || sz > CatalogService.MaxPackageBytes) throw Bad();
                 size = sz;
             }
+            var services = new List<PackageService>();
+            if (root.TryGetProperty("services", out var svcEl))
+            {
+                if (svcEl.ValueKind != JsonValueKind.Array || svcEl.GetArrayLength() > PluginNetServices.MaxPerPlugin) throw Bad();
+                foreach (var item in svcEl.EnumerateArray()) services.Add(Service(item, services));
+            }
             return new PackageStatement(id, folder, version!, sha, sdk, min, caps, key, license, source, author)
             {
-                Name = name, Summary = summary, Description = description, Icon = icon, Screenshots = shots, Changelog = changelog, Size = size
+                Name = name, Summary = summary, Description = description, Icon = icon, Screenshots = shots, Changelog = changelog, Size = size,
+                Services = services
             };
         }
         catch (JsonException)
@@ -262,6 +276,26 @@ public static class PackageStatements
         }
 
         static CatalogException Bad() => new(Strings.Get("plugin.statement.bad"));
+
+        static PackageService Service(JsonElement e, List<PackageService> seen)
+        {
+            if (e.ValueKind != JsonValueKind.Object || Text(e, "id") is not { } sid || !PluginFunctionRules.ValidId(sid) || seen.Any(x => x.Id == sid)
+                || !e.TryGetProperty("hosts", out var hs) || hs.ValueKind != JsonValueKind.Array || hs.GetArrayLength() is 0 or > PluginNetServices.MaxHosts)
+                throw Bad();
+            foreach (var p in e.EnumerateObject()) if (p.Name is not ("id" or "hosts" or "name")) throw Bad();
+            // The display name (a text, or { "de": ..., "en": ... }) is signed along with the rest; it only has to be short.
+            if (e.TryGetProperty("name", out var nm) && !(nm.ValueKind == JsonValueKind.String ? nm.GetString()!.Length <= 100
+                : nm.ValueKind == JsonValueKind.Object && nm.EnumerateObject().All(x => x.Value.ValueKind == JsonValueKind.String && x.Value.GetString()!.Length <= 100)))
+                throw Bad();
+            var hosts = new List<string>();
+            foreach (var h in hs.EnumerateArray())
+            {
+                var host = h.ValueKind == JsonValueKind.String ? h.GetString()!.Trim().ToLowerInvariant() : null;
+                if (host is null || !(host == PluginNetServices.AnyHost || host == PluginNetServices.LanHost || PluginNetRules.ValidHostName(host))) throw Bad();
+                if (!hosts.Contains(host)) hosts.Add(host);
+            }
+            return new PackageService(sid, hosts);
+        }
 
         static PackageMedia Media(JsonElement e, long max)
         {
@@ -325,11 +359,17 @@ public static class PackageStatements
 /// </summary>
 public static class PluginNames
 {
+    /// <summary>Product and company names: taken by skeleton equality, and as a part of a longer name from five characters on ("openai-bridge" is out).</summary>
+    public static readonly IReadOnlyList<string> Brands = ["casehud", "couchhud", "nordvpn", "homeassistant", "home-assistant", "stardust", "tvcontrol", "webostv", "samsungtv", "anthropic", "openai"];
+
+    /// <summary>Plain words: taken by skeleton equality and as the first word(s) of a name ("weather", "weather-plus"), but free inside one ("my-weather-widget", "fan-controller").</summary>
+    public static readonly IReadOnlyList<string> Generic = ["wand", "vpn", "weather", "news", "streaming", "fancontrol"];
+
     /// <summary>
     /// CouchHUD's own plugin names, fixed in the program: reserved for third parties also when the official index is not loaded or cached
-    /// (the index adds the ids it lists).
+    /// (the index adds the ids it lists). <see cref="Brands"/> and <see cref="Generic"/> together.
     /// </summary>
-    public static readonly IReadOnlyList<string> Reserved = ["casehud", "wand", "couchhud", "nordvpn", "vpn", "homeassistant", "home-assistant", "stardust", "tvcontrol", "webostv"];
+    public static readonly IReadOnlyList<string> Reserved = [.. Brands, .. Generic];
 
     /// <summary>The look of a name: lower case, separators gone, look-alike letters folded.</summary>
     public static string Skeleton(string name)
@@ -359,14 +399,45 @@ public static class PluginNames
         var skeleton = Skeleton(name);
         if (skeleton.Length == 0 || skeleton.Contains('\u0000')) return true;
         if (skeleton.StartsWith(Skeleton("couchhud"), StringComparison.Ordinal)) return true;
-        foreach (var reserved in Reserved.Concat(firstPartyIds ?? []))
+        // The ids of CouchHUD's other own plugins (from the signed index) count like brands.
+        foreach (var reserved in Brands.Concat(firstPartyIds ?? []))
         {
             var r = Skeleton(reserved);
             if (skeleton == r) return true;
             // "casehud-pro", "my_casehud": a reserved name inside counts too.
             if (r.Length >= 5 && skeleton.Contains(r, StringComparison.Ordinal)) return true;
         }
+        var words = Words(name);
+        foreach (var generic in Generic)
+        {
+            var g = Skeleton(generic);
+            if (skeleton == g) return true;
+            // The name starts with it, ended by a separator: "weather-plus", "fan-control-pro".
+            var joined = "";
+            foreach (var word in words)
+            {
+                joined += Skeleton(word);
+                if (joined == g) return true;
+                if (joined.Length > g.Length) break;
+            }
+        }
         return false;
+    }
+
+    private static string[] Words(string name) => name.Split(
+        [.. name.Where(c => !char.IsAsciiLetterOrDigit(c) && c < 128).Distinct()], StringSplitOptions.RemoveEmptyEntries);
+
+    /// <summary>
+    /// A display name that poses as one of the brands (case, look-alike letters, separators and diacritics do not help; a brand of five
+    /// characters or more counts anywhere in the name). The plain words are free in a name.
+    /// </summary>
+    public static bool NameImitatesBrand(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        var folded = new string(name.Normalize(NormalizationForm.FormD).Where(c => char.GetUnicodeCategory(c) is not (System.Globalization.UnicodeCategory.NonSpacingMark or System.Globalization.UnicodeCategory.Format)).ToArray());
+        var skeleton = Skeleton(folded);
+        if (skeleton.Contains('\u0000')) return false;
+        return Brands.Any(b => { var r = Skeleton(b); return skeleton == r || (r.Length >= 5 && skeleton.Contains(r, StringComparison.Ordinal)); });
     }
 }
 

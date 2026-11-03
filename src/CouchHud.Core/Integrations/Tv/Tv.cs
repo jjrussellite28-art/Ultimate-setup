@@ -1,102 +1,81 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using CouchHud.Sdk;
 
 namespace CouchHud.Core.Integrations.Tv;
 
-// TV control from the couch (0.5 plan, item 3): switch the TV on and off, choose the input, volume and mute.
-// PC graphics cards generally do not speak HDMI-CEC (the CEC line is not wired to the GPU's HDMI port), so CEC needs an adapter such
-// as a Pulse-Eight USB-CEC with libCEC. The first provider therefore uses the TV's network API: LG webOS (SSAP over a WebSocket, see
-// WebOsClient). Further providers plug in through ITvProvider:
-//   - HDMI-CEC (libCEC): documented stub only. It would need a native library (libcec.dll, GPL-2.0) and an adapter; not shipped now.
-//   - Samsung Tizen, Sony Bravia, Android/Google TV: own network APIs, each its own provider later.
+// TV control from the couch: switch the TV on and off, choose the input, volume and mute. PC graphics cards generally do not speak HDMI-CEC
+// (the CEC line is not wired to the GPU's HDMI port), so the TV's network API is used. Since 0.7 the protocols are plugins (SDK 5,
+// capability "tv.control": LG webOS in "webostv", Samsung Tizen in "samsungtv"); the core keeps the page, the pairing flow, the triggers,
+// Wake-on-LAN, discovery, the address policy and the key storage, and it is the only one that opens a connection to the TV (TvLink).
 
-/// <summary>Why a TV call failed, as a code the UI translates (docs/i18n.md: no finished sentences from the host).</summary>
-public enum TvError
-{
-    /// <summary>No answer on the TV's port (TV off, other address, network).</summary>
-    Unreachable,
-    /// <summary>The TV did not answer in time.</summary>
-    Timeout,
-    /// <summary>The TV's certificate is not the one seen at pairing: pair again (or someone else answers on that address).</summary>
-    CertChanged,
-    /// <summary>Pairing was declined on the TV, or the prompt was not answered.</summary>
-    Denied,
-    /// <summary>The TV does not know the stored key any more (reset, other TV): pair again.</summary>
-    Unpaired,
-    /// <summary>The TV refused the command (missing permission, wrong state).</summary>
-    Refused,
-    /// <summary>An answer that is not what the protocol says (too large, not JSON, wrong shape).</summary>
-    BadAnswer,
-    /// <summary>The address is not in the local network (public, loopback, multicast …).</summary>
-    NotLocal,
-    /// <summary>No TV is paired.</summary>
-    NotPaired,
-    /// <summary>Wake-on-LAN is not possible (no MAC known) or was sent just now.</summary>
-    NoWake,
-    /// <summary>The TV answers only on the old unencrypted port; pairing over it needs an explicit confirmation (expert mode).</summary>
-    PlainOnly,
-    /// <summary>This address or MAC was paired over TLS before: an unencrypted pairing is refused (a downgrade by someone else in the network).</summary>
-    Downgrade,
-    /// <summary>A pairing is running already.</summary>
-    Busy
-}
-
-public sealed class TvException(TvError code, string? detail = null) : Exception(detail ?? code.ToString())
-{
-    public TvError Code { get; } = code;
-}
-
-/// <summary>A TV found by discovery or typed in: the address (an IP literal of the local network) and what it said about itself.</summary>
+/// <summary>A TV found by discovery or typed in: the address (an IP literal of the local network), what it said about itself and the provider id that fits it.</summary>
 public sealed record TvDevice(string Address, string? Name, string Provider);
 
-/// <summary>One external input of the TV ("HDMI_1", "HDMI 1"). The label comes from the TV: shown escaped, never interpreted.</summary>
-public sealed record TvInput(string Id, string Label, bool Connected);
-
-public sealed record TvVolume(int Volume, bool Muted);
-
 /// <summary>
-/// What pairing produced. <see cref="ClientKey"/> is a secret (the caller stores it with DPAPI, never logs it, never hands it to the UI);
-/// <see cref="CertPin"/> is the SHA-256 of the TV certificate's public key (SPKI, base64), trusted on first use and required afterwards.
-/// <see cref="PcApp"/> is the app that was in front on the TV while pairing: pairing happens from CouchHUD on the TV, so that is the PC's
-/// input (e.g. "com.webos.app.hdmi2"); "TV off with the PC" only switches off while that input is in front.
+/// A stored pairing. <see cref="ClientKey"/> is a secret (stored with DPAPI, never logged, never handed to the UI, only ever handed to the
+/// provider of <see cref="Plugin"/>); <see cref="CertPin"/> is the SHA-256 of the TV certificate's public key (SPKI, base64), trusted on
+/// first use and required afterwards. <see cref="PcApp"/> is the app that was in front on the TV while pairing (the PC's input); "TV off
+/// with the PC" only switches off while that app is in front.
 /// </summary>
-public sealed record TvPairing(string Provider, string Address, bool Secure, string ClientKey, string? CertPin, string? Mac, string? Name, string? Model, string? PcApp = null);
+public sealed record TvPairing(string Provider, string Address, bool Secure, string ClientKey, string? CertPin, string? Mac, string? Name, string? Model, string? PcApp = null, string Plugin = "");
 
-/// <summary>A connection to a paired TV. One command at a time is fine; the implementation serializes.</summary>
-public interface ITvSession : IAsyncDisposable
+/// <summary>Text and certificate helpers for everything that comes from a TV.</summary>
+public static class TvText
 {
-    bool Open { get; }
-    Task TurnOffAsync(CancellationToken ct);
-    Task<TvVolume> GetVolumeAsync(CancellationToken ct);
-    Task VolumeStepAsync(bool up, CancellationToken ct);
-    Task SetVolumeAsync(int volume, CancellationToken ct);
-    Task SetMuteAsync(bool mute, CancellationToken ct);
-    Task<IReadOnlyList<TvInput>> GetInputsAsync(CancellationToken ct);
-    Task SwitchInputAsync(string inputId, CancellationToken ct);
-    /// <summary>The app in front on the TV (e.g. "com.webos.app.hdmi2"), or null.</summary>
-    Task<string?> GetForegroundAppAsync(CancellationToken ct);
-    Task ToastAsync(string message, CancellationToken ct);
-}
+    /// <summary>A label from the TV: control and format characters removed, whitespace collapsed, at most 48 characters; null if empty.</summary>
+    public static string? CleanLabel(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var sb = new StringBuilder(Math.Min(text.Length, 64));
+        var space = false;
+        foreach (var c in text)
+        {
+            var category = char.GetUnicodeCategory(c);
+            if (category is UnicodeCategory.Control or UnicodeCategory.Format or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator
+                or UnicodeCategory.Surrogate or UnicodeCategory.PrivateUse or UnicodeCategory.OtherNotAssigned)
+            {
+                continue;
+            }
+            if (char.IsWhiteSpace(c))
+            {
+                space = sb.Length > 0;
+                continue;
+            }
+            if (space) sb.Append(' ');
+            space = false;
+            sb.Append(c);
+            if (sb.Length >= 48) break;
+        }
+        return sb.Length == 0 ? null : sb.ToString();
+    }
 
-/// <summary>One kind of TV (one protocol).</summary>
-public interface ITvProvider
-{
-    /// <summary>Short id stored in the config ("lg-webos").</summary>
-    string Id { get; }
+    /// <summary>An app id from the TV ("com.webos.app.hdmi1", "org.tizen.hdmi"): letters, digits, ".", "_", "-", at most 128 characters; else null.</summary>
+    public static string? CleanAppId(string? id) =>
+        id is { Length: > 0 and <= 128 } && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-') ? id : null;
 
-    /// <summary>Shown name ("LG webOS").</summary>
-    string Name { get; }
+    /// <summary>A pairing key as the core keeps it: printable ASCII without spaces, 8 to 256 characters.</summary>
+    public static bool IsValidKey(string? key) => key is { Length: >= 8 and <= 256 } && key.All(c => c is > ' ' and < (char)127);
 
-    /// <summary>
-    /// Pairs with the TV at <paramref name="address"/>: the TV shows a prompt, <paramref name="onPrompt"/> is called when it does, and the
-    /// result carries the key and the pinned certificate. Throws <see cref="TvException"/> (Denied, Timeout, Unreachable, NotLocal …).
-    /// </summary>
-    /// <param name="allowPlain">Fall back to an unencrypted connection when the TV has no TLS port (only after the user confirmed it);
-    /// otherwise that case is <see cref="TvError.PlainOnly"/>.</param>
-    Task<TvPairing> PairAsync(IPAddress address, Action onPrompt, bool allowPlain, CancellationToken ct);
+    /// <summary>SHA-256 over the certificate's SubjectPublicKeyInfo, base64: survives a re-issued certificate with the same key.</summary>
+    public static string SpkiPin(X509Certificate2 certificate) =>
+        Convert.ToBase64String(SHA256.HashData(certificate.PublicKey.ExportSubjectPublicKeyInfo()));
 
-    /// <summary>Opens a session with a stored pairing; refuses a changed certificate (<see cref="TvError.CertChanged"/>).</summary>
-    Task<ITvSession> ConnectAsync(TvPairing pairing, CancellationToken ct);
+    /// <summary>Constant-time comparison of two pins (both base64 of 32 bytes).</summary>
+    public static bool SamePin(string? expected, string? actual)
+    {
+        if (expected is null || actual is null) return false;
+        var a = Encoding.ASCII.GetBytes(expected);
+        var b = Encoding.ASCII.GetBytes(actual);
+        return a.Length == b.Length && CryptographicOperations.FixedTimeEquals(a, b);
+    }
+
+    /// <summary>The address as stored: IPv4-mapped IPv6 as plain IPv4.</summary>
+    public static string Canonical(IPAddress address) => (address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address).ToString();
 }
 
 /// <summary>Which addresses a TV may have: only the local network, never the internet, never this PC.</summary>
@@ -120,7 +99,19 @@ public static class TvAddressPolicy
         if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
         if (IPAddress.IsLoopback(address)) return allowLoopback;
         var b = address.GetAddressBytes();
-        if (address.AddressFamily == AddressFamily.InterNetwork && IsNetworkOrBroadcast(b, subnets())) return false;
+        var own = subnets();
+        if (address.AddressFamily == AddressFamily.InterNetwork && IsNetworkOrBroadcast(b, own)) return false;
+        // This PC itself is never a TV: a tv.control plugin would reach every local service bound to 0.0.0.0 (the phone remote, ...).
+        if (own.Any(s => s.Address.Equals(address))) return false;
+        if (address.AddressFamily == AddressFamily.InterNetworkV6 && IsOwnIPv6(address)) return false;
+        return InLocalRange(address);
+    }
+
+    /// <summary>Only the address range (private, link-local, unique-local), nothing about this PC: for picking where to send discovery from.</summary>
+    public static bool InLocalRange(IPAddress address)
+    {
+        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        var b = address.GetAddressBytes();
         return address.AddressFamily switch
         {
             AddressFamily.InterNetwork => b[0] == 10
@@ -130,6 +121,21 @@ public static class TvAddressPolicy
             AddressFamily.InterNetworkV6 => b[0] == 0xFD,
             _ => false
         };
+    }
+
+    private static bool IsOwnIPv6(IPAddress address)
+    {
+        try
+        {
+            return System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+                .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+                .Any(u => u.Address.AddressFamily == AddressFamily.InterNetworkV6 && u.Address.Equals(address));
+        }
+        catch (System.Net.NetworkInformation.NetworkInformationException)
+        {
+            return false;
+        }
     }
 
     private static bool IsNetworkOrBroadcast(byte[] b, IReadOnlyList<(IPAddress Address, IPAddress Mask)> subnets)
@@ -171,7 +177,7 @@ public static class TvAddressPolicy
     /// An address typed by the user: an IP literal of the local network (as text, normalized), or null. Host names are not taken: the
     /// address is pinned to the certificate and the key, and a name could point elsewhere tomorrow (or resolve to a public address).
     /// </summary>
-    public static IPAddress? ParseManual(string? text, bool allowLoopback = false)
+    public static IPAddress? ParseManual(string? text, bool allowLoopback = false, Func<IReadOnlyList<(IPAddress Address, IPAddress Mask)>>? subnets = null)
     {
         var trimmed = (text ?? "").Trim();
         if (trimmed.Length is 0 or > 45) return null;
@@ -180,7 +186,7 @@ public static class TvAddressPolicy
         if (!trimmed.All(c => char.IsAsciiHexDigit(c) || c is '.' or ':')) return null;
         if (!IPAddress.TryParse(trimmed, out var ip)) return null;
         if (ip.AddressFamily == AddressFamily.InterNetwork && ip.ToString() != trimmed) return null;
-        return IsAllowed(ip, allowLoopback) ? ip : null;
+        return (subnets is null ? IsAllowed(ip, allowLoopback) : IsAllowed(ip, allowLoopback, subnets)) ? ip : null;
     }
 }
 
@@ -224,7 +230,7 @@ public static class TvPolicy
     /// </summary>
     public static string AdmitInputSwitch(string? inputId, Action<string> requireRelease)
     {
-        if (inputId is null || !WebOsProtocol.IsValidInputId(inputId)) throw new ArgumentException("input");
+        if (inputId is null || !TvInput.IsValidId(inputId)) throw new ArgumentException("input");
         requireRelease(inputId);
         return inputId;
     }

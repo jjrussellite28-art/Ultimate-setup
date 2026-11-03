@@ -226,8 +226,9 @@ public sealed class SteamScanner(IRegistry registry, string? steamPath = null) :
         // StateFlags bit 4 = fully installed; skip anything mid-download or uninstalling.
         if (long.TryParse(state.GetString("StateFlags"), out var flags) && flags != 0 && (flags & 4) == 0) return null;
 
-        long.TryParse(state.GetString("LastPlayed"), out var lastPlayedSeconds);
-        long.TryParse(state.GetString("SizeOnDisk"), out var size);
+        // Missing or unreadable: 0.
+        _ = long.TryParse(state.GetString("LastPlayed"), out var lastPlayedSeconds);
+        _ = long.TryParse(state.GetString("SizeOnDisk"), out var size);
         return (appId, name, lastPlayedSeconds * 1000, state.GetString("installdir"), size);
     }
 

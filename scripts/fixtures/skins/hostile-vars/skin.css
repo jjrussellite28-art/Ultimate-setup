@@ -1,0 +1,33 @@
+/* The skin API of the tab bar abused, for scripts/tabs-check.mjs, never for the catalog: every custom property out of range, unreadable or
+   invalid. The core clamps and cleans them; every tab must stay visible and readable with the skin active. */
+:root[data-skin="user:hostile-vars"] {
+  --bg: #111;
+  --fg: #f2f5fa;
+  --tab-color: transparent;
+  --tab-color-active: rgba(17, 17, 17, 0.9);
+  --tab-accent: #111;
+  --tab-bg: #111;
+  --tab-bg-active: #111;
+  --bar-bg: #111;
+  --tab-glow: 99;
+  --tab-glow-color: #fff;
+  --tab-font: "Evil Font", "Comic Sans MS", sans-serif;
+  --tab-size: 0;
+  --tab-weight: 9999;
+  --tab-weight-active: 0;
+  --tab-letter: 50em;
+  --tab-case: uppercase;
+  --tab-gap: 900rem;
+  --tab-pad-x: 99rem;
+  --tab-pad-y: 99rem;
+  --tab-radius: 999rem;
+  --tab-cut: 99rem;
+  --tab-underline: 99rem;
+  --tab-min-width: 0px;
+  --bar-pad: 99rem;
+  --bar-radius: 999rem;
+  --bar-pad-top: 99rem;
+  --bar-border: #111;
+  --bar-glass: 1;
+  --tab-glyph-bg: #111;
+}

@@ -264,6 +264,22 @@ public class AutoUpdateTests : IDisposable
         Assert.Single(Directory.GetFiles(PendingPackages.Folder(_dir)));
     }
 
+    [Fact]
+    public void A_new_plugin_is_marked_to_start_now_and_an_update_is_not()
+    {
+        var zip = Zip("""{ "capabilities": ["library"] }""");
+        var sha = PackageStatements.HashFile(zip);
+        var service = new CatalogService(new HttpClient(), _dir, () => [], () => false);
+
+        var fresh = service.Install(WandEntry(sha), zip, null, sha);
+        Assert.Equal("wand", fresh.StartNow);
+
+        // The folder is there now: the same package again is an update, which waits for the restart.
+        var update = service.Install(WandEntry(sha), zip, null, sha);
+        Assert.Null(update.StartNow);
+        Assert.True(update.RestartNeeded);
+    }
+
     // ---- the install gate of the automatic case
 
     private static PluginInstallRequest Request(CatalogEntry entry, VerifiedStatement? statement, bool isUpdate = true, bool adds = false) => new(entry, statement, isUpdate, adds);

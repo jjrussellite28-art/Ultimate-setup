@@ -1,0 +1,2 @@
+:root[data-skin="user:cq-bg-weird"]{--x:1}
+:root{--bg:color-mix(in srgb,red,blue);--fg:light-dark(#000,#fff);--accent:currentcolor}

@@ -18,6 +18,9 @@ public sealed class ShellManager(IRegistry registry)
     /// <summary>Command line Winlogon should start as shell.</summary>
     public string SelfCommand { get; } = $"\"{Environment.ProcessPath}\"";
 
+    /// <summary>The desktop's explorer.exe by its full path in the Windows folder, never found through the search path or the current folder.</summary>
+    internal static string ExplorerPath { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
+
     /// <summary>The per-user shell value, null if there is none (Windows then uses explorer.exe).</summary>
     public string? ShellValue() => registry.ReadString(WinlogonKey, "Shell");
 
@@ -171,7 +174,7 @@ public sealed class ShellManager(IRegistry registry)
         }
         try
         {
-            Process.Start(new ProcessStartInfo("explorer.exe") { UseShellExecute = true })?.Dispose();
+            Process.Start(new ProcessStartInfo(ShellManager.ExplorerPath) { UseShellExecute = true })?.Dispose();
             // Explorer reads the value while it starts: wait for the taskbar before restoring.
             // ConfigureAwait(false): this is also awaited synchronously in the emergency path.
             var started = DateTime.UtcNow;
@@ -219,7 +222,7 @@ public sealed class ShellManager(IRegistry registry)
     }
 
     public static void StartExplorer() =>
-        Process.Start(new ProcessStartInfo("explorer.exe") { UseShellExecute = true })?.Dispose();
+        Process.Start(new ProcessStartInfo(ShellManager.ExplorerPath) { UseShellExecute = true })?.Dispose();
 
     public static void LeavePcMode(bool killExplorer)
     {
@@ -251,6 +254,7 @@ public sealed class ShellManager(IRegistry registry)
     /// RunOnce entry puts it back at that login, so the boot after is the couch again.
     /// The caller also sets pendingShellRestore in the config, the fallback when RunOnce does not run.
     /// </summary>
+    [SecondFactorExempt("the callers guard it (Power restart-pc); the crash and recovery paths exempt themselves", CallersGuard = true)]
     public void RestartIntoPcMode()
     {
         if (IsInstalledAsShell())

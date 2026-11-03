@@ -3,6 +3,10 @@
 
 import { manualUndo } from './mode-transaction.js';
 
+// The way back's suppress step: already off 'done'; on with the shell setup's mark (AppConfig.SuppressBySetup) 'todo', it goes off;
+// on without the mark (the user's own choice, or on before the setup) 'na', it stays on.
+export const suppressBackStatus = (settings) => (!settings?.suppressCompetitors ? 'done' : settings.suppressBySetup ? 'todo' : 'na');
+
 export function createUndoTables({ api, state, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }) {
   // What a step records before it runs and how it is undone (the mode switch is a transaction, see core/mode-transaction.js).
   // snapshot(env) returns plain JSON of what the step is about to change; undo(before) looks at the state NOW and puts back only what
@@ -19,7 +23,66 @@ export function createUndoTables({ api, state, wait = (ms) => new Promise((resol
     }
   });
 
+  // "CouchHUD stays in front" with the mark of the shell setup (b: the setup switched it on, see AppConfig.SuppressBySetup). The host
+  // clears the mark with every change of the setting, so the mark goes back after it. A record of 0.6.3 has no b: only the setting.
+  const suppressBack = {
+    snapshot: (env) => ({ v: !!env.settings.suppressCompetitors, b: !!env.settings.suppressBySetup }),
+    undo: async (before) => {
+      if (!before) throw new Error('no record');
+      const now = await api.getSettings();
+      const mark = typeof before.b === 'boolean' ? before.b && before.v : null;
+      const settingDiffers = !!now?.suppressCompetitors !== before.v;
+      if (!settingDiffers && (mark === null || !!now?.suppressBySetup === mark)) return 'unchanged';
+      if (settingDiffers) await api.setSetting('suppressCompetitors', before.v);
+      if (mark !== null) await api.setSetting('suppressBySetup', mark);
+      return 'undone';
+    }
+  };
+
   const startupModes = async () => (await api.getStartup()) ?? [];
+
+  // The services as the host applied them (`installed`), for the record: plain names only, bounded like every list of a record. Null when
+  // the host did not say (the undo then falls back to the selection alone).
+  const installedOf = (data, max) => (Array.isArray(data?.installed) ? data.installed.filter((n) => typeof n === 'string' && n.length > 0 && n.length <= 96).slice(0, max) : null);
+  const sameSet = (a, b) => a.size === b.size && [...a].every((x) => b.has(x));
+  // Ticks the list until exactly `wanted` is selected (only names the host lists; the host checks each against its fixed list).
+  const tick = async (wanted) => {
+    let changed = false;
+    for (const entry of (await api.getServices())?.services ?? []) {
+      if (!!entry.selected !== wanted.has(entry.name)) {
+        await api.toggleCouchService(entry.name);
+        changed = true;
+      }
+    }
+    return changed;
+  };
+  /**
+   * Puts the services back to the record { s: selected, i: applied }. The applied list goes first (selected and applied by the host, which
+   * pauses and resumes accordingly), then the selection is ticked back WITHOUT applying: a selection that was pending before (chosen, not
+   * applied) is pending again instead of being applied by the undo. `apply` false: the host could not apply before either (not healthy), so
+   * only the selection is put back.
+   */
+  const servicesBack = async (before, apply = true) => {
+    const data = await api.getServices();
+    const listed = new Set((data?.services ?? []).map((x) => x.name));
+    // Only what the list can still tick counts (a service that is gone from this PC cannot be selected again).
+    const selected = new Set((before.s ?? []).filter((n) => listed.has(n)));
+    const applied = new Set(before.i.filter((n) => listed.has(n)));
+    const nowApplied = new Set((installedOf(data, 64) ?? []).filter((n) => listed.has(n)));
+    const nowSelected = new Set((data?.services ?? []).filter((x) => x.selected).map((x) => x.name));
+    let changed = false;
+    if (apply && !sameSet(applied, nowApplied)) {
+      await tick(applied);
+      await api.setupServiceTask(true);
+      changed = true;
+    }
+    if (!changed && sameSet(selected, nowSelected)) return 'unchanged';
+    await tick(selected);
+    return 'undone';
+  };
+
+  // Whether the service held a parents' code when the setup's lock step was recorded (see SETUP_UNDO.lock).
+  let parentHeldBefore = false;
 
   const SETUP_UNDO = {
     integration: {
@@ -55,13 +118,17 @@ export function createUndoTables({ api, state, wait = (ms) => new Promise((resol
     },
     services: {
       // `taskInstalled` of the host only says the service is healthy; it is true before and after, so it tells nothing about what the setup
-      // changed. What counts: which services were selected (k: that selection was applied, nothing pending) and then the host's own apply.
+      // changed. What counts: which services were selected (k: that selection was applied, nothing pending), which ones the host had applied
+      // (i, so a selection that was pending before stays pending after the undo) and then the host's own apply.
       snapshot: async () => {
         const data = await api.getServices();
-        return { k: !data?.pending, s: (data?.services ?? []).filter((x) => x.selected).slice(0, 24).map((x) => x.name) };
+        const installed = installedOf(data, 24);
+        return { k: !data?.pending, s: (data?.services ?? []).filter((x) => x.selected).slice(0, 24).map((x) => x.name), ...(installed ? { i: installed } : {}) };
       },
       undo: async (before) => {
         if (!before) throw new Error('no record');
+        if (Array.isArray(before.i)) return servicesBack(before);
+        // A record of 0.6.3 (no applied list): the selection, applied again when it was applied before.
         const data = await api.getServices();
         const wanted = new Set(before.s ?? []);
         let changed = false;
@@ -81,10 +148,15 @@ export function createUndoTables({ api, state, wait = (ms) => new Promise((resol
       }
     },
     xbox: settingBack('guideTapInGame'),
-    suppress: settingBack('suppressCompetitors'),
+    suppress: suppressBack,
     lock: {
       // c: a couch code was held before. Switching the lock off removes the service's couch code, which cannot be put back.
-      snapshot: (env) => ({ m: env.security.couchLock ?? 'off', c: !!env.security.hasPasscode }),
+      // The parents' code the service held before is kept here in the page (the host-checked record has no key for it): only a code that was
+      // there can be lost. After a restart in the middle of a switch this is not known, and the undo then says nothing about it.
+      snapshot: (env) => {
+        parentHeldBefore = env.security.serviceCodes?.parent === true;
+        return { m: env.security.couchLock ?? 'off', c: !!env.security.hasPasscode };
+      },
       undo: async (before) => {
         if (!before) throw new Error('no record');
         const now = await api.getSecurity();
@@ -92,6 +164,19 @@ export function createUndoTables({ api, state, wait = (ms) => new Promise((resol
         await api.setCouchLock(before.m);
         // Not "back as it was": the old code is gone, a new one has to be set (reported as a leftover, never as done).
         if (before.c && before.m === 'off' && !(await api.getSecurity())?.hasPasscode) throw manualUndo('lockCode');
+        // Raising the lock from "off" clears a parents' code that was set at the open couch (the service never lets such a code become the
+        // lock), and nothing here can put it back. With parental controls on and the service holding no parents' code any more that is a
+        // leftover to be named, never a quiet loss. Only a look: nothing is set or skipped.
+        if (before.m === 'off' && parentHeldBefore) {
+          let parental;
+          try {
+            parental = await api.getParental?.();
+          } catch {
+            // Not readable: neither "fine" nor "lost", the person is asked to look.
+            throw manualUndo('parentUnclear');
+          }
+          if (parental?.enabled && (await api.getSecurity())?.serviceCodes?.parent === false) throw manualUndo('parentCode');
+        }
         return 'undone';
       }
     },
@@ -138,12 +223,17 @@ export function createUndoTables({ api, state, wait = (ms) => new Promise((resol
     },
     services: {
       // The paused services and the helper tasks of the shell setup. The tasks need the full mode (the undo of the last step ran first).
+      // i: what the host had applied, so a selection that was pending before the way back is pending again, not applied by the undo.
       snapshot: async () => {
         const data = await api.getServices();
-        return { k: !!data?.taskInstalled, s: (data?.services ?? []).filter((x) => x.selected).slice(0, 12).map((x) => x.name) };
+        const installed = installedOf(data, 12);
+        return { k: !!data?.taskInstalled, s: (data?.services ?? []).filter((x) => x.selected).slice(0, 12).map((x) => x.name), ...(installed ? { i: installed } : {}) };
       },
       undo: async (before) => {
         if (!before) throw new Error('no record');
+        // Without a healthy service before (k false) the host could not apply anything then either: only the selection comes back.
+        if (Array.isArray(before.i)) return servicesBack(before, before.k);
+        // A record of 0.6.3 (no applied list).
         const data = await api.getServices();
         let changed = false;
         for (const name of before.s ?? []) {
@@ -178,7 +268,7 @@ export function createUndoTables({ api, state, wait = (ms) => new Promise((resol
         return changed ? 'undone' : 'unchanged';
       }
     },
-    suppress: settingBack('suppressCompetitors'),
+    suppress: suppressBack,
     light: {
       snapshot: (env) => {
         // A lock that could not be read is not "off": no record, and the undo then refuses instead of guessing.

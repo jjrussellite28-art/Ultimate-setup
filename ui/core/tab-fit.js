@@ -149,3 +149,72 @@ export function marqueeOffset(elapsed, max, pause = 1000, speed = 0.05) {
   if (t < 2 * pause + run) return max;
   return max - (t - 2 * pause - run) * speed;
 }
+
+/**
+ * "rgb(1, 2, 3)", "rgba(1, 2, 3, 0.5)", "rgb(1 2 3 / 50%)", "#rgb[a]", "#rrggbb[aa]", "color(srgb 1 0 0 / 0.5)" and "transparent" as
+ * [r, g, b, a] (0..255, alpha 0..1); null for anything else (nav.js paints other syntaxes, oklch() or color-mix(), on a canvas to get rgba).
+ */
+export function parseColor(text) {
+  const s = String(text ?? '').trim().toLowerCase();
+  if (s === 'transparent') return [0, 0, 0, 0];
+  const alpha = (v, pct) => (v === undefined ? 1 : Math.min(1, Math.max(0, Number(v) / (pct ? 100 : 1))));
+  const hex = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(s);
+  if (hex) {
+    const h = hex[1].length <= 4 ? [...hex[1]].map((d) => d + d).join('') : hex[1];
+    const v = h.match(/../g).map((x) => parseInt(x, 16));
+    return [v[0], v[1], v[2], v.length > 3 ? v[3] / 255 : 1];
+  }
+  const srgb = /^color\(\s*srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+)(%)?)?\s*\)$/.exec(s);
+  if (srgb) {
+    const c = [Number(srgb[1]) * 255, Number(srgb[2]) * 255, Number(srgb[3]) * 255, alpha(srgb[4], srgb[5])];
+    return c.every(Number.isFinite) ? c : null;
+  }
+  const m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:\s*[,/]\s*([\d.]+)(%)?)?\s*\)$/.exec(s);
+  if (!m) return null;
+  const c = [Number(m[1]), Number(m[2]), Number(m[3]), alpha(m[4], m[5])];
+  return c.every(Number.isFinite) ? c : null;
+}
+
+/** [r, g, b, a] as the rgba() text the other functions read. */
+export const rgbaText = (c) => `rgba(${c.slice(0, 3).map((v) => Math.round(v)).join(', ')}, ${Math.round(c[3] * 1000) / 1000})`;
+
+/** Layers ([r, g, b, a], top first) laid over each other into one colour. */
+export function flatten(layers) {
+  let acc = [0, 0, 0, 0];
+  for (const c of [...layers].reverse()) {
+    const a = c[3] + acc[3] * (1 - c[3]);
+    acc = a > 0 ? [0, 1, 2].map((i) => (c[i] * c[3] + acc[i] * acc[3] * (1 - c[3])) / a).concat(a) : [0, 0, 0, 0];
+  }
+  return acc;
+}
+
+const luminance = ([r, g, b]) => {
+  const lin = (v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+};
+const contrast = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const over = (fg, bg) => [0, 1, 2].map((i) => fg[i] * fg[3] + bg[i] * (1 - fg[3])).concat(1);
+
+/** Text fainter than this (alpha) is gone. */
+export const TAB_TEXT_ALPHA = 0.3;
+/** Text closer to its background than this (contrast ratio) cannot be read. */
+export const TAB_TEXT_CONTRAST = 1.5;
+
+/**
+ * The colour a tab label gets when the skin's would make it invisible, or null when it can be read. `text` is the colour the letters are
+ * painted with (the fill colour), `background` the solid colour behind the tab (null or a see-through colour: not known, a picture or a
+ * gradient; then only a faint colour counts), `fallback` the colour to use instead (the theme's text colour); when that does not stand out
+ * from the background either, white or black, whichever does. Any colour that can be read is fine: skins choose their colours freely. A
+ * text colour that cannot be read at all (a syntax nobody could paint) counts as invisible: when in doubt, the label is shown.
+ */
+export function readableColor(text, background, fallback) {
+  const fg = parseColor(text);
+  const bg = parseColor(background);
+  const solid = bg && bg[3] >= 0.5 ? [bg[0], bg[1], bg[2], 1] : null;
+  const faint = !fg || fg[3] < TAB_TEXT_ALPHA;
+  if (!faint && (!solid || contrast(over(fg, solid), solid) >= TAB_TEXT_CONTRAST)) return null;
+  const fb = parseColor(fallback);
+  if (fb && fb[3] >= TAB_TEXT_ALPHA && (!solid || contrast(over(fb, solid), solid) >= 3)) return String(fallback).trim();
+  if (!solid) return '#ffffff';
+  return contrast([255, 255, 255, 1], solid) >= contrast([0, 0, 0, 1], solid) ? '#ffffff' : '#000000';
+}

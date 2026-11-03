@@ -1,0 +1,2 @@
+:root[data-skin="user:cq-layer-first"]{--x:1}
+@layer ch-pins, ch-pins;@layer ch-pins{html #overlay{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;background:#000!important}}

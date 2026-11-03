@@ -183,6 +183,33 @@ public sealed class PluginSettingPageTests
     }
 
     [Fact]
+    public void The_gate_of_a_setting_is_asked_before_the_editor_opens_and_changes_nothing()
+    {
+        // 0.6.3: a locked or "nobody" setting opened the keyboard first and refused only the typed value.
+        var hud = ReadSource("src", "CouchHud.Shell", "Hud.cs");
+        var check = Body(hud, "public bool CheckPluginSetting(");
+        Assert.Contains("RefuseWhileConfigFaulted()", check);
+        Assert.Contains("plugins.Settings.FirstOrDefault(s => s.Plugin == pluginId && s.Setting.Key == key)", check);
+        // The same gate as the change: the lock for an admin setting (LockedException, so the page asks for the unlock), nobody always.
+        Assert.Contains("SettingGateRefusal(pluginId, found.Setting, out var function)", check);
+        Assert.Contains("refused == \"lock.unlockFirst\" ? new LockedException(", check);
+        // A child's profile: the parents' code for the settings visit, the same action and item the change uses; only looked at, never used up.
+        Assert.Contains("CheckParentGrant(\"pluginPage\", $\"{pluginId}/{PluginSettingRules.SettingsPageId}\"", check);
+        Assert.Contains("CheckParentGrant(\"pluginPage\", $\"{pluginId}/{PluginSettingRules.SettingsPageId}\"", Body(hud, "public void SetPluginSetting("));
+        foreach (var effect in new[] { "UseUp", "BeginVisit", ".Set(", "PluginSettingRules.Check(" }) Assert.DoesNotContain(effect, check);
+        Assert.Contains("checkPluginSetting", LockPolicy.OpenWhileLocked);
+        Assert.Contains("\"checkPluginSetting\"", ReadSource("src", "CouchHud.Core", "Config", "FeatureAreas.cs"));
+        Assert.Contains("hud.CheckPluginSetting(StringArg(0), StringArg(1))", ReadSource("src", "CouchHud.Shell", "UiHost", "UiBridge.cs"));
+        // The page asks the gate first, for every kind, and only then opens the keyboard or the choice.
+        var ui = ReadSource("ui", "views", "plugins.js");
+        var rows = ui[ui.IndexOf("function settingRows", StringComparison.Ordinal)..ui.IndexOf("function pluginSettingsOnlyPage", StringComparison.Ordinal)];
+        var gate = rows.IndexOf("if (!(await settingGate(p, s))) return;", StringComparison.Ordinal);
+        Assert.True(gate >= 0 && gate < rows.IndexOf("openKeyboard(", StringComparison.Ordinal) && gate < rows.IndexOf("chooseDialog(", StringComparison.Ordinal));
+        Assert.Contains("withUnlock(check, () => ensureUnlocked(", ui);
+        Assert.Contains("withParentGrant(() => api.checkPluginSetting(p.id, s.key))", ui);
+    }
+
+    [Fact]
     public void A_visit_of_the_opened_page_does_not_cover_the_settings_of_the_plugin()
     {
         var now = DateTimeOffset.UnixEpoch;
@@ -220,7 +247,7 @@ public sealed class PluginSettingPageTests
     [Fact]
     public void The_new_kind_and_property_are_additive_inside_sdk_4()
     {
-        Assert.Equal(4, SdkVersion.Current);
+        Assert.True(SdkVersion.Current >= 4);
         // Existing kinds keep their numbers (stored nowhere, but plugins compiled against SDK 4 before the change keep working).
         Assert.Equal(0, (int)SettingKind.Toggle);
         Assert.Equal(1, (int)SettingKind.Text);

@@ -1,0 +1,13 @@
+/* For scripts/tabs-check.mjs, never for the catalog: the runtime has to fall back to the default skin. */
+/* A box of one pixel whose shadow covers the whole screen. */
+[data-skin="user:hostile-shadow"] body::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  z-index: 9999;
+  pointer-events: none;
+  box-shadow: 0 0 0 200vmax #000;
+}

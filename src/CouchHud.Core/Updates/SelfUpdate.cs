@@ -175,7 +175,7 @@ public static partial class ReleaseNotes
 /// </summary>
 public static class ReleaseIntegrity
 {
-    private static readonly Regex Line = new(@"^([0-9a-fA-F]{64})  (\S+)$", RegexOptions.Compiled);
+    private static readonly Regex Line = new(@"^([0-9a-fA-F]{64})  (\S+)\z", RegexOptions.Compiled);
 
     public static void VerifySignature(byte[] checksumFile, string? signatureBase64, string? publicKeyPem = null)
     {

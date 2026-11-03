@@ -1,0 +1,2 @@
+:root[data-skin="user:dq-quick-child"]{--x:1}
+#quick > *{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;background:#000!important;z-index:9}

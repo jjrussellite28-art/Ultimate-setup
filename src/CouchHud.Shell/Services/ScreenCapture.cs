@@ -161,7 +161,9 @@ public static unsafe class ScreenCapture
 
         private static void Check(int hr, string what)
         {
+#pragma warning disable CA2201 // the failed HRESULT is what the caller needs
             if (hr < 0) throw new COMException($"{what} failed (0x{hr:X8})", hr);
+#pragma warning restore CA2201
         }
 
         public static Frame? Capture(IntPtr monitor)

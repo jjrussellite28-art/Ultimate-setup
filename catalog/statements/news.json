@@ -1,0 +1,34 @@
+{
+  "id": "news",
+  "folder": "CouchHud.Plugin.News",
+  "version": "1.0.0",
+  "sha256": "",
+  "sdk": 5,
+  "minCouchHud": "0.7.0",
+  "capabilities": [
+    "news",
+    "assistant",
+    "network:internet"
+  ],
+  "services": [
+    {
+      "id": "feeds",
+      "name": {
+        "de": "Nachrichten-Feeds",
+        "en": "News feeds"
+      },
+      "hosts": [
+        "*"
+      ]
+    }
+  ],
+  "publisherKey": "",
+  "license": "GPL-3.0-only",
+  "author": "kewe87",
+  "name": "News",
+  "summary": "News from RSS and Atom feeds in the News tab, with a tool for the assistant",
+  "icon": {
+    "sha256": "261a27a01642721dd76b64734a042f8807add44352fa3c8ee9c0656740f3f470",
+    "bytes": 33626
+  }
+}

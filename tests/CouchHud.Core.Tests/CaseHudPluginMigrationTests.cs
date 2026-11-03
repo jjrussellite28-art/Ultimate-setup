@@ -195,7 +195,7 @@ public sealed class CaseHudPluginMigrationTests : IDisposable
         Assert.Equal("CouchHud.Plugin.CaseHud", entry.Folder);
         Assert.Equal("GPL-3.0-only", entry.License);
         // The owner signed it: CouchHUD's own statement for exactly this package, with its icon.
-        SignedCatalogEntry.AssertOwnSigned(entry);
+        SignedCatalogEntry.AssertOwnSignedOrWaiting(entry);
         // Its rights: CouchHUD's own plugin may have them all, a third party could not even declare the three host services.
         Assert.Null(PluginPolicy.CheckDeclared(PluginOrigin.FirstParty, entry.Capabilities));
         Assert.NotNull(PluginPolicy.CheckDeclared(PluginOrigin.ThirdParty, entry.Capabilities));

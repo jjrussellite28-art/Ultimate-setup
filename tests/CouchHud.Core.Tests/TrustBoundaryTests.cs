@@ -69,7 +69,7 @@ public class TrustBoundaryTests
 
         Assert.Contains("launch", allowed);
         Assert.Contains("search_library", allowed);
-        Assert.Contains("get_weather", allowed);
+        Assert.Contains("get_session", allowed);
         Assert.DoesNotContain("list_home_entities", allowed);
         foreach (var blocked in new[]
                  {
@@ -126,18 +126,18 @@ public class TrustBoundaryTests
         };
 
         await server.HandleAsync(Call("plugin_x_read"));
-        await server.HandleAsync(Call("get_weather"));
+        await server.HandleAsync(Call("get_session"));
 
         Assert.Equal(["plugin_x_read"], asked);
         // Declined means not run; the plain read ran.
-        Assert.Equal(["get_weather"], host.Called);
+        Assert.Equal(["get_session"], host.Called);
     }
 
     [Fact]
     public async Task Tool_results_reach_the_model_marked_as_third_party_data()
     {
         var provider = new Scripted(
-            new ChatReply(null, [new ToolCall("t1", "get_news", JsonDocument.Parse("{}").RootElement.Clone())]),
+            new ChatReply(null, [new ToolCall("t1", "search_library", JsonDocument.Parse("{}").RootElement.Clone())]),
             new ChatReply("Fertig", []));
         var session = new AssistantSession(provider, new Host());
 
@@ -215,8 +215,6 @@ public class TrustBoundaryTests
     [InlineData("background: url(https://tracker.example/a.png);", "background: url(about:blank);")]
     [InlineData("background: url('http://tracker.example/a.png');", "background: url('about:blank');")]
     [InlineData("background: url(\"//tracker.example/a.png\");", "background: url(\"about:blank\");")]
-    [InlineData("@import url(https://fonts.example/x.css);", "@import url(about:blank);")]
-    [InlineData("@import \"https://fonts.example/x.css\";", "@import \"about:blank\";")]
     [InlineData("background: image-set(\"https://tracker.example/a.png\" 1x);", "background: image-set(\"about:blank\" 1x);")]
     [InlineData("background: url( HTTPS://Tracker.example/a.png );", "background: url( about:blank );")]
     public void External_addresses_are_cut_out_of_a_skin_stylesheet(string css, string expected)

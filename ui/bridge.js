@@ -11,18 +11,30 @@ webview.addEventListener('message', ({ data }) => {
     const call = pending.get(data.id);
     if (!call) return;
     pending.delete(data.id);
-    if (data.error !== undefined) call.reject(Object.assign(new Error(data.error), { locked: data.locked === true, held: data.held === true, parent: data.parent ?? null, codesDamaged: data.codesDamaged === true }));
+    if (data.error !== undefined) call.reject(Object.assign(new Error(data.error), { locked: data.locked === true, held: data.held === true, parent: data.parent ?? null, twofa: data.twofa ?? null, codesDamaged: data.codesDamaged === true }));
     else call.resolve(data.result);
   } else if (data.event) {
     for (const cb of listeners.get(data.event) || []) cb(data.payload);
   }
 });
 
-const call = (method, ...args) =>
+const send = (method, args) =>
   new Promise((resolve, reject) => {
     const id = nextId++;
     pending.set(id, { resolve, reject });
     webview.postMessage({ id, method, args });
+  });
+
+// The second factor (0.7): the host answers a critical action with "twofa" once the code was accepted. The handler (components/second-factor.js)
+// shows the question and resolves true when a phone (or a Windows administrator) confirmed; the same call is then repeated once. The host
+// decides again: the confirmation is a one-time ticket for exactly this action and these parameters. Cancelled: the call ends as an error.
+let secondFactorHandler = null;
+
+const call = (method, ...args) =>
+  send(method, args).catch(async (err) => {
+    if (!err?.twofa || !secondFactorHandler) throw err;
+    if (!(await secondFactorHandler(err.twofa))) throw Object.assign(new Error(err.twofa.cancelledText || err.message), { cancelled: true });
+    return send(method, args);
   });
 
 const on = (event) => (cb) => {
@@ -31,8 +43,18 @@ const on = (event) => (cb) => {
 };
 
 window.couchhud = {
+  setSecondFactorHandler: (handler) => {
+    secondFactorHandler = handler;
+  },
+  getSecondFactor: () => send('getSecondFactor', []),
+  setSecondFactor: (on) => call('setSecondFactor', on),
+  twoFactorState: () => send('twoFactorState', []),
+  twoFactorCancel: (requestId) => send('twoFactorCancel', [requestId]),
+  twoFactorAdmin: (requestId) => send('twoFactorAdmin', [requestId]),
+  onTwoFactor: on('twoFactor'),
   getLibrary: (opts = {}) => call('getLibrary', opts),
-  launch: (id) => call('launch', id),
+  // from: the running game's id when the person agreed to close it for this start (game switching).
+  launch: (id, from) => (from ? call('launch', id, from) : call('launch', id)),
   toggleFavorite: (id) => call('toggleFavorite', id),
   toggleFavoriteSite: (url) => call('toggleFavoriteSite', url),
   getFavorites: () => call('getFavorites'),
@@ -49,6 +71,9 @@ window.couchhud = {
   setShell: (install) => call('setShell', install),
   enterPcMode: () => call('enterPcMode'),
   power: (action) => call('power', action),
+  // The sleep timer's warning: over a game the host shows a notice and brings the HUD (with its question) to the front.
+  sleepTimerWarning: (action, seconds) => call('sleepTimerWarning', action, seconds),
+  sleepTimerArm: (action, seconds) => call('sleepTimerArm', action, seconds),
   listSkins: () => call('listSkins'),
   getSettings: () => call('getSettings'),
   setFeatureAreas: (enabled) => call('setFeatureAreas', enabled),
@@ -59,6 +84,7 @@ window.couchhud = {
   removeFeed: (url) => call('removeFeed', url),
   openUrl: (url, source) => call('openUrl', url, source ?? null),
   searchPlaces: (query) => call('searchPlaces', query),
+  setPluginService: (plugin, service, on) => call('setPluginService', plugin, service, !!on),
   setSetting: (key, value) => call('setSetting', key, value),
   browse: (path, extensions) => call('browse', path ?? null, extensions ?? null),
   scanFolder: (path) => call('scanFolder', path),
@@ -74,8 +100,15 @@ window.couchhud = {
   setItemInfo: (id, changes) => call('setItemInfo', id, changes),
   searchStore: (query) => call('searchStore', query),
   setStoreMatch: (id, match, name) => call('setStoreMatch', id, match, name),
+  getArtworkMatch: (id) => call('getArtworkMatch', id),
+  searchArtwork: (id, query) => call('searchArtwork', id, query),
+  setArtworkMatch: (id, match, name) => call('setArtworkMatch', id, match ?? null, name ?? null),
   setEntryEdge: (id, edge) => call('setEntryEdge', id, edge),
   removeEntry: (id) => call('removeEntry', id),
+  hideEntry: (id) => call('hideEntry', id),
+  showEntry: (id) => call('showEntry', id),
+  getIgnoredOrphans: () => call('getIgnoredOrphans'),
+  removeIgnoredOrphan: (key) => call('removeIgnoredOrphan', key),
   getArtworkChoices: (id) => call('getArtworkChoices', id),
   reloadArtwork: (id) => call('reloadArtwork', id),
   setArtwork: (id, slot, urlOrPath) => call('setArtwork', id, slot, urlOrPath ?? null),
@@ -116,6 +149,7 @@ window.couchhud = {
   onAreas: on('areas'),
   onHdr: on('hdr'),
   onRemote: on('remote'),
+  onCollections: on('collections'),
   onFocus: on('focus'),
   onLaunchTimeout: on('launch-timeout'),
   onUnlocked: on('unlocked'),
@@ -146,6 +180,7 @@ window.couchhud = {
   setPluginEnabled: (folder, enabled) => call('setPluginEnabled', folder, enabled),
   approvePlugin: (folder, hash) => call('approvePlugin', folder, hash),
   setPluginSetting: (plugin, key, value) => call('setPluginSetting', plugin, key, value),
+  checkPluginSetting: (plugin, key) => call('checkPluginSetting', plugin, key),
   openPluginSettingPage: (plugin, key) => call('openPluginSettingPage', plugin, key),
   getPluginTabs: () => call('getPluginTabs'),
   onPluginTabs: on('pluginTabs'),
@@ -172,6 +207,13 @@ window.couchhud = {
   // acknowledgedTrust must be true: it comes only from the warning dialog ("I trust this developer"); the host refuses without it.
   addCatalogSource: (url, publisherKey, name, acknowledgedTrust) => call('addCatalogSource', url, publisherKey ?? null, name ?? null, acknowledgedTrust === true),
   removeCatalogSource: (url) => call('removeCatalogSource', url),
+  // Companion apps (start next to a game) and apps in the Guide menu. The host decides and checks again; a rule names a library app by id only.
+  getCompanions: () => call('getCompanions'),
+  setCompanion: (appId, change) => call('setCompanion', appId, change),
+  removeCompanion: (appId) => call('removeCompanion', appId),
+  setupWand: (withEveryGame, acceptUnverified) => call('setupWand', withEveryGame === true, acceptUnverified === true),
+  getGuideApps: () => call('getGuideApps'),
+  setGuideApp: (id, on) => call('setGuideApp', id, on === true),
   getGameFolders: () => call('getGameFolders'),
   addGameFolder: (path) => call('addGameFolder', path),
   removeGameFolder: (path) => call('removeGameFolder', path),
@@ -197,6 +239,9 @@ window.couchhud = {
   pairingState: (open) => call('pairingState', open === true),
   revokeRemote: () => call('revokeRemote'),
   revokeRemoteDevice: (id) => call('revokeRemoteDevice', id),
+  setRemoteDeviceLevel: (id, level) => call('setRemoteDeviceLevel', id, level),
+  // The TV's sleep timer for the phone page (end in Unix ms, 0 when off).
+  sleepTimerState: (state) => call('sleepTimerState', state),
   allowFirewall: () => call('allowFirewall'),
   assistantInfo: () => call('assistantInfo'),
   askAssistant: (text) => call('askAssistant', text),
@@ -222,7 +267,8 @@ window.couchhud = {
   tvSwitchInput: (id) => call('tvSwitchInput', id),
   tvDiscover: () => call('tvDiscover'),
   /** address: an IP of the home network (checked by the host); allowPlain: confirmed unencrypted pairing (expert mode, old TVs). */
-  tvPair: (address, allowPlain) => call('tvPair', address, !!allowPlain),
+  // provider: the kind of TV (an id from tvStatus().providers or tvDiscover()); null lets the host take the only one there is.
+  tvPair: (address, allowPlain, provider) => call('tvPair', address, !!allowPlain, provider ?? null),
   tvCancelPair: () => call('tvCancelPair'),
   tvForget: () => call('tvForget'),
   tvSetMac: (mac) => call('tvSetMac', mac),
@@ -250,6 +296,7 @@ window.couchhud = {
   getServiceStatus: (fresh = false) => call('getServiceStatus', !!fresh),
   repairService: () => call('repairService'),
   resetCodeStore: () => call('resetCodeStore'),
+  resetServiceState: () => call('resetServiceState'),
   getParental: () => call('getParental'),
   setParental: (key, value) => call('setParental', key, value),
   setParentalItemLock: (id, locked) => call('setParentalItemLock', id, !!locked),
@@ -275,7 +322,7 @@ window.couchhud = {
   getProfileRules: (id) => call('getProfileRules', id),
   setProfileRule: (id, key, value) => call('setProfileRule', id, key, value),
   // asNewCode: a lock of 0.4.0 whose stored code did not match (legacyMismatch), confirmed as the new code after the person chose so.
-  unlock: (code, asNewCode = false) => call('unlock', code, asNewCode),
+  unlock: (code, asNewCode = false, byAdmin = false) => call('unlock', code, asNewCode, byAdmin),
   // Windows lock mode: the Windows sign-in once more, for the service's proof (a new couch code); "unlocked" follows like after unlock.
   windowsSignIn: () => call('windowsSignIn'),
   setPasscode: (code) => call('setPasscode', code),

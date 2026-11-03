@@ -11,6 +11,11 @@ public class ModeSwitchJournalTests
     [InlineData("""{"from":"shell","steps":[{"id":"lock","before":{"m":"off","c":true}},{"id":"shell","before":null}]}""")]
     [InlineData("""{"from":"app","steps":[{"id":"autostart","before":{"r":true,"e":[["steam","pc"]]}},{"id":"services","before":{"k":false,"s":["WSearch"]}}]}""")]
     [InlineData("""{"from":"shell","steps":[{"id":"release","before":{"p":true}},{"id":"services","before":{"k":true,"s":["WSearch"]}}]}""")]
+    // The applied list next to the selection (0.6.4): a pending selection stays pending after an undo.
+    [InlineData("""{"from":"app","steps":[{"id":"services","before":{"k":false,"s":["WSearch"],"i":[]}}]}""")]
+    [InlineData("""{"from":"shell","steps":[{"id":"services","before":{"k":true,"s":["WSearch","SysMain"],"i":["WSearch"]}}]}""")]
+    [InlineData("""{"from":"app","steps":[{"id":"suppress","before":{"v":false,"b":false}}]}""")]
+    [InlineData("""{"from":"shell","steps":[{"id":"suppress","before":{"v":true,"b":true}}]}""")]
     [InlineData("""{"from":"shell","steps":[{"id":"light","before":{"m":"full","s":true,"l":"code"}}]}""")]
     [InlineData("""{"from":"shell","steps":[{"id":"release"},{"id":"profiles","before":{"p":["a"]}},{"id":"light","before":{"m":"full","s":true}}]}""")]
     public void The_switch_record_shape_is_accepted(string text) => Assert.True(ModeSwitchJournal.IsValid(text));
@@ -32,6 +37,9 @@ public class ModeSwitchJournalTests
     [InlineData("""{"from":"app","steps":[{"id":"lock"},{"id":"lock"}]}""")]
     [InlineData("""{"from":"app","steps":[{"id":"shell","before":{"s":"yes"}}]}""")]
     [InlineData("""{"from":"app","steps":[{"id":"services","before":{"s":["a",1]}}]}""")]
+    [InlineData("""{"from":"app","steps":[{"id":"services","before":{"i":"WSearch"}}]}""")]
+    [InlineData("""{"from":"shell","steps":[{"id":"suppress","before":{"v":true,"b":"yes"}}]}""")]
+    [InlineData("""{"from":"app","steps":[{"id":"services","before":{"i":[""]}}]}""")]
     [InlineData("""{"from":"app","steps":[{"id":"autostart","before":{"e":[["id","off"]]}}]}""")]
     [InlineData("""{"from":"app","steps":[{"id":"release","before":{"m":"off"}}]}""")]
     [InlineData("""{"from":"shell","steps":[{"id":"release","before":{"p":"yes"}}]}""")]

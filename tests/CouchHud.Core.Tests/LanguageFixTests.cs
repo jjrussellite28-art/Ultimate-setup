@@ -71,23 +71,7 @@ public class LanguageFixTests
             Strings.RenderIn("en", Strings.Ref("downloads.installed", Strings.Ref("time.minutes", 3))));
     }
 
-    // ---- default news feeds follow the language until the user changes them
-
-    [Fact]
-    public void Default_feeds_follow_the_language_but_a_changed_list_stays()
-    {
-        var german = NewsService.Defaults.Select(f => new NewsFeed { Name = f.Name, Url = f.Url }).ToList();
-        Assert.Equal(NewsService.Defaults.Select(f => f.Url), NewsService.Effective(german, "de").Select(f => f.Url));
-        Assert.Equal(NewsService.DefaultsEnglish.Select(f => f.Url), NewsService.Effective(german, "en").Select(f => f.Url));
-
-        german.Add(new NewsFeed { Name = "Mine", Url = "https://example.com/feed" });
-        Assert.Equal(3, NewsService.Effective(german, "en").Count);
-        german.RemoveAt(0);
-        Assert.Equal(2, NewsService.Effective(german, "en").Count);
-        Assert.Contains(NewsService.Effective(german, "en"), f => f.Url == "https://example.com/feed");
-    }
-
-    // ---- store description and weather search ask in the active language
+    // ---- the store description asks in the active language
 
     [Fact]
     public async Task Store_info_is_fetched_and_cached_per_language()
@@ -116,22 +100,6 @@ public class LanguageFixTests
         language = "de";
         Assert.Equal("Trotze dem Gott der Toten.", (await service.GetAsync(item))!.Description);
         Assert.Equal(calls, handler.Urls.Count);
-    }
-
-    [Fact]
-    public async Task Place_search_uses_the_active_language()
-    {
-        var handler = new Handler(_ => Json("""{ "results": [] }"""));
-        Strings.Use("en");
-        try
-        {
-            await new WeatherService(new HttpClient(handler)).SearchAsync("Berlin");
-        }
-        finally
-        {
-            Strings.Use("de");
-        }
-        Assert.Contains("language=en", handler.Urls.Single());
     }
 
     // ---- catalog: language of the descriptions and error codes

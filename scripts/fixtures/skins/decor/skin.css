@@ -1,0 +1,31 @@
+/* A legitimate skin with decoration over the whole screen, for scripts/tabs-check.mjs: scanlines, a vignette and a grain that do not take
+   the pointer and leave the tabs as they are. The runtime must keep this skin (it is not a cover). Never for the catalog. */
+
+[data-skin="user:decor"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: repeating-linear-gradient(rgba(0, 0, 0, 0.18) 0 2px, transparent 2px 4px);
+}
+
+[data-skin="user:decor"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+[data-skin="user:decor"] html::after,
+:root[data-skin="user:decor"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9997;
+  pointer-events: none;
+  background: #fff;
+  opacity: 0.04;
+}

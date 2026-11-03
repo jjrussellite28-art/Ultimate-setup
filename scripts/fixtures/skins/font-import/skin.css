@@ -1,0 +1,5 @@
+:root[data-skin="user:font-import"]{--x:1}
+
+@import url("/nonexistent.css"); @font-face{font-family:Arial;src:local("Wingdings"); size-adjust:1%}
+@font-face{font-family:"Segoe UI Variable Display";src:local("Segoe UI");ascent-override:0%;descent-override:0%;size-adjust:1%;unicode-range:U+0041-005A}
+:root{--tab-font:Arial}

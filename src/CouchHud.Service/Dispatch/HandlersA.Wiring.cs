@@ -47,7 +47,58 @@ public static class OperationsAWiring
             serviceOnList,
             () => DateTimeOffset.UtcNow,
             TimeSpan.FromSeconds(8),
-            new WindowsSessions(accounts));
+            new WindowsSessions(accounts),
+            () => ShellRuns(appDir, log));
+    }
+
+    /// <summary>
+    /// Whether a CouchHud.exe from this installation's program folder runs on the machine (any account). Only the path of the running image
+    /// counts, not the name (<see cref="IsShellImage"/>); an image whose path cannot be read does not count (the watch then lets go rather than
+    /// hold on), and that is logged once, with the count only.
+    /// </summary>
+    public static bool ShellRuns(string appDir, IEventSink? log = null)
+    {
+        var unreadable = 0;
+        foreach (var process in System.Diagnostics.Process.GetProcessesByName("CouchHud"))
+        {
+            using (process)
+            {
+                try
+                {
+                    if (IsShellImage(process.MainModule?.FileName, appDir)) return true;
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+                {
+                    unreadable++;
+                }
+            }
+        }
+        if (unreadable > 0 && !_unreadableLogged)
+        {
+            _unreadableLogged = true;
+            log?.Error($"[services] the image path of {unreadable} CouchHud process(es) cannot be read; they do not keep a pause alive");
+        }
+        return false;
+    }
+
+    private static bool _unreadableLogged;
+
+    /// <summary>
+    /// The image is this installation's <c>CouchHud.exe</c>: the same full path as <c>{appDir}\CouchHud.exe</c>, ignoring case and a trailing
+    /// separator on the folder; the same file name in another folder, another file name and an unreadable (null or empty) path do not match.
+    /// </summary>
+    public static bool IsShellImage(string? imagePath, string appDir)
+    {
+        if (string.IsNullOrWhiteSpace(imagePath) || string.IsNullOrWhiteSpace(appDir)) return false;
+        try
+        {
+            var expected = Path.GetFullPath(Path.Combine(appDir.TrimEnd('\\', '/'), "CouchHud.exe"));
+            return string.Equals(Path.GetFullPath(imagePath), expected, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
     }
 
     /// <summary>When the machine started (Unix ms), from the kernel; it changes only with a restart. 0 when unknown (then every start counts as a restart).</summary>

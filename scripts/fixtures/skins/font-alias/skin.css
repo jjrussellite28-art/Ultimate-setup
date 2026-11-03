@@ -1,0 +1,6 @@
+:root[data-skin="user:font-alias"]{--x:1}
+
+@font-face{font-family:"Segoe  UI";src:local("Webdings")}
+@font-face{font-family:'SEGOE UI';src:local("Webdings")}
+@font-face{font-family:Calibri;src:local("Webdings")}
+:root{--tab-font:Calibri}

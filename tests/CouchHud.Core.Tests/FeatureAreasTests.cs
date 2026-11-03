@@ -110,7 +110,7 @@ public class FeatureAreasTests
         Assert.False(set.AllowsSetting("maximizeBrowser"));
         Assert.False(set.AllowsSetting("browserHistory"));
         Assert.True(set.AllowsSetting("language"));
-        Assert.False(set.AllowsTool("get_news"));
+        Assert.False(set.AllowsTool("plugin_news_get_news"));
         Assert.True(set.AllowsTool("launch"));
         foreach (var service in new[] { "gameStoreScan", "gameArtwork", "saveAutoBackup", "gameDownloads", "launcherStandby", "steamGuardSettings", "couchBrowser", "newsFeeds" })
             Assert.False(set.Runs(service), service);

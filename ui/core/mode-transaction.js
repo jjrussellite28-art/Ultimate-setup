@@ -24,9 +24,9 @@ const integration = (v) => ['light', 'full'].includes(v);
 const SHAPES = {
   integration: { m: integration },
   autostart: { r: isBool, e: (v) => Array.isArray(v) && v.length <= 24 && v.every((p) => Array.isArray(p) && p.length === 2 && isName(p[0]) && ['couch', 'pc'].includes(p[1])) },
-  services: { k: isBool, s: names },
+  services: { k: isBool, s: names, i: names },
   xbox: { v: isBool },
-  suppress: { v: isBool },
+  suppress: { v: isBool, b: isBool },
   lock: { m: modes, c: isBool },
   shell: { s: isBool },
   autologon: { on: isBool },
@@ -167,7 +167,8 @@ export function describeRollback(result, titleOf, t) {
   if (!result.leftover.length) return { ok: true, lines: [t('consoleSetup.rollback.done')] };
   const steps = result.leftover.map((l) => titleOf(l.id)).join(', ');
   // i18n-used: consoleSetup.rollback.lockCode consoleSetup.rollback.lockMode
-  const notes = ['lockCode', 'lockMode'].filter((n) => result.leftover.some((l) => l.note === n)).map((n) => t(n === 'lockCode' ? 'consoleSetup.rollback.lockCode' : 'consoleSetup.rollback.lockMode'));
+  // i18n-used: consoleSetup.rollback.parentCode consoleSetup.rollback.parentUnclear
+  const notes = ['lockCode', 'lockMode', 'parentCode', 'parentUnclear'].filter((n) => result.leftover.some((l) => l.note === n)).map((n) => t(n === 'lockCode' ? 'consoleSetup.rollback.lockCode' : n === 'parentCode' ? 'consoleSetup.rollback.parentCode' : n === 'parentUnclear' ? 'consoleSetup.rollback.parentUnclear' : 'consoleSetup.rollback.lockMode'));
   return { ok: false, lines: [t('consoleSetup.rollback.partial', { steps }), ...notes, t('consoleSetup.rollback.fix')] };
 }
 

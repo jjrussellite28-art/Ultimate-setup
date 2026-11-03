@@ -518,6 +518,20 @@ public sealed class BrowserPane : Grid
         settings.IsGeneralAutofillEnabled = false;
         // The zoom is the HUD's (LB/RB, the bar): Ctrl+wheel must not change it behind its back.
         settings.IsZoomControlEnabled = false;
+        // The built-in PDF viewer's toolbar has Print, Save and Save as (a print window and a file dialog of its own). (The toolbar switch IsPdfToolbarEnabled is not in this SDK.)
+        settings.HiddenPdfToolbarItems = CoreWebView2PdfToolbarItems.Print | CoreWebView2PdfToolbarItems.Save | CoreWebView2PdfToolbarItems.SaveAs;
+        // A site asking for a client certificate would show the Windows certificate chooser; a screen share would show a screen picker.
+        // Neither is answered by a person at the couch: refused without any window.
+        core.ClientCertificateRequested += (_, e) =>
+        {
+            e.Handled = true;
+            e.Cancel = true;
+        };
+        core.ScreenCaptureStarting += (_, e) =>
+        {
+            e.Handled = true;
+            e.Cancel = true;
+        };
 
         // Links to apps (search-ms:, ms-settings:, steam: …) never leave the browser, from frames neither.
         core.LaunchingExternalUriScheme += (_, e) =>
@@ -727,12 +741,75 @@ public sealed class BrowserPane : Grid
         core.ProcessFailed += OnProcessFailed;
         // No print dialog, no file, folder or color picker from a page, no upload field: each opens a Windows dialog.
         await core.AddScriptToExecuteOnDocumentCreatedAsync(BrowserGuard.Script);
+        // The script above runs per navigation; a frame a script makes (about:blank, srcdoc) is no navigation, so each frame also gets it
+        // when its content starts to load. The layers below do not depend on the page's scripts at all.
+        core.FrameCreated += (_, e) => GuardFrame(e.Frame);
+        // No context menu at all, not even a page's request for the browser's own (its entries open "Save as", "Print", "Open in …").
+        core.ContextMenuRequested += (_, e) => e.Handled = true;
+        // The browser never opens its file chooser: the page's file field gets no dialog, whatever the page's own scripts do.
+        await InterceptFileChoosersAsync(core);
         core.SourceChanged += (_, _) => PageChanged?.Invoke();
         core.DocumentTitleChanged += (_, _) => PageChanged?.Invoke();
         core.HistoryChanged += (_, _) => PageChanged?.Invoke();
         // History off in the settings: what the profile kept from earlier sessions (or from before it was switched off while no
         // pane was open) goes before the first page loads (audit 0.5 B2).
         if (_historyOff()) await ClearHistoryCoreAsync(core);
+    }
+
+    /// <summary>The process id of the web view's browser process (the one that makes its dialogs); null while it is not running or cannot be told.</summary>
+    public int? BrowserProcessId
+    {
+        get
+        {
+            try
+            {
+                return _disposed || _web.CoreWebView2 is not { } core ? null : (int)core.BrowserProcessId;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or System.Runtime.InteropServices.COMException)
+            {
+                return null;
+            }
+        }
+    }
+
+    private static void GuardFrame(CoreWebView2Frame frame)
+    {
+        void Inject()
+        {
+            _ = InjectGuardAsync(frame);
+        }
+        frame.ContentLoading += (_, _) => Inject();
+        frame.DOMContentLoaded += (_, _) => Inject();
+    }
+
+    private static async Task InjectGuardAsync(CoreWebView2Frame frame)
+    {
+        try
+        {
+            if (frame.IsDestroyed() == 0) await frame.ExecuteScriptAsync(BrowserGuard.Script);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or System.Runtime.InteropServices.COMException or ArgumentException)
+        {
+            // The frame went away or is of another process the call cannot reach: its own navigation script (and the native layers) remain.
+            Console.Error.WriteLine($"[browser] frame guard: {ex.GetType().Name}");
+        }
+    }
+
+    /// <summary>
+    /// DevTools protocol: the page's file chooser (a file field, also one inside a shadow root) is intercepted, so no Windows dialog is made
+    /// for it. Best effort for the top-level page; the process-level backstop (<see cref="Services.BrowserDialogGuard"/>) does not depend on it.
+    /// </summary>
+    private static async Task InterceptFileChoosersAsync(CoreWebView2 core)
+    {
+        try
+        {
+            await core.CallDevToolsProtocolMethodAsync("Page.enable", "{}");
+            await core.CallDevToolsProtocolMethodAsync("Page.setInterceptFileChooserDialog", "{\"enabled\":true}");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or System.Runtime.InteropServices.COMException or ArgumentException)
+        {
+            Console.Error.WriteLine($"[browser] file chooser interception: {ex.GetType().Name}");
+        }
     }
 
     /// <summary>
@@ -1207,6 +1284,8 @@ public sealed class BrowserPane : Grid
     {
         // With history off the pages of this visit go with it (best effort, at most 2 seconds; the next start deletes them anyway).
         var core = _disposed ? null : _web.CoreWebView2;
+        // The browser process and its start time, noted before the dispose: a web view that does not end its process is ended by force.
+        if (core is not null) _victim = NoteBrowserProcess(core);
         // From here on no start creates a web view again (Fresh, InitAsync, a start still running).
         _disposed = true;
         _edgeTimer.Stop();
@@ -1232,6 +1311,22 @@ public sealed class BrowserPane : Grid
         }
     }
 
+    private (int Pid, long Start)? _victim;
+
+    private static (int Pid, long Start)? NoteBrowserProcess(CoreWebView2 core)
+    {
+        try
+        {
+            var pid = (int)core.BrowserProcessId;
+            var start = Services.Win32ProcessControl.StartOf(pid);
+            return pid > 0 && start != 0 ? (pid, start) : null;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or System.Runtime.InteropServices.COMException)
+        {
+            return null;
+        }
+    }
+
     private void DisposeWeb()
     {
         try
@@ -1241,6 +1336,26 @@ public sealed class BrowserPane : Grid
         catch (InvalidOperationException ex)
         {
             Console.Error.WriteLine($"[browser] dispose: {ex.Message}");
+        }
+        if (_victim is { } victim) _ = EndLeftoverAsync(victim.Pid, victim.Start);
+    }
+
+    /// <summary>
+    /// A second after the dispose the browser process must be gone. If not (it can hold a dialog open), exactly that process is ended:
+    /// the start time is compared on the handle that ends it, so a reused process id is never hit.
+    /// </summary>
+    private static async Task EndLeftoverAsync(int pid, long start)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+            if (Services.Win32ProcessControl.StartOf(pid) != start) return;
+            Console.Error.WriteLine("[browser] the web view's process outlived the dispose: ending it");
+            Services.Win32ProcessControl.Instance.Kill(pid, start);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Console.Error.WriteLine($"[browser] leftover: {ex.GetType().Name}");
         }
     }
 }

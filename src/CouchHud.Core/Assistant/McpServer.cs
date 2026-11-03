@@ -84,9 +84,11 @@ public sealed class McpServer(IToolHost host, string version, Func<IReadOnlyList
         var args = JsonDocument.Parse(parameters?["arguments"]?.ToJsonString() ?? "{}").RootElement.Clone();
         try
         {
-            if (spec.NeedsConfirmationOverMcp && Confirm is not null && !await Confirm(spec, args))
+            if (spec.NeedsConfirmationOverMcp)
             {
-                return Result(id, ToolContent("The user declined this action on the TV.", true));
+                // Fail closed: without a way to ask on the TV a changing tool is not run (never skipped silently).
+                if (Confirm is null) return Result(id, ToolContent("This action needs a confirmation on the TV, and none is available. It was not run.", true));
+                if (!await Confirm(spec, args)) return Result(id, ToolContent("The user declined this action on the TV.", true));
             }
             var text = await host.CallAsync(spec.Name, args, ct);
             return Result(id, ToolContent(text, false));

@@ -1,14 +1,14 @@
 // Pure UI rules with a test: node scripts/ui-logic-check.mjs (run by check.sh).
 import assert from 'node:assert/strict';
 import { clampPaste, remoteView } from '../ui/core/paste.js';
-import { CODE_KEYS, holdsDialogs, isCodeEntry, padHelp, shouldShowCodeKeys, switchOffWarning } from '../ui/core/input-help.js';
+import { CODE_KEYS, holdsDialogs, isCodeEntry, padHelp, screenHeld, shouldShowCodeKeys, splitStack, switchOffWarning, tabClickAllowed } from '../ui/core/input-help.js';
 import { step } from '../ui/core/paging.js';
-import { POWER_GROUPS, SLEEP_TIMER, forMode as powerForMode, isDangerous, powerGroups, powerIndex } from '../ui/core/power-rules.js';
+import { MORE, POWER_START, SLEEP_TIMER, forMode as powerForMode, isDangerous, isSecondary, powerEntryIds, powerIndex, powerLayout } from '../ui/core/power-rules.js';
 import { DEFAULT_TIMER_ACTION, TIMER_ACTIONS, TIMER_WARN_MS, timerAction, timerTexts, timerUnlock, warnDelay } from '../ui/core/sleep-timer-rules.js';
 import { gridMove, groupRows } from '../ui/core/menu-grid.js';
 import { afterRun, closeAction, recoveryChoices, createModeTransaction, describeRollback, describeTargets, manualUndo, parseJournal, validBefore } from '../ui/core/mode-transaction.js';
-import { createUndoTables } from '../ui/core/mode-undo.js';
-import { applyRollbackToRows, createStepShow, rollbackOutcome, rollbackRowView, runRows, SATISFIED } from '../ui/core/mode-run.js';
+import { createUndoTables, suppressBackStatus } from '../ui/core/mode-undo.js';
+import { applyRollbackToRows, createStepShow, parentalBlocksRun, rollbackOutcome, rollbackRowView, runRows, SATISFIED } from '../ui/core/mode-run.js';
 import { withTimeout } from '../ui/core/input-help.js';
 import { admitProtectedChange, beginSetupHold, codeLockHeld, codeLockPlan, configFaultNow, lockStepStatus, setupCouchLock } from '../ui/core/lock-rules.js';
 import { admitInputSwitch, pairOutcome } from '../ui/core/tv-rules.js';
@@ -17,8 +17,14 @@ import { downloadActions, itemSize, pendingDownloads, updateSummary, validSize }
 import { TARGET_EXTENSIONS, isScript, launchRows, scriptArgsProblem, targetLabel } from '../ui/core/launch-rules.js';
 import { INFO_FIELDS, STORE_RETRY_MS, ageBadge, ageRating, badgeText, descriptionState, fieldText, infoProblem, loadTickets, queryOk, splitList, storeRetryDelay, storeRows } from '../ui/core/item-info-rules.js';
 import { LOW_PERCENT, bars, batteryEntries, padSteps, percentSteps, systemBadge, validPercent } from '../ui/core/battery-rules.js';
-import { TAB_EDGE_SLOP, TAB_MIN_RANGE, TAB_MIN_REM, fitWidths, marqueeOffset, minTabWidth, needsMarquee, overflowHints, tabWindow } from '../ui/core/tab-fit.js';
-import { tabProblems } from './skin-rules.mjs';
+import {
+  TAB_EDGE_SLOP, TAB_MIN_RANGE, TAB_MIN_REM, fitWidths, flatten, marqueeOffset, minTabWidth, needsMarquee, overflowHints, parseColor, readableColor, rgbaText, tabWindow
+} from '../ui/core/tab-fit.js';
+import { BAR_RANGES, BAR_SKIN_VARS, GENERIC_FONTS, GLOW_MAX_REM, SCRIM_ALPHA, SYSTEM_FONTS, familyKey, fontStack, lengthIn, readBarSkin } from '../ui/core/tab-skin.js';
+import { LAYER_RANK, NO_LINGER, layerOrder, overlayIsOpen } from '../ui/core/layers.js';
+import { tabNotes, tabProblems } from './skin-rules.mjs';
+import { createRequire } from 'node:module';
+import { chipAction, clearStackOf, enterBrowser, leaveBrowser, navAllowed, restoreStack, takeOverStack, timeUpAction } from '../ui/core/stack-rules.js';
 import { barStops, chipsBlocked, nextStop } from '../ui/core/tab-cycle.js';
 import { notificationTarget } from '../ui/core/notify-rules.js';
 import { searchMessage, searchProblems, searchSucceeded } from '../ui/core/update-search.js';
@@ -34,6 +40,7 @@ import enCore from '../ui/i18n/en/core.js';
 import { AREAS, AREA_DESC_KEYS, AREA_NAME_KEYS, LAUNCH_AREAS, SETTING_AREAS, areaOfSetting, areaOn, enabledAreas, setAreas, shownRows, shownSteps, shownTabs, toggleArea, validChoice } from '../ui/core/areas.js';
 import { NET_KEYS, privacyAfter, privacyDisabled, privacyDisabledReason, privacyShown, updateChoices } from '../ui/core/net-rules.js';
 import { PAD_GLYPH_SETTINGS, glyphFor, glyphKind, isPlayStationLabel, kindFromGamepadId, kindFromPresses, MIRROR_WINDOW_MS } from '../ui/core/pad-glyphs.js';
+import * as cr from '../ui/core/companion-rules.js';
 import { HISTORY_OFF_ACTION, HOLD_LIMIT, RECENT_LIMIT, cleanRecent, closeCountdown, dialogKind, fileSize, forgetRecent, forgetSite, historyOffNeedsParent, holding, host, initial, reconcileFocus, recentNote, rememberable, rememberSite, recentWithin, shortHost, siteAddress, siteHost, visibleRecent } from '../ui/core/browser-logic.js';
 
 // A pasted text is cut to the field's limit.
@@ -620,6 +627,18 @@ assert.equal(shouldShowCodeKeys(3), false);
   assert.equal(scriptArgsProblem('a & b', 'D:\\G\\game.exe'), false);
   assert.equal(targetLabel(view({ target: 'D:\\Games\\X\\start dx11.bat' }), 'auto'), 'start dx11.bat');
   assert.equal(targetLabel(view(), 'auto'), 'auto');
+  // Refused for the parents' code (the host's ParentCodeNeededException for "startOptions"): both saves ask for it and repeat once
+  // (0.6.3: a stale parental status skipped the page's own question and only "The parent code is required" showed). The guard loads
+  // the status when it is missing instead of reading "off".
+  const tools = readFileSync(new URL('../ui/components/library-tools.js', import.meta.url), 'utf8');
+  assert.ok(tools.includes("withParentGrant(call, t('libraryTools.edit.guardLaunchParental'))"), 'launch changes go through the parents-code retry');
+  assert.ok(tools.includes('launchChange(() => api.setLaunchOverride(item.id, changes))'), 'setLaunchOverride asks and repeats');
+  assert.ok(tools.includes('launchChange(() => api.editLaunch(item.id, args, cwd))'), 'editLaunch asks and repeats');
+  assert.ok(tools.includes('parental.status ?? (await refreshParental())'), 'the guard loads a missing parental status');
+  const retry = readFileSync(new URL('../ui/core/parent-retry.js', import.meta.url), 'utf8');
+  assert.ok(retry.includes('err.parent.reason || fallbackReason ||'), 'the page text is the prompt when the host names none');
+  const hud = readFileSync(new URL('../src/CouchHud.Shell/Hud.cs', import.meta.url), 'utf8');
+  assert.ok(hud.includes('throw new ParentCodeNeededException(Strings.Get("parental.codeRequired"), "startOptions", id)'), 'the host marks the refusal for the prompt');
 }
 
 // Own texts and the store match: the same bounds as the host, Steam's own entries without a choice, "confirm" only with parental controls.
@@ -1174,6 +1193,37 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   // Without its own parents' reason the unlock's reason is used.
   assert.equal(await admitProtectedChange({ reason: 'r', scope: { action: 'areas' }, parentalOn: true, ensureUnlocked: unlock(true), ensureParentGrant: parent(true) }), true);
   assert.deepEqual(order.splice(0), [['unlock', 'r'], ['parent', 'r', 'areas']]);
+  // Profile management (VM test 0.7 B, F1): every change goes through that same order, and adding asks for the unlock before the questions.
+  const prof = readFileSync(new URL('../ui/components/profiles.js', import.meta.url), 'utf8');
+  // Behaviour: the unlock comes first, a refused unlock never reaches the parents' code, the scope carries action and profile.
+  const calls = [];
+  const dlg = (ok) => ({ ensureUnlocked: async (r) => (calls.push(['unlock', r]), ok.unlock), ensureParentGrant: async (r, scope) => (calls.push(['parent', r, scope]), ok.parent) });
+  const { admitProfileChange } = await import('../ui/core/lock-rules.js');
+  assert.equal(await admitProfileChange({ reason: 'r', id: 'p1', action: 'profileManage', ...dlg({ unlock: true, parent: true }) }), true);
+  assert.deepEqual(calls.splice(0), [['unlock', 'r'], ['parent', 'r', { action: 'profileManage', item: 'p1' }]]);
+  assert.equal(await admitProfileChange({ reason: 'r', action: 'profileManage', ...dlg({ unlock: false, parent: true }) }), false);
+  assert.deepEqual(calls.splice(0), [['unlock', 'r']]);
+  assert.equal(await admitProfileChange({ reason: 'r', id: null, action: 'profileManage', ...dlg({ unlock: true, parent: false }) }), false);
+  assert.deepEqual(calls.splice(0), [['unlock', 'r'], ['parent', 'r', { action: 'profileManage', item: null }]]);
+  // The page uses it for every change (no other way to the parents' code in the management).
+  assert.ok(/const manageGrant = [^;]*admitProfileChange\(/.test(prof), 'profile changes: through admitProfileChange');
+  assert.ok(!/ensureParentGrant\(reason/.test(prof), 'no direct parents-code call in the management');
+  const addBody = prof.slice(prof.indexOf('async function addProfile()'), prof.indexOf('async function profileMenu'));
+  assert.ok(addBody.indexOf('ensureUnlocked(') > 0 && addBody.indexOf('ensureUnlocked(') < addBody.indexOf('chooseName('), 'add: unlock before the first question');
+  // Network listeners (VM test 0.7 B, F5): switching on takes the parents' code with parental controls on; off and parental off stay free.
+  const nr = await import('../ui/core/net-rules.js');
+  for (const key of ['remoteEnabled', 'mcpEnabled', 'mcpLan']) {
+    assert.equal(nr.listenerNeedsParent(key, true, true), true, key);
+    assert.equal(nr.listenerNeedsParent(key, false, true), false, key);
+    assert.equal(nr.listenerNeedsParent(key, true, false), false, key);
+  }
+  assert.equal(nr.listenerNeedsParent('remotePower', true, true), false);
+  const settingsPage = readFileSync(new URL('../ui/views/settings.js', import.meta.url), 'utf8');
+  for (const key of nr.LISTENER_KEYS) assert.ok(settingsPage.includes(`listenerToggle('${key}'`), `${key} uses the guarded toggle`);
+  assert.ok(!/[^r]toggle\('(remoteEnabled|mcpEnabled|mcpLan)'/.test(settingsPage), 'no plain toggle for a listener');
+  // F6: the page's own reads of the second factor are quiet when the couch is simply locked (no toast, no log line).
+  assert.ok(!/api\.getSecondFactor\?\.\(\)\)\)/.test(settingsPage), 'getSecondFactor reads are quietLocked');
+  assert.equal((settingsPage.match(/api\.getSecondFactor\?\.\(\), undefined, \{ quietLocked: true \}/g) ?? []).length, 2);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------
@@ -1206,6 +1256,10 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   assert.equal(pr.entryState(entry({ status: 'installed' }), { revoked: true }), 'revoked');
   // Withdrawn wins over everything else: it is never offered an update.
   assert.equal(pr.entryState(entry({ status: 'update' }), { revoked: true }), 'revoked');
+  // Uninstalled, files still held: its own state, nothing is offered (no install, no switch on, no second uninstall).
+  assert.equal(pr.entryState(entry({ status: 'installed' }), { removedAtRestart: true }), 'removing');
+  assert.equal(pr.entryState(entry({ status: 'notInstalled' }), { removedAtRestart: true, revoked: true }), 'removing');
+  assert.deepEqual(pr.entryActions(entry({ status: 'notInstalled' }), { removedAtRestart: true, enabled: true, userInstalled: true }, { expert: true }), []);
   // Delisted: installed from a catalog, no entry any more; only once a catalog has loaded; never a local plugin.
   const listed = [{ id: 'wand', kind: 'plugin' }, { id: 'wand', kind: 'skin' }];
   assert.equal(pr.isDelisted({ id: 'kodi', folder: 'Kodi', origin: 'thirdParty', userInstalled: true }, listed), true);
@@ -1237,7 +1291,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
 
   // Capabilities in plain words: known ids map to keys that exist in both languages; an unknown id never reaches the text.
   const { dictionaries } = await import('../ui/i18n/index.js');
-  for (const cap of ['library', 'pages', 'quickActions', 'assistant', 'notify', 'browser', 'downloads', 'network.state', 'process', 'browser.signin', 'tabs', 'setup.run', 'lock.restrict', 'startup.args', 'native', 'registry', 'network:loopback', 'network:lan', 'network:internet', 'dynamicCode']) {
+  for (const cap of ['library', 'pages', 'quickActions', 'assistant', 'notify', 'browser', 'downloads', 'network.state', 'host.state', 'sensors.publish', 'sensors.read', 'process', 'browser.signin', 'tabs', 'setup.run', 'lock.restrict', 'startup.args', 'native', 'registry', 'network:loopback', 'network:lan', 'network:internet', 'dynamicCode']) {
     const key = pr.capabilityKey(cap);
     assert.ok(key in dictionaries.de && key in dictionaries.en, `capability text for ${cap}`);
   }
@@ -1717,6 +1771,20 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   assert.ok(dicts.de['plugin.capability.browser_signin'] && dicts.en['plugin.capability.browser_signin']);
   assert.deepEqual(pr.capabilityKeys(['browser.signin', 'tabs']), ['plugin.capability.browser_signin', 'plugin.capability.tabs']);
 
+  // Every capability the host knows (PluginCapabilities.All) has a plain-words text in both languages and is not shown as unknown.
+  {
+    const sdk = readFileSync(new URL('../src/CouchHud.Sdk/Sdk3.cs', import.meta.url), 'utf8');
+    const block = sdk.slice(sdk.indexOf('class PluginCapabilities'), sdk.indexOf('public static readonly IReadOnlyList<string> All'));
+    const ids = [...block.matchAll(/public const string \w+ = "([^"]+)";/g)].map((m) => m[1]);
+    assert.ok(ids.length >= 25, 'capability ids found: ' + ids.length);
+    for (const id of ids) {
+      const key = pr.capabilityKey(id);
+      assert.deepEqual(pr.capabilityKeys([id]), [key], id + ' is known to the page');
+      assert.ok(dicts.de[key] && dicts.en[key], id + ' has German and English texts');
+    }
+    for (const id of ['host.state', 'sensors.publish', 'sensors.read', 'tv.control', 'network:lan', 'weather', 'news', 'assistant.provider']) assert.ok(ids.includes(id), id);
+  }
+
   // Umlauts and accents are fine; look-alike letters and other scripts are not (the same cases as the host's tests).
   for (const title of ['Küche', 'Übersicht', 'Größe', 'Café', 'Ärger']) assert.equal(ptabs.cleanPluginTabs([tab({ title })]).length, 1, title);
   for (const title of ['Settıngs', 'Settińgs', 'Łock', 'Homǀ', 'Brøwser', 'Ässistent', 'Spiéle', 'Einstellüngen', 'Àpps', 'Лампа', 'Fünfzehn Zeiche']) {
@@ -1774,8 +1842,16 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   const { BUILTIN_GLYPHS } = await import('../ui/core/glyph-icons.js');
   assert.deepEqual(strings('BuiltInGlyphs'), BUILTIN_GLYPHS);
   const names = readFileSync(new URL('../src/CouchHud.Core/Plugins/PackageStatement.cs', import.meta.url), 'utf8');
-  const reserved = names.slice(names.indexOf('Reserved = ['), names.indexOf('];', names.indexOf('Reserved = [')));
-  assert.deepEqual([...reserved.matchAll(/"([^"]+)"/g)].map((m) => m[1]), ptabs.RESERVED_NAMES);
+  const list = (name) => { const at = names.indexOf(`${name} = [`); const body = names.slice(at, names.indexOf('];', at)); return [...body.matchAll(/"([^"]+)"/g)].map((m) => m[1]); };
+  assert.deepEqual(list('Brands'), ptabs.BRAND_NAMES);
+  assert.deepEqual(list('Generic'), ptabs.GENERIC_NAMES);
+  // Brands are taken inside a name from five characters on; plain words only as the whole name or its first word(s).
+  assert.equal(ptabs.isReservedTitle('openai bridge', false), true);
+  assert.equal(ptabs.isReservedTitle('Weather', false), true);
+  assert.equal(ptabs.isReservedTitle('Weather Plus', false), true);
+  assert.equal(ptabs.isReservedTitle('My Weather Widget', false), false);
+  assert.equal(ptabs.isReservedTitle('Fan Controller', false), false);
+  assert.equal(ptabs.isReservedTitle('Pc Streaming Helper', false), false);
   assert.ok(cs.includes(`MaxTitle = ${ptabs.MAX_TITLE};`) && cs.includes(`MaxTotal = ${ptabs.MAX_TOTAL};`) && cs.includes(`MaxPerPlugin = ${ptabs.MAX_PER_PLUGIN};`));
 }
 
@@ -1895,6 +1971,172 @@ assert.equal(ptabs.isPinnedTab(null), false);
   assert.equal(minTabWidth('5rem', 0), 5 * 16, 'a broken rem size falls back to 16');
 }
 
+// Colours in any syntax the browser paints are read as rgba (core/tab-bar.js paints the rest); a label nobody can see gets a readable colour,
+// any colour that can be read stays.
+{
+  assert.deepEqual(parseColor('rgb(1, 2, 3)'), [1, 2, 3, 1]);
+  assert.deepEqual(parseColor('rgba(1, 2, 3, 0.5)'), [1, 2, 3, 0.5]);
+  assert.deepEqual(parseColor('rgb(1 2 3 / 25%)'), [1, 2, 3, 0.25]);
+  assert.deepEqual(parseColor('transparent'), [0, 0, 0, 0]);
+  assert.deepEqual(parseColor('color(srgb 1 0 0)'), [255, 0, 0, 1]);
+  assert.deepEqual(parseColor('color(srgb 0 0 0 / 0)'), [0, 0, 0, 0], 'color() with an alpha of zero is transparent');
+  assert.deepEqual(parseColor('#fff0'), [255, 255, 255, 0]);
+  assert.deepEqual(parseColor('#11223380'), [17, 34, 51, 128 / 255]);
+  assert.equal(parseColor('oklch(0.5 0.1 200 / 0)'), null, 'other syntaxes go through the canvas in tab-bar.js');
+  assert.equal(parseColor(undefined), null);
+  assert.equal(rgbaText([1.4, 2, 3, 0.5]), 'rgba(1, 2, 3, 0.5)');
+  const dark = 'rgb(7, 9, 15)';
+  const fg = 'rgb(242, 245, 250)';
+  assert.equal(readableColor('rgba(242, 245, 250, 0.7)', dark, fg), null, 'the muted tab text stays');
+  assert.equal(readableColor('rgb(255, 0, 170)', dark, fg), null, 'a bold colour is the skin\'s choice');
+  assert.equal(readableColor('rgb(0, 0, 0)', 'rgb(255, 230, 0)', fg), null, 'black on a yellow pill stays');
+  assert.equal(readableColor('rgb(40, 40, 40)', null, fg), null, 'dark text over a picture: not known, stays');
+  assert.equal(readableColor('rgba(0, 0, 0, 0)', dark, fg), fg, 'transparent: the theme\'s text colour');
+  assert.equal(readableColor('rgba(255, 255, 255, 0.1)', null, fg), fg, 'nearly transparent over a picture as well');
+  assert.equal(readableColor('rgb(7, 9, 15)', dark, fg), fg, 'the colour of the background');
+  assert.equal(readableColor('rgb(10, 12, 18)', dark, fg), fg, 'or nearly');
+  assert.equal(readableColor('rgb(250, 250, 250)', 'rgb(255, 255, 255)', fg), '#000000', 'the theme colour does not stand out either: black');
+  assert.equal(readableColor('rgb(20, 20, 20)', 'rgb(0, 0, 0)', 'rgb(5, 5, 5)'), '#ffffff', 'or white');
+  assert.equal(readableColor('rgb(7, 9, 15)', 'rgba(7, 9, 15, 0.2)', fg), null, 'a see-through background is not known');
+  assert.equal(readableColor('nonsense', dark, fg), fg, 'a colour nobody can read counts as invisible');
+  assert.equal(readableColor('oklch(0.5 0.1 200 / 0)', dark, fg), fg, 'so does one that was not painted to rgba first');
+  assert.equal(readableColor('', null, fg), fg);
+  assert.deepEqual(flatten([[255, 255, 255, 0.5], [0, 0, 0, 1]]).map(Math.round), [128, 128, 128, 1]);
+  assert.deepEqual(flatten([]), [0, 0, 0, 0]);
+  assert.equal(readableColor('rgb(17, 17, 17)', rgbaText(flatten([[17, 17, 17, 1]])), fg), fg, 'text in the colour of a one-colour fill is invisible');
+}
+
+// The skin API of the tab bar (core/tab-skin.js): every value is read, cleaned and clamped before it gets into the shadow root; the bar
+// never sees a skin's text, only numbers, colours as rgba and names from the allowlist.
+{
+  const toRgba = (t) => (parseColor(t) ? t : null);
+  const read = (vars = {}, ctx = {}) => readBarSkin((n) => vars[n] ?? '', { remPx: 20, toRgba, taken: new Set(), ...ctx });
+  const d = read();
+  assert.equal(d['--s-size'], '1.35rem', 'the core\'s own look without a skin');
+  assert.equal(d['--s-weight'], '600');
+  assert.equal(d['--s-gap'], '1.8rem');
+  assert.equal(d['--s-pad-top'], '2rem');
+  assert.equal(d['--s-glow'], 'none');
+  assert.equal(d['--s-case'], 'none');
+  assert.equal(d.glass, false);
+  assert.equal(d['--s-underline'], '0.18rem');
+  assert.equal(d['--s-font'], '"Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif');
+  assert.equal(d['--s-color-active'], 'rgba(242, 245, 250, 1)');
+  assert.equal(d['--s-color'], 'rgba(242, 245, 250, 0.7)', 'muted text, as the theme says');
+  // Numbers: a plain length of rem, px or em, held to its range; anything else is the default.
+  assert.equal(read({ '--tab-size': '0' })['--s-size'], `${BAR_RANGES.size[0]}rem`);
+  assert.equal(read({ '--tab-size': '500rem' })['--s-size'], `${BAR_RANGES.size[1]}rem`);
+  assert.equal(read({ '--tab-size': '20px' })['--s-size'], '1rem', 'px are rem of the core (20px here)');
+  assert.equal(read({ '--tab-size': '1.1rem' })['--s-size'], '1.1rem', 'a reasonable value stays as it is');
+  assert.equal(read({ '--tab-size': 'calc(1rem + 2px)' })['--s-size'], '1.35rem', 'not a plain number: the default');
+  assert.equal(read({ '--tab-size': '1.2rem; background: red' })['--s-size'], '1.35rem');
+  assert.equal(read({ '--tab-gap': '900rem' })['--s-gap'], `${BAR_RANGES.gap[1]}rem`);
+  assert.equal(read({ '--tab-gap': '-4rem' })['--s-gap'], `${BAR_RANGES.gap[0]}rem`);
+  assert.equal(read({ '--tab-pad-x': '99rem', '--tab-pad-y': '99rem' })['--s-pad-x'], '2rem');
+  assert.equal(read({ '--tab-pad-y': '99rem' })['--s-pad-y'], '0.8rem');
+  assert.equal(read({ '--tab-pad-y': '0' })['--s-pad-y'], '0.1rem', 'a tab never gets flat');
+  assert.equal(read({ '--tab-radius': '999rem' })['--s-radius'], '2rem');
+  assert.equal(read({ '--tab-cut': '99rem' })['--s-cut'], '0.9rem');
+  assert.equal(read({ '--tab-underline': '99rem' })['--s-underline'], '0.3rem');
+  assert.equal(read({ '--bar-pad': '99rem' })['--s-bar-pad'], '0.6rem');
+  assert.equal(read({ '--bar-radius': '999rem' })['--s-bar-radius'], '2.5rem');
+  assert.equal(read({ '--bar-pad-top': '99rem' })['--s-pad-top'], '3rem');
+  assert.equal(read({ '--tab-weight': '9999' })['--s-weight'], '800');
+  assert.equal(read({ '--tab-weight': '0' })['--s-weight'], '300');
+  assert.equal(read({ '--tab-weight': '300', '--tab-weight-active': '400' })['--s-weight-active'], '400');
+  assert.equal(read({ '--tab-weight': '300' })['--s-weight-active'], '300', 'the active weight follows the plain one');
+  assert.equal(read({ '--tab-weight': 'bold' })['--s-weight'], '600');
+  assert.equal(read({ '--tab-letter': '50em' })['--s-letter'], '0.12em');
+  assert.equal(read({ '--tab-letter': '-1em' })['--s-letter'], '-0.02em');
+  assert.equal(read({ '--tab-letter': '0.06em' })['--s-letter'], '0.06em');
+  assert.equal(read({ '--tab-letter': '2px' })['--s-letter'], `${Math.round((2 / (1.35 * 20)) * 1000) / 1000}em`, 'px against the font size');
+  assert.equal(read({ '--tab-case': 'uppercase' })['--s-case'], 'uppercase');
+  assert.equal(read({ '--tab-case': ' UPPERCASE ' })['--s-case'], 'uppercase');
+  assert.equal(read({ '--tab-case': 'capitalize' })['--s-case'], 'none', 'only the two cases of the allowlist');
+  assert.equal(read({ '--bar-glass': '1' }).glass, true);
+  assert.equal(read({ '--bar-glass': 'blur(9rem)' }).glass, false);
+  // The glow: one shadow, its blur capped.
+  assert.equal(read({ '--tab-glow': '99', '--tab-glow-color': '#fff' })['--s-glow'], `0 0 ${GLOW_MAX_REM}rem rgba(255, 255, 255, 1)`);
+  assert.equal(read({ '--tab-glow': '0.9', '--tab-glow-color': 'rgba(56, 232, 255, 0.8)' })['--s-glow'], '0 0 0.9rem rgba(56, 232, 255, 0.8)');
+  assert.equal(read({ '--tab-glow': '0', '--tab-glow-color': 'red' })['--s-glow'], 'none');
+  assert.equal(read({ '--tab-glow': '-3' })['--s-glow'], 'none');
+  assert.match(read({ '--tab-glow': '1', '--accent-glow': 'rgba(1, 2, 3, 0.5)' })['--s-glow'], /rgba\(1, 2, 3, 0.5\)/, 'the theme\'s glow colour is the default');
+  // Colours stay readable: against the page's colour and against the tab's own fill.
+  const page = { '--bg': '#111111', '--fg': '#f2f5fa' };
+  assert.equal(read({ ...page, '--tab-color': 'transparent' })['--s-color'], 'rgba(242, 245, 250, 1)', 'transparent letters: the theme\'s text colour');
+  assert.equal(read({ ...page, '--tab-color': '#111111' })['--s-color'], 'rgba(242, 245, 250, 1)', 'the colour of the page');
+  assert.equal(read({ ...page, '--tab-color': 'rgba(255, 255, 255, 0.1)' })['--s-color'], 'rgba(242, 245, 250, 1)', 'nearly transparent');
+  assert.equal(read({ ...page, '--tab-color-active': '#000000', '--tab-bg-active': '#ffe600' })['--s-color-active'], 'rgba(0, 0, 0, 1)', 'black on a yellow pill stays');
+  // The core's own backing: --bg at 0.8 under the bar, and the letters have to hold over black and over white behind it, whatever the page paints.
+  assert.equal(SCRIM_ALPHA, 0.8);
+  assert.equal(read({ '--bg': '#000000' })['--s-scrim'], 'rgba(0, 0, 0, 0.8)');
+  assert.equal(read({ '--bg': '#000000', '--fg': '#ffffff', '--tab-color': '#000000' })['--s-color'], 'rgba(255, 255, 255, 1)', 'black letters on the black backing');
+  assert.equal(read({ '--bg': '#000000', '--fg': '#ffffff', '--muted': '#ffffff' })['--s-color'], 'rgba(255, 255, 255, 1)', 'white on the backing of a black theme: fine over a white stripe too');
+  assert.equal(read({ '--bg': '#ffffff', '--fg': '#ffffff', '--muted': '#ffffff', '--tab-color-active': '#ffffff', '--tab-bg-active': '#ffffff' })['--s-color-active'], '#000000', 'white on white: black');
+  assert.equal(read({ ...page, '--tab-color': '#ffffff', '--tab-bg': '#ffffff' })['--s-color'], '#000000', 'letters in the colour of their own pill: black');
+  assert.equal(read({ ...page, '--tab-color': '#ff00aa' })['--s-color'], 'rgba(255, 0, 170, 1)', 'a bold colour is the skin\'s choice');
+  assert.equal(read({ ...page, '--tab-color': '#111111', '--bar-bg': '#222222' })['--s-color'], 'rgba(242, 245, 250, 1)', 'against the bar fill as well');
+  assert.equal(read({ ...page, '--tab-color-active': '#111111' })['--s-glyph-color'], 'rgba(242, 245, 250, 1)', 'the LB/RB symbols follow the theme text, not the active tab one');
+  assert.equal(read({ ...page, '--tab-glyph-color': '#111111' })['--s-glyph-color'], 'rgba(242, 245, 250, 1)', 'and stay readable on their own fill');
+  assert.equal(read({ ...page, '--tab-glyph-color': '#ffe600' })['--s-glyph-color'], 'rgba(255, 230, 0, 1)');
+  assert.equal(read({ ...page, '--tab-accent': '#111111' })['--s-accent'], 'rgba(242, 245, 250, 1)', 'the line under the active tab too');
+  assert.equal(read({ ...page, '--tab-color': 'oklch(0.5 0.1 200)' })['--s-color'], 'rgba(242, 245, 250, 0.7)', 'a colour that was not painted: the default');
+  // Fonts: generic keywords and the system allowlist only, never a name the skin declares itself.
+  assert.equal(fontStack('"Evil Font", "Comic Sans MS", Verdana'), '"Verdana", system-ui, sans-serif');
+  assert.equal(fontStack('"sans-serif"'), '"Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif', 'a quoted keyword is a name, and not on the list');
+  assert.equal(fontStack('SEGOE UI, Segoe UI Light', new Set(['segoe ui'])), '"Segoe UI Light", system-ui, sans-serif', 'a name the skin declares is dropped');
+  assert.equal(fontStack('"Segoe UI"', new Set(['segoe ui'])), '"Segoe UI Variable Display", system-ui, sans-serif', 'nothing left: the core\'s stack, without the name the skin declared');
+  assert.equal(fontStack('Segoe UI', new Set(['segoe ui', 'segoe ui variable display'])), 'system-ui, sans-serif', 'a skin that declares every name leaves the generic families');
+  assert.equal(fontStack('system-ui'), 'system-ui, sans-serif');
+  assert.equal(fontStack('monospace, Consolas'), 'monospace, "Consolas", system-ui, sans-serif');
+  assert.equal(fontStack('"Seg\\6fe UI"'), '"Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif', 'an escape is not a name');
+  assert.equal(fontStack('Arial, Tahoma, Verdana, Calibri, Cambria, Candara, Consolas, Georgia').split(',').length, 8, 'six names and the two generics at the end');
+  assert.equal(familyKey('"Segoe  UI"'), 'segoe ui');
+  assert.equal(familyKey("'Bahnschrift'"), 'bahnschrift');
+  assert.ok(GENERIC_FONTS.includes('system-ui') && SYSTEM_FONTS.includes('Bahnschrift') && !SYSTEM_FONTS.includes('Rajdhani'));
+  assert.equal(read({ '--font': '"Segoe UI Light", "Segoe UI", system-ui, sans-serif' })['--s-font'], '"Segoe UI Light", "Segoe UI", system-ui, sans-serif', 'the skin\'s own --font stack is the default');
+  assert.equal(read({ '--font': '"Orbitron", sans-serif', '--tab-font': 'Verdana' })['--s-font'], '"Verdana", system-ui, sans-serif', '--tab-font before --font');
+  assert.equal(lengthIn('1.5', [0, 2, 1], 20), 1.5);
+  assert.equal(lengthIn('', [0, 2, 1], 20), 1);
+  // Whatever a skin writes: every value that comes out is a number with a unit, an rgba(), a name from the list or a keyword, never text.
+  let seed = 7;
+  const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  const bits = ['red', '#fff', 'rgba(1,2,3,.5)', 'url(x)', '1rem', '-5px', '99em', '; background: red', '}', '{', '/*', 'calc(1px + 1rem)', '"', "'", '\\', '@import', 'transparent', 'none', 'bold', 'uppercase', '0', '1', 'var(--x)', 'Verdana', '"Evil"', 'expression(1)'];
+  for (let i = 0; i < 400; i++) {
+    const vars = {};
+    for (const name of BAR_SKIN_VARS) vars[name] = Array.from({ length: 1 + rnd(3) }, () => bits[rnd(bits.length)]).join(rnd(2) ? ' ' : ', ');
+    const out = read(vars);
+    for (const [k, v] of Object.entries(out)) {
+      if (k === 'glass') continue;
+      assert.match(v, /^[-0-9a-z .,()"%]+$/i, `${k}: ${v}`);
+      assert.ok(!/url|import|expression|;|\{|\}|\/\*|\\/.test(v), `${k}: ${v}`);
+    }
+  }
+}
+
+// What may stand over the bar, and when (core/layers.js): the bar is in the top layer, and so are the core's own overlays while they are open.
+{
+  const node = (over = {}) => ({ isConnected: true, hidden: false, childElementCount: 0, classList: { contains: (c) => !!over.classes?.includes(c) }, ...over });
+  const plain = { classList: { contains: () => false } };
+  assert.equal(overlayIsOpen('boot', node(), plain), true);
+  assert.equal(overlayIsOpen('boot', node({ classes: ['done'] }), plain), false);
+  // The toasts and the notification cards stay below the bar, however they are open.
+  // Nor the guide menu and the dialogs: they stand under the bar, so nothing a skin says about their box can reach the tabs.
+  for (const id of ['quick', 'overlay', 'toast', 'shot-toast', 'notify-stack']) assert.ok(!(id in LAYER_RANK), `${id} is not a layer over the bar`);
+  assert.equal(overlayIsOpen('screensaver', node(), plain), true, 'made when needed: open while it exists');
+  // The pointer: only while the mouse is in use, and not with the real Windows pointer; it leaves at once.
+  const mouse = { classList: { contains: (c) => c === 'mouse-active' } };
+  assert.equal(overlayIsOpen('cursor', node({ hasAttribute: () => false }), mouse), true);
+  assert.equal(overlayIsOpen('cursor', node({ hasAttribute: () => false }), plain), false);
+  assert.equal(overlayIsOpen('cursor', node({ hasAttribute: () => true }), mouse), false);
+  assert.deepEqual([...NO_LINGER], ['cursor']);
+  assert.equal(overlayIsOpen('screensaver', node({ isConnected: false }), plain), false);
+  // The old z-index order is kept: quick menu under the dialog under the pointer under the screensaver under the launch screen under the boot
+  // screen under the web page's mark.
+  assert.deepEqual(layerOrder(), ['cursor', 'screensaver', 'launch', 'boot', 'web-fullscreen-badge']);
+  assert.ok(Object.values(LAYER_RANK).every((r) => Number.isInteger(r) && r > 0));
+}
+
 // A scrolling bar keeps the focused tab whole, the edge between two tabs and room for an arrow only where tabs are hidden; the arrows show
 // only on the side with hidden tabs.
 {
@@ -1960,43 +2202,315 @@ assert.equal(ptabs.isPinnedTab(null), false);
   assert.equal(marqueeOffset(NaN, 40), 0);
 }
 
-// Skins never take a tab away: rules that hide the tab bar or its items (by name, position or as a whole) are problems; styling is not.
+// The skin lint that is left (scripts/skin-rules.mjs). A skin cannot reach the tab bar any more (closed shadow root in the top layer), so
+// rules for the old bar are notes, not problems; what still fails the check is what reaches the rest of the page.
 {
-  assert.deepEqual(tabProblems('[data-skin="user:x"] #tab-list li { font-size: 1.2rem; color: red; border-bottom-width: 0; }'), []);
-  assert.deepEqual(tabProblems('[data-skin="user:x"] #tabs .shoulder { display: none; }'), [], 'the LB/RB glyphs may go');
-  assert.deepEqual(tabProblems('#bg::after { display: none; } .tile { opacity: 0; }'), []);
-  assert.deepEqual(tabProblems('#top { padding-top: 1.8rem; } #top #pad-status { display: none; } #top .x { opacity: 0 }'), [], 'styling #top and hiding a status icon in it is fine');
-  assert.deepEqual(tabProblems('[id="status"] { display: none }'), [], 'another id is another element');
-  for (const css of [
-    '#tab-list li:nth-child(7) { display: none; }',
-    '#tab-list li:last-child { visibility: hidden; }',
-    '#tab-list > li:not(.active) { opacity: 0 }',
-    '#tab-list { display: none !important; }',
-    '#tabs { display: none; }',
-    '#tab-list li.pinned { width: 0; }',
-    '#tab-list li { max-width: 0px; font-size: 0 }',
-    '@media (max-width: 1280px) { :root[data-skin="user:x"] #tab-list li { display: none } }',
-    '#top #tabs, .other { transform: scale(0); }',
-    'li[data-tab="6"] { clip-path: inset(100%); }',
-    '.tab-more { display: none; }',
-    String.raw`#tab\-list li { display: none }`,
-    String.raw`#tab\2d list li { display: none }`,
-    String.raw`#\74 ab-list li { DISPLAY: NONE }`,
-    '[id="tab-list"] li { display: none }',
-    '[id^="tab-l"] li { display: none }',
-    "[id*='abs'] { visibility: hidden }",
-    '[id="tabs"] li { opacity: 0 }',
-    ':is(#tab-list) li { display: none }',
-    '#top { display: none }',
-    '#top ul > li:last-of-type { display: none }',
-    '#top nav { display: none }',
-    '@layer x { #tab-list li { display: none } }',
-    '#tab-list li { text-indent: -9999px }',
-    '#tab-list li { pointer-events: none }',
-    '#tab-list li { filter: opacity(0) }',
-    '#tab-list li { scale: 0 }'
-  ]) assert.ok(tabProblems(css).length >= 1, css);
-  assert.equal(tabProblems('/* #tab-list li { display: none } */ .x { color: red }').length, 0, 'comments are ignored');
+  const css = (s) => tabProblems(s);
+  assert.deepEqual(css('[data-skin="user:x"] #tab-list li { font-size: 1.2rem; color: red; border-bottom-width: 0; }'), []);
+  assert.deepEqual(css('#tab-list li { display: none } #tabs { visibility: hidden } #top { display: none }'), [], 'nothing that names the bar is a problem: it does nothing');
+  assert.deepEqual(css('#bg::after { display: none; } .tile { opacity: 0; } #status { opacity: 0 }'), []);
+  assert.deepEqual(css('/* html { display: none } */ .x { color: red }'), [], 'comments are ignored');
+  // html and body hold the whole page: what hides, fades, masks or cuts it is a problem.
+  for (const rule of ['body { opacity: 0 }', 'html { display: none }', ':root { visibility: hidden }', 'body { filter: brightness(0) }', 'html { clip-path: inset(50%) }',
+    'body { mask-image: linear-gradient(transparent, transparent) }', 'body { content-visibility: hidden }', 'html { mix-blend-mode: difference }', 'body { filter: opacity(0.2) }']) {
+    assert.ok(css(rule).length >= 1, rule);
+  }
+  for (const rule of ['body { opacity: 1 }', 'body::after { opacity: 0 }', 'body { filter: grayscale(1) }', 'html { font-size: 1px }']) assert.deepEqual(css(rule), [], rule);
+  // Fonts: a face that shrinks or re-measures letters, or stands in for an installed font, is a problem.
+  assert.ok(css('@font-face { font-family: tiny; src: local("Arial"); size-adjust: 12%; }').some((p) => /size-adjust/.test(p)));
+  assert.ok(css('@font-face { font-family: tiny; src: local("Arial"); ascent-override: 500%; }').some((p) => /ascent-override/.test(p)));
+  assert.ok(css('@font-face { font-family: tiny; src: local("Arial"); descent-override: 90%; line-gap-override: 10%; }').length === 2);
+  assert.ok(css('@font-face { font-family: "Segoe UI"; src: local("Arial"); }').some((p) => /installed system font/.test(p)));
+  assert.ok(css('@font-face { font-family: segoe ui; src: url(a.woff2); }').length === 1);
+  assert.deepEqual(css('@font-face { font-family: Orbitron; src: url("orbitron.woff2"); size-adjust: 100%; }'), [], 'a skin\'s own font is allowed (for the rest of the UI)');
+  assert.deepEqual(css('@font-face { font-family: wide; src: local("Arial"); size-adjust: 110%; ascent-override: normal; }'), []);
+  // Notes: the old selectors, in every spelling, and values the core will not read.
+  const notes = (s) => tabNotes(s);
+  assert.equal(notes('[data-skin="user:x"] #tab-list li { color: red }').length, 1);
+  assert.match(notes('#tab-list li { color: red }')[0], /no effect since 0\.7/);
+  for (const sel of ['#tabs .shoulder', '.glyph.shoulder', '.tab-more', '[id="tab-list"] li', '[id^="tab-"] li', '#\\74 ab-list li', '#top { padding-top: 1.8rem }', '#top', '#tab-list li:nth-child(3)', '#tab-list li.pinned', 'li[data-tab]']) {
+    assert.equal(notes(`${sel.startsWith('#top {') ? sel : `${sel} { color: red }`}`).length, 1, sel);
+  }
+  assert.deepEqual(notes('.glyph:not(.shoulder) { color: red } #status { gap: 1rem } #top::after { content: "" } #top #pad-status { display: none }'), [], 'the status area and generated content are not the old bar');
+  assert.equal(notes(':root { --tab-size: calc(1rem + 2px) }').length, 1);
+  assert.equal(notes(':root { --tab-gap: big }').length, 1);
+  assert.deepEqual(notes(':root { --tab-size: 1.2rem; --tab-letter: 0.04em; --tab-weight: 300; --tab-color: red; --tab-font: "Segoe UI Light" }'), []);
+}
+
+// A click on a tab of the bar (the mouse) does not leave a page that holds the screen: the code prompt, the parental time-up page, a required profile picker. The code
+// prompt would be closed unanswered (nothing granted, but the way out is the page's own), the time-up page would be taken off the screen for good (clearStack; the
+// page is not sticky and its guard stays set) with the game under it uncovered, a required picker keeps tab switches out.
+{
+  const code = { id: 'passcode', codeEntry: true };
+  const timeUp = { id: 'parental-timeup' };
+  const plain = { id: 'home' };
+  assert.equal(tabClickAllowed(plain, {}), true);
+  assert.equal(tabClickAllowed(code, {}), false, 'a code prompt: no tab switch by mouse');
+  assert.equal(tabClickAllowed(timeUp, {}), false, 'the time-up page: no way out by a tab click');
+  assert.equal(tabClickAllowed(plain, { pickerHold: true }), false, 'a required profile picker');
+  assert.equal(tabClickAllowed({ id: 'profile-picker' }, { pickerHold: false }), true, 'an optional picker may be left');
+  assert.equal(tabClickAllowed(undefined, undefined), true);
+  assert.equal(holdsDialogs(code) && holdsDialogs(timeUp) && !holdsDialogs(plain), true);
+  // clearStack (every way off the page: tab switch, home, a chip, the guide menu, a call of the host or the phone) keeps what holds the screen and cancels the code prompt.
+  {
+    const closed = [];
+    const mk = (id, extra = {}) => ({ id, onClose: () => closed.push(id), ...extra });
+    const stack = [mk('detail'), mk('parental-timeup', { sticky: true }), mk('passcode', { codeEntry: true }), mk('profile-picker', { sticky: true })];
+    const { keep, closing } = splitStack(stack);
+    assert.deepEqual(keep.map((p) => p.id), ['parental-timeup', 'profile-picker'], 'the time-up page and a required picker stay');
+    assert.deepEqual(closing.map((p) => p.id), ['passcode', 'detail'], 'the code prompt is closed (cancelled), newest first');
+    for (const p of closing) p.onClose();
+    assert.deepEqual(closed, ['passcode', 'detail']);
+    assert.deepEqual(splitStack([]), { keep: [], closing: [] });
+    // Forced off the stack nevertheless: the next round puts it back while the time is up and a game runs; never when it is not needed.
+    const page = { id: 'parental-timeup' };
+    assert.equal(screenHeld({ stack: [page] }), true);
+    assert.equal(screenHeld({ pickerHold: true, stack: [] }), true);
+    assert.equal(screenHeld({ stack: [{ id: 'detail' }] }), false);
+    assert.equal(screenHeld(undefined), false);
+    // Who must ask: the sources (the DOM parts are not run here).
+    const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+    const parental = src('../ui/components/parental.js');
+    assert.ok(/id: 'parental-timeup',[\s\S]{0,300}sticky: true/.test(parental), 'the time-up page is sticky');
+    assert.ok(parental.includes('if (timeUp) return reassertTimeUp();') && parental.includes("window.addEventListener('focus', check)") && parental.includes('refreshParentalFresh().then(reassertTimeUp)'), 'it is put back on every round and when the window is in front');
+    assert.ok(src('../ui/core/nav.js').includes('clearStackOf(state)') && src('../ui/core/stack-rules.js').includes('splitStack(state.stack)'), 'clearStack keeps sticky pages');
+    assert.ok(src('../ui/app.js').includes('if (screenHeld(state)) return;'), 'the host and the phone cannot navigate away');
+    assert.ok(src('../ui/components/quick-menu.js').includes('if (screenHeld(state)) return;'), 'the guide menu does not open over it');
+    const chips = src('../ui/core/bar-chips.js');
+    assert.ok(chips.includes("chipAction(state, currentView(), id) === 'blocked'") && chips.includes('if (!tabClickAllowed(currentView(), state)) return;'), 'the chips and LB/RB ask too');
+    assert.ok(src('../ui/components/mouse.js').includes("return quick.open ? dispatch('b') : undefined;"), 'an open guide menu still closes on a tab click');
+  }
+  // The stack rules on a real stack (ui/core/stack-rules.js is what nav.js, the browser view, the parental code, the chips and the host calls use): a state
+  // that holds the time-up page; every way off the page leaves it, the browser round trip too, and it goes away when the time is added.
+  {
+    const closed = [];
+    const mk = (id, extra = {}) => ({ id, onClose: () => closed.push(id), ...extra });
+    const timeUp = mk('parental-timeup', { sticky: true });
+    const mkState = (stack) => ({ stack: [...stack], tab: 2, pickerHold: false, overlay: null, session: { game: 'g' } });
+    const view = (st) => st.stack.at(-1);
+    // home / a tab switch / the downloads chip (switchTab -> clearStack): the time-up page stays, what was over the tab goes.
+    let st = mkState([mk('detail'), timeUp, mk('passcode', { codeEntry: true })]);
+    clearStackOf(st);
+    assert.deepEqual(st.stack, [timeUp]);
+    assert.deepEqual(closed, ['passcode', 'detail'], 'the code prompt is cancelled, nothing else survives');
+    // onNav (host, phone) and the chips: refused while it holds, allowed without it.
+    st = mkState([timeUp]);
+    assert.equal(navAllowed(st), false);
+    assert.equal(chipAction(st, view(st), 'downloads'), 'blocked');
+    assert.equal(chipAction(st, view(st), 'bell'), 'blocked');
+    st.stack = [];
+    assert.equal(navAllowed(st), true);
+    assert.equal(chipAction(st, undefined, 'downloads'), 'downloads');
+    assert.equal(chipAction(st, undefined, 'bell'), 'bell');
+    assert.equal(chipAction({ ...st, overlay: {} }, undefined, 'bell'), 'blocked', 'an overlay blocks the chips as before');
+    // The browser takes over the screen and gives it back (views/browser.js showTab / leaveToOrigin).
+    const detail = mk('detail');
+    st = mkState([detail, timeUp]);
+    let aside = takeOverStack(st);
+    assert.deepEqual(st.stack, [timeUp], 'case A: the time-up page is not wiped by the browser taking over');
+    assert.deepEqual(aside, [detail]);
+    restoreStack(st, aside);
+    assert.deepEqual(st.stack, [detail, timeUp], 'it stays on top after the round trip');
+    // Case B: the time is added while the browser is in front: the page goes away (reassert closes it), and the round trip does not bring it back.
+    st = mkState([detail, timeUp]);
+    aside = takeOverStack(st);
+    assert.equal(timeUpAction({ page: timeUp, stack: st.stack, status: { expired: false }, session: st.session, fresh: true }), 'close');
+    st.stack = st.stack.filter((p) => p !== timeUp);
+    restoreStack(st, aside);
+    assert.deepEqual(st.stack, [detail], 'only live pages come back');
+    assert.equal(screenHeld(st), false, 'nothing holds the screen any more');
+    // A sticky page that was put aside (a dead one) is never restored, and nothing is restored twice.
+    st = mkState([]);
+    restoreStack(st, [detail, timeUp, detail]);
+    assert.deepEqual(st.stack, [detail]);
+    // A code prompt above the time-up page when the browser gives the screen back: closed properly (cancelled), never left hanging, never restored.
+    {
+      closed.length = 0;
+      const code = mk('passcode', { codeEntry: true });
+      st = mkState([detail, timeUp]);
+      const put = takeOverStack(st);
+      st.stack.push(code);
+      restoreStack(st, put);
+      assert.deepEqual(st.stack, [detail, timeUp], 'the live pages are back, the time-up page on top');
+      assert.deepEqual(closed, ['passcode'], 'the code prompt was told to close (cancelled)');
+    }
+    // Where the browser came from (state.browserOrigin): kept once, never overwritten by a second "show", forgotten when it is stale, never restored twice.
+    {
+      closed.length = 0;
+      const detail2 = mk('detail2');
+      st = mkState([detail]);
+      st.tab = 1;
+      assert.equal(enterBrowser(st, 4, false), true);
+      assert.deepEqual(st.browserOrigin, { tab: 1, stack: [detail] });
+      assert.equal(st.tab, 4);
+      // a second "show" while it is in front changes nothing (and does not lose the first origin)
+      assert.equal(enterBrowser(st, 4, true), false);
+      // a page over the browser tab and a second "show": the page is closed, the origin stays the first one
+      st.stack.push(detail2);
+      assert.equal(enterBrowser(st, 4, false), true);
+      assert.deepEqual(st.browserOrigin, { tab: 1, stack: [detail] }, 'the first origin is kept');
+      assert.deepEqual(closed, ['detail2'], 'the page over the browser tab is closed properly');
+      // leaving: back to the tab with its pages, and the origin is gone
+      assert.equal(leaveBrowser(st), true);
+      assert.deepEqual([st.tab, st.stack, st.browserOrigin], [1, [detail], null]);
+      assert.equal(leaveBrowser(st), false, 'a second exit does not know where to go (home)');
+      // a tab switch elsewhere (switchTab sets browserOrigin = null) and a later "show": the old pages are never restored
+      st = mkState([detail]);
+      st.tab = 1;
+      enterBrowser(st, 4, false);
+      st.browserOrigin = null; // switchTab / goHome / B
+      st.tab = 0;
+      st.stack = [];
+      enterBrowser(st, 4, false);
+      assert.deepEqual(st.browserOrigin, { tab: 0, stack: [] }, 'a new origin, not the stale one');
+      leaveBrowser(st);
+      assert.deepEqual(st.stack, [], 'the stale page object does not come back');
+      // stale without the reset (the tab was left some other way): not on the browser tab, so the origin is replaced
+      st = mkState([detail]);
+      st.tab = 1;
+      enterBrowser(st, 4, false);
+      st.tab = 2;
+      st.stack = [];
+      enterBrowser(st, 4, false);
+      assert.deepEqual(st.browserOrigin, { tab: 2, stack: [] });
+      // the held pages stay through all of it
+      const held = mkState([timeUp]);
+      held.tab = 1;
+      assert.equal(enterBrowser(held, 4, false), true);
+      assert.deepEqual(held.stack, [timeUp]);
+      assert.equal(enterBrowser(held, 4, false), false, 'held and on the browser tab: nothing happens, the origin stays');
+      assert.deepEqual(held.browserOrigin, { tab: 1, stack: [] });
+    }
+    // The required picker behaves the same.
+    const picker = mk('profile-picker', { sticky: true });
+    st = mkState([mk('x'), picker]);
+    st.pickerHold = true;
+    aside = takeOverStack(st);
+    assert.deepEqual(st.stack, [picker]);
+    clearStackOf(st);
+    assert.deepEqual(st.stack, [picker]);
+    // The decisions of the time-up page: back when forced off while the time is up; away when the time was added or the game ended, also when the event was missed.
+    const stack = [];
+    assert.equal(timeUpAction({ page: timeUp, stack, status: { expired: true }, session: { game: 'g' } }), 'push');
+    assert.equal(timeUpAction({ page: timeUp, stack: [timeUp], status: { expired: true }, session: { game: 'g' } }), null);
+    assert.equal(timeUpAction({ page: timeUp, stack: [timeUp], status: { expired: false }, session: { game: 'g' }, fresh: true }), 'close');
+    assert.equal(timeUpAction({ page: timeUp, stack: [timeUp], status: { expired: true }, session: null, fresh: true }), 'close');
+    // Only a status that was just read successfully may close it: a cached one (a failed refresh) decides nothing, and it still puts the page back.
+    assert.equal(timeUpAction({ page: timeUp, stack: [timeUp], status: { expired: false }, session: { game: 'g' } }), null, 'a cached status never closes');
+    assert.equal(timeUpAction({ page: timeUp, stack: [timeUp], status: { expired: true }, session: null }), null);
+    assert.equal(timeUpAction({ page: timeUp, stack: [], status: { expired: true }, session: { game: 'g' } }), 'push', 'but a cached expired status puts it back');
+    assert.equal(timeUpAction({ page: timeUp, stack: [timeUp], status: null, session: { game: 'g' } }), null, 'status not known yet: nothing is decided');
+    assert.equal(timeUpAction({ page: null, stack, status: { expired: false }, session: null }), null);
+    const parental = readFileSync(new URL('../ui/components/parental.js', import.meta.url), 'utf8');
+    const browser = readFileSync(new URL('../ui/views/browser.js', import.meta.url), 'utf8');
+    assert.ok(parental.includes("if (action === 'close') closeTimeUp();") && parental.includes('timeUpAction({'), 'the page closes itself when the time is not up');
+    assert.ok(browser.includes('enterBrowser(state, at,') && browser.includes('leaveBrowser(state)') && !/state\.stack = /.test(browser) && !/let origin/.test(browser), 'the browser view never assigns the stack itself and keeps no origin of its own');
+    assert.ok(parental.includes('refreshParentalFresh().then(reassertTimeUp)') && parental.includes('fresh: !!freshStatus') && parental.includes("window.addEventListener('focus', check)"), 'focus and visibility refresh first and decide from the fresh status');
+    assert.ok(readFileSync(new URL('../ui/core/nav.js', import.meta.url), 'utf8').includes('state.browserOrigin = null;'), 'switchTab forgets where the browser came from');
+    // Nothing but the stack rules and nav.js's own push, pop and removePage touches state.stack: every JS file of the UI (app.js, components, core, views, the
+    // plugin views, remote) and of the plugins is scanned for an assignment, a length, a splice, pop, shift, unshift, sort or reverse; the few direct pushes that exist
+    // (the code prompt, the terms page and the setup assistant put their own page on) are a fixed list.
+    {
+      const walk = (url) => readdirSync(url, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? (['node_modules', 'bin', 'obj'].includes(d.name) ? [] : walk(new URL(`${d.name}/`, url))) : d.name.endsWith('.js') ? [new URL(d.name, url)] : []));
+      const files = [...walk(new URL('../ui/', import.meta.url)), ...walk(new URL('../plugins/', import.meta.url))];
+      assert.ok(files.length > 50, `${files.length} files scanned`);
+      const DIRECT_PUSH = ['ui/components/passcode.js', 'ui/views/legal.js', 'ui/views/setup-wizard.js'];
+      for (const url of files) {
+        const rel = url.pathname.slice(url.pathname.indexOf('/ui/') >= 0 ? url.pathname.lastIndexOf('/ui/') + 1 : url.pathname.lastIndexOf('/plugins/') + 1);
+        const text = readFileSync(url, 'utf8');
+        const own = rel === 'ui/core/stack-rules.js' ? [] : rel === 'ui/core/nav.js' ? ['push', 'pop', 'splice'] : [];
+        for (const m of text.matchAll(/\bstate\.stack\b\s*(=(?!=)|\.length\s*=(?!=)|\.(splice|pop|shift|unshift|sort|reverse|push|fill|copyWithin)\()/g)) {
+          const op = m[2] ?? (m[1].startsWith('.length') ? 'length=' : '=');
+          if (rel === 'ui/core/stack-rules.js' && op === '=') continue;
+          if (own.includes(op)) continue;
+          if (op === 'push' && DIRECT_PUSH.includes(rel)) continue;
+          assert.fail(`${rel} touches state.stack with ${op}`);
+        }
+      }
+      assert.ok(!/state\.stack\s*=(?!=)/.test(readFileSync(new URL('../ui/core/nav.js', import.meta.url), 'utf8')), 'nav.js no longer assigns the stack');
+    }
+  }
+  const mouse = readFileSync(new URL('../ui/components/mouse.js', import.meta.url), 'utf8');
+  assert.ok(mouse.includes('tabClickAllowed(currentView(), state)') && mouse.indexOf('tabClickAllowed') < mouse.indexOf('switchTab(Number(tab.dataset.tab))'), 'the mouse asks before it switches');
+}
+
+// The skin stylesheet sanitizer (scripts/skin-css.js, the same as SkinCss in Core): no @import, no @layer, read the way CSS tokenizes it, refused whole when
+// either word survives. tests/skin-css-cases.json is the list both implementations (and SkinCssLayerTests) agree on; tabs-check feeds the outputs to Edge.
+{
+  const { sanitize, sanitizeBytes, stripLayersAndImports, mentionsLayerOrImport } = createRequire(import.meta.url)('./skin-css.js');
+  const cases = JSON.parse(readFileSync(new URL('../tests/skin-css-cases.json', import.meta.url), 'utf8'));
+  assert.ok(cases.length >= 450 && new Set(cases.map((c) => c.name)).size === cases.length);
+  for (const c of cases) assert.equal(sanitize(c.input).css, c.output, c.name);
+  // What the reviews found (an unquoted url( runs to its bracket and takes the comment mark with it; a string ends at CR and FF) is removed...
+  assert.equal(stripLayersAndImports('a{b:url(/*)}@layer ch{c{d:e}}/* */'), 'a{b:url(/*)}c{d:e}/* */');
+  assert.equal(stripLayersAndImports('@x url(/*);@import "e.css" layer(ch);/* */'), '@x url(/*);/* */');
+  assert.equal(stripLayersAndImports('a{content:"\r}@layer ch{x{y:z}}"}'), 'a{content:"\r}x{y:z}"}');
+  assert.equal(stripLayersAndImports('a{content:"\f}@layer ch{x{y:z}}"}'), 'a{content:"\f}x{y:z}"}');
+  // ...and what survives anyway is refused: the backstop.
+  for (const css of ['a{content:"@layer x"}', '/* @import */', 'a{b:url(@layer)}', 'a{content:"\\40 LAYER"}', 'a{content:"x\\\n}@layer ch{c{d:e}}"}', '@layerx{}']) {
+    assert.equal(sanitize(css).refused, true, css);
+    assert.equal(sanitize(css).css, '');
+  }
+  // Another charset hides text from the scan: the host sends charset=utf-8, and what could still change the reading is refused (the charset, controls, the bytes).
+  for (const css of ['@charset "iso-2022-jp";\n@\u001b(Blayer ch{x{y:z}}', '@charset "utf-16";a{b:c}', "@charset 'utf-8';a{b:c}", 'a{b:c}\u0000', '@l\u001bayer ch{}', 'a{b:c}\u000b']) assert.equal(sanitize(css).refused, true, JSON.stringify(css));
+  assert.deepEqual(sanitize('@charset "utf-8";a{b:c}'), { css: 'a{b:c}', refused: false });
+  assert.deepEqual(sanitize('a{b:c}\t\n\f\r\n'), { css: 'a{b:c}\t\n\f\r\n', refused: false });
+  assert.equal(sanitizeBytes(Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('a{b:c}', 'utf16le')])).refused, true, 'UTF-16 byte order mark');
+  assert.equal(sanitizeBytes(Buffer.from([0x61, 0x7b, 0xff, 0x7d])).refused, true, 'not UTF-8');
+  assert.deepEqual(sanitizeBytes(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('a{content:"Grüße"}')])), { css: 'a{content:"Grüße"}', refused: false });
+  const host = readFileSync(new URL('../src/CouchHud.Shell/UiHost/LocalFiles.cs', import.meta.url), 'utf8');
+  assert.ok(host.includes('"text/css; charset=utf-8"') && host.includes('"image/svg+xml; charset=utf-8"') && host.includes('Sanitize(memory.ToArray(), out var refused)'), 'the host sends charset=utf-8 with every text type it serves');
+  assert.ok(readFileSync(new URL('./preview-server.js', import.meta.url), 'utf8').includes('charset=utf-8'));
+  assert.equal(mentionsLayerOrImport('a{b:c}'), false);
+  for (const css of ['a{b:c}', ':root{--accent:#f0f}', 'a{b:url("x.png")}']) assert.deepEqual(sanitize(css), { css, refused: false });
+  // C# and JS pin the same source structure: the refusing backstop and the shared list.
+  const cs = readFileSync(new URL('../src/CouchHud.Core/Skins/SkinCss.cs', import.meta.url), 'utf8');
+  assert.ok(cs.includes('MentionsLayerOrImport') && cs.includes('refused = true') && cs.includes('SkipUrlBody') && cs.includes('IsNl(char c) => c is \'\\n\' or \'\\r\' or \'\\f\''));
+  assert.ok(readFileSync(new URL('../src/CouchHud.Shell/UiHost/LocalFiles.cs', import.meta.url), 'utf8').includes('out var refused'), 'the host logs a refused skin');
+}
+
+// The bar is structure, not a runtime guard (source pins: the DOM part is walked by scripts/tabs-check.mjs).
+{
+  const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  const nav = read('../ui/core/nav.js');
+  const bar = read('../ui/core/tab-bar.js');
+  const layers = read('../ui/core/layers.js');
+  const html = read('../ui/index.html');
+  const css = read('../ui/styles.css');
+  for (const pin of ["mode: 'closed'", 'showPopover', 'all: initial', ':host {', ':host::before', ':host::backdrop', '!important', 'document.fonts', 'ANCESTORS', "['zoom', '1']", 'contain: paint',
+    'window.chrome?.webview', 'popover-open', 'barSane', 'tabAtPoint']) assert.ok(bar.includes(pin), `tab-bar.js: ${pin}`);
+  // The test hook that opens the closed root exists only where the app is not (the preview with the mock API).
+  assert.ok(bar.includes('if (!window.chrome?.webview) window.__couchhudTabBar'), 'the hook is set only without the WebView2 bridge');
+  assert.ok(!read('../ui/bridge.js').includes('__couchhudTabBar') && !nav.includes('__couchhudTabBar'));
+  assert.ok(html.includes('id="top" popover="manual"') && html.includes('id="top-gap"') && !html.includes('id="tab-list"') && !html.includes('id="tabs"'));
+  assert.ok(/:where\(\[popover\]\)/.test(css), 'the popover defaults of the browser are taken off the core\'s overlays');
+  // What the old guard did is gone: no inline holds on tabs, no hit testing of layers, no text measuring, no overlay guard.
+  for (const gone of ['guardOverlays', 'elementsFromPoint', 'TAB_COVER_ALPHA', 'KEEP_SHOWN', 'ANCESTOR_SHOWN', 'holdText', 'labelFix', 'coveredTabs', 'PROBE_CSS', 'checkCover', "'important'"]) assert.ok(!nav.includes(gone), `nav.js still has ${gone}`);
+  assert.ok(!css.includes('data-skin-unsafe') && !css.includes('#tab-list') && !css.includes('#tabs'), 'styles.css has nothing of the old bar');
+  // The overlays: the top layer manager knows all of them, they are shown after the bar, and only while open.
+  assert.ok(html.includes('id="boot"') && 'boot' in LAYER_RANK);
+  assert.ok(html.includes('id="quick"') && html.includes('id="overlay"') && !('quick' in LAYER_RANK) && !('overlay' in LAYER_RANK));
+  assert.ok(/#quick \{[^}]*top: var\(--bar-h, 0px\)/.test(css), 'the guide menu starts below the bar');
+  for (const [id, file] of [['screensaver', 'core/screensaver.js'], ['launch', 'components/launch-overlay.js'], ['cursor', 'components/mouse.js'], ['web-fullscreen-badge', 'views/browser.js']]) {
+    assert.ok(read(`../ui/${file}`).includes(`id: '${id}'`) && id in LAYER_RANK, `${id} is made in ${file} and ranked`);
+  }
+  assert.ok(layers.includes('showPopover') && layers.includes('hidePopover') && layers.includes("'manual'") && layers.includes('LAYER_LINGER_MS'));
+  assert.ok(bar.includes('raiseOverlays') && bar.includes('watchLayers'), 'the bar is shown first, the overlays after it');
+  // A saved skin that the bar rejects is not kept: the menu waits for the verdict, the start resets the setting.
+  const menu = read('../ui/components/skin-menu.js');
+  assert.ok(menu.includes('skinVerdict') && menu.indexOf('skinVerdict(skin.id)') < menu.indexOf('api.setSkin'), 'the verdict comes before the skin is saved');
+  assert.ok(read('../ui/app.js').includes('onSkinRejected'));
+  // The pointer is a shadow host of its own, the overlays' backdrops and outlines are pinned in the first cascade layer, the host resets everything.
+  const mouseJs = read('../ui/components/mouse.js');
+  assert.ok(mouseJs.includes("attachShadow({ mode: 'closed' })") && mouseJs.includes(':host::backdrop') && mouseJs.includes('all: initial !important'));
+  assert.ok(!css.includes('@layer') && !css.includes('#cursor'), 'no cascade layer to take apart, nothing for the pointer in the page\'s CSS');
+  const browserJs = read('../ui/views/browser.js');
+  assert.ok(browserJs.includes("attachShadow({ mode: 'closed' })") && browserJs.includes('BADGE_CSS') && !css.includes('#web-fullscreen-badge {'), 'the web page mark is a shadow root of its own');
+  assert.ok(read('../src/CouchHud.Core/Skins/SkinCss.cs').includes('StripLayersAndImports') && read('preview-server.js').includes("require('./skin-css.js')"), '@layer and @import never reach the page');
+  for (const pin of ['all: initial !important;', 'position-anchor: none', 'position-area: none', 'position-try-fallbacks: none', 'aspect-ratio: auto', 'container-type: normal', 'var(--s-scrim)', 'max-width: 40%', 'a tab is squashed']) assert.ok(bar.includes(pin), `tab-bar.js: ${pin}`);
+  assert.ok(nav.includes('matchMedia(q)'), 'media queries read the skin again');
+  // The mouse finds a tab through the bar, not through the page.
+  assert.ok(read('../ui/components/mouse.js').includes('tabAtPoint') && !read('../ui/components/mouse.js').includes('#tab-list'));
 }
 
 // LB/RB: through the tabs, then the chips (bell, downloads when shown), wrapping at both ends.
@@ -2201,7 +2715,13 @@ console.log('ui logic: ok');
       getSecurity: async () => ({ ...db.security }),
       getStartup: async () => db.startup.map((e) => ({ ...e })),
       getServices: async () => ({ ...JSON.parse(JSON.stringify(db.services)), pending: db.services.services.filter((v) => v.selected).map((v) => v.name).sort().join() !== [...(db.services.installed ?? [])].sort().join() }),
-      setSetting: async (k, v) => { db.calls.push(['setSetting', k, v]); db.settings[k] = v; },
+      setSetting: async (k, v) => {
+        db.calls.push(['setSetting', k, v]);
+        db.settings[k] = v;
+        // Like the host: any change of the setting clears the setup's mark, the mark only stands while the setting is on.
+        if (k === 'suppressCompetitors') db.settings.suppressBySetup = false;
+        if (k === 'suppressBySetup') db.settings.suppressBySetup = !!v && !!db.settings.suppressCompetitors;
+      },
       setIntegrationMode: async (m) => { db.calls.push(['setIntegrationMode', m]); db.settings.integrationMode = m; return { mode: m }; },
       setShell: async (v) => { db.calls.push(['setShell', v]); db.settings.isShell = v; return v; },
       setCouchLock: async (m) => { db.calls.push(['setCouchLock', m]); db.security.couchLock = m; if (m === 'off') db.security.hasPasscode = false; },
@@ -2232,6 +2752,62 @@ console.log('ui logic: ok');
     for (const id of Object.keys(SETUP_UNDO)) await assert.rejects(() => SETUP_UNDO[id].undo(null), /no record/, id);
   }
   {
+    // 0.6.4: "CouchHUD stays in front" carries the setup's mark (b). Switched on by the setup: its undo switches it off, mark gone.
+    const h = host({});
+    const { SETUP_UNDO, REVERT_UNDO } = createUndoTables(h);
+    const env = () => ({ settings: h.db.settings, security: h.db.security });
+    const before = await SETUP_UNDO.suppress.snapshot(env());
+    assert.deepEqual(before, { v: false, b: false });
+    await h.api.setSetting('suppressCompetitors', true);
+    await h.api.setSetting('suppressBySetup', true);
+    assert.equal(await SETUP_UNDO.suppress.undo(before), 'undone');
+    assert.deepEqual([h.db.settings.suppressCompetitors, h.db.settings.suppressBySetup], [false, false]);
+    // The way back switched off what the setup had switched on: its undo puts the setting AND the mark back (a later way back can
+    // switch it off again).
+    await h.api.setSetting('suppressCompetitors', true);
+    await h.api.setSetting('suppressBySetup', true);
+    const back = await REVERT_UNDO.suppress.snapshot(env());
+    assert.deepEqual(back, { v: true, b: true });
+    assert.equal(validBefore('suppress', back), true);
+    await h.api.setSetting('suppressCompetitors', false);
+    assert.equal(await REVERT_UNDO.suppress.undo(back), 'undone');
+    assert.deepEqual([h.db.settings.suppressCompetitors, h.db.settings.suppressBySetup], [true, true]);
+    assert.equal(await REVERT_UNDO.suppress.undo(back), 'unchanged');
+    // Only the mark differs: it goes back too.
+    await h.api.setSetting('suppressBySetup', false);
+    assert.equal(await REVERT_UNDO.suppress.undo(back), 'undone');
+    assert.equal(h.db.settings.suppressBySetup, true);
+    // The user's own choice (on, no mark): an undo never adds a mark.
+    await h.api.setSetting('suppressCompetitors', true);
+    const own = await REVERT_UNDO.suppress.snapshot(env());
+    assert.deepEqual(own, { v: true, b: false });
+    assert.equal(await REVERT_UNDO.suppress.undo(own), 'unchanged');
+    assert.equal(h.db.settings.suppressBySetup, false);
+    // A record of 0.6.3 (no b): only the setting, the mark is left alone.
+    await h.api.setSetting('suppressCompetitors', false);
+    assert.equal(await REVERT_UNDO.suppress.undo({ v: true }), 'undone');
+    assert.deepEqual([h.db.settings.suppressCompetitors, h.db.settings.suppressBySetup], [true, false]);
+    assert.equal(validBefore('suppress', { v: true }), true);
+    assert.equal(validBefore('suppress', { v: true, b: 'yes' }), false);
+  }
+  {
+    // The way back's suppress step (console-setup.js): off already 'done', on with the setup's mark 'todo', on without it 'na'.
+    assert.equal(suppressBackStatus({ suppressCompetitors: false, suppressBySetup: false }), 'done');
+    assert.equal(suppressBackStatus({ suppressCompetitors: false, suppressBySetup: true }), 'done');
+    assert.equal(suppressBackStatus({ suppressCompetitors: true, suppressBySetup: true }), 'todo');
+    assert.equal(suppressBackStatus({ suppressCompetitors: true, suppressBySetup: false }), 'na');
+    assert.equal(suppressBackStatus({ suppressCompetitors: true }), 'na'); // 0.6.3 settings: no mark, the user's choice stays
+    assert.equal(suppressBackStatus(undefined), 'done');
+    // With the fake host: the setup's switch-on is 'todo', any choice of the user afterwards clears the mark ('na').
+    const h = host({});
+    await h.api.setSetting('suppressCompetitors', true);
+    await h.api.setSetting('suppressBySetup', true);
+    assert.equal(suppressBackStatus(h.db.settings), 'todo');
+    await h.api.setSetting('suppressCompetitors', false);
+    await h.api.setSetting('suppressCompetitors', true);
+    assert.equal(suppressBackStatus(h.db.settings), 'na');
+  }
+  {
     // Changed since: only the differing parts are put back.
     const h = host({ startup: [{ id: 'a', mode: 'couch', suggested: 'pc', disabled: false }], services: { services: [{ name: 'WSearch', suggested: true, selected: false }], taskInstalled: true, installed: [], paused: [] } });
     const { SETUP_UNDO } = createUndoTables(h);
@@ -2253,11 +2829,67 @@ console.log('ui logic: ok');
     const kept = host({ services: { services: [{ name: 'WSearch', suggested: true, selected: true }, { name: 'SysMain', suggested: true, selected: false }], taskInstalled: true, installed: ['WSearch'], paused: ['WSearch'] } });
     const keptUndo = createUndoTables(kept).SETUP_UNDO.services;
     const keptBefore = await keptUndo.snapshot({});
-    assert.deepEqual(keptBefore, { k: true, s: ['WSearch'] });
+    assert.deepEqual(keptBefore, { k: true, s: ['WSearch'], i: ['WSearch'] });
     await kept.api.toggleCouchService('SysMain');
     await kept.api.setupServiceTask(true);
     assert.equal(await keptUndo.undo(keptBefore), 'undone');
     assert.deepEqual([kept.db.services.installed, kept.db.services.paused], [['WSearch'], ['WSearch']]);
+    // A record of 0.6.3 (no applied list) still undoes like before.
+    await kept.api.toggleCouchService('SysMain');
+    await kept.api.setupServiceTask(true);
+    assert.equal(await keptUndo.undo({ k: true, s: ['WSearch'] }), 'undone');
+    assert.deepEqual(kept.db.services.installed, ['WSearch']);
+  }
+  {
+    // 0.6.4: a selection that was pending before the setup (ticked, never applied) stays pending after the undo: the services the host had
+    // applied come back as they were, the ticks come back as they were, and nothing new is paused.
+    const services = () => [{ name: 'WSearch', suggested: true, selected: true }, { name: 'SysMain', suggested: true, selected: false }, { name: 'Spooler', suggested: true, selected: false }];
+    const h = host({ services: { services: services(), taskInstalled: true, installed: [], paused: [] } });
+    const undo = createUndoTables(h).SETUP_UNDO.services;
+    const before = await undo.snapshot({});
+    assert.deepEqual(before, { k: false, s: ['WSearch'], i: [] });
+    assert.equal(validBefore('services', before), true);
+    // The setup ticks every suggestion and applies.
+    await h.api.toggleCouchService('SysMain');
+    await h.api.toggleCouchService('Spooler');
+    await h.api.setupServiceTask(true);
+    assert.deepEqual(h.db.services.paused, ['WSearch', 'SysMain', 'Spooler']);
+    assert.equal(await undo.undo(before), 'undone');
+    assert.deepEqual(h.db.services.installed, []);
+    assert.deepEqual(h.db.services.paused, []); // WSearch was never paused before the setup: the undo does not pause it either
+    assert.deepEqual(h.db.services.services.filter((v) => v.selected).map((v) => v.name), ['WSearch']);
+    assert.equal((await h.api.getServices()).pending, true); // pending again, exactly as before
+    assert.equal(await undo.undo(before), 'unchanged');
+    // Applied [WSearch], selection [SysMain] pending: both come back, WSearch stays paused and SysMain is not paused.
+    const p = host({ services: { services: services().map((v) => ({ ...v, selected: v.name === 'SysMain' })), taskInstalled: true, installed: ['WSearch'], paused: ['WSearch'] } });
+    const pUndo = createUndoTables(p).SETUP_UNDO.services;
+    const pBefore = await pUndo.snapshot({});
+    assert.deepEqual(pBefore, { k: false, s: ['SysMain'], i: ['WSearch'] });
+    await p.api.toggleCouchService('WSearch');
+    await p.api.toggleCouchService('Spooler');
+    await p.api.setupServiceTask(true);
+    assert.equal(await pUndo.undo(pBefore), 'undone');
+    assert.deepEqual([p.db.services.installed, p.db.services.paused], [['WSearch'], ['WSearch']]);
+    assert.deepEqual(p.db.services.services.filter((v) => v.selected).map((v) => v.name), ['SysMain']);
+    // The way back: a selection pending before it is pending again after its undo, not applied.
+    const r = host({ services: { services: services(), taskInstalled: true, installed: [], paused: [] } });
+    const rUndo = createUndoTables(r).REVERT_UNDO.services;
+    const rBefore = await rUndo.snapshot({});
+    assert.deepEqual(rBefore, { k: true, s: ['WSearch'], i: [] });
+    await r.api.setupServiceTask(false);
+    assert.equal(await rUndo.undo(rBefore), 'undone');
+    assert.deepEqual([r.db.services.installed, r.db.services.paused], [[], []]);
+    assert.deepEqual(r.db.services.services.filter((v) => v.selected).map((v) => v.name), ['WSearch']);
+    assert.ok(!r.db.calls.some((c) => c[0] === 'setupServiceTask' && c[1] === true)); // nothing to apply: nothing was applied before
+    // Without a healthy service before the way back (k false) only the ticks come back.
+    const u = host({ services: { services: services(), taskInstalled: false, installed: ['WSearch'], paused: [] } });
+    const uUndo = createUndoTables(u).REVERT_UNDO.services;
+    const uBefore = await uUndo.snapshot({});
+    await u.api.toggleCouchService('WSearch');
+    u.db.services.installed = [];
+    assert.equal(await uUndo.undo(uBefore), 'undone');
+    assert.ok(!u.db.calls.some((c) => c[0] === 'setupServiceTask'));
+    assert.deepEqual(u.db.services.services.filter((v) => v.selected).map((v) => v.name), ['WSearch']);
   }
   {
     // M2: the lock goes back to "off", but a couch code held before is gone with it: a leftover, never "everything is back".
@@ -2280,6 +2912,77 @@ console.log('ui logic: ok');
     const b2 = await t2.snapshot({ settings: clean.db.settings, security: clean.db.security });
     clean.db.security.couchLock = 'code';
     assert.equal(await t2.undo(b2), 'undone');
+  }
+  {
+    // A parents' code set at the open couch is cleared by the service when the lock is raised; the undo cannot put it back and says so
+    // (only with parental controls on and the service holding no parents' code any more), never a quiet loss and never a skipped check.
+    const withParental = (parentHeld) => {
+      const h = host({ security: { couchLock: 'off', hasPasscode: false, serviceCodes: { couch: false, parent: parentHeld } } });
+      h.api.getParental = async () => ({ enabled: true });
+      return h;
+    };
+    const lost = withParental(true);
+    const undo = createUndoTables(lost).SETUP_UNDO.lock;
+    const before = await undo.snapshot({ settings: lost.db.settings, security: lost.db.security });
+    lost.db.security.couchLock = 'code';
+    lost.db.security.serviceCodes.parent = false; // cleared by the service when the lock was raised
+    const tx = createModeTransaction({ from: 'app' });
+    await tx.begin('lock', before);
+    const result = await tx.rollback({ lock: undo.undo });
+    assert.equal(lost.db.security.couchLock, 'off'); // the lock itself went back
+    assert.deepEqual(result.leftover.map((l) => [l.id, l.note]), [['lock', 'parentCode']]);
+    assert.ok(describeRollback(result, (id) => id, (key) => key).lines.includes('consoleSetup.rollback.parentCode'));
+    // The service still holds the parents' code: clean. Parental controls off: clean. The host cannot say: clean (no guess).
+    const kept = withParental(true);
+    const keptUndo = createUndoTables(kept).SETUP_UNDO.lock;
+    const keptBefore = await keptUndo.snapshot({ settings: kept.db.settings, security: kept.db.security });
+    kept.db.security.couchLock = 'code';
+    assert.equal(await keptUndo.undo(keptBefore), 'undone');
+    // The remembered state follows each snapshot, it is not latched: a snapshot without a parents' code forgets an earlier one.
+    const latch = withParental(true);
+    const latchUndo = createUndoTables(latch).SETUP_UNDO.lock;
+    await latchUndo.snapshot({ settings: latch.db.settings, security: latch.db.security });
+    latch.db.security.serviceCodes.parent = false;
+    const latchBefore = await latchUndo.snapshot({ settings: latch.db.settings, security: latch.db.security });
+    latch.db.security.couchLock = 'code';
+    assert.equal(await latchUndo.undo(latchBefore), 'undone');
+    // A parents' code that was never there is not "lost".
+    const never = withParental(false);
+    const neverUndo = createUndoTables(never).SETUP_UNDO.lock;
+    const neverBefore = await neverUndo.snapshot({ settings: never.db.settings, security: never.db.security });
+    never.db.security.couchLock = 'code';
+    assert.equal(await neverUndo.undo(neverBefore), 'undone');
+    // The parental state cannot be read: unclear, a manual note of its own, not a failure of the lock.
+    const unclear = withParental(true);
+    unclear.api.getParental = async () => { throw new Error('host busy'); };
+    const unclearUndo = createUndoTables(unclear).SETUP_UNDO.lock;
+    const unclearBefore = await unclearUndo.snapshot({ settings: unclear.db.settings, security: unclear.db.security });
+    unclear.db.security.couchLock = 'code';
+    await assert.rejects(() => unclearUndo.undo(unclearBefore), (e) => e.manual === true && e.note === 'parentUnclear');
+    assert.equal(unclear.db.security.couchLock, 'off');
+    const off = withParental(true);
+    off.api.getParental = async () => ({ enabled: false });
+    const offUndo = createUndoTables(off).SETUP_UNDO.lock;
+    const offBefore = await offUndo.snapshot({ settings: off.db.settings, security: off.db.security });
+    off.db.security.couchLock = 'code';
+    off.db.security.serviceCodes.parent = false;
+    assert.equal(await offUndo.undo(offBefore), 'undone');
+  }
+  {
+    // The way back does not start while parental controls are on and the step "light" is still to take (the host refuses it anyway).
+    const rows = (light) => [{ step: { id: 'services' }, status: 'todo' }, { step: { id: 'light' }, status: light }];
+    assert.equal(parentalBlocksRun(rows('todo'), true), true);
+    assert.equal(parentalBlocksRun(rows('unknown'), true), true);
+    assert.equal(parentalBlocksRun(rows('todo'), false), false);
+    assert.equal(parentalBlocksRun(rows('todo'), undefined), false);
+    assert.equal(parentalBlocksRun(rows('done'), true), false);
+    assert.equal(parentalBlocksRun([{ step: { id: 'services' }, status: 'todo' }], true), false); // the setup run has no such step
+    // The page asks before it begins and offers the setting; the source pins it (the host's own check stays).
+    const page = readFileSync(new URL('../ui/views/console-setup.js', import.meta.url), 'utf8');
+    assert.ok(page.includes('blockedBy: async (rows) => (parentalBlocksRun('));
+    const at = page.indexOf('if (await this.lookBlocked()) {');
+    assert.ok(at > 0 && page.slice(at, page.indexOf('beginSetupHold(', at)).includes('return;')); // nothing is held or begun before the look
+    assert.ok(page.includes("settingsView.jump('parental')"));
   }
   {
     // A cancelled way back with steps only a person can reverse never says "done".
@@ -2335,7 +3038,7 @@ assert.deepEqual(recoveryChoices(true), ['undo', 'finish']);
 assert.deepEqual(recoveryChoices(false), ['undo']);
 
 // A notification leads only to a whitelisted screen: the exact name, never a prototype member, another spelling or an address.
-for (const bad of ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'Downloads', 'downloads ', 'https://evil.example', 'C:\Windows\calc.exe', 'settings:updates', '', null, undefined, 5, {}]) {
+for (const bad of ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'Downloads', 'downloads ', 'https://evil.example', 'C:\\Windows\\calc.exe', 'settings:updates', '', null, undefined, 5, {}]) {
   assert.equal(notificationTarget({ target: bad }), null, String(bad));
 }
 assert.equal(notificationTarget({ target: 'downloads' }), 'downloads');
@@ -2489,26 +3192,274 @@ assert.equal(chipsBlocked(null), false);
   assert.ok(held.after > -0.1, `swing back ${held.after}`);
 }
 
-// Square tiles: a skin asks with --tile-art: square; no square picture means the cover, cropped (one answer for every skin).
+// Tile artwork per skin: --tile-art names the art (square, cover, hero), the rule gives the order and whether the picture fills or fits.
 {
-  const { squareArt, tileArtMode } = await import('../ui/core/square-rules.js');
+  const { tileArt, tileArtMode, tileFit, parseAspectRatio, TILE_ART_RATIO } = await import('../ui/core/square-rules.js');
   assert.equal(tileArtMode('square'), 'square');
   assert.equal(tileArtMode(' Square '), 'square');
   assert.equal(tileArtMode('"square"'), 'square');
-  for (const other of ['', 'cover', 'squares', 'square x', undefined, null, 5]) assert.equal(tileArtMode(other), 'cover');
-  const withSquare = squareArt({ art: { square: ['https://art.couchhud/s'], cover: ['https://art.couchhud/c'] } });
-  assert.deepEqual(withSquare.urls, ['https://art.couchhud/s', 'https://art.couchhud/c']);
-  assert.equal(withSquare.hasSquare, true);
-  assert.equal(withSquare.isCropped('https://art.couchhud/s'), false);
-  assert.equal(withSquare.isCropped('https://art.couchhud/c'), true); // the square failed to load: the cover is cropped
-  const coverOnly = squareArt({ art: { cover: ['https://art.couchhud/c'] } });
-  assert.deepEqual(coverOnly.urls, ['https://art.couchhud/c']);
-  assert.equal(coverOnly.hasSquare, false);
-  assert.equal(coverOnly.isCropped('https://art.couchhud/c'), true);
-  assert.deepEqual(squareArt({ art: { square: ['a'], cover: ['a', 'b'] } }).urls, ['a', 'b']);
-  assert.deepEqual(squareArt({ art: { square: [null, '', 5] } }).urls, []);
-  assert.deepEqual(squareArt({}).urls, []);
-  assert.deepEqual(squareArt(null).urls, []);
+  assert.equal(tileArtMode('hero'), 'hero');
+  assert.equal(tileArtMode('cover', 'hero'), 'cover');
+  for (const other of ['', 'squares', 'square x', 'logo', undefined, null, 5]) {
+    assert.equal(tileArtMode(other), 'cover');
+    assert.equal(tileArtMode(other, 'hero'), 'hero'); // nothing declared: the kind's own art
+  }
+  assert.equal(tileArtMode('', 'icon'), 'cover');
+
+  const s = 'https://art.couchhud/s';
+  const c = 'https://art.couchhud/c';
+  const h = 'https://art.couchhud/h';
+  const full = { art: { square: [s], cover: [c], hero: [h] } };
+  // Square tiles: the square first, the cover as stand-in (a hero strip would be lost in a square).
+  const sq = tileArt(full, 'square');
+  assert.deepEqual(sq.urls, [s, c]);
+  assert.equal(sq.slotOf(s), 'square');
+  assert.equal(sq.slotOf(c), 'cover');
+  assert.equal(sq.slotOf('https://elsewhere'), null);
+  // Back to a cover skin: the cover first again, the square only when there is no cover.
+  assert.deepEqual(tileArt(full, 'cover').urls, [c, s]);
+  assert.deepEqual(tileArt({ art: { square: [s] } }, 'cover').urls, [s]);
+  assert.deepEqual(tileArt(full, 'hero').urls, [h, c, s]);
+  assert.deepEqual(tileArt(full, 'odd').urls, [c, s]); // unknown: the cover order
+  assert.equal(tileArt(full, 'odd').mode, 'cover');
+  assert.deepEqual(tileArt({ art: { square: ['a'], cover: ['a', 'b'] } }, 'square').urls, ['a', 'b']);
+  assert.equal(tileArt({ art: { square: ['a'], cover: ['a', 'b'] } }, 'square').slotOf('a'), 'square');
+  assert.deepEqual(tileArt({ art: { square: [null, '', 5] } }, 'square').urls, []);
+  assert.deepEqual(tileArt({}, 'square').urls, []);
+  assert.deepEqual(tileArt(null, 'cover').urls, []);
+
+  assert.equal(parseAspectRatio('1'), 1);
+  assert.equal(parseAspectRatio('1 / 1'), 1);
+  assert.equal(parseAspectRatio('2 / 3'), 2 / 3);
+  assert.equal(parseAspectRatio('auto 16 / 9'), 16 / 9);
+  assert.equal(parseAspectRatio('0.5'), 0.5);
+  for (const none of ['auto', '', null, undefined, '0', '1 / 0']) assert.equal(parseAspectRatio(none), null);
+
+  // A square picture in a square tile fills it; a cover standing in fits (whole, centred over a blurred copy, never stretched).
+  assert.equal(tileFit({ mode: 'square', slot: 'square', imageRatio: 1, tileRatio: 1 }), 'fill');
+  assert.equal(tileFit({ mode: 'square', slot: 'square', imageRatio: 0.9, tileRatio: 1 }), 'fill');
+  assert.equal(tileFit({ mode: 'square', slot: 'cover', imageRatio: 600 / 900, tileRatio: 1 }), 'fit');
+  assert.equal(tileFit({ mode: 'square', slot: 'cover', imageRatio: 460 / 215, tileRatio: 1 }), 'fit');
+  assert.equal(tileFit({ mode: 'square', slot: 'cover', imageRatio: 1.05, tileRatio: 1 }), 'fill'); // a nearly square cover
+  // Cover tiles as before: a portrait cover fills, a store header or a square stand-in fits.
+  assert.equal(tileFit({ mode: 'cover', slot: 'cover', imageRatio: 600 / 900, tileRatio: 2 / 3 }), 'fill');
+  assert.equal(tileFit({ mode: 'cover', slot: 'cover', imageRatio: 460 / 215, tileRatio: 2 / 3 }), 'fit');
+  assert.equal(tileFit({ mode: 'cover', slot: 'square', imageRatio: 1, tileRatio: 2 / 3 }), 'fit');
+  // A wide app tile (16:9) with a store header fills; with a portrait picture it fits.
+  assert.equal(tileFit({ mode: 'cover', slot: 'cover', imageRatio: 460 / 215, tileRatio: 16 / 9 }), 'fill');
+  assert.equal(tileFit({ mode: 'cover', slot: 'cover', imageRatio: 2 / 3, tileRatio: 16 / 9 }), 'fit');
+  // The hero card: the hero is cut to it as always, a cover standing in fits.
+  assert.equal(tileFit({ mode: 'hero', slot: 'hero', imageRatio: 1920 / 620, tileRatio: 4 / 3 }), 'fill');
+  assert.equal(tileFit({ mode: 'hero', slot: 'cover', imageRatio: 2 / 3, tileRatio: 4 / 3 }), 'fit');
+  // Unknown tile shape: the wanted art's own shape counts; unknown picture size: fill (no guess).
+  assert.equal(tileFit({ mode: 'square', slot: 'cover', imageRatio: 2 / 3, tileRatio: null }), 'fit');
+  assert.equal(tileFit({ mode: 'cover', slot: 'cover', imageRatio: 2 / 3, tileRatio: null }), 'fill');
+  assert.equal(tileFit({ mode: 'square', slot: 'cover', imageRatio: null, tileRatio: 1 }), 'fill');
+  assert.equal(TILE_ART_RATIO.square, 1);
+}
+
+// Prototype keys are no art (they used to reach `in` and break the order).
+{
+  const { tileArt, tileArtMode, tileFit } = await import('../ui/core/square-rules.js');
+  for (const key of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+    assert.equal(tileArtMode(key), 'cover');
+    assert.equal(tileArtMode('', key), 'cover');
+    assert.deepEqual(tileArt({ art: { cover: ['c'], square: ['s'] } }, key).urls, ['c', 's']);
+    assert.equal(tileFit({ mode: key, slot: 'cover', imageRatio: 2 / 3, tileRatio: null }), 'fill');
+  }
+}
+
+// The skin's stylesheet: "styled" only once the stylesheet asked for last is in (fake <link>).
+{
+  const { skinStyler } = await import('../ui/core/skin-load.js');
+  const fakeLink = () => {
+    const listeners = { load: new Set(), error: new Set() };
+    const attrs = {};
+    return {
+      sheet: null,
+      listeners,
+      getAttribute: (k) => attrs[k] ?? null,
+      setAttribute(k, v) { attrs[k] = v; this.sheet = null; },
+      removeAttribute(k) { delete attrs[k]; this.sheet = null; },
+      addEventListener: (type, fn) => listeners[type].add(fn),
+      removeEventListener: (type, fn) => listeners[type].delete(fn),
+      fire(type) { if (type === 'load') this.sheet = {}; for (const fn of [...listeners[type]]) fn(); }
+    };
+  };
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  // The same skin twice before its stylesheet loaded: nothing early, one report when it loads.
+  {
+    const link = fakeLink();
+    const style = skinStyler(link);
+    const calls = [];
+    style('/skins/b.css', () => calls.push('b1'));
+    style('/skins/b.css', () => calls.push('b2'));
+    await tick();
+    assert.deepEqual(calls, []);
+    link.fire('load');
+    assert.deepEqual(calls, ['b2']);
+    await tick();
+    assert.deepEqual(calls, ['b2']);
+    // Asked again once loaded: reports again, without a new load.
+    style('/skins/b.css', () => calls.push('b3'));
+    await tick();
+    assert.deepEqual(calls, ['b2', 'b3']);
+    assert.equal(link.listeners.load.size, 0);
+  }
+  // A -> B -> A before anything loaded: only A's load counts, B's listeners are gone.
+  {
+    const link = fakeLink();
+    const style = skinStyler(link);
+    const calls = [];
+    style('/a.css', () => calls.push('a1'));
+    style('/b.css', () => calls.push('b'));
+    style('/a.css', () => calls.push('a2'));
+    assert.equal(link.getAttribute('href'), '/a.css');
+    assert.equal(link.listeners.load.size, 1);
+    link.fire('load');
+    await tick();
+    assert.deepEqual(calls, ['a2']);
+  }
+  // A stylesheet that fails still reports; the Couch skin (no stylesheet) reports in a microtask and drops a pending load.
+  {
+    const link = fakeLink();
+    const style = skinStyler(link);
+    const calls = [];
+    style('/x.css', () => calls.push('x'));
+    link.fire('error');
+    assert.deepEqual(calls, ['x']);
+    style('/y.css', () => calls.push('y'));
+    style(null, () => calls.push('none'));
+    assert.equal(link.getAttribute('href'), null);
+    assert.equal(link.listeners.load.size + link.listeners.error.size, 0);
+    await tick();
+    assert.deepEqual(calls, ['x', 'none']);
+  }
+}
+
+// Tiles follow the skin in place: added tiles settle once in the page, refresh switches square <-> cover, fits by shape.
+{
+  const { createTiles } = await import('../ui/core/tiles.js');
+  const classList = () => {
+    const set = new Set();
+    return {
+      set,
+      add: (...c) => c.forEach((x) => set.add(x)),
+      remove: (...c) => c.forEach((x) => set.delete(x)),
+      toggle: (c, on) => (on ?? !set.has(c) ? set.add(c) : set.delete(c), set.has(c)),
+      contains: (c) => set.has(c)
+    };
+  };
+  const box = (css) => ({ isConnected: true, dataset: {}, classList: classList(), style: { backgroundImage: '', props: {}, setProperty(k, v) { this.props[k] = v; }, removeProperty(k) { delete this.props[k]; } }, css });
+  const sizes = { s: [512, 512], c: [600, 900], h: [1920, 620] };
+  const log = [];
+  const frames = [];
+  const tiles = createTiles({
+    read: (b) => {
+      log.push('read');
+      if (b.css.throws) throw new Error('broken tile');
+      return { ...b.css, width: 0, height: 0 };
+    },
+    // Loads the first URL at once with its fake size (the browser does this later; the rule does not care).
+    load: (urls, cb) => urls[0] && cb(urls[0], { naturalWidth: sizes[urls[0]][0], naturalHeight: sizes[urls[0]][1] }),
+    frame: (fn) => frames.push(fn),
+    cssUrl: (u) => `url(${u})`
+  });
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  const both = { name: 'G', art: { square: ['s'], cover: ['c'], hero: ['h'] } };
+  const coverOnly = { name: 'C', art: { cover: ['c'] } };
+
+  const a = box({ tileArt: '', aspectRatio: '2 / 3' });
+  const b = box({ tileArt: '', aspectRatio: '2 / 3' });
+  tiles.add(a, both, 'cover');
+  tiles.add(b, coverOnly, 'cover');
+  assert.equal(a.dataset.tileArt, 'cover');
+  assert.equal(a.style.backgroundImage, ''); // nothing before it is in the page
+  await tick();
+  assert.equal(a.style.backgroundImage, 'url(c)');
+  assert.equal(a.classList.contains('art-fit'), false);
+
+  // Square skin: the square picture fills, a cover without a square fits (whole, never stretched).
+  a.css = { tileArt: 'square', aspectRatio: '1' };
+  b.css = { tileArt: ' square ', aspectRatio: '1' };
+  log.length = 0;
+  tiles.refresh([a, b]);
+  assert.equal(a.dataset.tileArt, 'square');
+  assert.equal(a.style.backgroundImage, 'url(s)');
+  assert.ok(a.classList.contains('art-square'));
+  assert.equal(a.classList.contains('art-fit'), false);
+  assert.equal(b.style.backgroundImage, 'url(c)');
+  assert.ok(b.classList.contains('art-fit'));
+  assert.equal(b.style.props['--art-img'], 'url(c)');
+  // Reads first for every tile, then the writes (and one more read each for the tiles whose art changed).
+  assert.deepEqual(log, ['read', 'read', 'read', 'read']);
+
+  // And back: covers again, no square classes left.
+  a.css = b.css = { tileArt: '', aspectRatio: '2 / 3' };
+  tiles.refresh([a, b]);
+  assert.equal(a.style.backgroundImage, 'url(c)');
+  assert.equal(a.classList.contains('art-square'), false);
+  assert.equal(b.classList.contains('art-fit'), false);
+
+  // Same art, other shape (a 16:9 tile): only the fit changes.
+  b.css = { tileArt: '', aspectRatio: '16 / 9' };
+  tiles.refresh([b]);
+  assert.ok(b.classList.contains('art-fit'));
+  assert.equal(b.style.backgroundImage, 'url(c)');
+
+  // A broken tile or an odd value does not stop the others.
+  const broken = box({ tileArt: '', aspectRatio: '1' });
+  tiles.add(broken, both, 'cover');
+  await tick();
+  broken.css = { throws: true };
+  a.css = { tileArt: 'constructor', aspectRatio: '1' };
+  b.css = { tileArt: 'square', aspectRatio: '1' };
+  const logged = [];
+  const consoleError = console.error;
+  console.error = (e) => logged.push(String(e));
+  try {
+    tiles.refresh([broken, a, b]);
+  } finally {
+    console.error = consoleError;
+  }
+  assert.deepEqual(logged, ['Error: broken tile']);
+  assert.equal(a.dataset.tileArt, 'cover');
+  assert.equal(b.dataset.tileArt, 'square');
+
+  // A tile not in the page after three frames shows its kind's art and is asked again once it is.
+  const late = box({ tileArt: 'square', aspectRatio: '1' });
+  late.isConnected = false;
+  tiles.add(late, both, 'cover');
+  await tick();
+  for (let i = 0; i < 3; i++) frames.splice(0).forEach((fn) => fn());
+  assert.equal(late.dataset.tileArt, 'cover');
+  assert.equal(late.style.backgroundImage, 'url(c)');
+  late.isConnected = true;
+  tiles.add(box({ tileArt: '', aspectRatio: '2 / 3' }), coverOnly, 'cover'); // any later pass looks again
+  await tick();
+  assert.equal(late.dataset.tileArt, 'square');
+  assert.equal(late.style.backgroundImage, 'url(s)');
+
+  // The hero card: hero fills, a cover standing in fits.
+  const hero = box({ tileArt: 'hero', aspectRatio: '4 / 3' });
+  tiles.add(hero, { name: 'H', art: { cover: ['c'] } }, 'hero');
+  await tick();
+  assert.equal(hero.dataset.tileArt, 'hero');
+  assert.ok(hero.classList.contains('art-fit'));
+}
+
+// Wiring: art.js listens for couchhud:skin-styled, applySkin sends it through skin-load.js.
+{
+  const artSrc = readFileSync(new URL('../ui/core/art.js', import.meta.url), 'utf8');
+  const skinSrc = readFileSync(new URL('../ui/core/skins.js', import.meta.url), 'utf8');
+  assert.match(artSrc, /addEventListener\('couchhud:skin-styled', refreshTiles\)/);
+  assert.match(skinSrc, /new Event\('couchhud:skin-styled'\)/);
+  assert.match(skinSrc, /styleSkin\(skin\.css, styled\)/);
+  const css = readFileSync(new URL('../ui/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.shelf \.hero-art \{[^}]*--tile-art: hero;/);
+  assert.match(css, /\.grid-apps \.cover \{[^}]*--tile-art: cover;/);
+  assert.match(css, /\.art\.art-fit::after \{[^}]*background-size: contain;/);
 }
 
 // 0.6.3 acceptance findings of the mode switch (F3, F4): the run loop and the undo against fake steps and a fake host.
@@ -2748,7 +3699,7 @@ assert.equal(chipsBlocked(null), false);
   // F3 with the real undo tables of the setup against a fake host: the aborted lock step undoes integration, services and the rest.
   {
     const db = {
-      settings: { integrationMode: 'light', isShell: false, runStartupApps: true, guideTapInGame: false, suppressCompetitors: false },
+      settings: { integrationMode: 'light', isShell: false, runStartupApps: true, guideTapInGame: false, suppressCompetitors: false, suppressBySetup: false },
       security: { couchLock: 'off', hasPasscode: false, autoLogon: false },
       services: { services: [{ name: 'WSearch', suggested: true, selected: false }], taskInstalled: true, installed: [], paused: [] }
     };
@@ -2888,31 +3839,47 @@ console.log('mode switch findings: ok');
 }
 console.log('undo progress: ok');
 
-// Power menu: CouchHUD's own entries on top, the computer's below; the mode decides PC mode vs. quit and the restart into PC mode.
+// Power menu: three everyday tiles, the rare entries behind "Mehr", the timer as a row; the mode decides what is offered.
 {
-  const ids = (shell, opts) => powerGroups(shell, opts).map((g) => [g.id, g.ids]);
-  assert.deepEqual(ids(true), [['app', ['restart-app', 'pc-mode', SLEEP_TIMER]], ['pc', ['standby', 'restart', 'restart-pc', 'shutdown']]]);
-  assert.deepEqual(ids(false), [['app', ['restart-app', 'quit', SLEEP_TIMER]], ['pc', ['standby', 'restart', 'shutdown']]]);
+  const lay = (shell, opts) => powerLayout(shell, opts);
+  assert.deepEqual(lay(true), { primary: ['standby', 'shutdown', 'restart'], more: ['pc-mode', 'restart-pc', 'restart-app'], timer: true });
+  assert.deepEqual(lay(false), { primary: ['standby', 'shutdown', 'restart'], more: ['quit', 'restart-app'], timer: true });
   // The Guide menu opens it without the timer (it has its own row).
-  assert.deepEqual(ids(false, { sleepTimer: false }), [['app', ['restart-app', 'quit']], ['pc', ['standby', 'restart', 'shutdown']]]);
-  // Headings are i18n keys with plain text in both languages.
-  assert.deepEqual(POWER_GROUPS.map((g) => g.heading), ['power.group.app', 'power.group.pc']);
-  for (const g of POWER_GROUPS) assert.ok(/^[A-Za-z]+$/.test(deCore[g.heading]) && /^[A-Za-z]+$/.test(enCore[g.heading]), g.heading);
+  assert.equal(lay(false, { sleepTimer: false }).timer, false);
+  // Nothing offered is something the mode does not allow; nothing behind "Mehr" hides the row.
+  for (const shell of [true, false]) {
+    const l = lay(shell);
+    for (const id of [...l.primary, ...l.more]) assert.equal(powerForMode(id, shell), id, `${id} in ${shell}`);
+  }
+  assert.deepEqual(powerEntryIds({ primary: ['standby'], more: [], timer: true }, true), ['standby', SLEEP_TIMER]);
+  assert.deepEqual(powerEntryIds({ primary: ['standby'], more: [], timer: false }, false), ['standby']);
+  // Collapsed: tiles, Mehr, timer. Expanded: the secondary entries between Mehr and the timer.
+  const shell = lay(true);
+  assert.deepEqual(powerEntryIds(shell, false), ['standby', 'shutdown', 'restart', MORE, SLEEP_TIMER]);
+  assert.deepEqual(powerEntryIds(shell, true), ['standby', 'shutdown', 'restart', MORE, 'pc-mode', 'restart-pc', 'restart-app', SLEEP_TIMER]);
+  assert.ok(isSecondary(shell, 'restart-pc') && !isSecondary(shell, 'restart') && !isSecondary(shell, SLEEP_TIMER));
   // forMode: shell has no quit, app mode has no restart into PC mode and "pc-mode" is quitting.
   assert.equal(powerForMode('quit', true), null);
   assert.equal(powerForMode('pc-mode', true), 'pc-mode');
   assert.equal(powerForMode('pc-mode', false), 'quit');
   assert.equal(powerForMode('restart-pc', false), null);
   assert.equal(powerForMode('shutdown', false), 'shutdown');
+  // The phone's actions (RemotePower.EntryId: sleep → standby, restart, shutdown) are the same entries in both modes: the phone never
+  // lands on a different entry (with another unlock) than the couch.
+  for (const isShell of [true, false]) for (const id of ['standby', 'restart', 'shutdown']) assert.equal(powerForMode(id, isShell), id, `${id} ${isShell}`);
   // Only what ends the session for everybody is tinted as dangerous.
-  assert.deepEqual(['standby', 'pc-mode', 'quit', 'restart-app', 'restart', 'restart-pc', 'shutdown', SLEEP_TIMER].filter(isDangerous), ['restart', 'restart-pc', 'shutdown']);
-  // Focus starts on standby; a cancelled question brings the menu back on its own entry; an unknown id falls back to standby.
-  const flat = powerGroups(true).flatMap((g) => g.ids);
-  assert.equal(flat[powerIndex(flat, 'standby')], 'standby');
-  for (const id of flat) assert.equal(flat[powerIndex(flat, id)], id);
-  assert.equal(flat[powerIndex(flat, 'quit')], 'standby');
+  assert.deepEqual(['standby', 'pc-mode', 'quit', 'restart-app', 'restart', 'restart-pc', 'shutdown', SLEEP_TIMER, MORE].filter(isDangerous), ['restart', 'restart-pc', 'shutdown']);
+  // Focus starts on standby (the first tile); a cancelled question brings the menu back on its own entry (expanded for a secondary
+  // one); an unknown id falls back to standby.
+  const collapsed = powerEntryIds(shell, false);
+  assert.equal(collapsed[powerIndex(collapsed, POWER_START)], 'standby');
+  assert.equal(powerIndex(collapsed, POWER_START), 0);
+  for (const id of collapsed) assert.equal(collapsed[powerIndex(collapsed, id)], id);
+  assert.equal(collapsed[powerIndex(collapsed, 'quit')], 'standby');
+  const open = powerEntryIds(shell, true);
+  for (const id of ['pc-mode', 'restart-pc', 'restart-app']) assert.equal(open[powerIndex(open, id)], id);
   assert.equal(powerIndex([], 'standby'), 0);
-  const app = powerGroups(false).flatMap((g) => g.ids);
+  const app = powerEntryIds(lay(false), true);
   assert.equal(app[powerIndex(app, 'quit')], 'quit');
   // The default layout is the tiles; the menu has no "Abbrechen" entry any more (B, the hint or a click next to it close it).
   const powerSrc = readFileSync(new URL('../ui/core/power.js', import.meta.url), 'utf8');
@@ -2924,12 +3891,34 @@ console.log('undo progress: ok');
   const icons = ['restart-app', 'restart', 'restart-pc', 'shutdown', 'standby', 'pc-mode'].map((id) => glyphName(iconOf(id)));
   assert.ok(icons.every(Boolean), String(icons));
   assert.equal(new Set(icons).size, icons.length, String(icons));
-  // The timer shows its remaining time once (a live value, no detail while it runs), and B in its picker goes back to the menu.
-  assert.match(powerSrc, /get detail\(\) \{ return sleepTimer\.at \? '' : sleepTimerDetail\(\); \}/);
-  assert.match(powerSrc, /get value\(\) \{ return sleepTimer\.at \? sleepTimerDetail\(\) : ''; \}/);
-  assert.match(powerSrc, /run: \(\) => pickSleepTimer\(back\)/);
+  assert.ok(glyphName('⋯'), 'the Mehr row has a drawn icon');
+  // The timer row always shows its state on the right, and B in its picker goes back to the menu (on the timer, "Mehr" as it was).
+  assert.match(powerSrc, /get value\(\) \{ return sleepTimerDetail\(\); \}/);
+  assert.match(powerSrc, /run: pick/);
   assert.match(powerSrc, /if \(minutes === undefined\) return onCancel\?\.\(\);/);
-  assert.match(powerSrc, /sleepTimerEntry\(\(\) => reopen\(SLEEP_TIMER\)\)/);
+  assert.match(powerSrc, /pickSleepTimer\(\(\) => reopen\(SLEEP_TIMER, menu\.expanded\)\)/);
+  // A cancelled question reopens the menu on the same entry; a secondary entry reopens it expanded.
+  assert.match(powerSrc, /const reopen = \(id, open = isSecondary\(parts, id\)\) => openOverlay\(powerMenu\(\{[^}]*expanded: open, focus: id/);
+  // A expands "Mehr" without closing the menu and moves to its first entry; B folds it back first; X opens the timer anywhere.
+  assert.match(powerSrc, /keepOpen: true, run: toggle/);
+  assert.match(powerSrc, /fill\(!open, open \? MORE : parts\.more\[0\], !open\)/);
+  assert.match(powerSrc, /if \(!menu\.expanded\) return false;\s*fill\(false, MORE, false\);\s*return true;/);
+  assert.match(powerSrc, /keys: sleepTimer \? \{ x: timer \} : \{\}/);
+  assert.match(powerSrc, /\['X', t\('power\.timerHint'\)\]/);
+  // Same behaviour in the overlay: B asks onBack first, X runs keys.x, keepOpen entries leave the menu open, Mehr says aria-expanded.
+  const overlaySrc = readFileSync(new URL('../ui/components/overlay.js', import.meta.url), 'utf8');
+  assert.match(overlaySrc, /if \(menu\.onBack\?\.\(\)\) \{/);
+  assert.match(overlaySrc, /menu\.keys\.x\(\)/);
+  assert.match(overlaySrc, /if \(entry\.keepOpen\) \{/);
+  assert.match(overlaySrc, /setAttribute\('aria-expanded', String\(e\.expanded\)\)/);
+  for (const lang of [deCore, enCore]) for (const key of ['power.more', 'power.moreDetail', 'power.timerHint']) assert.ok(lang[key], key);
+  // Rows of the tiles: the three tiles share one row, every other entry has a row of its own (up/down walks them one by one).
+  const { groupRows, gridMove } = await import('../ui/core/menu-grid.js');
+  const rows = groupRows(['primary', 'primary', 'primary', MORE, 'pc-mode', 'restart-pc', 'restart-app', SLEEP_TIMER]);
+  assert.deepEqual(rows, [[0, 1, 2], [3], [4], [5], [6], [7]]);
+  assert.equal(gridMove(rows, 2, 'down'), 3);
+  assert.equal(gridMove(rows, 3, 'up'), 0);
+  assert.equal(gridMove(rows, 7, 'up'), 6);
   // A click lands on the entry's own index: group headings sit between the entries and are no click target.
   const mouseSrc = readFileSync(new URL('../ui/components/mouse.js', import.meta.url), 'utf8');
   assert.match(mouseSrc, /\.menu li:not\(\.menu-group\)/);
@@ -2976,8 +3965,30 @@ console.log('power menu groups: ok');
   assert.match(src, /\} while \(action === undefined\);/);
   assert.match(src, /t\('power\.timerNow'\)/);
   assert.match(src, /tag: WARN_TAG/);
+  // A replaced timer tells the host about the cancel too (startSleepTimer stops the old one with the host call).
+  assert.match(src, /function startSleepTimer\(ms, action, token = ''\) \{\r?\n(  \/\/[^\r\n]*\r?\n)?  stopSleepTimer\(\);/);
+  assert.doesNotMatch(src, /stopSleepTimer\(false\)/);
   // The menu's refresh looks at the running timer, not at its own sleepTimer option.
   assert.match(src, /refreshMs: sleepTimer && timerRunning\(\) \? 15_000 : 0/);
+  // PC mode (security review M3): the host's pcMode event ends a running timer (TV's or phone's) and none starts or fires while it lasts.
+  assert.match(src, /if \(event\?\.type === 'pcMode'\) \{\s*pcModeActive = event\.on === true;\s*if \(pcModeActive\) stopSleepTimer\(\);/);
+  assert.match(src, /function startSleepTimer\(ms, action, token = ''\) \{\r?\n(  \/\/[^\r\n]*\r?\n)?\s*stopSleepTimer\(\);\s*if \(pcModeActive\) return;/);
+  // Security re-review L5: the host's token for a phone's timer comes back with the TV's report of that very timer (no time window).
+  assert.match(src, /startSleepTimer\(timer\.minutes \* 60_000, timer\.action, typeof event\.token === 'string' \? event\.token : ''\)/);
+  assert.match(src, /api\.sleepTimerState\?\.\(\{ at: sleepTimer\.at, action: sleepTimer\.action, token: sleepTimer\.token \}\)/);
+  assert.match(src, /function fireSleepTimer\(\) \{[^}]*stopSleepTimer\(\);[^}]*if \(pcModeActive\) return;[^}]*attempt\(\(\) => action\.run\(\), action\.label\);/);
+  assert.equal((src.match(/pcModeActive/g) || []).length, 5, 'pcModeActive: declaration, listener (2), start, fire');
+  // The host side: entering PC mode ends the timer and tells the phones (Hud.cs / HudRemote.cs), leaving tells them too.
+  const hudSrc = readFileSync(new URL('../src/CouchHud.Shell/Hud.cs', import.meta.url), 'utf8');
+  assert.match(hudSrc, /_pcMode = true;[^]*?ApplyCouchSecurity\(\);[^]*?PcModeChangedForPhones\(entered: true\);/);
+  assert.equal((hudSrc.match(/PcModeChangedForPhones\(entered: false\)/g) || []).length, 2, 'leaving PC mode, and the failed entry');
+  const remoteSrc = readFileSync(new URL('../src/CouchHud.Shell/HudRemote.cs', import.meta.url), 'utf8');
+  assert.match(remoteSrc, /Emit\("remote", new \{ type = "pcMode", on = entered \}\);/);
+  // Security re-review L4/L5: a child's phone neither ends nor replaces a foreign timer; the phone's timer is told by a token, not by time.
+  assert.equal((remoteSrc.match(/RemoteRights\.MayEndSleepTimer\(device\.Child, _sleepTimerByChildPhone\)/g) || []).length, 2, 'off and set');
+  assert.match(remoteSrc, /string\.Equals\(token, pending\.Token, StringComparison\.Ordinal\)/);
+  assert.doesNotMatch(remoteSrc, /FromSeconds\(10\)/);
+  assert.match(remoteSrc, /Emit\("remote", new \{ type = "sleepTimer", minutes = 0 \}\);/);
 }
 console.log('sleep timer action: ok');
 
@@ -3079,22 +4090,47 @@ console.log('busy state: ok');
 // The Downloads tab: the list holds only what loads or waits to be installed; searching and the games that are not installed are footer
 // shortcuts (X, Y), and the search's state stands by the heading.
 {
-  const { downloadRows, downloadShortcuts, finishedMenu } = await import('../ui/core/downloads-rules.js');
+  const { downloadRows, downloadSections, downloadShortcuts, finishedMenu } = await import('../ui/core/downloads-rules.js');
   const { searchOutcome, searchStatus } = await import('../ui/core/update-search.js');
   const entries = [
     { id: 'a', state: 'done' }, { id: 'b', state: 'downloading' }, { id: 'c', state: 'failed' }, { id: 'd', state: 'paused' }
   ];
-  const reboot = { kind: 'pending', open: true, label: 'restart' };
-  const pending = [{ kind: 'pending', label: 'Windows' }, { kind: 'pending', label: 'Plugin' }];
+  const reboot = { kind: 'pending', group: 'windows', open: true, label: 'restart' };
+  const pending = [
+    { kind: 'pending', group: 'windows', label: 'Windows' }, { kind: 'pending', group: 'plugins', label: 'Plugin' },
+    { kind: 'pending', group: 'apps', label: 'All apps' }, { kind: 'pending', group: 'apps', label: 'Discord' },
+    { kind: 'pending', group: 'couchhud', label: 'CouchHUD' }
+  ];
+  // Sections in a fixed order (running, CouchHUD, apps, Windows, plugins, finished); the restart stands first with the Windows updates.
+  const sections = downloadSections({ entries, first: [reboot], pending });
+  assert.deepEqual(sections.map((s) => [s.id, s.rows.map((r) => r.entry?.id ?? r.label)]), [
+    ['running', ['b', 'd']], ['couchhud', ['CouchHUD']], ['apps', ['All apps', 'Discord']], ['windows', ['restart', 'Windows']],
+    ['plugins', ['Plugin']], ['finished', ['a', 'c']]
+  ]);
   const rows = downloadRows({ entries, first: [reboot], pending });
-  assert.deepEqual(rows.map((r) => r.entry?.id ?? r.label), ['b', 'd', 'restart', 'Windows', 'Plugin', 'a', 'c']);
+  assert.deepEqual(rows.map((r) => r.entry?.id ?? r.label), ['b', 'd', 'CouchHUD', 'All apps', 'Discord', 'restart', 'Windows', 'Plugin', 'a', 'c']);
   assert.ok(rows.every((r) => r.kind === 'entry' || r.kind === 'pending'));
+  // Empty sections are left out; a start row without a known section is never lost (it goes with the plugins), a note to Windows.
+  assert.deepEqual(downloadSections({ entries: [{ id: 'x', state: 'done' }] }).map((s) => s.id), ['finished']);
+  assert.deepEqual(downloadSections({ first: [{ label: 'n' }], pending: [{ label: 'p', group: '__proto__' }] }).map((s) => [s.id, s.rows.map((r) => r.label)]),
+    [['windows', ['n']], ['plugins', ['p']]]);
   assert.deepEqual(downloadRows(), []);
-  assert.deepEqual(downloadShortcuts({ canSearch: true, searching: false, gamesOn: true }),
-    [{ button: 'X', id: 'search', busy: false }, { button: 'Y', id: 'uninstalled', busy: false }]);
-  assert.equal(downloadShortcuts({ canSearch: true, searching: true, gamesOn: true })[0].busy, true);
-  assert.deepEqual(downloadShortcuts({ canSearch: true, gamesOn: false }).map((s) => s.id), ['search']); // Gaming off: no Y
-  assert.deepEqual(downloadShortcuts({ canSearch: false, gamesOn: true }).map((s) => s.id), ['uninstalled']); // no update state yet
+  assert.deepEqual(downloadSections(), []);
+  // Only X (search) is left on the page; installing new games moved to View in the Games tab.
+  assert.deepEqual(downloadShortcuts({ canSearch: true, searching: false }), [{ button: 'X', id: 'search', busy: false }]);
+  assert.equal(downloadShortcuts({ canSearch: true, searching: true })[0].busy, true);
+  assert.deepEqual(downloadShortcuts({ canSearch: false }), []); // no update state yet
+  {
+    const dl = readFileSync(new URL('../ui/views/downloads.js', import.meta.url), 'utf8');
+    assert.ok(!dl.includes('uninstalledPage') && !dl.includes("case 'y'"), 'Downloads no longer opens the games that are not installed');
+    // The Games tab: View (the pad's "back", "view" from a click on its hint) opens them, only for games outside a collection and
+    // with the Gaming area on, also with an empty list; the X filter entry stays. V is View on the keyboard.
+    const grid = readFileSync(new URL('../ui/views/grid.js', import.meta.url), 'utf8');
+    assert.ok(grid.includes("addKind === 'game' && !collectionId && areaOn('games')") && grid.includes("action === 'back' || action === 'view'")
+      && grid.includes("['View', t('grid.hint.installGames')]") && grid.includes("case 'uninstalled': return push(uninstalledPage());"), 'Games tab: View installs games');
+    assert.ok(grid.indexOf("action === 'back' || action === 'view'") < grid.indexOf('if (!this.list.length) return;'), 'View works with an empty list');
+    assert.ok(readFileSync(new URL('../ui/input.js', import.meta.url), 'utf8').includes("KeyV: 'back'"), 'V is View on the keyboard');
+  }
   // "Remove finished" moved from X into a finished line's menu, when there is more than one.
   assert.deepEqual(finishedMenu(['remove'], entries), ['remove', 'clearFinished']);
   assert.deepEqual(finishedMenu(['remove'], [{ state: 'done' }, { state: 'downloading' }]), ['remove']);
@@ -3102,6 +4138,8 @@ console.log('busy state: ok');
   // The page's source builds no action rows any more.
   const src = readFileSync(new URL('../ui/views/downloads.js', import.meta.url), 'utf8');
   assert.ok(!src.includes("kind: 'uninstalled'") && !src.includes('searchRow'), 'Downloads list has no action rows');
+  // The view draws the sections with their headings, and a click finds its row among the rows, not among the list's children.
+  assert.ok(src.includes('downloadSections(') && src.includes('downloads.section.') && src.includes('this.items?.indexOf(node)'), 'Downloads draws sections');
   // The status line: running, the host at work, the outcome of this visit, a problem, or when it last searched.
   const tr = (key, p) => (p ? `<${key}:${JSON.stringify(p)}>` : `<${key}>`);
   const ago = () => '5 min';
@@ -3158,8 +4196,8 @@ console.log('busy instead of toasts: ok');
     console.error = quiet;
   }
 
-  const { pressPending, pressSearch, downloadHints } = await import('../ui/core/downloads-rules.js');
-  const fake = ({ busy = false, locked = false } = {}) => {
+  const { pressPending, pressSearch, downloadHints, withUnlock, sharedUnlock } = await import('../ui/core/downloads-rules.js');
+  const fake = ({ busy = false, locked = false, opens = true } = {}) => {
     const log = [];
     return {
       log,
@@ -3167,22 +4205,32 @@ console.log('busy instead of toasts: ok');
         busy,
         locked: async () => { log.push('locked?'); return locked; },
         run: async (key, fn) => { log.push(`busy:${key}`); return fn(); },
-        unlocked: () => log.push('unlock-toast'),
+        unlock: async () => { log.push('code-prompt'); return opens; },
         bump: () => log.push('bump'),
         select: () => log.push('select')
       }
     };
   };
   const row = (extra = {}) => ({ busyKey: 'update:windows', run: () => 'started', ...extra });
-  // Locked: the unlock toast, and nothing ever looked busy.
+  // Locked (0.6.4, finding of 0.6.3: "unlock first" and never a prompt, so no update was reachable): the code prompt opens, and once
+  // it opened the start runs under its busy key; cancelled, nothing runs and nothing looked busy.
   let f = fake({ locked: true });
-  await pressPending(row(), f.deps);
-  assert.deepEqual(f.log, ['select', 'locked?', 'unlock-toast']);
+  assert.equal(await pressPending(row(), f.deps), 'started');
+  assert.deepEqual(f.log, ['select', 'locked?', 'code-prompt', 'busy:update:windows']);
+  f = fake({ locked: true, opens: false });
+  assert.equal(await pressPending(row(), f.deps), undefined);
+  assert.deepEqual(f.log, ['select', 'locked?', 'code-prompt']);
+  // Every kind of pending row the page builds (Windows, all apps, one app, CouchHUD, a plugin or skin) asks the same way.
+  for (const busyKey of ['update:windows', 'update:apps', 'update:app:Mozilla.Firefox', 'update:self', 'catalog:demo']) {
+    f = fake({ locked: true });
+    assert.equal(await pressPending(row({ busyKey }), f.deps), 'started');
+    assert.deepEqual(f.log, ['select', 'locked?', 'code-prompt', `busy:${busyKey}`], busyKey);
+  }
   // Busy: only a bump, the lock is not even asked.
   f = fake({ busy: true });
   await pressPending(row(), f.deps);
   assert.deepEqual(f.log, ['bump']);
-  // Free: under its busy key.
+  // Free: under its busy key, no prompt.
   f = fake();
   assert.equal(await pressPending(row(), f.deps), 'started');
   assert.deepEqual(f.log, ['select', 'locked?', 'busy:update:windows']);
@@ -3190,25 +4238,71 @@ console.log('busy instead of toasts: ok');
   f = fake({ locked: true });
   assert.equal(await pressPending(row({ open: true, busyKey: undefined }), f.deps), 'started');
   assert.deepEqual(f.log, ['select']);
-  // The search: the same order.
+  // The search: the same order, the prompt included.
   f = fake({ locked: true });
-  await pressSearch('downloads:search', () => 'searched', f.deps);
-  assert.deepEqual(f.log, ['select', 'locked?', 'unlock-toast']);
+  assert.equal(await pressSearch('downloads:search', () => 'searched', f.deps), 'searched');
+  assert.deepEqual(f.log, ['select', 'locked?', 'code-prompt', 'busy:downloads:search']);
+  f = fake({ locked: true, opens: false });
+  assert.equal(await pressSearch('downloads:search', () => 'searched', f.deps), undefined);
+  assert.deepEqual(f.log, ['select', 'locked?', 'code-prompt']);
   f = fake({ busy: true });
   await pressSearch('downloads:search', () => 'searched', f.deps);
   assert.deepEqual(f.log, ['bump']);
   f = fake();
   assert.equal(await pressSearch('downloads:search', () => 'searched', f.deps), 'searched');
   assert.deepEqual(f.log, ['select', 'locked?', 'busy:downloads:search']);
+  // The host refuses with "unlock first" (the unlock ran out meanwhile): the prompt, then exactly one more call; cancelled: undefined;
+  // other errors and a second refusal pass through unchanged.
+  {
+    const lockedErr = () => Object.assign(new Error('Unlock first'), { locked: true });
+    let calls = 0;
+    let prompts = 0;
+    const flaky = async () => { calls++; if (calls === 1) throw lockedErr(); return 'ok'; };
+    assert.equal(await withUnlock(flaky, async () => { prompts++; return true; }), 'ok');
+    assert.deepEqual([calls, prompts], [2, 1]);
+    calls = 0;
+    assert.equal(await withUnlock(flaky, async () => false), undefined);
+    assert.equal(calls, 1);
+    await assert.rejects(withUnlock(async () => { throw lockedErr(); }, async () => true), (e) => e.locked === true);
+    await assert.rejects(withUnlock(async () => { throw new Error('other'); }, async () => { throw new Error('no prompt for other errors'); }), /other/);
+    assert.equal(await withUnlock(async () => 'direct', async () => { throw new Error('no prompt when open'); }), 'direct');
+  }
+  // One shared unlock: calls refused together share the open entry, one refused right after it closed reuses it (about a second), a cancel is not remembered.
+  {
+    let now = 0;
+    let asked = 0;
+    let answer = true;
+    const unlock = sharedUnlock(async () => { asked++; return answer; }, () => now, 1000);
+    const [a, b] = await Promise.all([unlock(), unlock()]);
+    assert.deepEqual([a, b, asked], [true, true, 1]);
+    now = 500;
+    assert.equal(await unlock(), true);
+    assert.equal(asked, 1, 'a second call right after the unlock does not ask again');
+    now = 1600;
+    assert.equal(await unlock(), true);
+    assert.equal(asked, 2, 'later it asks again');
+    answer = false;
+    now = 5000;
+    assert.equal(await unlock(), false);
+    assert.equal(await unlock(), false);
+    assert.equal(asked, 4, 'a cancel is never remembered');
+  }
   // Hints: A greys out on a busy row instead of disappearing; X carries the search's busy state.
-  const labels = { a: 'Install', search: 'Search', uninstalled: 'Not installed', back: 'Home' };
-  assert.deepEqual(downloadHints({ hasRow: true, rowBusy: true, shortcuts: [{ button: 'X', id: 'search', busy: true }, { button: 'Y', id: 'uninstalled' }], labels }),
-    [['A', 'Install', { busy: true }], ['X', 'Search', { busy: true }], ['Y', 'Not installed', { busy: false }], ['B', 'Home']]);
+  const labels = { a: 'Install', search: 'Search', back: 'Home' };
+  assert.deepEqual(downloadHints({ hasRow: true, rowBusy: true, shortcuts: [{ button: 'X', id: 'search', busy: true }], labels }),
+    [['A', 'Install', { busy: true }], ['X', 'Search', { busy: true }], ['B', 'Home']]);
   assert.deepEqual(downloadHints({ shortcuts: [], labels }), [['B', 'Home']]);
   // The view wires them (and no longer asks the lock inside the busy run).
   const src = readFileSync(new URL('../ui/views/downloads.js', import.meta.url), 'utf8');
   assert.ok(src.includes('pressPending(row, pressDeps(') && src.includes('pressSearch(SEARCH,') && src.includes('downloadHints({'), 'Downloads uses the press rules');
   assert.ok(!/runBusy\([^)]*isLocked/.test(src) && !src.includes("? toast(t('downloads.unlockFirst')) : row.run()"), 'no lock check inside the busy run');
+  // Each gated call of the page goes through the prompt-and-retry: the search (both checks), the cancel, the update starts (updates.js).
+  assert.ok(src.includes('unlock: unlockForDownloads') && src.includes('sharedUnlock(') && !src.includes("toast(t('downloads.unlockFirst'))"), 'a locked press opens the code prompt');
+  for (const call of ['api.checkUpdates()', 'api.checkSelfUpdate?.()', 'api.cancelDownload(entry.id)']) {
+    assert.ok(src.includes(`withUnlock(() => ${call}, unlockForDownloads)`), `${call} asks for the unlock and repeats`);
+  }
+  const upd = readFileSync(new URL('../ui/views/updates.js', import.meta.url), 'utf8');
+  for (const call of ['api.startUpdate(kind, id)', 'api.startSelfUpdate()']) assert.ok(upd.includes(`withUnlock(() => ${call},`), `${call} asks for the unlock and repeats`);
   for (const file of ['views/network.js', 'views/bluetooth.js']) {
     const v = readFileSync(new URL(`../ui/${file}`, import.meta.url), 'utf8');
     assert.ok(v.includes('busyTarget(BUSY)') && !/busySsid|busyRow/.test(v), `${file} reads its busy row from the registry`);
@@ -3288,3 +4382,280 @@ console.log('busy review follow-up: ok');
   assert.ok(bridge.includes("openPluginSettingPage: (plugin, key) => call('openPluginSettingPage', plugin, key)"));
 }
 console.log('plugin settings pages: ok');
+
+// "Search artwork": what the edit menu and the detail page offer, and how a hit reads.
+{
+  const { artworkHitDetail, artworkMatchOk, canChooseArtwork, needsArtworkChoice } = await import('../ui/core/item-info-rules.js');
+  const tt = (key) => ({ 'artworkSearch.best': 'matches' })[key] ?? key;
+  for (const ok of ['steam:1145350', 'sgdb:5321']) assert.ok(artworkMatchOk(ok), ok);
+  for (const bad of [null, '', 'steam:', 'steam:0', 'steam:01', 'sgdb:abc', 'http://x', 'steam:1 ', 'gog:12', 'steam:12345678901']) assert.ok(!artworkMatchOk(bad), String(bad));
+  assert.ok(!canChooseArtwork({ source: 'steam' }));
+  assert.ok(canChooseArtwork({ source: 'folder' }));
+  assert.ok(needsArtworkChoice({ source: 'folder', type: 'game', art: { cover: [] } }));
+  assert.ok(!needsArtworkChoice({ source: 'folder', type: 'game', art: { cover: ['https://x'] } }));
+  assert.ok(!needsArtworkChoice({ source: 'folder', type: 'app', art: { cover: [] } }), 'an app with only its icon is normal');
+  assert.ok(!needsArtworkChoice({ source: 'steam', type: 'game', art: { cover: [] } }));
+  assert.equal(artworkHitDetail({ source: 'SteamGridDB', year: '2023', platforms: ['Steam', 'Epic'], best: true }, tt), '2023 · Steam, Epic · SteamGridDB · matches');
+  assert.equal(artworkHitDetail({ source: 'Steam', year: null, platforms: ['Steam'] }, tt), 'Steam');
+  assert.equal(artworkHitDetail({ source: 'SteamGridDB', year: '<b>', platforms: [42, ''] }, tt), 'SteamGridDB');
+
+  // The edit menu has the row (not for Steam's own entries), the bridge sends what the host reads, the overlay shows the thumbnails.
+  const tools = readFileSync(new URL('../ui/components/library-tools.js', import.meta.url), 'utf8');
+  assert.ok(tools.includes('artworkSearchMenu(item)') && tools.includes('canChooseArtwork(item)') && tools.includes('needsArtworkChoice(item)'));
+  const bridge = readFileSync(new URL('../ui/bridge.js', import.meta.url), 'utf8');
+  assert.ok(bridge.includes("searchArtwork: (id, query) => call('searchArtwork', id, query)"));
+  assert.ok(bridge.includes("setArtworkMatch: (id, match, name) => call('setArtworkMatch', id, match ?? null, name ?? null)"));
+  const overlay = readFileSync(new URL('../ui/components/overlay.js', import.meta.url), 'utf8');
+  assert.ok(overlay.includes("referrerPolicy: 'no-referrer'"));
+}
+console.log('artwork search: ok');
+// The phone channel's seal (ui/remote/seal.js) is byte for byte the host's RemoteSeal (RemoteChannelTests.Vector), and opens nothing else.
+{
+  const S = await import('../ui/remote/seal.js');
+  const key = Uint8Array.from({ length: 32 }, (_, i) => i);
+  const nonce = Uint8Array.from({ length: 16 }, (_, i) => 0xa0 + i);
+  const plain = '{"op":"state","args":{"name":"Grüße aus dem Wohnzimmer, ein etwas längerer Text"}}';
+  const vector = '1.7.oKGio6SlpqeoqaqrrK2ur6qdpfF0xhitAqSfKT5uKZcw66PsF0giQccLARPm7A_o0l11C6vJFPQJLYlxitywHw9Xa3xvbB5tlKr1MtA8PbWexEHquLo93L-zLJhVSr3pqhcVh-hiDdY9-UjWDDNU9_9nNvjRj2gXVQ8afZl8LkbVOG14Jw';
+  assert.equal(S.seal(key, S.DIR.request, 7, 'rpc|abc', plain, nonce), vector);
+  assert.deepEqual(S.open(key, S.DIR.request, 'rpc|abc', vector), { seq: 7, text: plain });
+  assert.equal(S.urlProof(key, 'events', 'sid|5'), '33e89a402023a384db04c474a67aa2f3');
+  assert.equal(S.open(key, S.DIR.response, 'rpc|abc', vector), null);
+  assert.equal(S.open(key, S.DIR.request, 'rpc|abd', vector), null);
+  assert.equal(S.open(key, S.DIR.request, 'rpc|abc', `1.8.${vector.slice(4)}`), null);
+  assert.equal(S.open(key, S.DIR.request, 'rpc|abc', `${vector.slice(0, -2)}AA`), null);
+  for (const bad of ['', '1.7.', `2.7.${vector.slice(4)}`, `1.07.${vector.slice(4)}`, null, 7]) assert.equal(S.open(key, S.DIR.request, 'rpc|abc', bad), null);
+}
+console.log('phone seal: ok');
+
+// The phone's sleep timer reaches the TV only as minutes of the list (or 0 = off) and a known action.
+{
+  const { TIMER_MINUTES, phoneTimer } = await import('../ui/core/sleep-timer-rules.js');
+  assert.deepEqual(TIMER_MINUTES, [30, 60, 90, 120]);
+  assert.deepEqual(phoneTimer({ type: 'sleepTimer', minutes: 60, action: 'standby' }), { minutes: 60, action: 'standby' });
+  assert.deepEqual(phoneTimer({ type: 'sleepTimer', minutes: 0 }), { minutes: 0, action: '' });
+  for (const bad of [null, {}, { type: 'keyboard', minutes: 30, action: 'shutdown' }, { type: 'sleepTimer', minutes: 45, action: 'shutdown' },
+    { type: 'sleepTimer', minutes: 30, action: 'restart' }, { type: 'sleepTimer', minutes: '30', action: 'shutdown' }, { type: 'sleepTimer', minutes: -1, action: 'shutdown' }]) {
+    assert.equal(phoneTimer(bad), null);
+  }
+}
+console.log('phone sleep timer: ok');
+
+// Settings that change from outside the page (the phone remote, a tool): the language reloads the page only between known values, the screensaver and the
+// settings page follow, and the phone's own page offers the settings of the host's positive list only (RemoteSettings.cs).
+{
+  const { languageChanged } = await import('../ui/core/settings-rules.js');
+  assert.equal(languageChanged('de', 'en'), true);
+  assert.equal(languageChanged('auto', 'de'), true);
+  assert.equal(languageChanged('de', 'de'), false);
+  for (const [a, b] of [[undefined, 'en'], ['de', undefined], [null, 'en'], ['de', 'fr'], ['fr', 'de'], ['de', ''], ['de', 'DE']]) assert.equal(languageChanged(a, b), false, `${a} -> ${b}`);
+  const app = readFileSync(new URL('../ui/app.js', import.meta.url), 'utf8');
+  assert.match(app, /languageChanged\(state\.info\.languageSetting, s\.language\)/);
+  assert.match(app, /couchhud\.languageReload/);
+  // The reload waits for a quiet moment: not under a code entry, an open dialog or the profile picker, and it is made up afterwards.
+  const { languageReloadWaits } = await import('../ui/core/settings-rules.js');
+  assert.equal(languageReloadWaits({}), false);
+  assert.equal(languageReloadWaits(), false);
+  for (const busy of [{ codeEntry: true }, { overlay: { id: 'x' } }, { pickerHold: true }]) assert.equal(languageReloadWaits(busy), true);
+  assert.match(app, /languageReloadWaits\(\{ codeEntry: codeEntryOpen\(\), overlay: state\.overlay, pickerHold: state\.pickerHold \}\)\) return;/);
+  assert.match(app, /languageReloadPending = true;\s+reloadForLanguage\(\);/);
+  assert.match(app, /setInterval\(reloadForLanguage, 1000\);/);
+  assert.match(readFileSync(new URL('../ui/components/passcode.js', import.meta.url), 'utf8'), /export const codeEntryOpen = \(\) => codeEntries\.open > 0;/);
+  assert.match(app, /window\.dispatchEvent\(new CustomEvent\('couchhud:settings', \{ detail: s \}\)\);/);
+  assert.match(app, /configureScreensaver\(\{ minutes: s\.screensaverMinutes \?\? 5, style: s\.screensaverStyle \?\? 'art'/);
+  assert.match(readFileSync(new URL('../ui/views/settings.js', import.meta.url), 'utf8'), /window\.addEventListener\('couchhud:settings'/);
+  const host = readFileSync(new URL('../src/CouchHud.Core/Remote/RemoteSettings.cs', import.meta.url), 'utf8');
+  const keys = [...host.matchAll(/new\("(\w+)", RemoteSettingKind\./g)].map((m) => m[1]);
+  assert.deepEqual(keys, ['language', 'favoritesMode', 'favoritesRecentDays', 'favoritesSites', 'screensaverMinutes', 'screensaverStyle', 'audioMode', 'soundVolume', 'musicVolume']);
+  // The TV's picker for the screensaver is the host's list.
+  const tv = readFileSync(new URL('../ui/views/settings.js', import.meta.url), 'utf8').match(/chooseDialog\(t\('settings\.screensaver\.title'\), \[([0-9, ]+)\]\.map/)[1];
+  assert.equal(`[${tv}]`, host.match(/ScreensaverMinutes = (\[[0-9, ]+\])/)[1]);
+  // The phone page: its groups name exactly these keys (and the skin), it sends only "setting"/"skin", and the settings tab is for Full.
+  const page = readFileSync(new URL('../ui/remote/index.html', import.meta.url), 'utf8');
+  const grouped = [...page.match(/const GROUPS = \[([^]*?)\];/)[1].matchAll(/'(\w+)'/g)].map((m) => m[1]).filter((k) => !/^g[A-Z]/.test(k));
+  assert.deepEqual(grouped.sort(), [...keys, 'skin'].sort());
+  assert.match(page, /act\('setting', \{ key, value \}\)/);
+  assert.match(page, /act\('skin', \{ id \}\)/);
+  assert.match(page, /\$\('tabSettings'\)\.hidden = !full;/);
+  // Every text of the settings page exists in German and English.
+  const names = [...page.matchAll(/^\s+((?:t|g|s|o)[A-Z]\w*|reloadArt|art\w+|off|days|year|unlimited|settingSaved): '/gm)].map((m) => m[1]);
+  for (const name of new Set(names)) assert.equal(names.filter((n) => n === name).length, 2, `phone page text ${name} in both languages`);
+}
+console.log('phone settings: ok');
+// Companion apps and apps in the Guide menu: the page only shapes what it shows and sends; the host decides.
+{
+  // A draft of a rule, and what differs from the saved one (nothing: null, so nothing is sent).
+  const saved = { appId: 'custom:wand', mode: 'games', games: [{ id: 'steam:1', name: 'A' }, { id: 'steam:2', name: 'B' }], closeWithGame: false, minimized: true, whenLocked: false };
+  const draft = cr.draftOf(saved);
+  assert.deepEqual(draft, { mode: 'games', gameIds: ['steam:1', 'steam:2'], closeWithGame: false, minimized: true, whenLocked: false });
+  assert.equal(cr.changeOf(saved, draft), null);
+  draft.closeWithGame = true;
+  draft.gameIds = cr.toggleGame(draft.gameIds, 'steam:1');
+  assert.deepEqual(cr.changeOf(saved, draft), { gameIds: ['steam:2'], closeWithGame: true });
+  draft.mode = cr.MODE_ALL;
+  assert.equal(cr.changeOf(saved, draft).mode, 'all');
+  // A hand-edited or older answer never widens a rule: no mode is "games", a missing switch has its safe default.
+  assert.deepEqual(cr.draftOf({}), { mode: 'games', gameIds: [], closeWithGame: false, minimized: true, whenLocked: false });
+  assert.equal(cr.draftOf({ mode: 'everything' }).mode, 'games');
+  // Only what the host reads is ever sent: no path, no arguments, no program name.
+  assert.deepEqual(cr.FIELDS, ['mode', 'gameIds', 'closeWithGame', 'minimized', 'whenLocked']);
+  assert.ok(Object.keys(cr.changeOf({}, { mode: 'all', gameIds: ['x'], closeWithGame: true, minimized: false, whenLocked: true })).every((k) => cr.FIELDS.includes(k)));
+  // The game list is capped like the host's.
+  let ids = [];
+  for (let i = 0; i < cr.MAX_GAMES + 5; i++) ids = cr.toggleGame(ids, `g${i}`);
+  assert.equal(ids.length, cr.MAX_GAMES);
+  assert.deepEqual(cr.toggleGame(['a', 'b'], 'a'), ['b']);
+  // Summary and switches of a row.
+  assert.deepEqual(cr.summary({ mode: 'all' }), { key: 'companion.sum.all' });
+  assert.deepEqual(cr.summary(saved), { key: 'companion.sum.games', params: { count: 2 } });
+  assert.deepEqual(cr.summary({ mode: 'games', games: [] }), { key: 'companion.sum.none' });
+  assert.deepEqual(cr.flagKeys({ closeWithGame: true, minimized: true, whenLocked: true }), ['companion.flag.close', 'companion.flag.minimized', 'companion.flag.locked']);
+  assert.deepEqual(cr.flagKeys({ minimized: false }), []);
+  assert.equal(cr.problemKey(null), null);
+  assert.equal(cr.problemKey('missing'), 'companion.problem.missing');
+  assert.equal(cr.problemKey('signature'), 'companion.problem.signature');
+  assert.equal(cr.problemKey('Script'), 'companion.problem.other');
+  assert.deepEqual(cr.gameRows([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], ['b']), [{ id: 'a', name: 'A', checked: false }, { id: 'b', name: 'B', checked: true }]);
+  // Wand: offered when found and not yet a companion.
+  assert.equal(cr.wandOffer({ found: true, hasRule: false }), true);
+  assert.equal(cr.wandOffer({ found: true, hasRule: true }), false);
+  assert.equal(cr.wandOffer({ found: false }), false);
+  assert.equal(cr.wandOffer(null), false);
+  // Guide menu: only apps, the toggle text follows the saved list, and the rows are what the host listed (bounded).
+  assert.equal(cr.canGuide({ type: 'app' }), true);
+  assert.equal(cr.canGuide({ type: 'game' }), false);
+  assert.equal(cr.guideRowKey(['a'], 'a'), 'guideApps.remove');
+  assert.equal(cr.guideRowKey([], 'a'), 'guideApps.add');
+  assert.deepEqual(cr.guideRows([{ id: 'a', name: 'A', path: 'C:\\x.exe' }, { id: 1, name: 'bad' }, null]), [{ id: 'a', name: 'A' }]);
+  assert.equal(cr.guideRows(Array.from({ length: 40 }, (_, i) => ({ id: `i${i}`, name: 'n' }))).length, cr.MAX_GUIDE_APPS);
+  assert.deepEqual(cr.guideRows(undefined), []);
+
+  // The pages ask for the unlock and (with parental controls) the parents' code, and offer no free path or text input.
+  const page = readFileSync(new URL('../ui/components/companions.js', import.meta.url), 'utf8');
+  assert.ok(page.includes("ensureUnlocked(t('companion.guard'))"));
+  assert.ok(page.includes("action: 'companions'"));
+  // Wand: the host's full path is shown before anything happens; an unverified file is only added as a plain app (the second argument), never set up.
+  assert.ok(page.includes("t('companion.wandConfirm', { path: wand.path ?? '' })") && page.includes("t('companion.wandUnverified', { path: wand.path ?? '' })"));
+  assert.ok(page.includes('api.setupWand(false, true)') && page.includes('if (!wand.verified)'));
+  assert.ok(!/api\.launch\(|openFileBrowser|openKeyboard/.test(page), 'no free path or text input in the companion pages');
+  const quick = readFileSync(new URL('../ui/components/quick-menu.js', import.meta.url), 'utf8');
+  assert.ok(quick.includes('api.launch(app.id)'), 'the Guide menu starts an app through the library start');
+  const bridge = readFileSync(new URL('../ui/bridge.js', import.meta.url), 'utf8');
+  assert.ok(bridge.includes("setCompanion: (appId, change) => call('setCompanion', appId, change)"));
+  assert.ok(bridge.includes("setGuideApp: (id, on) => call('setGuideApp', id, on === true)"));
+  assert.ok(bridge.includes("setupWand: (withEveryGame, acceptUnverified) => call('setupWand', withEveryGame === true, acceptUnverified === true)"));
+}
+console.log('companion apps and guide apps: ok');
+// Catalog categories and plugins without a restart (ui/core/plugin-rules.js, ui/views/plugins.js).
+{
+  const e = (id, category, categoryLabel, extra = {}) => ({ id, name: id, kind: 'plugin', status: 'notInstalled', category, categoryLabel, ...extra });
+  const list = [
+    e('zeta', 'other', 'Sonstige'), e('lights', 'smartHome', 'Smart Home'), e('kodi', 'media', 'Medien'), e('bar', 'hud', 'HUD'),
+    e('alpha', 'smartHome', 'Smart Home', { status: 'update' }), e('beta', 'smartHome', 'Smart Home'),
+    { id: 'theme', name: 'theme', kind: 'skin', status: 'notInstalled', category: 'skins', categoryLabel: 'Skins' },
+    e('future', 'quantum', 'Quantum'),
+    { id: 'oldskin', name: 'oldskin', kind: 'skin', status: 'notInstalled' }
+  ];
+  // The fixed order, "other" last; unknown ids read as other (skins: skins); older hosts without the field still list.
+  assert.deepEqual(pr.CATEGORY_ORDER, ['smartHome', 'streaming', 'hardware', 'media', 'ai', 'information', 'hud', 'skins', 'other']);
+  assert.equal(pr.categoryOf(e('x', 'quantum')), 'other');
+  assert.equal(pr.categoryOf({ kind: 'skin' }), 'skins');
+  assert.equal(pr.categoryOf({ kind: 'plugin' }), 'other');
+  assert.equal(pr.categoryOf(null), 'other');
+  assert.deepEqual(pr.categoriesIn(list).map((c) => c.id), ['smartHome', 'media', 'hud', 'skins', 'other']);
+  assert.equal(pr.categoriesIn(list).find((c) => c.id === 'smartHome').count, 3);
+  // Grouped: updates first inside a group, then by name.
+  const groups = pr.categoryGroups(list, 'all');
+  assert.deepEqual(groups.map((g) => g.id), ['smartHome', 'media', 'hud', 'skins', 'other']);
+  assert.deepEqual(groups[0].entries.map((x) => x.id), ['alpha', 'beta', 'lights']);
+  assert.deepEqual(groups.find((g) => g.id === 'other').entries.map((x) => x.id), ['future', 'zeta']);
+  assert.deepEqual(groups.find((g) => g.id === 'skins').entries.map((x) => x.id), ['oldskin', 'theme']);
+  // Filter: one group; a category that is gone counts as all; A goes round all -> each -> all.
+  assert.deepEqual(pr.categoryGroups(list, 'media').map((g) => g.id), ['media']);
+  assert.equal(pr.effectiveFilter('ai', list), 'all');
+  assert.equal(pr.effectiveFilter('hud', list), 'hud');
+  assert.deepEqual(pr.categoryGroups(list, 'ai').map((g) => g.id), ['smartHome', 'media', 'hud', 'skins', 'other']);
+  let f = 'all';
+  const walked = [];
+  for (let i = 0; i < 7; i += 1) { f = pr.nextCategoryFilter(f, list); walked.push(f); }
+  assert.deepEqual(walked, ['smartHome', 'media', 'hud', 'skins', 'other', 'all', 'smartHome']);
+  assert.deepEqual(pr.categoriesIn([]), []);
+  assert.deepEqual(pr.categoryGroups(undefined, 'all'), []);
+  // The names come from the host, never from the page's own text.
+  assert.equal(pr.categoriesIn(list).find((c) => c.id === 'media').label, 'Medien');
+
+  // The page: a filter row on A, a heading per category, the cursor stays on the filter row.
+  const plugins = readFileSync(new URL('../ui/views/plugins.js', import.meta.url), 'utf8');
+  assert.ok(plugins.includes('store.categoryFilter = nextCategoryFilter(store.categoryFilter, c.entries)'));
+  assert.ok(plugins.includes('list.push({ section: group.label })'));
+  assert.ok(plugins.includes('page.index = filterAt'));
+  assert.ok(plugins.includes("t('plugins.catalog.categoryNext')"));
+
+  // A switch says what it did: at once, or (only when the host could not) after a restart.
+  assert.ok(plugins.includes('export function tellChange'));
+  assert.ok(plugins.includes('now?.stopsAfterRestart') && plugins.includes('now?.startsAfterRestart'));
+  assert.ok(!/offerRestart\(t\('plugins\.page\.restartHint'\)\);\s*\n\s*return list;/.test(plugins), 'a plain switch no longer asks for a restart');
+}
+console.log('catalog categories and plugins without a restart: ok');
+
+
+// The second factor on a phone (0.7): the TV's question text, the bridge repeats a call only after a confirmation, the mock has every method,
+// and the phone page asks with three numbers, answers over the channel and has its texts in both languages.
+{
+  const { secondFactorText, isQuestionNumber } = await import('../ui/core/second-factor-rules.js');
+  const t = (key, vars = {}) => `${key}|${Object.entries(vars).map(([k, v]) => `${k}=${v}`).join(',')}`;
+  assert.equal(secondFactorText({ label: 'X', number: 47, reachable: true }, 42, t), 'twofa.message|label=X,number=47,seconds=42');
+  assert.match(secondFactorText({ label: 'X', number: 47, reachable: false }, 42, t), /twofa\.noPhone/);
+  assert.equal(secondFactorText({ number: 47, lockedOutSeconds: 90 }, 5, t), 'twofa.locked|minutes=2');
+  assert.equal(secondFactorText({ number: 47, lockedOutSeconds: 1 }, 5, t), 'twofa.locked|minutes=1');
+  assert.match(secondFactorText({ label: 'X', number: 47, reachable: true }, -3, t), /seconds=0/);
+  for (const ok of [10, 47, 99]) assert.ok(isQuestionNumber(ok));
+  for (const bad of [9, 100, 4.5, '47', null, undefined, NaN]) assert.ok(!isQuestionNumber(bad));
+
+  const bridge = readFileSync(new URL('../ui/bridge.js', import.meta.url), 'utf8');
+  const mock = readFileSync(new URL('../ui/mock-api.js', import.meta.url), 'utf8');
+  // The call is repeated only when the handler said yes, and only once; no handler or a no ends it as an error (cancelled).
+  assert.match(bridge, /if \(!err\?\.twofa \|\| !secondFactorHandler\) throw err;/);
+  assert.match(bridge, /if \(!\(await secondFactorHandler\(err\.twofa\)\)\) throw Object\.assign\(new Error\([^)]*\), \{ cancelled: true \}\);\s*return send\(method, args\);/);
+  assert.match(bridge, /twofa: data\.twofa \?\? null/);
+  for (const name of ['setSecondFactorHandler', 'getSecondFactor', 'setSecondFactor', 'twoFactorState', 'twoFactorCancel', 'twoFactorAdmin', 'onTwoFactor']) {
+    assert.ok(bridge.includes(`${name}:`), `bridge has ${name}`);
+    assert.ok(mock.includes(`${name}:`), `mock has ${name}`);
+  }
+  // The question and the cancel never repeat a call themselves (they use send, not call).
+  assert.match(bridge, /twoFactorState: \(\) => send\(/);
+  assert.match(bridge, /twoFactorAdmin: \(requestId\) => send\(/);
+
+  const dialog = readFileSync(new URL('../ui/components/second-factor.js', import.meta.url), 'utf8');
+  // B (onCancel) cancels the request at the host; the administrator is offered as an entry; the time runs out by itself.
+  assert.match(dialog, /onCancel: \(\) => finish\('cancel'\)/);
+  assert.match(dialog, /api\.twoFactorCancel\(current\.requestId\)/);
+  assert.match(dialog, /api\.twoFactorAdmin\(current\.requestId\)/);
+  assert.match(dialog, /if \(left <= 0\) return finish\('expired'\)/);
+
+  const page = readFileSync(new URL('../ui/remote/index.html', import.meta.url), 'utf8');
+  assert.match(page, /rpc\('secondFactor'\)/);
+  assert.match(page, /rpc\('secondFactorAnswer', \{ requestId: q\.requestId, number: choice \}\)/);
+  // A keypad, not choices: the phone gets no options and shows ten digit keys, two digits and Confirm.
+  assert.ok(!/q\.options/.test(page), 'the phone gets no options to tap');
+  assert.match(page, /\[1, 2, 3, 4, 5, 6, 7, 8, 9\]\.map\(key\)/);
+  assert.match(page, /typed\.length === 2/);
+  assert.match(page, /if \(type === 'secondFactor'\) return checkSecondFactor\(\);/);
+  // Only a phone at the full level asks; the number the TV shows is never sent to the phone (the page reads no "number" from the question).
+  assert.match(page, /if \(!channel \|\| !atLeast\('full'\)\) return;/);
+  assert.ok(!/q\.number/.test(page), 'the phone never gets the TV number');
+  const sf = [...page.matchAll(/^\s+(sf[A-Z]\w*): '/gm)].map((m) => m[1]);
+  for (const name of new Set(sf)) assert.equal(sf.filter((n) => n === name).length, 2, `phone page text ${name} in both languages`);
+  assert.ok(sf.length >= 10);
+
+  // The settings: the row, the lock-off warning (stronger with the second factor on) and the pairing page's locked state.
+  const settingsSrc = readFileSync(new URL('../ui/views/settings.js', import.meta.url), 'utf8');
+  assert.match(settingsSrc, /strong \? t\('settings\.lock\.offWarn2fa'\) : t\('settings\.lock\.offWarn'\)/);
+  assert.match(settingsSrc, /\{ danger: true, focusCancel: true, message \}/);
+  assert.match(settingsSrc, /action: 'secondFactorOff'/);
+  assert.match(settingsSrc, /canEnable === 'NoCodeCheck'/);
+  assert.match(settingsSrc, /canEnable === 'NoPhone'/);
+  const phoneView = readFileSync(new URL('../ui/views/phone.js', import.meta.url), 'utf8');
+  assert.match(phoneView, /r\.pairLocked/);
+}
+console.log('second factor: ok');
+

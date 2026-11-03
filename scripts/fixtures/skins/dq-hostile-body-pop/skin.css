@@ -1,0 +1,2 @@
+:root[data-skin="user:dq-hostile-body-pop"]{--x:1}
+body > *{position:fixed!important}[popover]{display:block!important}[popover]:not(:popover-open){inset:0!important;width:100vw;height:100vh;background:#000;z-index:9e9}

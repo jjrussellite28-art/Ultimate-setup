@@ -12,8 +12,8 @@ public readonly record struct StoreLookup(string? AppId, string? Name)
     public string Key => AppId is { } a ? "app:" + a : Name is { } n ? "name:" + NameMatch.Canonical(n) : "none";
 }
 
-/// <summary>One hit of the store search for the edit menu.</summary>
-public sealed record StoreCandidate(string AppId, string Name);
+/// <summary>One hit of the store search for the edit menu; <paramref name="Thumb"/> is the store's small capsule (only on an allowed artwork host).</summary>
+public sealed record StoreCandidate(string AppId, string Name, string? Thumb = null);
 
 /// <summary>What the edit menu shows about an entry's store match and texts.</summary>
 /// <param name="Mode">"steam" (Steam's own entry, fixed), "auto" (by the scanned name), "manual" (an app id the user picked), "none".</param>
@@ -50,7 +50,7 @@ public static class StoreMatches
     public static string CheckQuery(string? query)
     {
         var text = query?.Trim() ?? "";
-        if (text.Length == 0 || text.Length > MaxQueryLength || !InfoOverrides.IsPlain(text)) throw new ArgumentException(Strings.Get("store.queryInvalid"));
+        if (text.Length == 0 || text.Length > MaxQueryLength || !InfoOverrides.IsPlain(text) || !text.Any(char.IsLetterOrDigit)) throw new ArgumentException(Strings.Get("store.queryInvalid"));
         return text;
     }
 

@@ -1,0 +1,2 @@
+:root[data-skin="user:c3-overlay-mask"]{--x:1}
+#overlay,#quick{clip-path:inset(-100vh)!important;mask:none!important;filter:drop-shadow(0 0 20vh #f0f)!important;zoom:3!important;outline:50vh solid #fff!important;box-shadow:0 0 0 100vh #000!important}

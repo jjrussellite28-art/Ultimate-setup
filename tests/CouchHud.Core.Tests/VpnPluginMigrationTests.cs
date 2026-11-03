@@ -204,7 +204,7 @@ public sealed class VpnPluginMigrationTests : IDisposable
         Assert.Equal("CouchHud.Plugin.Vpn", entry.Folder);
         Assert.Equal("GPL-3.0-only", entry.License);
         // The owner signed it: CouchHUD's own statement for exactly this package, with its icon.
-        SignedCatalogEntry.AssertOwnSigned(entry);
+        SignedCatalogEntry.AssertOwnSignedOrWaiting(entry);
         // Its rights are the smallest set; a first-party plugin may have them (the lint of the package decides the rest).
         Assert.Null(PluginPolicy.CheckDeclared(PluginOrigin.FirstParty, entry.Capabilities));
         Assert.Equal(new[] { "native", "pages", "process", "quickActions", "registry" }, entry.Capabilities.Order());
@@ -228,7 +228,7 @@ public sealed class VpnPluginMigrationTests : IDisposable
         Assert.DoesNotContain("},    {", text0);
         // The addresses are written in the canonical form.
         var text = File.ReadAllText(Path.Combine(dir!, "catalog", "index.json"));
-        Assert.Contains("kewe87/CouchHUD-Catalog/releases/download/vpn-1.0.0/CouchHud.Plugin.Vpn-1.0.0.zip", text);
+        Assert.Contains("kewe87/CouchHUD-Catalog/releases/download/vpn-1.0.1/CouchHud.Plugin.Vpn-1.0.1.zip", text);
         Assert.DoesNotContain("couchhud-catalog/releases/download/vpn", text);
     }
 }

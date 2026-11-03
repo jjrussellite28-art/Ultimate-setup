@@ -191,7 +191,7 @@ public sealed class RequestValidator(Func<string, bool> serviceAllowed)
                     a.Kind is not (CodeKinds.Couch or CodeKinds.Parent) ? "kind"
                     : !IsSequence(a.Sequence) ? "sequence"
                     // A couch grant is for the unlock as a whole (no operations); a parent's grant only for the operations named.
-                    : a.Ops is not null && (a.Kind != CodeKinds.Parent || !IsOps(a.Ops)) ? "ops" : null);
+                    : a.Ops is not null && (a.Kind != CodeKinds.Parent || !IsOps(a.Ops) || a.Ops.Any(AdminApprovalOnly.Contains)) ? "ops" : null);
             case Operation.RequestWindowsGrant:
                 // The unlock is something the service saw itself: nothing else comes along.
                 return Typed(operation, grant, args, ["scope"], ProtocolJsonContext.Default.RequestWindowsGrantArgs, a =>
@@ -255,7 +255,17 @@ public sealed class RequestValidator(Func<string, bool> serviceAllowed)
     {
         nameof(Operation.SetAutoLogon), nameof(Operation.ChangePasscode), nameof(Operation.EnrollPasscode), nameof(Operation.RemovePasscode),
         nameof(Operation.SetLockMode), nameof(Operation.ReleaseLockPolicies), nameof(Operation.CleanupPolicyKeys), nameof(Operation.SetRemoteFirewall),
-        nameof(Operation.InstallCouchHudUpdate), nameof(Operation.ResetCodeStore)
+        nameof(Operation.InstallCouchHudUpdate), nameof(Operation.ResetCodeStore), nameof(Operation.ResetServiceState),
+        // Approvals for what a standard account may not do alone on a machine with other accounts or from a session that is not the console's.
+        nameof(Operation.PauseServices), nameof(Operation.InstallWindowsUpdates)
+    };
+
+    /// <summary>
+    /// Of <see cref="GrantableOperations"/>, the ones only an administrator's approval (UAC) opens, never a parents' code: a parents' code
+    /// is never checked for them (the service's policy refuses such a grant anyway).</summary>
+    public static readonly IReadOnlySet<string> AdminApprovalOnly = new HashSet<string>(StringComparer.Ordinal)
+    {
+        nameof(Operation.ResetCodeStore), nameof(Operation.ResetServiceState)
     };
 
     /// <summary>How many uses one parent's or administrator's grant may name (e.g. two policy groups and their key cleanup).</summary>

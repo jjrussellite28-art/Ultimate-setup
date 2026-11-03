@@ -1,0 +1,15 @@
+/* A reviewer's skin from the 0.6.4 reviews (the bypasses of the runtime check), for scripts/tabs-check.mjs, never for the catalog. Its old selectors name the
+   tab bar that a skin cannot reach any more; the block at the end tries the same on what a skin can still reach. */
+@font-face { font-family: tiny2; src: local("Segoe UI"); size-adjust: 12%; ascent-override: 500%; descent-override: 500%; }
+[data-skin="user:review-ascent"] #tab-list li { font-family: tiny2, sans-serif; }
+
+@font-face { font-family: "Segoe UI"; src: local("Arial"); size-adjust: 12%; ascent-override: 500%; descent-override: 500%; }
+@font-face { font-family: "Segoe UI Variable Display"; src: local("Arial"); size-adjust: 12%; ascent-override: 500%; descent-override: 500%; }
+@font-face { font-family: "Segoe UI Light"; src: local("Arial"); size-adjust: 12%; ascent-override: 500%; descent-override: 500%; }
+@font-face { font-family: "Bahnschrift"; src: local("Arial"); size-adjust: 12%; ascent-override: 500%; descent-override: 500%; }
+@font-face { font-family: "Arial"; src: local("Arial"); size-adjust: 12%; ascent-override: 500%; descent-override: 500%; }
+@font-face { font-family: "Tahoma"; src: local("Arial"); size-adjust: 12%; ascent-override: 500%; descent-override: 500%; }
+@font-face { font-family: "Verdana"; src: local("Arial"); size-adjust: 12%; ascent-override: 500%; descent-override: 500%; }
+@font-face { font-family: "Calibri"; src: local("Arial"); size-adjust: 12%; ascent-override: 500%; descent-override: 500%; }
+@font-face { font-family: "Consolas"; src: local("Arial"); size-adjust: 12%; ascent-override: 500%; descent-override: 500%; }
+:root[data-skin="user:review-ascent"] { --tab-font: "Segoe UI", "Segoe UI Variable Display", "Segoe UI Light", "Bahnschrift", "Arial", "Tahoma", "Verdana", "Calibri", "Consolas", tiny2; --font: "Segoe UI", "Segoe UI Variable Display", "Segoe UI Light", "Bahnschrift", "Arial", "Tahoma", "Verdana", "Calibri", "Consolas"; }

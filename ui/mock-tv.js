@@ -1,6 +1,7 @@
-// Preview of the TV control (LG webOS) without the host: a small state machine like TvController's.
+// Preview of the TV control without the host: a small state machine like TvController's.
 // ?notv: no TV paired yet; ?tvoff: the TV is off; ?tvcert: the TV shows a changed certificate; ?tvnomac: no MAC (no switching on);
-// ?tvplain: the TV has no TLS port (pairing asks for an unencrypted one in expert mode); with ?tvseen a TV was paired encrypted before.
+// ?tvplain: the TV has no TLS port (pairing asks for an unencrypted one in expert mode); with ?tvseen a TV was paired encrypted before;
+// ?tvnoplugin: no TV plugin runs (a pairing from 0.6 waits for the LG plugin); ?tvsamsung: the Samsung plugin runs too.
 
 const params = new URLSearchParams(location.search);
 const INPUTS = [
@@ -23,10 +24,21 @@ const tv = {
   certReplaced: false
 };
 const listeners = [];
+const PROVIDERS = params.has('tvnoplugin') ? [] : [
+  { id: 'lg-webos', name: 'LG webOS', plugin: 'webostv' },
+  ...(params.has('tvsamsung') ? [{ id: 'samsung-tizen', name: 'Samsung Tizen', plugin: 'samsungtv' }] : [])
+];
+let provider = 'lg-webos';
+const ready = (id) => PROVIDERS.some((p) => p.id === id);
+const KNOWN = { 'lg-webos': ['LG webOS', 'webostv'], 'samsung-tizen': ['Samsung Tizen', 'samsungtv'] };
 
 const describe = () => ({
-  provider: 'lg-webos',
-  providerName: 'LG webOS',
+  provider: tv.paired ? provider : '',
+  providerName: tv.paired ? KNOWN[provider][0] : '',
+  providerMissing: tv.paired && !ready(provider),
+  installPlugin: tv.paired && !ready(provider) ? KNOWN[provider][1] : null,
+  providers: PROVIDERS,
+  migrated: tv.paired && params.has('tvnoplugin'),
   paired: tv.paired,
   address: tv.paired ? '192.168.1.20' : null,
   name: null,
@@ -47,6 +59,7 @@ const publish = () => listeners.forEach((cb) => cb(describe()));
 const later = (ms, fn) => setTimeout(() => { fn(); publish(); }, ms);
 const needOn = () => {
   if (!tv.paired) throw new Error('No TV paired yet (Settings › TV)');
+  if (!ready(provider)) throw new Error('The plugin for this TV is missing. Install it from the catalog');
   if (tv.error === 'certChanged') throw new Error('The TV shows a different certificate. Pair the TV again (Settings › TV)');
   if (tv.power !== 'on') throw new Error('The TV doesn’t answer. Is it on and in the same network?');
 };
@@ -96,9 +109,14 @@ export function tvMock() {
     },
     tvDiscover: async () => {
       await new Promise((r) => setTimeout(r, 1200));
-      return [{ address: '192.168.1.20', name: '[LG] webOS TV OLED55C3', provider: 'lg-webos' }];
+      return [
+        { address: '192.168.1.20', name: '[LG] webOS TV OLED55C3', provider: 'lg-webos', providerName: 'LG webOS', ready: ready('lg-webos'), plugin: ready('lg-webos') ? null : 'webostv' },
+        { address: '192.168.1.31', name: '[TV] Samsung Q80', provider: 'samsung-tizen', providerName: 'Samsung Tizen', ready: ready('samsung-tizen'), plugin: ready('samsung-tizen') ? null : 'samsungtv' }
+      ];
     },
-    tvPair: async (address, allowPlain) => {
+    tvPair: async (address, allowPlain, kind) => {
+      const chosen = kind ?? (PROVIDERS.length === 1 ? PROVIDERS[0].id : null);
+      if (!chosen || !ready(chosen)) throw new Error('The plugin for this TV is missing. Install it from the catalog');
       if (!/^(10|172\.(1[6-9]|2\d|3[01])|192\.168)\./.test(address)) throw new Error('That’s not an address in your home network (e.g. 192.168.1.20)');
       if (tv.pairing !== 'idle') throw new Error('A pairing is already running. Confirm it on the TV or cancel it first');
       if (params.has('tvplain') && !allowPlain) {
@@ -112,6 +130,7 @@ export function tvMock() {
       tv.pairing = 'prompt';
       publish();
       await new Promise((r) => setTimeout(r, 2500));
+      provider = chosen;
       Object.assign(tv, { paired: true, power: 'on', pairing: 'idle', error: null, mac: tv.mac ?? 'A8:23:FE:01:02:03', secure: !allowPlain, certReplaced: replaced });
       publish();
       return describe();

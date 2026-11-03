@@ -153,6 +153,7 @@ public sealed class ParentalController
     private string? _blockedId;
     private string _lastStatus = "";
 
+    [SecondFactorExempt("bookkeeping: marks the play time ledger as started, no rule is loosened")]
     public ParentalController(ConfigStore config, string dataDir, byte[]? key, ParentalHooks hooks, bool persist = true)
     {
         _config = config;
@@ -166,6 +167,7 @@ public sealed class ParentalController
         Service = new ParentalService(() => _config.Current.Profile(ProfileId).Rules, ledger,
             new TrustedClock(() => DateTimeOffset.UtcNow, () => Environment.TickCount64, ZoneOffset, ledger.LastUtc));
         Service.Warning += OnWarning;
+        ApplyLimitKeyMoves();
         if (ledger.Tampered) Console.Error.WriteLine("[parental] the play time file was changed or removed");
         else if (!profile.IsDefault && config.Current.ParentalEnabled && !profile.Rules.LedgerStarted)
         {
@@ -179,6 +181,9 @@ public sealed class ParentalController
                 });
         }
     }
+
+    /// <summary>A watched-folder game whose start program changed keeps its per-game play time of the last days (the key follows the folder), once per move.</summary>
+    private void ApplyLimitKeyMoves() => FolderIdMigration.ApplyPending(_config, ProfileId, Service.Ledger);
 
     private TimeSpan ZoneOffset(DateTimeOffset at)
     {
@@ -203,6 +208,9 @@ public sealed class ParentalController
 
     /// <summary>A game started outside CouchHud breaks the rules and waits for the parents or the end of the grace time.</summary>
     public bool Blocked => _blockedId is not null;
+
+    /// <summary>That entry is the one held by <see cref="Blocked"/>: it must not be brought back to the front.</summary>
+    public bool BlocksGame(string id) => _blockedId == id;
 
     public string? BlockedGame { get; private set; }
 
@@ -257,6 +265,7 @@ public sealed class ParentalController
     /// <summary>Every few seconds on the UI thread.</summary>
     public void Tick()
     {
+        ApplyLimitKeyMoves();
         var session = _hooks.Session();
         var game = Counted();
         // Several games at once count once, but all of them end with the time.
@@ -447,6 +456,7 @@ public sealed class ParentalController
         var counts = item.Type == ItemType.Game || cfg.CountApps;
         if (counts)
         {
+            ApplyLimitKeyMoves(); // a move recorded a moment ago counts before the question
             var time = Service.CanStart(ParentalService.LimitKey(item));
             if (!time.Ok)
             {

@@ -1,0 +1,2 @@
+/* For scripts/tabs-check.mjs, never for the catalog. */
+:root{--bg:#fff;--fg:#fff;--muted:#fff;--tab-color:#fff;--tab-color-active:#fff;--tab-bg:#fff;--tab-bg-active:#fff;--bar-bg:#fff;--tab-accent:#fff;--tab-glyph-color:#fff} body::before{content:"";position:fixed;top:0;left:0;right:0;height:9rem;background:#fff;z-index:9999;pointer-events:none}

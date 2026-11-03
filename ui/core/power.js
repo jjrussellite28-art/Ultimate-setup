@@ -2,10 +2,11 @@
 // entries, texts and confirmations.
 //
 //   requestPower(id)            asks first (focus on "Abbrechen"), then runs; resolves to true if it ran
-//   powerMenu({ sleepTimer })   overlay menu definition for openOverlay(): two groups (CouchHUD, Computer), see power-rules.js
+//   powerMenu({ sleepTimer })   overlay menu definition for openOverlay(): three tiles, a "Mehr" row and the timer row, see power-rules.js
 //   powerEntries(ids?)          [{ id, icon, label, detail, run }] for custom menus (settings, ...)
 //   powerRows()                 Guide menu rows
 //   chooseSleepTimer()          sleep timer picker (minutes, then shut down or standby); sleepTimerDetail() is its status text
+//   listenToPhoneSleepTimer()   the phone may start or stop the timer (the host checked the gates); the TV reports the timer back
 //
 // Ids: standby, pc-mode, restart-app, restart, restart-pc, shutdown, quit. The mode decides which are offered (see forMode).
 
@@ -15,8 +16,8 @@ import { attempt, toast } from './feedback.js';
 import { t } from './i18n.js';
 import { chooseDialog, closeOverlay, closeTagged, confirmDialog, openOverlay } from '../components/overlay.js';
 import { ensureUnlocked } from '../components/passcode.js';
-import { POWER_START, SLEEP_TIMER, forMode as forModeRule, isDangerous, powerGroups, powerIndex } from './power-rules.js';
-import { TIMER_ACTIONS, TIMER_ACTION_KEY, TIMER_WARN_MS, timerAction, timerTexts, timerUnlock, warnDelay } from './sleep-timer-rules.js';
+import { MORE, POWER_START, SLEEP_TIMER, forMode as forModeRule, isDangerous, isSecondary, powerEntryIds, powerLayout } from './power-rules.js';
+import { TIMER_ACTIONS, TIMER_ACTION_KEY, TIMER_MINUTES, TIMER_WARN_MS, phoneTimer, timerAction, timerTexts, timerUnlock, warnDelay } from './sleep-timer-rules.js';
 
 /** How the Start menu lays out its groups: 'list' (rows with headings) or 'tiles' (one row of large tiles per group). */
 export const POWER_MENU_LAYOUT = 'tiles';
@@ -123,41 +124,62 @@ export function powerEntries(ids = POWER_ACTIONS.map((a) => a.id), { onCancel } 
 }
 
 /**
- * The Start menu: CouchHUD's own entries on top, the computer's below a separator (power-rules.js). Focus starts on standby; after a
- * cancelled question the menu comes back on the entry the question was about. No "Abbrechen" entry: B, a click next to the menu
- * or the B hint close it.
+ * The Start menu: three large tiles (standby, shut down, restart), a collapsed "Mehr" row with the rare entries (PC mode, restart into
+ * it, restart CouchHUD, quit) and one row for the sleep timer (power-rules.js). Focus starts on standby. A expands "Mehr" in place and
+ * moves to its first entry; B folds it back before the menu closes; X opens the timer picker from anywhere. After a cancelled question
+ * the menu comes back on the entry the question was about (focus), expanded if that entry lives behind "Mehr". No "Abbrechen" entry:
+ * B, a click next to the menu or the B hint close it. Whether "Mehr" is open is remembered for the open menu only.
  */
-export function powerMenu({ sleepTimer = true, index, layout = POWER_MENU_LAYOUT } = {}) {
-  const groups = powerGroups(!!state.info?.isShell, { sleepTimer });
-  const ids = groups.flatMap((g) => g.ids);
-  const reopen = (id) => openOverlay(powerMenu({ sleepTimer, layout, index: powerIndex(ids, id) }));
-  const actions = new Map(powerEntries(ids.filter((id) => id !== SLEEP_TIMER), { onCancel: reopen }).map((e) => [e.id, e]));
-  // i18n-used: power.group.app power.group.pc
-  // Object.assign, not a spread: the timer's value is a getter that must stay live.
-  const entries = groups.flatMap((g) => g.ids.map((id) => Object.assign(id === SLEEP_TIMER ? sleepTimerEntry(() => reopen(SLEEP_TIMER)) : actions.get(id), { group: t(g.heading) })));
-  return {
-    title: t('power.title'),
-    entries,
-    layout,
-    details: layout === 'tiles' ? 'below' : 'focused',
-    // A running timer counts down while the menu is open (the option above shadows the timer's state, hence timerRunning()).
-    refreshMs: sleepTimer && timerRunning() ? 15_000 : 0,
-    index: index ?? powerIndex(ids, POWER_START)
+export function powerMenu({ sleepTimer = true, focus = POWER_START, expanded = false, layout = POWER_MENU_LAYOUT } = {}) {
+  const parts = powerLayout(!!state.info?.isShell, { sleepTimer });
+  const reopen = (id, open = isSecondary(parts, id)) => openOverlay(powerMenu({ sleepTimer, layout, expanded: open, focus: id }));
+  const actions = new Map(powerEntries([...parts.primary, ...parts.more], { onCancel: (id) => reopen(id) }).map((e) => [e.id, e]));
+  const timer = () => pickSleepTimer(() => reopen(SLEEP_TIMER, menu.expanded));
+  // The menu object stays the same when "Mehr" folds in or out (the refresh timer and the overlay hold it); only its entries change.
+  const menu = { title: t('power.title'), layout, details: layout === 'tiles' ? 'below' : 'focused' };
+  const fill = (open, focusId, reveal) => {
+    const ids = powerEntryIds(parts, open);
+    const entries = ids.map((id) => {
+      if (id === SLEEP_TIMER) return Object.assign(sleepTimerEntry(timer), { wide: true, row: id });
+      if (id === MORE) return moreEntry(open, () => fill(!open, open ? MORE : parts.more[0], !open));
+      return Object.assign(actions.get(id), isSecondary(parts, id) ? { wide: true, row: id, reveal } : { row: 'primary' });
+    });
+    Object.assign(menu, {
+      entries,
+      expanded: open,
+      // A running timer counts down while the menu is open (the option above shadows the timer's state, hence timerRunning()).
+      refreshMs: sleepTimer && timerRunning() ? 15_000 : 0,
+      index: Math.max(0, ids.indexOf(focusId)),
+      hints: () => [['A', t('nav.select')], ...(sleepTimer ? [['X', t('power.timerHint')]] : []), ['B', t('nav.back')]],
+      onBack: () => {
+        if (!menu.expanded) return false;
+        fill(false, MORE, false);
+        return true;
+      },
+      keys: sleepTimer ? { x: timer } : {}
+    });
   };
+  fill(expanded, focus, false);
+  return menu;
+}
+
+/** The "Mehr" row: folds the rare entries in and out (A on it never closes the menu). */
+function moreEntry(open, toggle) {
+  return { id: MORE, icon: '⋯', label: t('power.more'), detail: t('power.moreDetail'), value: open ? '▴' : '▾', wide: true, row: MORE, expanded: open, keepOpen: true, run: toggle };
 }
 
 /**
- * The timer in the menu: a running one says its remaining time once (on the right of the row, under the tile), "Aus" is its
- * detail. Cancelling the picker comes back to the menu on the timer.
+ * The timer row: always says its state on the right ("Aus", or the remaining time and what happens). Cancelling the picker comes back
+ * to the menu on the timer.
  */
-function sleepTimerEntry(back) {
+function sleepTimerEntry(pick) {
   return {
     id: SLEEP_TIMER,
     icon: '⏲',
     label: t('power.sleepTimer'),
-    get detail() { return sleepTimer.at ? '' : sleepTimerDetail(); },
-    get value() { return sleepTimer.at ? sleepTimerDetail() : ''; },
-    run: () => pickSleepTimer(back)
+    detail: '',
+    get value() { return sleepTimerDetail(); },
+    run: pick
   };
 }
 
@@ -173,7 +195,7 @@ export function powerRows() {
 // Sleep timer: "in 60 minutes shut down" (or standby), like on a TV. The action is a power entry's id (sleep-timer-rules.js); when
 // the timer runs out, that entry's own host call runs, without asking again: it was authorised when the timer was set.
 // gen tells an old warning (its timer was cancelled, replaced or fired) from the current one.
-const sleepTimer = { at: 0, action: '', handle: 0, warnHandle: 0, gen: 0 };
+const sleepTimer = { at: 0, action: '', handle: 0, warnHandle: 0, gen: 0, token: '' };
 const WARN_TAG = 'sleep-timer-warning';
 
 function timerRunning() {
@@ -202,7 +224,7 @@ function rememberAction(action) {
  * B in the minutes runs onCancel (the power menu comes back). "Timer aus" is one step.
  */
 async function pickSleepTimer(onCancel) {
-  const options = [30, 60, 90, 120].map((m) => ({ label: t('power.inMinutes', { n: m }), value: m }));
+  const options = TIMER_MINUTES.map((m) => ({ label: t('power.inMinutes', { n: m }), value: m }));
   if (sleepTimer.at) options.push({ label: t('power.timerOff'), value: 0 });
   let minutes;
   let action;
@@ -227,27 +249,70 @@ async function pickSleepTimer(onCancel) {
   toast(t(timerTexts(action).set, { n: minutes }));
 }
 
-function stopSleepTimer() {
+// The host shows its notice over a game only for the timer armed here, close to its end (Hud.SleepTimerWarning).
+function stopSleepTimer(tellHost = true) {
   clearTimeout(sleepTimer.handle);
   clearTimeout(sleepTimer.warnHandle);
+  const wasRunning = !!sleepTimer.at;
   sleepTimer.at = 0;
   sleepTimer.action = '';
+  sleepTimer.token = '';
   sleepTimer.gen++;
   closeTagged(WARN_TAG);
+  if (tellHost && wasRunning) api.sleepTimerArm?.(null, 0).catch(() => {});
+  if (wasRunning) reportSleepTimer();
 }
 
-function startSleepTimer(ms, action) {
+/** The phone page shows the TV's timer: the host keeps only end and action. */
+function reportSleepTimer() {
+  api.sleepTimerState?.({ at: sleepTimer.at, action: sleepTimer.action, token: sleepTimer.token })?.catch?.(() => {});
+}
+
+let phoneTimerListening = false;
+// True while CouchHUD is in PC mode (the host says so): no sleep timer starts or fires then, whoever set it.
+let pcModeActive = false;
+
+/**
+ * The phone's sleep timer: the host checked the same gates as for the power action it ends in (couch lock, waiting picker, areas, the
+ * owner's setting, PC mode) and told the TV; here it starts like one set on the couch (with the warning a minute before), or stops.
+ */
+export function listenToPhoneSleepTimer() {
+  if (phoneTimerListening) return;
+  phoneTimerListening = true;
+  api.onRemote?.((event) => {
+    // PC mode: the desktop is in use, no timer may shut it down. The host sends this when PC mode begins or ends.
+    if (event?.type === 'pcMode') {
+      pcModeActive = event.on === true;
+      if (pcModeActive) stopSleepTimer();
+      return;
+    }
+    const timer = phoneTimer(event);
+    if (!timer) return;
+    if (!timer.minutes) return stopSleepTimer();
+    // The host's token for this very timer comes back with the report: that is how it knows the timer is the phone's.
+    startSleepTimer(timer.minutes * 60_000, timer.action, typeof event.token === 'string' ? event.token : '');
+  });
+}
+
+function startSleepTimer(ms, action, token = '') {
+  // The host hears the cancel of a replaced timer too (its arm gap is cleared by it).
   stopSleepTimer();
+  if (pcModeActive) return;
   sleepTimer.at = Date.now() + ms;
   sleepTimer.action = action;
+  sleepTimer.token = token;
+  api.sleepTimerArm?.(action, Math.ceil(ms / 1000)).catch(() => {});
   sleepTimer.warnHandle = setTimeout(warnSleepTimer, warnDelay(ms));
   sleepTimer.handle = setTimeout(fireSleepTimer, ms);
+  reportSleepTimer();
 }
 
 /** Runs the power entry the timer was set for (its own host call only; the action was checked when it was stored). */
 function fireSleepTimer() {
   const action = byId(timerAction(sleepTimer.action));
   stopSleepTimer();
+  // Checked again at the end: a timer set before PC mode never shuts the desktop down (the host also ends it when PC mode begins).
+  if (pcModeActive) return;
   attempt(() => action.run(), action.label);
 }
 
@@ -262,9 +327,13 @@ async function warnSleepTimer() {
   await new Promise((resolve) => setTimeout(resolve, 0));
   if (gen !== sleepTimer.gen) return;
   const entry = byId(action);
-  const now = await confirmDialog(t(timerTexts(action).warn, { n: Math.round(TIMER_WARN_MS / 1000) }), t('power.timerNow'), {
+  const seconds = Math.round(TIMER_WARN_MS / 1000);
+  const asked = confirmDialog(t(timerTexts(action).warn, { n: seconds }), t('power.timerNow'), {
     danger: action === 'shutdown', icon: entry.icon, tag: WARN_TAG, focusCancel: true
   });
+  // A game in front hides the question: the host shows a notice over it and brings the HUD (with the question) to the front.
+  api.sleepTimerWarning?.(action, seconds).catch(() => {});
+  const now = await asked;
   // The timer was cancelled, replaced or fired meanwhile: this answer is about nothing any more.
   if (gen !== sleepTimer.gen) return;
   if (now) return fireSleepTimer();

@@ -51,7 +51,8 @@ public static partial class Winget
 
             var id = Column(1);
             var available = Column(3);
-            if (id.Length == 0 || id.Contains(' ') || available.Length == 0) continue;
+            // An id that could not be handed back to winget safely is not listed at all.
+            if (!IsValidId(id) || available.Length == 0) continue;
             result.Add(new UpdateItem(
                 id,
                 "winget",
@@ -63,9 +64,10 @@ public static partial class Winget
         return result;
     }
 
-    /// <summary>Arguments for upgrading one package (or all with <paramref name="id"/> null), without any prompt.</summary>
+    /// <summary>Arguments for upgrading one package (or all with <paramref name="id"/> null), without any prompt. Throws for an id that is not <see cref="IsValidId"/>.</summary>
     public static IReadOnlyList<string> UpgradeArguments(string? id)
     {
+        if (id is not null && !IsValidId(id)) throw new ArgumentException("not a winget package id", nameof(id));
         var args = new List<string> { "upgrade" };
         if (id is null) args.Add("--all");
         else args.AddRange(["--id", id, "--exact"]);
@@ -84,6 +86,16 @@ public static partial class Winget
             .ToList();
 
     private static string? NullIfUnknown(string version) => version is "" or "Unknown" or "Unbekannt" or "<" ? null : version;
+
+    /// <summary>
+    /// A package id as winget lists it and as it may be handed back to winget: ids come from winget's own output, which is untrusted.
+    /// Letters, digits and <c>. - _ + \ { } ~ &amp;</c> (store ids, "Notepad++.Notepad++", "ARP\Machine\X64\{GUID}"), at most 128
+    /// characters, never starting with '-' (it would read as an option); no blanks, quotes, control characters or anything else.
+    /// </summary>
+    public static bool IsValidId(string? id) => id is { Length: > 0 and <= 128 } && id[0] != '-' && ValidId().IsMatch(id);
+
+    [GeneratedRegex(@"^[A-Za-z0-9._\-+\\{}~&]+\z")]
+    private static partial Regex ValidId();
 
     [GeneratedRegex(@"\S+")]
     private static partial Regex HeaderWord();

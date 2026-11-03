@@ -1,0 +1,9 @@
+/* For scripts/tabs-check.mjs, never for the catalog: the runtime has to fall back to the default skin. */
+/* The page is cut to nothing: the tabs are drawn but cannot be hit. */
+html[data-skin="user:hostile-contain"] {
+  overflow: hidden;
+}
+[data-skin="user:hostile-contain"] body {
+  height: 0 !important;
+  overflow: hidden !important;
+}

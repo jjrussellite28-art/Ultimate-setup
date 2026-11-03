@@ -6,29 +6,32 @@ using System.Text;
 namespace CouchHud.Core.Integrations.Tv;
 
 /// <summary>
-/// Finding LG webOS TVs in the local network with SSDP: one M-SEARCH for <c>urn:lge-com:service:webos-second-screen:1</c> to the
+/// Finding TVs in the local network with SSDP: one M-SEARCH per kind of TV CouchHUD knows (<see cref="TvProviderRegistry.Known"/>: LG
+/// webOS <c>urn:lge-com:service:webos-second-screen:1</c>, Samsung <c>urn:samsung.com:device:RemoteControlReceiver:1</c>) to the
 /// multicast group 239.255.255.250:1900 from each private IPv4 address of this PC (TTL 1, so it never leaves the subnet), answers
 /// collected for a few seconds. Only the sender's address is used: the LOCATION URL in the answer is never fetched, an answer from an
 /// address outside the local network is dropped, and every answer is size-limited. Runs only when the user asks (Settings › TV › Search).
 /// </summary>
 public static class SsdpDiscovery
 {
+    /// <summary>The LG webOS target (kept for the tests and the docs).</summary>
     public const string SearchTarget = "urn:lge-com:service:webos-second-screen:1";
     public static readonly IPEndPoint Group = new(IPAddress.Parse("239.255.255.250"), 1900);
     public const int MaxAnswerBytes = 2048;
     public const int MaxDevices = 16;
 
-    public static byte[] SearchMessage() => Encoding.ASCII.GetBytes(
+    public static byte[] SearchMessage(string target = SearchTarget) => Encoding.ASCII.GetBytes(
         "M-SEARCH * HTTP/1.1\r\n" +
         "HOST: 239.255.255.250:1900\r\n" +
         "MAN: \"ssdp:discover\"\r\n" +
         "MX: 2\r\n" +
-        $"ST: {SearchTarget}\r\n" +
+        $"ST: {target}\r\n" +
         "\r\n");
 
     /// <summary>
-    /// One answer: "HTTP/1.1 200 OK" with <c>ST</c> (or <c>NT</c>) equal to the webOS target, from a local-network address. The name comes
-    /// from LG's <c>DLNADeviceName.lge.com</c> header (URL-encoded) if present, cleaned like any text from the TV. Null otherwise.
+    /// One answer: "HTTP/1.1 200 OK" with <c>ST</c> (or <c>NT</c>) equal to the target of a known kind of TV, from a local-network address;
+    /// the device carries that kind's provider id. The name comes from LG's <c>DLNADeviceName.lge.com</c> header (URL-encoded) if present,
+    /// cleaned like any text from the TV. Null otherwise.
     /// </summary>
     public static TvDevice? ParseAnswer(ReadOnlySpan<byte> data, IPAddress from, bool allowLoopback = false)
     {
@@ -49,13 +52,14 @@ public static class SsdpDiscovery
             if (key.Equals("ST", StringComparison.OrdinalIgnoreCase) || key.Equals("NT", StringComparison.OrdinalIgnoreCase)) st ??= value;
             else if (key.Equals("DLNADeviceName.lge.com", StringComparison.OrdinalIgnoreCase))
             {
-                try { name = WebOsProtocol.CleanLabel(Uri.UnescapeDataString(value)); }
+                try { name = TvText.CleanLabel(Uri.UnescapeDataString(value)); }
                 catch (UriFormatException) { name = null; }
             }
         }
-        if (!string.Equals(st, SearchTarget, StringComparison.OrdinalIgnoreCase)) return null;
+        var kind = TvProviderRegistry.Known.FirstOrDefault(k => k.SsdpTarget is not null && string.Equals(st, k.SsdpTarget, StringComparison.OrdinalIgnoreCase));
+        if (kind is null) return null;
         if (from.IsIPv4MappedToIPv6) from = from.MapToIPv4();
-        return new TvDevice(from.ToString(), name, WebOsClient.ProviderId);
+        return new TvDevice(from.ToString(), name, kind.Id);
     }
 
     /// <summary>Searches for <paramref name="duration"/> (capped at 5 s); duplicates by address are merged, at most <see cref="MaxDevices"/>.</summary>
@@ -78,13 +82,16 @@ public static class SsdpDiscovery
                 }
                 catch (SocketException) { }
             }
-            var message = SearchMessage();
+            var messages = TvProviderRegistry.Known.Where(k => k.SsdpTarget is not null).Select(k => SearchMessage(k.SsdpTarget!)).ToList();
             foreach (var udp in sockets)
             {
                 for (var i = 0; i < 2; i++)
                 {
-                    try { await udp.SendAsync(message, Group, cts.Token); }
-                    catch (SocketException) { }
+                    foreach (var message in messages)
+                    {
+                        try { await udp.SendAsync(message, Group, cts.Token); }
+                        catch (SocketException) { }
+                    }
                 }
             }
             var lockObj = new object();
@@ -121,7 +128,7 @@ public static class SsdpDiscovery
             if (nic.OperationalStatus != OperationalStatus.Up || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback || !nic.SupportsMulticast) continue;
             foreach (var u in nic.GetIPProperties().UnicastAddresses)
             {
-                if (u.Address.AddressFamily == AddressFamily.InterNetwork && TvAddressPolicy.IsAllowed(u.Address)) yield return u.Address;
+                if (u.Address.AddressFamily == AddressFamily.InterNetwork && TvAddressPolicy.InLocalRange(u.Address)) yield return u.Address;
             }
         }
     }

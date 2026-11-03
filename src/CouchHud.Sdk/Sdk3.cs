@@ -42,6 +42,23 @@ public static class PluginCapabilities
     public const string StartupArgs = "startup.args";
     /// <summary>First-party only: a web sign-in in the couch browser whose redirect address the host catches without loading it (<see cref="IPluginContext.SignIn"/>).</summary>
     public const string BrowserSignIn = "browser.signin";
+    /// <summary>SDK 5: the weather in the header (<see cref="IPluginContext.RegisterWeather"/>).</summary>
+    public const string Weather = "weather";
+    /// <summary>SDK 5: the source of the News tab (<see cref="IPluginContext.RegisterNews"/>).</summary>
+    public const string News = "news";
+    /// <summary>SDK 5, first-party only: a cloud provider for the assistant (<see cref="IPluginContext.RegisterChatProvider"/>); it sees the whole conversation.</summary>
+    public const string ChatProvider = "assistant.provider";
+    /// <summary>SDK 5: read-only state of CouchHUD itself: version, shell or app mode, PC mode, the running app, the sleep timer, the lock (<see cref="IPluginContext.Host"/>).</summary>
+    public const string HostState = "host.state";
+    /// <summary>First-party only: puts fan speeds and temperatures on the host's sensor board (<see cref="IPluginContext.PublishSensors"/>).</summary>
+    public const string SensorsPublish = "sensors.publish";
+    /// <summary>Reads fan speeds and temperatures from the host's sensor board, read only (<see cref="IPluginContext.ReadSensors"/>).</summary>
+    public const string SensorsRead = "sensors.read";
+    /// <summary>
+    /// SDK 5: brings the protocol of one kind of TV (<see cref="IPluginContext.RegisterTvProvider"/>). The plugin reaches only the TV the user
+    /// pairs, only through the <see cref="ITvLink"/> the core hands it (no socket of its own, no network capability needed).
+    /// </summary>
+    public const string TvControl = "tv.control";
 
     // What the lint finds in the code (System.Reflection.Metadata, the plugin never runs for it). Declaring them grants no host member.
     /// <summary>P/Invoke, native libraries, native files in the package.</summary>
@@ -61,7 +78,9 @@ public static class PluginCapabilities
     public static readonly IReadOnlyList<string> All =
     [
         Library, Pages, QuickActions, Assistant, Notify, Browser, Downloads, NetworkState, Process, Tabs, SetupRun, LockRestrict, StartupArgs, BrowserSignIn,
-        Native, Registry, NetworkLoopback, NetworkLan, NetworkInternet, DynamicCode
+        Weather, News, ChatProvider, HostState,
+        SensorsPublish, SensorsRead,
+        TvControl, Native, Registry, NetworkLoopback, NetworkLan, NetworkInternet, DynamicCode
     ];
 }
 

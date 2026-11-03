@@ -1,0 +1,2 @@
+/* For scripts/tabs-check.mjs, never for the catalog. */
+#quick:popover-open{outline:200vh solid #000 !important; box-shadow:0 0 0 200vh #000 !important; filter:brightness(0) !important; scale:40 !important}

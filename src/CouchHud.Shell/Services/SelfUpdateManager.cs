@@ -201,7 +201,8 @@ public sealed class SelfUpdateManager
                 Publish();
                 // From the moment the service runs the setup, the setup stops the service: that is no reason for alarm or a Windows lock.
                 AdminService.ExpectRestart(TimeSpan.FromMinutes(15));
-                var result = await AdminService.Ops.InstallCouchHudUpdateAsync(header, setup.ReadFromStart(), null);
+                var result = await AdminService.WithGrantJobAsync(CouchHud.Service.Contracts.Operation.InstallCouchHudUpdate,
+                    () => AdminService.Ops.InstallCouchHudUpdateAsync(header, setup.ReadFromStart(), null));
                 if (!result.Started)
                 {
                     AdminService.ExpectRestart(TimeSpan.Zero);

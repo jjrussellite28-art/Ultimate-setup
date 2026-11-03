@@ -1,0 +1,10 @@
+/* A skin that lays the page over the tab bar (click-through, so a plain hit test would not see it), for scripts/tabs-check.mjs: the runtime
+   cannot take that back in the bar, so it has to fall back to the default skin. Never for the catalog. */
+
+[data-skin="user:hostile-cover"] #view {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #111;
+  pointer-events: none;
+}

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using CouchHud.Core.Assistant;
+using CouchHud.Sdk;
 
 namespace CouchHud.Core.Tests;
 
@@ -84,10 +85,10 @@ public class AssistantTests
     [Fact]
     public async Task A_failed_request_leaves_the_history_usable()
     {
-        var provider = new ScriptedProvider(new ChatReply(null, [new ToolCall("t1", "get_weather", Args("{}"))]));
+        var provider = new ScriptedProvider(new ChatReply(null, [new ToolCall("t1", "get_session", Args("{}"))]));
         var session = new AssistantSession(provider, new FakeHost());
 
-        await Assert.ThrowsAsync<AssistantException>(() => session.AskAsync("Wetter?", (_, _) => Task.FromResult(true)));
+        await Assert.ThrowsAsync<AssistantException>(() => session.AskAsync("Was läuft?", (_, _) => Task.FromResult(true)));
 
         Assert.Empty(session.History);
     }
@@ -106,79 +107,108 @@ public class AssistantTests
         Assert.Empty(session.History);
     }
 
-    [Fact]
-    public void OpenAi_reply_cut_off_by_the_token_limit_is_an_error()
+    /// <summary>A provider plugin as the SDK sees it (the vendors' own tests live in their plugin repos since 0.7).</summary>
+    private sealed class FakePluginProvider(Func<PluginChatReply?>? reply = null, Exception? fail = null, TimeSpan? delay = null) : CouchHud.Sdk.IPluginChatProvider
     {
-        Assert.Throws<AssistantException>(() => OpenAiProvider.ParseReply(JsonNode.Parse("""
-            {"choices":[{"finish_reason":"length","message":{"content":""}}]}
-            """)!));
-        Assert.Equal("low", OpenAiProvider.BuildRequest("gpt-5-mini", "s", [], [])["reasoning_effort"]!.GetValue<string>());
+        public string? Model { get; private set; }
+        public IReadOnlyList<PluginChatMessage> Sent { get; private set; } = [];
+        public IReadOnlyList<PluginChatTool> Tools { get; private set; } = [];
+        public string Id => "fake";
+        public string Name => "Fake\u0007 AI";
+        public IReadOnlyList<string> Models => ["m1"];
+        public bool HasKey => true;
+        public void SetKey(string? key) { }
+
+        public async Task<PluginChatReply> CompleteAsync(string model, string system, IReadOnlyList<PluginChatMessage> history, IReadOnlyList<PluginChatTool> tools, CancellationToken ct)
+        {
+            Model = model;
+            Sent = history;
+            Tools = tools;
+            if (delay is { } d) await Task.Delay(d, ct);
+            if (fail is not null) throw fail;
+            return reply?.Invoke()!;
+        }
     }
 
     [Fact]
-    public void Anthropic_request_pairs_tool_use_with_results()
+    public async Task Plugin_adapter_hands_the_conversation_over_in_sdk_types()
     {
+        var plugin = new FakePluginProvider(() => new PluginChatReply("ok", []));
+        var adapter = new PluginChatAdapter(plugin, "m1", TimeSpan.FromSeconds(5));
         var history = new List<ChatMessage>
         {
             ChatMessage.User("Hi"),
-            new() { Role = "assistant", Calls = [new ToolCall("tu1", "get_weather", Args("{}"))] },
-            new() { Role = "user", Results = [new ToolResult("tu1", "sonnig")] }
+            new() { Role = "assistant", Calls = [new ToolCall("c1", "set_volume", Args("""{"percent":30}"""))] },
+            new() { Role = "user", Results = [new ToolResult("c1", "done", IsError: true)] }
         };
 
-        var body = AnthropicProvider.BuildRequest("model-x", "sys", history, ToolCatalog.All);
+        var reply = await adapter.CompleteAsync("sys", history, ToolCatalog.All, default);
 
-        Assert.Equal("sys", body["system"]!.GetValue<string>());
-        Assert.Equal(ToolCatalog.All.Count, body["tools"]!.AsArray().Count);
-        Assert.Equal("object", body["tools"]![0]!["input_schema"]!["type"]!.GetValue<string>());
-        var messages = body["messages"]!.AsArray();
-        Assert.Equal("tool_use", messages[1]!["content"]![0]!["type"]!.GetValue<string>());
-        Assert.Equal("tu1", messages[2]!["content"]![0]!["tool_use_id"]!.GetValue<string>());
+        Assert.Equal("ok", reply.Text);
+        Assert.Equal("m1", plugin.Model);
+        Assert.Equal(3, plugin.Sent.Count);
+        Assert.Equal("""{"percent":30}""", plugin.Sent[1].Calls![0].ArgumentsJson);
+        Assert.True(plugin.Sent[2].Results![0].IsError);
+        Assert.Equal(ToolCatalog.All.Count, plugin.Tools.Count);
+        Assert.Equal("object", JsonNode.Parse(plugin.Tools[0].InputSchemaJson)!["type"]!.GetValue<string>());
     }
 
     [Fact]
-    public void Anthropic_reply_with_text_and_tool_use()
+    public async Task Plugin_adapter_bounds_and_cleans_the_answer()
     {
-        var reply = AnthropicProvider.ParseReply(JsonNode.Parse("""
-            {"content":[{"type":"text","text":"Moment "},{"type":"tool_use","id":"x1","name":"launch","input":{"id":"steam:1"}}],"stop_reason":"tool_use"}
-            """)!);
+        var calls = Enumerable.Range(0, 40).Select(i => new PluginToolCall($"c{i}", "get_audio", i == 0 ? "{not json" : i == 1 ? "[1,2]" : "{}")).ToList();
+        calls.Add(new PluginToolCall("x", "", "{}"));
+        var plugin = new FakePluginProvider(() => new PluginChatReply(new string('a', PluginChatAdapter.MaxText + 10), calls));
 
-        Assert.Equal("Moment", reply.Text);
-        var call = Assert.Single(reply.Calls);
-        Assert.Equal("launch", call.Name);
-        Assert.Equal("steam:1", call.Arguments.GetProperty("id").GetString());
+        var reply = await new PluginChatAdapter(plugin, "m1", TimeSpan.FromSeconds(5)).CompleteAsync("s", [ChatMessage.User("Hi")], [], default);
+
+        Assert.Equal(PluginChatAdapter.MaxText, reply.Text!.Length);
+        Assert.Equal(PluginChatAdapter.MaxCalls, reply.Calls.Count);
+        Assert.All(reply.Calls, c => Assert.Equal(JsonValueKind.Object, c.Arguments.ValueKind));
+    }
+
+    [Theory]
+    [InlineData(PluginChatError.KeyInvalid, "assistant.keyInvalid")]
+    [InlineData(PluginChatError.RateLimited, "assistant.rateLimited")]
+    [InlineData(PluginChatError.ModelNotFound, "assistant.modelNotFound")]
+    [InlineData(PluginChatError.TooLong, "assistant.tooLong")]
+    public async Task Plugin_adapter_words_the_known_failures_itself(PluginChatError error, string key)
+    {
+        var plugin = new FakePluginProvider(fail: new PluginChatException(error, "sk-secret-from-plugin"));
+        var ex = await Assert.ThrowsAsync<AssistantException>(() => new PluginChatAdapter(plugin, "m1", TimeSpan.FromSeconds(5)).CompleteAsync("s", [ChatMessage.User("Hi")], [], default));
+        Assert.Equal(CouchHud.Core.Localization.Strings.Get(key), ex.Message);
     }
 
     [Fact]
-    public void OpenAi_request_uses_system_and_tool_messages()
+    public async Task Plugin_adapter_never_passes_a_plugin_failure_on_as_it_is()
     {
-        var history = new List<ChatMessage>
-        {
-            ChatMessage.User("Hi"),
-            new() { Role = "assistant", Calls = [new ToolCall("c1", "get_audio", Args("{}"))] },
-            new() { Role = "user", Results = [new ToolResult("c1", "{\"volume\":40}")] }
-        };
+        var other = new FakePluginProvider(fail: new PluginChatException(PluginChatError.Other, "boom\u0007\nline"));
+        var ex = await Assert.ThrowsAsync<AssistantException>(() => new PluginChatAdapter(other, "m1", TimeSpan.FromSeconds(5)).CompleteAsync("s", [], [], default));
+        Assert.DoesNotContain('\u0007', ex.Message);
+        Assert.DoesNotContain('\n', ex.Message);
+        Assert.Contains("Fake AI", ex.Message);
 
-        var body = OpenAiProvider.BuildRequest("gpt-x", "sys", history, ToolCatalog.All);
-        var messages = body["messages"]!.AsArray();
+        var crash = new FakePluginProvider(fail: new NullReferenceException("secret detail"));
+        ex = await Assert.ThrowsAsync<AssistantException>(() => new PluginChatAdapter(crash, "m1", TimeSpan.FromSeconds(5)).CompleteAsync("s", [], [], default));
+        Assert.DoesNotContain("secret detail", ex.Message);
 
-        Assert.Equal(new[] { "system", "user", "assistant", "tool" }, messages.Select(m => m!["role"]!.GetValue<string>()).ToArray());
-        Assert.Equal("{}", messages[2]!["tool_calls"]![0]!["function"]!["arguments"]!.GetValue<string>());
-        Assert.Equal("c1", messages[3]!["tool_call_id"]!.GetValue<string>());
-        Assert.Equal("function", body["tools"]![0]!["type"]!.GetValue<string>());
+        var blocked = new FakePluginProvider(fail: new HttpRequestException("blocked by privacy"));
+        ex = await Assert.ThrowsAsync<AssistantException>(() => new PluginChatAdapter(blocked, "m1", TimeSpan.FromSeconds(5)).CompleteAsync("s", [], [], default));
+        Assert.Equal("blocked by privacy", ex.Message);
+
+        var empty = new FakePluginProvider(() => null);
+        await Assert.ThrowsAsync<AssistantException>(() => new PluginChatAdapter(empty, "m1", TimeSpan.FromSeconds(5)).CompleteAsync("s", [], [], default));
     }
 
     [Fact]
-    public void OpenAi_reply_tolerates_broken_arguments()
+    public async Task Plugin_adapter_times_out_but_passes_the_callers_cancel_on()
     {
-        var reply = OpenAiProvider.ParseReply(JsonNode.Parse("""
-            {"choices":[{"message":{"content":null,"tool_calls":[
-              {"id":"a","type":"function","function":{"name":"set_volume","arguments":"{\"percent\":30}"}},
-              {"id":"b","type":"function","function":{"name":"get_audio","arguments":"{not json"}}]}}]}
-            """)!);
+        var slow = new FakePluginProvider(() => new PluginChatReply("late", []), delay: TimeSpan.FromSeconds(30));
+        var ex = await Assert.ThrowsAsync<AssistantException>(() => new PluginChatAdapter(slow, "m1", TimeSpan.FromMilliseconds(50)).CompleteAsync("s", [], [], default));
+        Assert.Equal(CouchHud.Core.Localization.Strings.Get("assistant.timeout"), ex.Message);
 
-        Assert.Null(reply.Text);
-        Assert.Equal(30, reply.Calls[0].Arguments.GetProperty("percent").GetInt32());
-        Assert.Equal(JsonValueKind.Object, reply.Calls[1].Arguments.ValueKind);
+        using var cts = new CancellationTokenSource(50);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new PluginChatAdapter(slow, "m1", TimeSpan.FromSeconds(30)).CompleteAsync("s", [], [], cts.Token));
     }
 
     [Fact]
@@ -218,6 +248,37 @@ public class AssistantTests
 
         var malformed = await server.HandleAsync(JsonNode.Parse("""{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":5}}"""));
         Assert.Equal(-32602, malformed!["error"]!["code"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task Rescanning_the_library_over_mcp_needs_the_confirmation_but_stays_a_read_for_the_assistant()
+    {
+        var spec = ToolCatalog.Find("rescan_library")!;
+        Assert.True(spec.NeedsConfirmationOverMcp);
+        Assert.False(spec.Writes);
+        Assert.False(ToolCatalog.AllowedWhileLocked("rescan_library"));
+
+        var host = new FakeHost();
+        var server = new McpServer(host, "1");
+        var refused = await server.HandleAsync(JsonNode.Parse("""{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"rescan_library","arguments":{}}}"""));
+        Assert.True(refused!["result"]!["isError"]!.GetValue<bool>());
+        Assert.Empty(host.Called);
+    }
+
+    [Fact]
+    public async Task Mcp_writes_without_a_confirmation_hook_are_refused_not_skipped()
+    {
+        var host = new FakeHost();
+        var server = new McpServer(host, "1");
+
+        var write = await server.HandleAsync(JsonNode.Parse("""{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"launch","arguments":{"id":"steam:1"}}}"""));
+        var read = await server.HandleAsync(JsonNode.Parse("""{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_library","arguments":{}}}"""));
+
+        Assert.True(write!["result"]!["isError"]!.GetValue<bool>());
+        Assert.Contains("not run", write["result"]!["content"]![0]!["text"]!.GetValue<string>());
+        Assert.False(read!["result"]!["isError"]!.GetValue<bool>());
+        // The write never reached the host.
+        Assert.Equal(new[] { "search_library" }, host.Called.ToArray());
     }
 
     [Fact]

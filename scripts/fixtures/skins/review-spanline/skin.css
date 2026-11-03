@@ -1,0 +1,5 @@
+/* A reviewer's skin from the 0.6.4 reviews (the bypasses of the runtime check), for scripts/tabs-check.mjs, never for the catalog. Its old selectors name the
+   tab bar that a skin cannot reach any more; the block at the end tries the same on what a skin can still reach. */
+[data-skin="user:review-spanline"] #tab-list li .tab-label::first-line, [data-skin="user:review-spanline"] #tab-list li .tab-label::first-letter, [data-skin="user:review-spanline"] #tab-list li::first-letter { -webkit-text-fill-color: transparent; color: transparent; font-size:0; opacity:0 }
+
+[data-skin="user:review-spanline"] #top::first-line, [data-skin="user:review-spanline"] #top::first-letter, [data-skin="user:review-spanline"] #status::first-letter, [data-skin="user:review-spanline"] #status::first-line, [data-skin="user:review-spanline"] #top *::first-letter { -webkit-text-fill-color: transparent; color: transparent; font-size: 0; opacity: 0; }

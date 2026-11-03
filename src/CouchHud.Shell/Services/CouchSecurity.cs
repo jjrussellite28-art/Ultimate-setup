@@ -547,6 +547,7 @@ public static class Recovery
     /// does not depend on it: see <see cref="WtsSessionSource"/>).
     /// False when Windows could not be locked: nothing was touched and the caller carries on as if there was no recovery.
     /// </summary>
+    [SecondFactorExempt("the recovery after a crash loop: a deliberate reset to a safe state, nobody can ask a phone")]
     public static bool Run(string dataDir, string reason)
     {
         Console.Error.WriteLine($"[recovery] {reason}");
@@ -613,7 +614,7 @@ public static class Recovery
             // start one. The desktop only comes back when we start it (the first explorer.exe of a session becomes the shell).
             if (!ShellManager.IsDesktopShellRunning())
             {
-                Process.Start(new ProcessStartInfo("explorer.exe") { UseShellExecute = true })?.Dispose();
+                Process.Start(new ProcessStartInfo(ShellManager.ExplorerPath) { UseShellExecute = true })?.Dispose();
                 Console.WriteLine(ShellManager.WaitForDesktopShell(TimeSpan.FromSeconds(15))
                     ? "[recovery] explorer started, the desktop is there"
                     : "[recovery] explorer started, the taskbar did not show up in time");

@@ -81,10 +81,10 @@ public sealed partial class ArtworkCache
     /// <summary>The address the UI uses for a source address (whether or not it is cached yet).</summary>
     public static string UrlFor(string key) => $"https://{Host}/{HashOf(key)}";
 
-    [GeneratedRegex("^[0-9a-f]{64}$")]
+    [GeneratedRegex(@"^[0-9a-f]{64}\z")]
     private static partial Regex HashPattern();
 
-    [GeneratedRegex(@"^[0-9a-f]{64}\.(jpg|png|webp|gif)$")]
+    [GeneratedRegex(@"^[0-9a-f]{64}\.(jpg|png|webp|gif)\z")]
     private static partial Regex FilePattern();
 
     private string FileFor(string hash, string ext) => Path.Combine(_root, hash + ext);
@@ -435,7 +435,7 @@ public static class ImageSniffer
                 if (chunk.SequenceEqual("VP8 "u8)) return ((d[26] | d[27] << 8) & 0x3FFF, (d[28] | d[29] << 8) & 0x3FFF);
                 if (chunk.SequenceEqual("VP8L"u8) && d[20] == 0x2F)
                 {
-                    var bits = d[21] | d[22] << 8 | d[23] << 16 | (uint)d[24] << 24;
+                    var bits = (uint)d[21] | (uint)d[22] << 8 | (uint)d[23] << 16 | (uint)d[24] << 24;
                     return ((int)(bits & 0x3FFF) + 1, (int)((bits >> 14) & 0x3FFF) + 1);
                 }
                 return null;

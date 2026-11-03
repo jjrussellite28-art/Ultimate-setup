@@ -91,6 +91,8 @@ public sealed class LaunchOverrideContractTests
         var change = require.IndexOf("var result = change();", StringComparison.Ordinal);
         var consume = require.IndexOf("if (withCode) _grant.TryConsume(\"startOptions\", id);", StringComparison.Ordinal);
         Assert.True(unlocked < fits && fits < change && change < consume, "unlock, grant check, change, then the grant used up");
+        // The refusal is marked for the page's code prompt and its one retry (0.6.4), for exactly this action and entry.
+        Assert.Contains("throw new ParentCodeNeededException(Strings.Get(\"parental.codeRequired\"), \"startOptions\", id);", require);
         Assert.Contains("RequireLaunchChange(id, () => library.SetLaunchOverride(id, change));", Body(hud, "    public LaunchOptionsView SetLaunchOverride("));
         Assert.Contains("RequireLaunchChange(id, () =>", Body(hud, "    public LibraryItem EditLaunch("));
         Assert.Contains("RequireUnlocked();", Body(hud, "    public LaunchOptionsView GetLaunchOptions("));
@@ -110,7 +112,7 @@ public sealed class LaunchOverrideContractTests
     public void The_start_uses_the_override_checked_again_and_keeps_the_entry_as_it_is()
     {
         var hud = Code("src", "CouchHud.Shell", "Hud.cs");
-        var launch = Body(hud, "    public LibraryItem Launch(string id, bool byPerson = false)");
+        var launch = Body(hud, "    private LibraryItem LaunchCore(LibraryItem item, bool byPerson)");
         var effective = launch.IndexOf("var start = library.EffectiveLaunch(item);", StringComparison.Ordinal);
         var started = launch.IndexOf("Launcher.Launch(item, start, LaunchOverrides.PinFor(start, own));", StringComparison.Ordinal);
         Assert.True(effective >= 0 && effective < started);

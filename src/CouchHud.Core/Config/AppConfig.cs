@@ -73,6 +73,13 @@ public sealed class ItemOverride
     /// Null: nothing pending.
     /// </summary>
     public int? StoreAgeFloor { get; set; }
+    /// <summary>
+    /// The game the artwork comes from, picked by the user in "Search artwork": "steam:&lt;app id&gt;" or "sgdb:&lt;SteamGridDB game id&gt;". Wins over the
+    /// store match and the name for the pictures only (never for texts or the age rating); survives rescans and "reload artwork". Null: automatic.
+    /// </summary>
+    public string? ArtworkMatch { get; set; }
+    /// <summary>The picked game's name, for the edit menu only.</summary>
+    public string? ArtworkMatchName { get; set; }
     /// <summary>Own texts instead of the store's (plain text, shown as text). Null: the store's.</summary>
     public string? Description { get; set; }
     public List<string>? Developers { get; set; }
@@ -90,7 +97,28 @@ public sealed class ItemOverride
     public bool HasStore => StoreMatch is not null || StoreAgeFloor is not null;
 
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool IsEmpty => Name is null && Type is null && !Hidden && Cover is null && Hero is null && Logo is null && Square is null && !HasLaunch && !HasInfo && !HasStore;
+    public bool IsEmpty => Name is null && Type is null && !Hidden && Cover is null && Hero is null && Logo is null && Square is null && !HasLaunch && !HasInfo && !HasStore && ArtworkMatch is null;
+}
+
+/// <summary>One recorded move of a per-game play time key (see <see cref="AppConfig.LimitKeyMoves"/>).</summary>
+public sealed class LimitKeyMove
+{
+    public long Seq { get; set; }
+    public string From { get; set; } = "";
+    public string To { get; set; } = "";
+}
+
+/// <summary>
+/// One entry the user hid (Library.LibraryIgnore): the keys it is known by (its id, and for a game folder guess also its exe and game
+/// folder), and its name and source for Settings › Library › Hidden entries.
+/// </summary>
+public sealed class IgnoredEntry
+{
+    public List<string> Keys { get; set; } = [];
+    public string Name { get; set; } = "";
+    public string Source { get; set; } = "";
+    /// <summary>Unix epoch milliseconds.</summary>
+    public long HiddenAt { get; set; }
 }
 
 /// <summary>A user-made list of games and apps ("Couch Koop", "Kinder").</summary>
@@ -182,10 +210,18 @@ public sealed class AppConfig
 
     public Dictionary<string, ItemOverride> Overrides { get; set; } = new();
 
+    /// <summary>
+    /// Entries the user hid ("Hide"): left out of every list and never shown again by a rescan, until Settings › Library › Hidden entries
+    /// shows them again. For the whole household, like the overrides; the rules are Library.LibraryIgnore.
+    /// </summary>
+    public List<IgnoredEntry> Ignored { get; set; } = [];
+
     public List<ItemCollection> Collections { get; set; } = [];
 
-    /// <summary>Place for the weather in the header; null hides it.</summary>
-    public CouchHud.Core.Integrations.Place? WeatherLocation { get; set; }
+    // LEGACY (the weather, the news and the assistant's providers are plugins since 0.7): WeatherLocation, NewsFeeds, AnthropicApiKey and
+    // OpenAiApiKey are only read, once, to hand them to the plugins (PluginSettingSeeds); the seed clears them. Nothing else writes them.
+    /// <summary>LEGACY, read only for the weather plugin's first settings. The place for the weather in the header.</summary>
+    public LegacyPlace? WeatherLocation { get; set; }
 
     // LEGACY (Home Assistant is a plugin now): HomeAssistantUrl, HomeAssistantToken, HomeAssistantRefreshToken, HomeAssistantPinned and
     // HomeAssistantEntities are only read, once, to hand them to the Home Assistant plugin (PluginSettingSeeds). Nothing writes them any more.
@@ -201,9 +237,11 @@ public sealed class AppConfig
     /// </summary>
     public string HomeAssistantRefreshToken { get; set; } = "";
 
-    /// <summary>RSS/Atom feeds for the News tab.</summary>
-    public List<CouchHud.Core.Integrations.NewsFeed> NewsFeeds { get; set; } =
-        CouchHud.Core.Integrations.NewsService.Defaults.Select(f => new CouchHud.Core.Integrations.NewsFeed { Name = f.Name, Url = f.Url }).ToList();
+    /// <summary>
+    /// LEGACY, read only for the news plugin's first settings. The feeds of the News tab as the core kept them (null: none kept, a config from
+    /// 0.7 on). A list that is still one of the old default sets carries nothing over: the plugin starts without feeds.
+    /// </summary>
+    public List<LegacyNewsFeed>? NewsFeeds { get; set; }
 
     /// <summary>LEGACY, read only for the plugin's first settings. Entities shown in the guide menu for quick access.</summary>
     public List<string> HomeAssistantPinned { get; set; } = [];
@@ -240,6 +278,12 @@ public sealed class AppConfig
     /// the foreground, the Game Bar does not get the Xbox button. Everything is undone in PC mode and on quit.
     /// </summary>
     public bool SuppressCompetitors { get; set; } = true;
+
+    /// <summary>
+    /// <see cref="SuppressCompetitors"/> was switched on by the shell setup (it was off before): only then does the way back to the
+    /// app mode switch it off again. Any other change of the setting clears it, so a choice of the user is never undone by a mode switch.
+    /// </summary>
+    public bool SuppressBySetup { get; set; }
 
     /// <summary>
     /// The save backup limits are decimal MB (since 0.5). A file without this field was written with binary MB and is moved up once
@@ -575,6 +619,13 @@ public sealed class AppConfig
     /// <summary>Salted hash of the controller passcode (Core.Security.Passcode).</summary>
     public string PasscodeHash { get; set; } = "";
 
+    /// <summary>
+    /// The administrator's reset of a damaged code file left the service without a parents' code. While parental controls are on and this is set,
+    /// the parents' releases count as protected (<see cref="CouchHud.Core.Security.ParentCodeState"/>) and only an administrator's approval gives
+    /// them; it ends when a new code is set. Set by the host's reset only, there is no settings key or bridge call for it.
+    /// </summary>
+    public bool ParentCodeResetPending { get; set; }
+
     /// <summary>CouchHud set up the automatic Windows sign-in (never the password itself; Windows keeps it as LSA secret).</summary>
     public bool AutoLogonConfigured { get; set; }
 
@@ -583,6 +634,20 @@ public sealed class AppConfig
 
     /// <summary>Library item id → profile.</summary>
     public Dictionary<string, GameProfile> GameProfiles { get; set; } = new();
+
+    /// <summary>
+    /// Per-game play time keys ("dir:&lt;folder&gt;") of watched-folder games whose start program changed, old to new, in the order they happened
+    /// (FolderIdMigration). Each profile's play time ledger replays the ones after its own mark in <see cref="LimitKeyApplied"/> exactly once, in
+    /// this order, so a flip-flop or a chain ends on the current key. Replaced as a whole when it changes (readers on other threads keep a
+    /// consistent copy), pruned once every profile has applied an entry, at most 256 (the oldest go first).
+    /// </summary>
+    public List<LimitKeyMove> LimitKeyMoves { get; set; } = [];
+
+    /// <summary>The number of the last recorded move.</summary>
+    public long LimitKeyMoveSeq { get; set; }
+
+    /// <summary>Profile id (the default one is "default") to the number of the last move its ledger has applied.</summary>
+    public Dictionary<string, long> LimitKeyApplied { get; set; } = new();
 
     /// <summary>"off", "on" or "evening" (19:00 to 7:00).</summary>
     public string NightMode { get; set; } = "off";
@@ -642,13 +707,21 @@ public sealed class AppConfig
     /// <summary>Save-game detection: the download of the save location list.</summary>
     public bool NetSaves { get; set; } = true;
 
-    /// <summary>Weather in the header.</summary>
+    /// <summary>
+    /// The network services of plugins (SDK 5, declared in plugin.json) that are switched off in Settings › Privacy, as "plugin/service".
+    /// Every other declared service is on; Offline stops all of them.
+    /// </summary>
+    public List<string> PluginNetOff { get; set; } = [];
+
+    // LEGACY (0.7): the switches of the weather, the news and the assistant became the switches of their plugins' services. An old "off" is
+    // carried into PluginNetOff when the config is read (ConfigStore.MigratePluginNet) and the field is set back to true; nothing reads it after.
+    /// <summary>LEGACY, read once: the weather's switch.</summary>
     public bool NetWeather { get; set; } = true;
 
-    /// <summary>News feeds.</summary>
+    /// <summary>LEGACY, read once: the news feeds' switch.</summary>
     public bool NetNews { get; set; } = true;
 
-    /// <summary>The AI assistant at a cloud provider.</summary>
+    /// <summary>LEGACY, read once: the assistant's switch.</summary>
     public bool NetAssistant { get; set; } = true;
 
     /// <summary>Install plugin updates by themselves when their rights do not change. Only the setting: the automatic update itself is not built yet.</summary>
@@ -679,6 +752,19 @@ public sealed class AppConfig
 
     /// <summary>Watched game folders: every game in them shows up in the library automatically.</summary>
     public List<string> GameFolders { get; set; } = [];
+
+    /// <summary>
+    /// Companion apps (0.7): library apps that start next to a game (Wand, Discord, a monitoring tool). Only an app of the library can be one,
+    /// never a path from outside; what really starts is decided again at each start (CompanionRules). Changed behind the unlock and, with
+    /// parental controls, the parents' code. The file is untrusted: CompanionRules.Sanitize reads it.
+    /// </summary>
+    public List<CompanionRule> Companions { get; set; } = [];
+
+    /// <summary>Library apps the person put into the Guide menu as a quick start during a game (ids; GuideAppRules reads them).</summary>
+    public List<string> GuideApps { get; set; } = [];
+
+    /// <summary>The one-time hint that Wand is a companion app now (for households that had the Wand plugin) was shown.</summary>
+    public bool WandCompanionHintShown { get; set; }
 
     /// <summary>Autostart entry id → "couch" (at boot) or "pc" (only in PC mode). Missing means couch.</summary>
     public Dictionary<string, string> StartupModes { get; set; } = new();
@@ -719,16 +805,26 @@ public sealed class AppConfig
     /// <summary>Phone remote (text input, d-pad) over the LAN; off unless the user turns it on.</summary>
     public bool RemoteEnabled { get; set; }
 
+    /// <summary>The paired phone may shut down, restart and send the PC to standby (with the couch's own gates); on unless the owner turns it off.</summary>
+    public bool RemotePower { get; set; } = true;
+
+    /// <summary>
+    /// The second factor (0.7): critical actions need a confirmation on a paired phone after the code. Off unless the owner turns it on; only
+    /// possible with the code check on and a phone with the full right (<see cref="CouchHud.Core.Remote.SecondFactorRules"/>).
+    /// </summary>
+    public bool SecondFactor { get; set; }
+
     public int RemotePort { get; set; } = 8766;
 
     public List<CouchHud.Core.Remote.RemoteDevice> RemoteDevices { get; set; } = [];
 
-    /// <summary>"anthropic", "openai" or empty (assistant off).</summary>
+    /// <summary>The id of the assistant's provider (a provider plugin, e.g. "anthropic" or "openai") or empty (assistant off).</summary>
     public string AiProvider { get; set; } = "";
 
-    /// <summary>Encrypted with DPAPI, like all secrets here.</summary>
+    /// <summary>LEGACY, read only for the Anthropic plugin's first settings (encrypted with DPAPI); the seed clears it.</summary>
     public string AnthropicApiKey { get; set; } = "";
 
+    /// <summary>LEGACY, read only for the OpenAI plugin's first settings (encrypted with DPAPI); the seed clears it.</summary>
     public string OpenAiApiKey { get; set; } = "";
 
     /// <summary>Empty means the provider's default model.</summary>
@@ -1467,9 +1563,31 @@ public sealed class ConfigStore
         MigrateSkinIds(config);
         MigrateAgeRatingSystem(config, json);
         MigrateFavorites(config);
+        Library.LibraryIgnore.Sanitize(config);
+        MigratePluginNet(config);
         NormalizeNet(config);
         if (!HasProperty(json, nameof(AppConfig.PluginTrustAdopted))) config.PluginTrustAdopted = false;
         return config;
+    }
+
+    /// <summary>
+    /// 0.7: the weather, the news and the assistant are plugins with declared services. A switch that was off stays off as the switch of the
+    /// plugin's service (also before the plugin is installed); the old field goes back to its default so this runs once.
+    /// </summary>
+    internal static void MigratePluginNet(AppConfig config)
+    {
+        config.PluginNetOff ??= [];
+        void Off(params string[] keys)
+        {
+            foreach (var key in keys) if (!config.PluginNetOff.Contains(key, StringComparer.OrdinalIgnoreCase)) config.PluginNetOff.Add(key);
+        }
+        if (!config.NetWeather) Off(Plugins.PluginSettingSeeds.WeatherService);
+        if (!config.NetNews) Off(Plugins.PluginSettingSeeds.NewsService);
+        if (!config.NetAssistant) Off(Plugins.PluginSettingSeeds.AnthropicService, Plugins.PluginSettingSeeds.OpenAiService);
+        config.NetWeather = config.NetNews = config.NetAssistant = true;
+        // Well-formed keys only, bounded (the file is untrusted).
+        config.PluginNetOff = config.PluginNetOff.Where(k => k is { Length: > 2 and <= 100 } && k.Count(c => c == '/') == 1)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Take(200).ToList();
     }
 
     /// <summary>The automatic plugin update only means something while plugins are searched for updates at all.</summary>

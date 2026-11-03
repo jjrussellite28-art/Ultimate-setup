@@ -1,0 +1,20 @@
+{
+  "id": "samsungtv",
+  "folder": "CouchHud.Plugin.SamsungTv",
+  "version": "1.0.0",
+  "sha256": "",
+  "sdk": 5,
+  "minCouchHud": "0.7.0",
+  "capabilities": [
+    "tv.control"
+  ],
+  "publisherKey": "",
+  "license": "GPL-3.0-only",
+  "author": "kewe87",
+  "name": "Samsung Tizen",
+  "summary": "Pair and control Samsung TVs with Tizen: on/off, volume and HDMI inputs, only through CouchHUD and only the paired TV",
+  "icon": {
+    "sha256": "a43567b5d05b33f875deaffe02894d9a9cc4e4c6ffafc0ece606c9912cc54347",
+    "bytes": 35431
+  }
+}

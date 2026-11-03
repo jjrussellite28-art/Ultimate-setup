@@ -1,0 +1,2 @@
+:root[data-skin="user:c3-overlay-contents"]{--x:1}
+#overlay,#quick{display:contents!important}.dialog,#quick>*{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;background:#000!important;z-index:2147483647!important}

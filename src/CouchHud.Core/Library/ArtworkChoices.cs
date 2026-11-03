@@ -123,14 +123,8 @@ public sealed partial class ArtworkResolver
 
     private async Task CollectSteamGridDb(LibraryItem item, List<ArtChoice> cover, List<ArtChoice> hero, List<ArtChoice> logo, List<ArtChoice> square, CancellationToken ct)
     {
-        string route;
-        if (SteamStore.AppIdOf(item) is { } appId) route = $"steam/{appId}";
-        else
-        {
-            using var search = await GetJson($"{SteamGridDb}/search/autocomplete/{Uri.EscapeDataString(item.Name)}", ct, auth: true);
-            if (FirstInData(search.RootElement, "id") is not { } id) return;
-            route = $"game/{id.GetRawText()}";
-        }
+        // The pinned game, the Steam app, or a search hit that is surely the game; else nothing (the entry's "Search artwork" finds the right one).
+        if (await SgdbRouteAsync(item, ct) is not { } route) return;
 
         var dims = item.Type == ItemType.App ? "920x430,460x215" : "600x900,342x482,660x930";
         cover.AddRange(await ListChoices($"{SteamGridDb}/grids/{route}?dimensions={dims}", ct));

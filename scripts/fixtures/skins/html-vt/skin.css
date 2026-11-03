@@ -1,0 +1,4 @@
+:root[data-skin="user:html-vt"]{--x:1}
+
+html{view-transition-name:root}
+::view-transition,::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none;background:#000;opacity:1}

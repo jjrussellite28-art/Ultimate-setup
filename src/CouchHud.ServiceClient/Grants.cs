@@ -190,6 +190,15 @@ public static class GrantFlow
         if (!await obtainGrant().ConfigureAwait(false)) return result;
         return await operation().ConfigureAwait(false);
     }
+
+    /// <summary>Like <see cref="WithGrantAsync"/> for the long operations (Windows Update, the CouchHUD setup): the start is asked for again once with the approval.</summary>
+    public static async Task<JobResult> WithGrantJobAsync(Func<Task<JobResult>> operation, Func<Task<bool>> obtainGrant)
+    {
+        var result = await operation().ConfigureAwait(false);
+        if (result.Result.Failure != FailureKind.NeedGrant) return result;
+        if (!await obtainGrant().ConfigureAwait(false)) return result;
+        return await operation().ConfigureAwait(false);
+    }
 }
 
 /// <summary>How the one-time migration of the local code ended.</summary>
@@ -362,6 +371,45 @@ public static class CodeFlow
         !result.Ok && result.Code is ErrorCodes.Denied or ErrorCodes.Unavailable && held is { Damaged: true };
 
     /// <summary>
+    /// Whether an administrator's approval (Windows' UAC prompt) may open a code lock in place of the code: only while the service answers
+    /// right now (<paramref name="held"/>, null when it did not) that it holds no couch code at all, its code file is not damaged and no lock of
+    /// 0.4.0 waits for its confirmation. That is the state after the reset of a damaged code file, before the new code is set; with a code there
+    /// (also one only the service knows), a damaged file (the reset is the way) or an unknown state the code stays the only way (fail closed).
+    /// </summary>
+    public static bool AdminOpensCodeLock(HeldCodes? held) => held is { Couch: false, Damaged: false, LegacyLock: false };
+
+    public enum AdminUnlockOutcome { Refused, Declined, Opened }
+
+    /// <summary>
+    /// The administrator's approval opens a code lock without any code: the service is asked right now before and again after the approval
+    /// (a code that appeared in between, a damaged file or no answer refuse); a declined approval opens nothing. <paramref name="approve"/> is
+    /// Windows' UAC prompt (true when approved; it may throw with the reason).
+    /// </summary>
+    public static async Task<AdminUnlockOutcome> UnlockByAdminAsync(Func<Task<HeldCodes?>> fresh, Func<Task<bool>> approve)
+    {
+        if (!AdminOpensCodeLock(await fresh().ConfigureAwait(false))) return AdminUnlockOutcome.Refused;
+        if (!await approve().ConfigureAwait(false)) return AdminUnlockOutcome.Declined;
+        return AdminOpensCodeLock(await fresh().ConfigureAwait(false)) ? AdminUnlockOutcome.Opened : AdminUnlockOutcome.Refused;
+    }
+
+    /// <summary>What the administrator's reset of a damaged code file left: whether it ran, and what the service holds afterwards.</summary>
+    public sealed record ResetOutcome(bool Reset, bool CouchCodeGone, bool ParentCodeGone, bool OpensLock);
+
+    /// <summary>
+    /// The reset runs only while the service itself reports its code file as damaged (<paramref name="refresh"/> asks now); <paramref name="reset"/>
+    /// is the approved reset (it throws when declined or failed, then nothing changed). Afterwards <paramref name="known"/> is what the service
+    /// holds: gone codes are reported as such, and the couch opens for the unlock window only for a code lock without any couch code
+    /// (<see cref="AdminOpensCodeLock"/>), never for a file that is valid again or a service that does not answer.
+    /// </summary>
+    public static async Task<ResetOutcome> ResetDamagedStoreAsync(Func<Task<HeldCodes?>> refresh, Func<Task> reset, Func<HeldCodes?> known, bool codeLock)
+    {
+        if (await refresh().ConfigureAwait(false) is not { Damaged: true }) return new ResetOutcome(false, false, false, false);
+        await reset().ConfigureAwait(false);
+        var after = known();
+        return new ResetOutcome(true, after is not { Couch: true }, after is not { Parent: true }, codeLock && AdminOpensCodeLock(after));
+    }
+
+    /// <summary>
     /// Why a code that came along with the lock switch was probably refused, from what the service holds: "codeHeld" (a couch code is still
     /// stored), "parentHeld" (a parents' code is), else null. Reveals nothing the settings page does not show anyway (serviceCodes).
     /// </summary>
@@ -427,5 +475,54 @@ public static class UninstallRelease
             if (now() - started >= cap) return "timeout";
             await delay(Poll).ConfigureAwait(false);
         }
+    }
+}
+
+/// <summary>
+/// What follows the administrator's reset of the service's state in the shell. The reset is one job in the service that may outlive its
+/// request: when <see cref="UninstallRelease"/> gave up with "timeout" the job still runs, and setting this account's policies again
+/// right then would be undone by the job's end (the reconcile sees them applied and does nothing, then the job removes them). So after a
+/// "timeout" the job is asked for until it says "done" or "failed" (at most <c>cap</c> more), and only then are the policies set again;
+/// the set-again also runs when anything throws on the way (<c>finally</c>), and once more after a pause (<see cref="VerifyAsync"/>) to
+/// catch a release that ended late. The result is the honest outcome: "timeout" stays "timeout" while the job is still running.
+/// </summary>
+public static class ResetFollowUp
+{
+    /// <summary>The pause before the second look at the policies.</summary>
+    public static readonly TimeSpan VerifyDelay = TimeSpan.FromSeconds(10);
+
+    /// <summary>The slower poll for a job that is still running after the first cap.</summary>
+    public static readonly TimeSpan SlowPoll = TimeSpan.FromSeconds(30);
+
+    /// <returns>The outcome: "done"/"failed" when a late job ended, else <paramref name="outcome"/> unchanged.</returns>
+    public static async Task<string> RunAsync(string outcome, Func<Task<string?>> releaseStatus, Func<TimeSpan, Task> delay,
+        Func<DateTimeOffset> now, Action reapply, TimeSpan cap, TimeSpan? poll = null, bool reapplyIfRunning = true)
+    {
+        var ended = false;
+        try
+        {
+            if (outcome != "timeout") { ended = true; return outcome; }
+            var started = now();
+            while (true)
+            {
+                var status = await releaseStatus().ConfigureAwait(false);
+                if (status is "done" or "failed") { ended = true; return status; }
+                if (status is null or "none") { ended = true; return outcome; }
+                if (now() - started >= cap) return outcome;
+                await delay(poll ?? UninstallRelease.Poll).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            // Not while the job still runs and a slower poll is to follow: its end would take the policies off again.
+            if (ended || reapplyIfRunning) reapply();
+        }
+    }
+
+    /// <summary>Looks at the policies once more after <see cref="VerifyDelay"/>: the set-again runs a second time.</summary>
+    public static async Task VerifyAsync(Func<TimeSpan, Task> delay, Action reapply)
+    {
+        await delay(VerifyDelay).ConfigureAwait(false);
+        reapply();
     }
 }

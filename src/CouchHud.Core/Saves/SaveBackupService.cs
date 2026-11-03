@@ -159,7 +159,7 @@ public sealed partial class SaveBackupService(string backupRoot, int keep, int a
         return cleaned.Length == 0 ? "Spiel" : cleaned.Length > 100 ? cleaned[..100] : cleaned;
     }
 
-    [GeneratedRegex(@"^[0-9A-Za-z_\- ]{1,100}\.zip$")]
+    [GeneratedRegex(@"^[0-9A-Za-z_\- ]{1,100}\.zip\z")]
     private static partial Regex IdPattern();
 
     public static bool IsValidId(string id) => IdPattern().IsMatch(id) && Path.GetFileName(id) == id;
@@ -726,7 +726,7 @@ public sealed partial class SaveBackupService(string backupRoot, int keep, int a
         SaveContext ctx, IReadOnlyList<string> patterns, List<string> created, Dictionary<string, string?> rootCache)
     {
         var errors = new List<string>();
-        foreach (var (target, existed) in written.Where(w => !w.Existed))
+        foreach (var (target, _) in written.Where(w => !w.Existed))
         {
             try { File.Delete(target); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { errors.Add($"Rollback {target}: {ex.Message}"); }
         }

@@ -31,6 +31,22 @@ public sealed class BrowserGuardTests
     public void ScriptCoversEveryWayToAWindowsDialog(string needle) =>
         Assert.Contains(needle, BrowserGuard.Script);
 
+    [Theory]
+    [InlineData("composedPath")]
+    [InlineData("attachShadow")]
+    [InlineData("'contentWindow'")]
+    [InlineData("'contentDocument'")]
+    [InlineData("new w.MutationObserver")]
+    [InlineData("'drop'")]
+    [InlineData("Symbol.for('couchhud.guard')")]
+    [InlineData("indexOf.call(types, 'Files')")]
+    public void ScriptHardeningsAreThere(string needle) =>
+        Assert.Contains(needle, BrowserGuard.Script);
+
+    [Fact]
+    public void ScriptDoesNotRelyOnEventTargetAlone() =>
+        Assert.DoesNotContain("const t = e.target", BrowserGuard.Script);
+
     [Fact]
     public void PictureInPictureIsOffOnTheCommandLine()
     {

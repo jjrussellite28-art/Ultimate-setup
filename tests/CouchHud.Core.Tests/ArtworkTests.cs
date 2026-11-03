@@ -7,6 +7,13 @@ namespace CouchHud.Core.Tests;
 
 public class ArtworkTests
 {
+    /// <summary>SteamGridDB's search answer for a search URL: one game with the very name that was searched (so the match is sure).</summary>
+    internal static string SgdbHit(string url, int id)
+    {
+        var term = Uri.UnescapeDataString(new Uri(url).AbsolutePath.Split('/')[^1]);
+        return $$"""{ "data": [ { "id": {{id}}, "name": {{System.Text.Json.JsonSerializer.Serialize(term)}} } ] }""";
+    }
+
     private static string TempCache() =>
         Path.Combine(Directory.CreateTempSubdirectory("couchhud-art-").FullName, "cache.json");
 
@@ -46,7 +53,7 @@ public class ArtworkTests
     public async Task SteamGridDb_is_used_first_when_a_key_is_set_and_results_are_cached()
     {
         var handler = new FakeHandler(
-            ("autocomplete/Kodi", """{ "data": [ { "id": 42 } ] }"""),
+            ("autocomplete/Kodi", """{ "data": [ { "id": 42, "name": "Kodi" } ] }"""),
             ("grids/game/42?dimensions=920x430", """{ "data": [ { "url": "https://cdn/grid.png" } ] }"""),
             ("heroes/game/42", """{ "data": [ { "url": "https://cdn/hero.png" } ] }"""),
             ("logos/game/42", """{ "data": [ { "url": "https://cdn/logo.png" } ] }"""));
@@ -79,7 +86,7 @@ public class ArtworkTests
     public async Task Own_artwork_wins_and_only_missing_slots_are_filled()
     {
         var handler = new FakeHandler(
-            ("autocomplete/Kodi", """{ "data": [ { "id": 42 } ] }"""),
+            ("autocomplete/Kodi", """{ "data": [ { "id": 42, "name": "Kodi" } ] }"""),
             ("grids/game/42", """{ "data": [ { "url": "https://cdn/grid.png" } ] }"""),
             ("logos/game/42", """{ "data": [ { "url": "https://cdn/logo.png" } ] }"""));
         var mine = Item("Kodi", ItemType.App) with { Art = new Artwork { Cover = ["file:///C:/my/kodi.png"] } };

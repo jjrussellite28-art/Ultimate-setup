@@ -131,7 +131,10 @@ public sealed class BrowserUnlockContractTests
         var setters = Members(@"\b_unlockedUntil\s*(?:[-+]?=(?!=)|\?\?=)|\b(?:ref|out)\s+_unlockedUntil\b");
         setters.Sort(StringComparer.Ordinal);
         Assert.Equal(
-            ["Hud.cs: ConfirmWindowsUnlockAsync", "Hud.cs: ForgetUnlock", "Hud.cs: LeavePcModeAsync", "Hud.cs: UnlockAsync", "Hud.cs: UnlockAsync", "Hud.cs: WatchBrowserUnlock"],
+            // 0.6.4: the administrator's ways out of a damaged code store (ResetCodeStoreAsync, UnlockByAdminAsync), both only while the
+            // service holds no couch code (CodeFlow.AdminOpensCodeLock, pinned in DamagedCodeStoreRecoveryTests).
+            ["Hud.cs: ConfirmWindowsUnlockAsync", "Hud.cs: ForgetUnlock", "Hud.cs: LeavePcModeAsync", "Hud.cs: ResetCodeStoreAsync", "Hud.cs: UnlockAsync",
+                "Hud.cs: UnlockAsync", "Hud.cs: UnlockByAdminAsync", "Hud.cs: WatchBrowserUnlock"],
             setters);
         var text = string.Join('\n', Lines("src", "CouchHud.Shell", "Hud.cs"));
         Assert.Contains("_unlockedUntil = next.UnlockedUntil;", text);

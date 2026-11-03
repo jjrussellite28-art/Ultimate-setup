@@ -21,9 +21,9 @@ public static class LocalFiles
         [".png"] = "image/png",
         [".webp"] = "image/webp",
         [".gif"] = "image/gif",
-        [".svg"] = "image/svg+xml",
+        [".svg"] = "image/svg+xml; charset=utf-8",
         [".ico"] = "image/x-icon",
-        [".css"] = "text/css",
+        [".css"] = "text/css; charset=utf-8",
         [".woff2"] = "font/woff2",
         [".ttf"] = "font/ttf",
         [".wav"] = "audio/wav",
@@ -102,15 +102,16 @@ public static class LocalFiles
     }
 
     /// <summary>A window of a file stream; disposing it closes the file.</summary>
-    private sealed class RangeStream(Stream inner, long length) : Stream
+    private sealed class RangeStream(Stream inner, long size) : Stream
     {
-        private long _remaining = length;
+        private readonly long _length = size;
+        private long _remaining = size;
 
         public override bool CanRead => true;
         public override bool CanSeek => false;
         public override bool CanWrite => false;
-        public override long Length => length;
-        public override long Position { get => length - _remaining; set => throw new NotSupportedException(); }
+        public override long Length => _length;
+        public override long Position { get => _length - _remaining; set => throw new NotSupportedException(); }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
@@ -171,10 +172,13 @@ public static class LocalFiles
                 file.CopyTo(memory);
                 memory.Position = 0;
                 content = memory;
-                if (mime == "text/css")
+                if (mime.StartsWith("text/css", StringComparison.Ordinal))
                 {
                     // Skin stylesheets cannot reach out to the web (see SkinCss).
-                    content = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(CouchHud.Core.Skins.SkinCss.Sanitize(System.Text.Encoding.UTF8.GetString(memory.ToArray()))));
+                    var clean = CouchHud.Core.Skins.SkinCss.Sanitize(memory.ToArray(), out var refused);
+                    // A stylesheet that still mentions @layer or @import after they were removed is not served at all (an honest skin has no reason to).
+                    if (refused) Console.Error.WriteLine($"[skin] stylesheet refused (@layer or @import, a charset other than utf-8, a control character, bytes that are not UTF-8, or it stalls the sanitizer): {path}");
+                    content = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(clean));
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

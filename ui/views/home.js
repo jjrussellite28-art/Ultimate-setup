@@ -2,7 +2,9 @@
 import { iconEl } from '../core/glyph-icons.js';
 import { el, entriesLabel, formatDuration, relativeTime, setFocused, withoutTransition } from '../core/dom.js';
 import { artwork, plainBackground, setBackground, showClearLogo } from '../core/art.js';
-import { itemMeta, toggleFavorite } from '../core/library.js';
+import { findItem, itemMeta } from '../core/library.js';
+import { itemMenuHint, openItemMenu } from '../components/item-menu.js';
+import { sound } from '../sound.js';
 import { favorites, refreshFavorites, shelfEntries, toggleFavoriteSite } from '../core/favorites.js';
 import { host, initial } from '../core/browser-logic.js';
 import { hue } from '../core/art.js';
@@ -97,9 +99,9 @@ export const homeView = {
         : item.site
           ? siteTile(item)
           : item.id === this.heroId
-          // The first "Continue playing" card is the big one: the wide hero picture (the cover as a stand-in).
+          // The first "Continue playing" card is the big one: the wide hero picture (the cover as a stand-in, see square-rules.js).
           ? el('div', { className: `tile tile-hero${item.running ? ' running' : ''}` },
-            artwork({ ...item, art: { ...item.art, hero: [...(item.art?.hero ?? []), ...(item.art?.cover ?? [])] } }, 'hero', 'hero-art'),
+            artwork(item, 'hero', 'hero-art', { tile: true }),
             item.favorite ? el('span', { className: 'fav', textContent: '★' }) : null,
             item.running ? el('span', { className: 'running-badge', textContent: state.session?.paused ? t('home.badge.paused') : t('home.badge.running') }) : null)
           : el('div', { className: `tile${item.running ? ' running' : ''}` }, artwork(item, 'cover', 'cover', { tile: true }),
@@ -212,16 +214,18 @@ export const homeView = {
         if (item.collection) return this.collectionMenu(item.collection);
         // A favorite website: Y takes it off. A recent site is no bookmark, so it cannot be one (mark it in the browser first).
         if (item.site) return item.favorite ? toggleFavoriteSite(item.url, item.name) : undefined;
-        return toggleFavorite(item);
+        // A library entry: the same menu as on Games, Apps and collections (favorite, collections, details, hide).
+        return findItem(item.id) ? openItemMenu(findItem(item.id)) : sound.bump();
       case 'x': return item.running && push(detailPage(item));
     }
   },
   hints() {
     const item = this.list?.[this.index];
     if (!item) return [['≡', t('home.hint.power')]];
-    if (item?.running) return [['A', t('home.hint.resume')], ['X', t('home.hint.details')], ['Y', item.favorite ? t('home.hint.unfavorite') : t('home.hint.favorite')], ['≡', t('home.hint.power')]];
+    const menu = findItem(item.id) ? [itemMenuHint()] : [];
+    if (item?.running) return [['A', t('home.hint.resume')], ['X', t('home.hint.details')], ...menu, ['≡', t('home.hint.power')]];
     if (item?.collection) return [['A', t('home.hint.openCollection')], ['Y', t('home.hint.menu')], ['≡', t('home.hint.power')]];
     if (item?.site) return [['A', t('home.hint.open')], ...(item.favorite ? [['Y', t('home.hint.unfavorite')]] : []), ['≡', t('home.hint.power')]];
-    return [['A', t('home.hint.open')], ['Y', item?.favorite ? t('home.hint.unfavorite') : t('home.hint.favorite')], ['≡', t('home.hint.power')]];
+    return [['A', t('home.hint.open')], ...menu, ['≡', t('home.hint.power')]];
   }
 };

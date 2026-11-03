@@ -5,13 +5,13 @@
 import { ensureParentGrant } from '../components/parental.js';
 import { t } from './i18n.js';
 
-export async function withParentGrant(call) {
+export async function withParentGrant(call, fallbackReason) {
   try {
     return await call();
   } catch (err) {
     if (!err?.parent?.action) throw err;
-    // The host names the plugin and the function in its prompt text; the page's own text is the fallback.
-    if (!(await ensureParentGrant(err.parent.reason || t('plugin.fn.useReason'), { action: err.parent.action, item: err.parent.item ?? undefined }))) return undefined;
+    // The host names the plugin and the function in its prompt text; the page's own text (or the plugin one) is the fallback.
+    if (!(await ensureParentGrant(err.parent.reason || fallbackReason || t('plugin.fn.useReason'), { action: err.parent.action, item: err.parent.item ?? undefined }))) return undefined;
     return call();
   }
 }

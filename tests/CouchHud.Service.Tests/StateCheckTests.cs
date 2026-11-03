@@ -6,7 +6,7 @@ namespace CouchHud.Service.Tests;
 /// <summary>The checks that depend on state: they run for every operation that names them, and a missing one denies.</summary>
 public class StateCheckTests
 {
-    private static readonly StateChecks Builtin = StateChecks.BuiltIn(n => n == "GamingServices", AssumeCodeEnrolled.Instance);
+    private static readonly StateChecks Builtin = StateChecks.BuiltIn(n => n == "GamingServices", AssumeCodeEnrolled.Instance, TestSessions.AtConsole);
 
     private static ValidatedRequest Req(Operation op, object? args = null, string? grant = null) => new(op, grant, args);
 
@@ -54,7 +54,7 @@ public class StateCheckTests
     [Fact]
     public void A_registered_check_opens_the_operation_and_a_throwing_one_denies()
     {
-        var checks = StateChecks.BuiltIn(_ => false, AssumeCodeEnrolled.Instance).Register(StateCheck.JobOwner, Harness.AllowAll);
+        var checks = StateChecks.BuiltIn(_ => false, AssumeCodeEnrolled.Instance, TestSessions.AtConsole).Register(StateCheck.JobOwner, Harness.AllowAll);
         Assert.Equal(Verdict.Allow, Authorizer.Authorize(Callers.User(), Req(Operation.GetJob, new GetJobArgs("0")), false, checks).Verdict);
         checks.Register(StateCheck.JobOwner, new StateCheckFunc((_, _) => throw new InvalidOperationException()));
         Assert.Equal(Verdict.Deny, Authorizer.Authorize(Callers.User(), Req(Operation.GetJob, new GetJobArgs("0")), false, checks).Verdict);
@@ -64,7 +64,8 @@ public class StateCheckTests
     public void A_check_that_asks_for_a_grant_makes_the_request_need_one()
     {
         var checks = new StateChecks()
-            .Register(StateCheck.SignedSetupPipeline, new StateCheckFunc((c, _) => c.IsElevatedAdmin ? AuthorizationDecision.Allowed : AuthorizationDecision.GrantNeeded));
+            .Register(StateCheck.SignedSetupPipeline, new StateCheckFunc((c, _) => c.IsElevatedAdmin ? AuthorizationDecision.Allowed : AuthorizationDecision.GrantNeeded))
+            .Register(StateCheck.OtherSessionsNeedApproval, Harness.AllowAll);
         var request = Req(Operation.InstallCouchHudUpdate, new SetupStreamArgs("CouchHud-Setup-0.4.2.exe", 10, "AA==", "AA=="));
         Assert.Equal(Verdict.NeedGrant, Authorizer.Authorize(Callers.User(), request, false, checks).Verdict);
         Assert.Equal(Verdict.Allow, Authorizer.Authorize(Callers.ElevatedAdmin(), request, false, checks).Verdict);
@@ -102,7 +103,7 @@ public class StateCheckTests
     public void The_denylist_wins_over_any_allowlist(string name)
     {
         Assert.False(ServicePolicy.IsAllowed(name, _ => true));
-        var everything = StateChecks.BuiltIn(_ => true, AssumeCodeEnrolled.Instance);
+        var everything = StateChecks.BuiltIn(_ => true, AssumeCodeEnrolled.Instance, TestSessions.AtConsole);
         Assert.Equal(Verdict.Deny, Authorizer.Authorize(Callers.ElevatedAdmin(), Req(Operation.PauseServices, new ServicesArgs([name])), false, everything).Verdict);
         Assert.Equal(Verdict.Deny, Authorizer.Authorize(Callers.ElevatedAdmin(), Req(Operation.ResumeServices, new ServicesArgs([name])), false, everything).Verdict);
     }

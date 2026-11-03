@@ -27,8 +27,8 @@ public static class LockPolicy
     /// </summary>
     public static readonly IReadOnlySet<string> OpenWhileLocked = new HashSet<string>
     {
-        "getLibrary", "getFavorites", "launch", "toggleFavorite", "toggleFavoriteSite", "getStoreInfo", "getDetails", "systemInfo", "getSettings",
-        "enterPcMode", "holdUnlockForSetup", "power", "quit", "restartCouchHud", "unlock", "confirmWindowsUnlock", "getSecurity", "setPasscode", "setCouchLock",
+        "getLibrary", "getFavorites", "getGuideApps", "launch", "toggleFavorite", "toggleFavoriteSite", "getStoreInfo", "getDetails", "systemInfo", "getSettings",
+        "enterPcMode", "holdUnlockForSetup", "power", "sleepTimerWarning", "sleepTimerArm", "quit", "restartCouchHud", "unlock", "confirmWindowsUnlock", "getSecurity", "setPasscode", "setCouchLock",
         // The service: its state, and the repair (Windows' UAC prompt is the gate; the way out of a fail-closed lock).
         "getServiceStatus", "repairService",
         // The reset of the service's damaged code file: UAC again (the service takes an administrator's approval only), and with a damaged
@@ -51,20 +51,25 @@ public static class LockPolicy
         // A plugin's setting: the bridge lets it through, Hud decides by the function level (PluginSettingRules): on the locked couch only
         // "restricted" settings with a value that fits; admin (also a setting without any function, and the "$settings" visit) needs the unlock, nobody is nobody.
         "setPluginSetting",
+        // The same gate asked before the page opens the editor (Hud.CheckPluginSetting): changes nothing, so a refusal comes before the keyboard.
+        "checkPluginSetting",
         // A settings entry that opens a plugin page: the same gate (Hud.OpenPluginSettingPage); the page itself is decided again by getPluginPage.
         "openPluginSettingPage",
         // The answer to the automatic Bluetooth switch-on's countdown: "now" or "leave it off" (the guest could switch the radio off with
         // the keyboard's airplane key anyway; switching it off in CouchHUD, "setBluetooth", needs the code).
         "answerBluetoothRecovery",
-        "getBluetooth", "getRemote", "keyboardState", "codeEntryState", "pairingState", "getUpdates", "getCatalogUpdates", "getSelfUpdate", "refreshUpdates", "getWeather",
+        "getBluetooth", "getRemote", "keyboardState", "sleepTimerState", "codeEntryState", "pairingState", "getUpdates", "getCatalogUpdates", "getSelfUpdate", "refreshUpdates", "getWeather",
         "listSkins", "setSkin", "getGameFolders", "getCollections", "getParental", "parentalCheck", "parentalCloseGame", "parentalAuth", "setParental", "setParentalItemLock", "parentalExtend", "parentalReset", "parentalAcceptClock", "parentalAdoptZone"
     };
 
-    /// <summary>Settings a guest may change while locked: sound and look only.</summary>
+    /// <summary>
+    /// Settings a guest may change while locked: sound and look only. Not expert mode (up to 0.6.3 it was in here): it shows the admin's
+    /// tools (startup options, start targets, developer settings), so switching it is an admin setting behind the unlock like the others.
+    /// </summary>
     public static readonly IReadOnlySet<string> HarmlessSettings = new HashSet<string>
     {
         "soundVolume", "soundSet", "audioMode", "musicVolume", "trailerPreviews", "favoritesMode", "favoritesRecentDays", "rumble", "padGlyphs", "acceptedTerms",
-        "screensaverMinutes", "screensaverStyle", "displayOffMinutes", "pixelShift", "reduceMotion", "pointer", "mouseUnlocked", "nightMode", "nightModeStrength", "expertMode"
+        "screensaverMinutes", "screensaverStyle", "displayOffMinutes", "pixelShift", "reduceMotion", "pointer", "mouseUnlocked", "nightMode", "nightModeStrength"
     };
 
     /// <summary>

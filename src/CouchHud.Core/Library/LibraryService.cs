@@ -43,6 +43,22 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
     /// <summary>Whether the scan whose entries are shown left stores out (set together with the entries).</summary>
     private bool _partialScan;
 
+    /// <summary>
+    /// Whether the scan whose entries are shown saw everything it should: no store left out, no provider failed or timed out, the host's
+    /// <see cref="ScanComplete"/> held before and after it. False before the first scan has finished. Only then can a record of the ignore
+    /// list be called orphaned.
+    /// </summary>
+    private bool _scanTrusted;
+
+    /// <summary>
+    /// Set by the host: plugins are loaded and none is paused (Offline mode), so the plugin provider's answer is the real one and not an empty
+    /// stand-in. Null: nothing to wait for.
+    /// </summary>
+    public Func<bool>? ScanComplete { get; set; }
+
+    /// <summary>Whether a folder exists; the drive of a watched folder may be offline. A seam for tests.</summary>
+    public Func<string, bool> DirectoryExists { get; set; } = Directory.Exists;
+
     /// <summary>Scans are numbered: one that finishes after a newer one started is dropped (its store choice may be out of date).</summary>
     private long _scanNumber;
 
@@ -66,17 +82,33 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
         var skip = SkipProvider;
         var scanned = _providers.Where(p => skip is null || !skip(p)).ToList();
         var partial = scanned.Count < _providers.Count;
-        var results = await Task.WhenAll(scanned.Select(p => SafeScan(p, ProviderTimeout, ct)));
+        var completeBefore = ScanComplete?.Invoke() ?? true;
+        var failed = 0;
+        var results = await Task.WhenAll(scanned.Select(async p =>
+        {
+            var found = await SafeScan(p, ProviderTimeout, ct);
+            if (found is null) Interlocked.Increment(ref failed);
+            return found ?? [];
+        }));
+        var trusted = !partial && failed == 0 && completeBefore && (ScanComplete?.Invoke() ?? true);
         var cfg = config.Current;
         var custom = CustomEntries.From(cfg.Apps);
 
         var raw = WithoutFolderDuplicates(results.SelectMany(r => r).Concat(custom)
             .GroupBy(i => i.Id).Select(g => g.First()) // first provider wins on id clashes
             .ToList());
+        // Only what the core's folder scan found is a folder guess (known by exe and game folder too); a plugin's entry never is.
+        var folderItems = new HashSet<LibraryItem>(scanned.Zip(results).Where(p => IsFolderScan(p.First)).SelectMany(p => p.Second),
+            ReferenceEqualityComparer.Instance);
+        var folderGuesses = raw.Where(folderItems.Contains).Select(i => i.Id).ToHashSet(StringComparer.Ordinal);
+        // Hidden flags from before the ignore list move onto it, with the stable keys of what this scan found.
+        if (cfg.Overrides.Values.Any(o => o?.Hidden == true))
+            config.Update(c => LibraryIgnore.MigrateLegacy(c, raw, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), i => folderGuesses.Contains(i.Id)));
         lock (_lock)
         {
             // A newer scan started meanwhile: its result counts, this one changes nothing.
             if (number != Interlocked.Read(ref _scanNumber)) return _items;
+            _folderGuesses = folderGuesses;
             _baseNames.Clear();
             _baseLastPlayed.Clear();
             foreach (var item in raw)
@@ -85,7 +117,8 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
                 _baseLastPlayed[item.Id] = item.LastPlayed;
             }
         }
-        var merged = raw.Select(ApplyUserState).ToList();
+        var ignored = IgnoredKeys();
+        var merged = raw.Select(i => ApplyUserState(i, ignored, folderGuesses)).ToList();
 
         // The art without the user's picks: "automatic" is always this, whatever was picked before.
         var cached = artwork.ApplyCached(merged);
@@ -95,6 +128,7 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
         {
             if (number != Interlocked.Read(ref _scanNumber)) return _items;
             _partialScan = partial;
+            _scanTrusted = trusted;
             _scannedArt.Clear();
             foreach (var item in raw) _scannedArt[item.Id] = item.Art;
             _baseArt.Clear();
@@ -147,7 +181,27 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
         }
     }
 
-    private LibraryItem ApplyUserState(LibraryItem item)
+    /// <summary>Every key of the ignore list, for one pass over the library.</summary>
+    private HashSet<string> IgnoredKeys() => LibraryIgnore.KeySet(config.Current.Ignored);
+
+    /// <summary>Ids of the entries the core's folder scan found in the last scan (see <see cref="LibraryIgnore.KeysOf"/>).</summary>
+    private HashSet<string> _folderGuesses = new(StringComparer.Ordinal);
+
+    /// <summary>The provider whose finds are folder guesses: the core's folder scan (tests stand in for it, it reads the disk).</summary>
+    internal Func<ILibraryProvider, bool> IsFolderScan { get; init; } = p => p is FolderGamesProvider;
+
+    private HashSet<string> FolderGuesses()
+    {
+        lock (_lock) return _folderGuesses;
+    }
+
+    /// <summary>The ignore list keys of an entry of this library.</summary>
+    private IReadOnlyList<string> KeysOf(LibraryItem item, IReadOnlySet<string>? folderGuesses = null) =>
+        LibraryIgnore.KeysOf(item, config.Current.GameFolders, (folderGuesses ?? FolderGuesses()).Contains(item.Id));
+
+    private LibraryItem ApplyUserState(LibraryItem item) => ApplyUserState(item, IgnoredKeys(), FolderGuesses());
+
+    private LibraryItem ApplyUserState(LibraryItem item, IReadOnlySet<string> ignored, IReadOnlySet<string> folderGuesses)
     {
         var cfg = config.Current;
         var profile = cfg.ActiveProfile;
@@ -164,25 +218,141 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
             LastSessionMinutes = lastSession,
             Name = string.IsNullOrWhiteSpace(custom?.Name) ? item.Name : custom!.Name!,
             Type = custom?.Type switch { "game" => ItemType.Game, "app" => ItemType.App, _ => item.Type },
-            Hidden = custom?.Hidden ?? false
+            // On the ignore list by any stable key (a folder guess with a new id included); a flag from before the list until it is migrated.
+            Hidden = custom?.Hidden == true || LibraryIgnore.IsIgnored(LibraryIgnore.KeysOf(item, cfg.GameFolders, folderGuesses.Contains(item.Id)), ignored)
         };
     }
 
-    /// <summary>Rename, re-categorize or hide any entry; stored as an override so rescans keep it.</summary>
+    /// <summary>
+    /// Rename, re-categorize or hide any entry; stored as an override (name, type) or on the ignore list (hidden) so rescans keep it.
+    /// Who may hide is the host's decision (Hud.SetHidden); this only stores.
+    /// </summary>
     public LibraryItem EditItem(string id, string? name, string? type, bool? hidden)
     {
         if (Find(id) is null) throw new KeyNotFoundException($"unknown item {id}");
         if (type is not null && type is not ("game" or "app")) throw new ArgumentException("type must be game or app", nameof(type));
+        // Every check before anything is stored: a full ignore list refuses the whole edit, never half of it.
+        if (hidden == true) EnsureCanHide(id);
+        if (name is not null || type is not null)
+        {
+            config.Update(c =>
+            {
+                var o = c.Overrides.TryGetValue(id, out var existing) ? existing : new ItemOverride();
+                if (name is not null) o.Name = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+                if (type is not null) o.Type = type;
+                if (o.IsEmpty) c.Overrides.Remove(id);
+                else c.Overrides[id] = o;
+            });
+        }
+        if (hidden is not null) return SetHidden(id, hidden.Value);
+        return Replace(id, i => ApplyUserState(i with { Name = BaseName(i) }));
+    }
+
+    /// <summary>
+    /// Puts an entry on the ignore list ("Hide": out of every list, also after rescans and when a scanner finds it again) or takes it off
+    /// ("Show again"). Keyed by the entry's stable identity (<see cref="LibraryIgnore.KeysOf"/>), not only its id. The entry stays in
+    /// <see cref="Items"/> with <see cref="LibraryItem.Hidden"/> set: parental controls keep seeing it.
+    /// </summary>
+    public LibraryItem SetHidden(string id, bool hidden)
+    {
+        var item = Find(id) ?? throw new KeyNotFoundException($"unknown item {id}");
+        var keys = KeysOf(item);
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var before = LibraryIgnore.KeySet(config.Current.Ignored);
         config.Update(c =>
         {
-            var o = c.Overrides.TryGetValue(id, out var existing) ? existing : new ItemOverride();
-            if (name is not null) o.Name = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
-            if (type is not null) o.Type = type;
-            if (hidden is not null) o.Hidden = hidden.Value;
-            if (o.IsEmpty) c.Overrides.Remove(id);
-            else c.Overrides[id] = o;
+            c.Ignored ??= [];
+            if (hidden) LibraryIgnore.Hide(c.Ignored, item, keys, now, Strings.Get("library.ignoreFull", LibraryIgnore.MaxEntries));
+            else LibraryIgnore.Show(c.Ignored, keys);
+            // A flag from before the ignore list goes either way: the list is the one place now.
+            if (c.Overrides.TryGetValue(id, out var o) && o.Hidden)
+            {
+                o.Hidden = false;
+                if (o.IsEmpty) c.Overrides.Remove(id);
+            }
         });
-        return Replace(id, i => ApplyUserState(i with { Name = BaseName(i) }));
+        var result = Replace(id, i => ApplyUserState(i with { Name = BaseName(i) }));
+        // Other entries share a key (the same game folder, the same exe): they change with it right away, not only after the next scan.
+        if (OthersShare(id, before, LibraryIgnore.KeySet(config.Current.Ignored))) ReapplyUserState();
+        return Find(id) ?? result;
+    }
+
+    /// <summary>Whether an entry other than <paramref name="id"/> has a key whose state changed between the two key sets.</summary>
+    private bool OthersShare(string id, HashSet<string> before, HashSet<string> after)
+    {
+        var changed = new HashSet<string>(before, StringComparer.Ordinal);
+        changed.SymmetricExceptWith(after);
+        if (changed.Count == 0) return false;
+        var guesses = FolderGuesses();
+        return Items.Any(i => i.Id != id && KeysOf(i, guesses).Any(changed.Contains));
+    }
+
+    /// <summary>Refuses (with the message for the user) when hiding the entry would need room the full ignore list does not have.</summary>
+    public void EnsureCanHide(string id)
+    {
+        var item = Find(id) ?? throw new KeyNotFoundException($"unknown item {id}");
+        if (!LibraryIgnore.CanHide(config.Current.Ignored, KeysOf(item)))
+            throw new InvalidOperationException(Strings.Get("library.ignoreFull", LibraryIgnore.MaxEntries));
+    }
+
+    /// <summary>
+    /// Records of the ignore list that no entry of the library matches any more (the game was uninstalled, a folder removed). Shown
+    /// name-only under Settings › Library › Hidden entries with "Remove", so they never fill the list silently. Empty after a partial scan:
+    /// an entry of a store left out may come back.
+    /// </summary>
+    public IReadOnlyList<IgnoredOrphan> IgnoredOrphans()
+    {
+        // Only a scan that saw everything proves an entry gone: not before the first scan, not after a skipped store, a failed provider,
+        // plugins that are still loading or paused (they list nothing then), and not right now if that changed since the scan.
+        lock (_lock)
+        {
+            if (_partialScan || !_scanTrusted) return [];
+        }
+        if (ScanComplete?.Invoke() == false) return [];
+        var guesses = FolderGuesses();
+        var live = Items.SelectMany(i => KeysOf(i, guesses)).ToHashSet(StringComparer.Ordinal);
+        var folders = (config.Current.GameFolders ?? []).Where(f => !string.IsNullOrWhiteSpace(f)).ToList();
+        return [.. (config.Current.Ignored ?? [])
+            .Where(e => e?.Keys is { Count: > 0 } && !e.Keys.Any(live.Contains) && !OnMissingFolder(e, folders))
+            .Select(e => new IgnoredOrphan(e.Keys[0], e.Name, e.Source))];
+    }
+
+    /// <summary>
+    /// A record with an exe or game folder key whose watched folder or drive is not there now (an unplugged disk, a network share that is
+    /// down): the game may come back with it, so the record is not offered for removal.
+    /// </summary>
+    private bool OnMissingFolder(IgnoredEntry entry, List<string> folders)
+    {
+        foreach (var key in entry.Keys ?? [])
+        {
+            var path = key.StartsWith(LibraryIgnore.ExePrefix, StringComparison.Ordinal) ? key[LibraryIgnore.ExePrefix.Length..]
+                : key.StartsWith(LibraryIgnore.DirPrefix, StringComparison.Ordinal) ? key[LibraryIgnore.DirPrefix.Length..] : null;
+            if (path is null) continue;
+            try
+            {
+                var root = Path.GetPathRoot(path);
+                if (!string.IsNullOrEmpty(root) && !DirectoryExists(root)) return true;
+                foreach (var watched in folders)
+                {
+                    var w = LibraryIgnore.NormalizePath(watched);
+                    if (w.Length > 0 && path.StartsWith(w + "\\", StringComparison.Ordinal) && !DirectoryExists(watched)) return true;
+                }
+            }
+            catch (Exception ex) when (ex is ArgumentException or IOException)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>Takes a record off the list that no entry matches any more (see <see cref="IgnoredOrphans"/>).</summary>
+    public void RemoveIgnoredOrphan(string key)
+    {
+        var orphan = IgnoredOrphans().FirstOrDefault(o => o.Key == key) ?? throw new KeyNotFoundException($"no orphaned record {key}");
+        // Only the records that are orphans themselves; a live record that shares a key stays.
+        var orphans = IgnoredOrphans().Select(o => o.Key).ToHashSet(StringComparer.Ordinal);
+        config.Update(c => LibraryIgnore.RemoveRecord(c.Ignored ??= [], orphan.Key, orphans));
     }
 
     /// <summary>Picks artwork for one slot ("cover", "hero", "logo", "square"): an https URL or a local image. Null goes back to automatic.</summary>
@@ -400,6 +570,67 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
         return result;
     }
 
+    /// <summary>The game the entry's artwork comes from, for the edit menu: automatic or the pinned one with its name.</summary>
+    public ArtworkMatchView GetArtworkMatch(string id)
+    {
+        if (Find(id) is null) throw new KeyNotFoundException($"unknown item {id}");
+        var o = config.Current.Overrides.GetValueOrDefault(id);
+        return ArtworkMatches.View(o?.ArtworkMatch, o?.ArtworkMatchName);
+    }
+
+    /// <summary>
+    /// Pins the game an entry's artwork comes from ("Search artwork": "steam:&lt;app id&gt;" or "sgdb:&lt;game id&gt;"), or null for automatic again.
+    /// The pin is stored per entry and survives rescans and "Reload artwork"; it changes only the pictures, never the store match or the age
+    /// rating. Online images picked for single slots go (they were of the wrong game); own pictures from the PC stay. The automatic art is
+    /// looked up again from the scanned art.
+    /// </summary>
+    public LibraryItem SetArtworkMatch(string id, string? match, string? name)
+    {
+        var item = Find(id) ?? throw new KeyNotFoundException($"unknown item {id}");
+        if (!ArtworkMatches.CanChoose(item)) throw new ArgumentException(Strings.Get("artwork.chooseOwnEntry"));
+        var pin = ArtworkMatches.Validate(match);
+        ItemOverride? after = null;
+        config.Update(c =>
+        {
+            var o = c.Overrides.TryGetValue(id, out var existing) ? existing : new ItemOverride();
+            // Online picks of the old game's pictures go only when another game is pinned; unpinning or the same pin leaves them.
+            var otherGame = pin is not null && pin != o.ArtworkMatch;
+            o.ArtworkMatch = pin;
+            o.ArtworkMatchName = pin is null ? null : InfoOverrides.Clip(name, ArtworkMatches.MaxName);
+            static string? KeepOwn(string? url) => url is not null && url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ? null : url;
+            if (otherGame)
+            {
+                o.Cover = KeepOwn(o.Cover);
+                o.Hero = KeepOwn(o.Hero);
+                o.Logo = KeepOwn(o.Logo);
+                o.Square = KeepOwn(o.Square);
+            }
+            if (o.IsEmpty) c.Overrides.Remove(id);
+            else c.Overrides[id] = o;
+            after = o;
+        });
+        LibraryItem result;
+        lock (_lock)
+        {
+            var current = _items.First(i => i.Id == id);
+            var scanned = _scannedArt.TryGetValue(id, out var s) ? s : current.Art;
+            var art = artwork.ApplyCached([current with { Art = scanned }])[0].Art;
+            _baseArt[id] = art;
+            result = Replace(id, i => i with { Art = ArtworkOverrides.Apply(art, after) });
+        }
+        Changed?.Invoke(Items);
+        _ = FetchMissingArtworkAsync();
+        return result;
+    }
+
+    /// <summary>"Search artwork" for an entry (see <see cref="ArtworkResolver.SearchAsync"/>).</summary>
+    public Task<ArtworkSearchResult> SearchArtworkAsync(string id, string query, CancellationToken ct = default)
+    {
+        var item = Find(id) ?? throw new KeyNotFoundException($"unknown item {id}");
+        if (!ArtworkMatches.CanChoose(item)) throw new ArgumentException(Strings.Get("artwork.chooseOwnEntry"));
+        return artwork.SearchAsync(query, ct);
+    }
+
     /// <summary>
     /// An automatic store match lost the rating it had (<see cref="StoreInfoService.RatingDropped"/>): that rating stays as the age floor (the
     /// stricter of it and one already pending) until the parents confirm the match again (Edit › Store entry, <see cref="StoreMatches.Apply"/>).
@@ -428,13 +659,14 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
     public IReadOnlyList<LibraryItem> ReapplyUserState()
     {
         IReadOnlyList<LibraryItem> result;
+        var ignored = IgnoredKeys();
         lock (_lock)
         {
             _items = _items.Select(i => ApplyUserState(i with
             {
                 Name = BaseName(i),
                 LastPlayed = _baseLastPlayed.TryGetValue(i.Id, out var played) ? played : 0
-            })).ToList();
+            }, ignored, _folderGuesses)).ToList();
             result = _items;
         }
         Changed?.Invoke(result);
@@ -486,7 +718,7 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
     public LaunchOptionsView SetLaunchOverride(string id, LaunchOverrideChange change, LaunchFileSystem? fs = null)
     {
         var item = Find(id) ?? throw new KeyNotFoundException($"unknown item {id}");
-        fs ??= LaunchFileSystem.Real;
+        fs = WithLibraryFolders(fs);
         ItemOverride? after = null;
         config.Update(c =>
         {
@@ -501,7 +733,17 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
 
     /// <summary>What a start of this entry runs: the scanned start with the user's override on top, checked again now.</summary>
     public LaunchTarget EffectiveLaunch(LibraryItem item, LaunchFileSystem? fs = null) =>
-        LaunchOverrides.Effective(item, config.Current.Overrides.GetValueOrDefault(item.Id), fs ?? LaunchFileSystem.Real);
+        LaunchOverrides.Effective(item, config.Current.Overrides.GetValueOrDefault(item.Id), WithLibraryFolders(fs));
+
+    /// <summary>The disk checks plus the folders that are no game's own: the watched game folders and the other entries' install folders.</summary>
+    private LaunchFileSystem WithLibraryFolders(LaunchFileSystem? fs)
+    {
+        var real = fs ?? LaunchFileSystem.Real;
+        return real.LibraryFolders is not null ? real : real with
+        {
+            LibraryFolders = id => [.. config.Current.GameFolders, .. Items.Where(i => i.Id != id && i.InstallDir is not null).Select(i => i.InstallDir!)]
+        };
+    }
 
     /// <summary>A web entry opens in Edge (copy-protected streaming) or in the couch browser. Takes effect with the next scan.</summary>
     public void SetCustomEdge(string id, bool edge)
@@ -531,6 +773,8 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
             if (index < 0) return;
             c.Apps.Remove(valid[index]);
             c.Overrides.Remove(id);
+            // Own entries are named after their name: a new entry with the same name must not come back hidden.
+            LibraryIgnore.Show(c.Ignored ??= [], [LibraryIgnore.IdPrefix + id]);
             // The entry is gone for everybody: out of every profile's favorites and collections.
             foreach (var profile in c.AllProfiles)
             {
@@ -634,7 +878,8 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
         }
     }
 
-    private static async Task<IReadOnlyList<LibraryItem>> SafeScan(ILibraryProvider provider, TimeSpan timeout, CancellationToken ct)
+    /// <summary>The provider's entries; null when it failed or did not answer in time (an empty list from a provider is a real answer).</summary>
+    private static async Task<IReadOnlyList<LibraryItem>?> SafeScan(ILibraryProvider provider, TimeSpan timeout, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeout);
@@ -648,7 +893,7 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
             // One broken, slow or offline store or plugin must not take down the whole library.
             var reason = ex is TimeoutException or OperationCanceledException ? $"no answer within {timeout.TotalSeconds:0}s" : ex.ToString();
             Console.Error.WriteLine($"[library] {provider.Name} skipped: {reason}");
-            return [];
+            return null;
         }
     }
 }

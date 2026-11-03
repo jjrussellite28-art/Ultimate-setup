@@ -31,8 +31,13 @@ public sealed class StateChecks
 
     public bool IsRegistered(StateCheck kind) => _checks.ContainsKey(kind);
 
-    /// <summary>The checks available now: the service list, a code that is not enrolled yet, and Windows Update without ids.</summary>
-    public static StateChecks BuiltIn(Func<string, bool> serviceOnList, ICodeState codes) => new StateChecks()
+    /// <summary>
+    /// The checks available now: the service list, a code that is not enrolled yet, Windows Update without ids, and the two session
+    /// checks. <paramref name="sessions"/> null: nothing is known about the sessions, so both session checks ask for an approval (fail-closed).
+    /// </summary>
+    public static StateChecks BuiltIn(Func<string, bool> serviceOnList, ICodeState codes, SessionFacts? sessions = null) => new StateChecks()
+        .Register(StateCheck.ConsoleSessionOrApproval, new StateCheckFunc((caller, _) => SessionChecks.ConsoleSessionOrApproval(caller, sessions ?? SessionFacts.Unknown)))
+        .Register(StateCheck.OtherSessionsNeedApproval, new StateCheckFunc((caller, _) => SessionChecks.OtherSessionsNeedApproval(caller, sessions ?? SessionFacts.Unknown)))
         .Register(StateCheck.ServiceAllowlist, new StateCheckFunc((_, request) =>
             request.Args is ServicesArgs { Names: { Length: > 0 } names } && names.All(n => ServicePolicy.IsAllowed(n, serviceOnList))
                 ? AuthorizationDecision.Allowed
@@ -48,6 +53,7 @@ public sealed class StateChecks
     public AuthorizationDecision Run(Rule rule, CallerInfo caller, ValidatedRequest request)
     {
         var needGrant = false;
+        var approvalOnly = false;
         foreach (var kind in rule.Checks)
         {
             if (kind == StateCheck.None) continue;
@@ -62,8 +68,13 @@ public sealed class StateChecks
                 return AuthorizationDecision.Denied($"state check {kind} failed");
             }
             if (decision.Verdict == Verdict.Deny) return decision;
-            if (decision.Verdict == Verdict.NeedGrant) needGrant = true;
+            if (decision.Verdict == Verdict.NeedGrant)
+            {
+                needGrant = true;
+                approvalOnly |= decision.ApprovalOnly;
+            }
         }
-        return needGrant ? AuthorizationDecision.GrantNeeded : AuthorizationDecision.Allowed;
+        if (!needGrant) return AuthorizationDecision.Allowed;
+        return approvalOnly ? AuthorizationDecision.ApprovalNeeded : AuthorizationDecision.GrantNeeded;
     }
 }

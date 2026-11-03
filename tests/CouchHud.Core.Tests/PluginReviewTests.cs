@@ -212,12 +212,68 @@ public sealed class PluginReviewTests : IDisposable
         // Never offered as an unknown folder to approve: it does not even load.
         var manager = new PluginManager([(PluginsDir, true)], _dir, _ => true) { Trust = trust };
         manager.LoadAll();
-        Assert.DoesNotContain(manager.Plugins, p => p.Folder == "tool");
+        // Listed only as what it is: uninstalled, nothing loaded, nothing to approve.
+        Assert.True(Assert.Single(manager.Plugins, p => p.Folder == "tool").RemovedAtRestart);
+        Assert.False(manager.IsRunning("tool"));
 
         CatalogService.FinishRemovals(_dir);
         Assert.False(Directory.Exists(dir));
         Assert.False(new PluginTrust(_dir).IsRemoved("tool"));
         Assert.False(new PluginTrust(_dir).IsFaulty);
+    }
+
+    [Fact]
+    public void An_uninstall_that_succeeds_leaves_no_plugin_trash_behind()
+    {
+        var first = Zip("v1");
+        Service().Install(Entry("1.0.0", Sha(first)), first);
+
+        Assert.True(Service().UninstallPlugin("tool"));
+
+        Assert.False(Directory.Exists(Path.Combine(PluginsDir, "tool")));
+        var trash = Path.Combine(_dir, "plugin-trash");
+        Assert.True(!Directory.Exists(trash) || !Directory.EnumerateFileSystemEntries(trash).Any());
+        Assert.False(new PluginTrust(_dir).IsRemoved("tool"));
+    }
+
+    [Fact]
+    public void The_plugin_trash_is_never_loaded_and_a_start_empties_it_once_its_files_are_free()
+    {
+        // What an uninstall put aside: a plugin folder with a file that is in use for now.
+        var aside = Path.Combine(_dir, "plugin-trash", "tool." + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(aside);
+        File.WriteAllText(Path.Combine(aside, "tool.dll"), "x");
+        File.WriteAllText(Path.Combine(aside, "plugin.json"), "{\"id\":\"tool\"}");
+        Directory.CreateDirectory(PluginsDir);
+        using (new FileStream(Path.Combine(aside, "tool.dll"), FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            CatalogService.FinishRemovals(_dir);
+            // Still in use: it stays for the next start, and it is nowhere a plugin is loaded from (only the plugins folder is).
+            Assert.True(Directory.Exists(aside));
+            var manager = new PluginManager([(PluginsDir, true)], _dir, _ => true) { Trust = new PluginTrust(_dir) };
+            manager.LoadAll();
+            Assert.Empty(manager.Plugins);
+        }
+        CatalogService.FinishRemovals(_dir);
+        Assert.False(Directory.Exists(aside));
+    }
+
+    [Fact]
+    public void A_catalog_install_over_a_folder_that_waits_for_its_removal_is_refused_and_stages_nothing()
+    {
+        var first = Zip("v1");
+        Service().Install(Entry("1.0.0", Sha(first)), first);
+        var dir = Path.Combine(PluginsDir, "tool");
+        using (new FileStream(Path.Combine(dir, "readme.txt"), FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.False(Service().UninstallPlugin("tool"));
+            var second = Zip("v2");
+            var ex = Assert.Throws<CatalogException>(() => Service().Install(Entry("1.0.1", Sha(second)), second));
+            Assert.Contains("tool", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        var trust = new PluginTrust(_dir);
+        Assert.True(trust.IsRemoved("tool"));
+        Assert.Null(trust.PendingFor("tool"));
     }
 
     [Fact]
@@ -393,50 +449,6 @@ public sealed class PluginReviewTests : IDisposable
         var ok = Png(4096, 4096);
         var okCache = new CatalogMediaCache(_dir, (_, _, _) => Task.FromResult<byte[]?>(ok));
         Assert.NotNull(await okCache.GetAsync("https://x.example/ok.png", Convert.ToHexStringLower(SHA256.HashData(ok)), PackageMedia.MaxIconBytes));
-    }
-
-    // ---- Wand's statement (signed by the release owner with scripts/sign-plugin-statement.ps1)
-
-    [Fact]
-    public void Wands_statement_template_is_a_valid_first_party_statement_once_filled()
-    {
-        var root = AppContext.BaseDirectory;
-        while (!File.Exists(Path.Combine(root, "CouchHud.slnx"))) root = Path.GetDirectoryName(root)!;
-        var template = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "catalog", "statements", "wand.json")))!.AsObject();
-        template["sha256"] = new string('a', 64);
-        template["publisherKey"] = new string('b', 64);
-        template["size"] = 12345;
-        var statement = PackageStatements.Parse(Encoding.UTF8.GetBytes(template.ToJsonString()));
-        Assert.Equal("wand", statement.Id);
-        Assert.Equal("CouchHud.Plugin.Wand", statement.Folder);
-        Assert.Null(PluginPolicy.CheckDeclared(PluginOrigin.FirstParty, statement.Capabilities));
-        // It starts programs (Wand itself), which the lint finds: declared, and nothing first-party-only.
-        Assert.Contains(PluginCapabilities.Process, statement.Capabilities);
-        Assert.DoesNotContain(statement.Capabilities, PluginPolicy.FirstPartyOnly.Contains);
-    }
-
-    [Fact]
-    public void Wands_manifest_statement_and_index_entry_agree_and_ask_for_0_6()
-    {
-        var root = AppContext.BaseDirectory;
-        while (!File.Exists(Path.Combine(root, "CouchHud.slnx"))) root = Path.GetDirectoryName(root)!;
-        var statement = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "catalog", "statements", "wand.json")))!.AsObject();
-        var manifest = PluginManager.ReadManifest(Path.Combine(root, "plugins", "CouchHud.Plugin.Wand"))!;
-        Assert.Equal("wand", manifest.Id);
-        Assert.Equal(statement["version"]!.GetValue<string>(), manifest.Version);
-        Assert.Equal(statement["sdk"]!.GetValue<int>(), manifest.Sdk);
-        Assert.Equal(statement["license"]!.GetValue<string>(), manifest.License);
-        Assert.Equal(statement["capabilities"]!.AsArray().Select(c => c!.GetValue<string>()).Order(), manifest.Capabilities!.Order());
-        // 1.0.0 is the package 0.5 clients download from the live index and must stay unchanged: the 0.6 package is a new version.
-        Assert.True(SemVer.TryParse(manifest.Version, out var v) && SemVer.TryParse("1.0.0", out var old) && v > old);
-        // The icon already online (icons/wand.png) is named in the signed statement (the entry's own iconSha256 only serves until it is signed).
-        Assert.Equal(64, statement["icon"]!["sha256"]!.GetValue<string>().Length);
-        Assert.True(statement["icon"]!["bytes"]!.GetValue<long>() is > 0 and <= PackageMedia.MaxIconBytes);
-        // A 0.5 client reads minCouchHud from the shared index and then offers nobody the package it cannot load.
-        var entry = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "catalog", "index.json")))!["entries"]!.AsArray().Single(e => e!["id"]!.GetValue<string>() == "wand")!;
-        Assert.Equal("0.6.0", entry["minCouchHud"]!.GetValue<string>());
-        Assert.Equal("0.6.0", statement["minCouchHud"]!.GetValue<string>());
-        Assert.Equal(statement["icon"]!["sha256"]!.GetValue<string>(), entry["iconSha256"]!.GetValue<string>());
     }
 
     // ---- approving a local folder is as strict as installing an unsigned package

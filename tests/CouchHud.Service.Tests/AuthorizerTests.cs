@@ -153,7 +153,6 @@ public class AuthorizerTests
         Assert.Equal(Requirement.ParentGrantOrAdmin, OperationPolicy.Table[Operation.SetAutoLogon].Requirement);
         Assert.Equal(GrantKinds.Parent | GrantKinds.WindowsAdmin, OperationPolicy.AcceptedGrants(Operation.SetAutoLogon));
         Assert.Equal(GrantKinds.Couch | GrantKinds.ParentOrAdmin, OperationPolicy.AcceptedGrants(Operation.ReleaseLockPolicies));
-        Assert.Equal(GrantKinds.None, OperationPolicy.AcceptedGrants(Operation.ResetServiceState));
         foreach (var allow in new[] { false, true })
         {
             var request = Req(Operation.SetAutoLogon, new SetAutoLogonArgs("pw", allow));
@@ -163,15 +162,20 @@ public class AuthorizerTests
     }
 
     [Fact]
-    public void Reset_service_state_is_for_an_elevated_admin_only()
+    public void Reset_service_state_is_for_an_elevated_admin_or_an_administrators_approval_only()
     {
-        // Machine-wide release: no grant of any kind opens it.
-        Assert.Equal(Requirement.Admin, OperationPolicy.Table[Operation.ResetServiceState].Requirement);
-        Assert.Equal(Verdict.Deny, Authorizer.AuthorizeTable(Callers.User(), Req(Operation.ResetServiceState), codeEnrolled: false).Verdict);
-        Assert.Equal(Verdict.Deny, Authorizer.AuthorizeTable(Callers.User() with { IsAdminGroupEnabled = true }, Req(Operation.ResetServiceState), codeEnrolled: false).Verdict);
+        // Machine-wide release: an elevated administrator, or an administrator's approval through UAC; whatever the lock, never a
+        // parents' code, the couch code or the Windows unlock.
+        Assert.Equal(Requirement.ParentGrantOrAdmin, OperationPolicy.Table[Operation.ResetServiceState].Requirement);
+        Assert.Equal(GrantKinds.WindowsAdmin, OperationPolicy.AcceptedGrants(Operation.ResetServiceState));
+        foreach (var view in new[] { LockView.Closed, new LockView(LockModes.Windows, false, true), new LockView(LockModes.Off, false, false), new LockView(LockModes.Code, true, false) { Legacy = true } })
+            Assert.Equal(GrantKinds.WindowsAdmin, OperationPolicy.AcceptedGrants(new ValidatedRequest(Operation.ResetServiceState, null, null), view));
+        Assert.Equal(Verdict.NeedGrant, Authorizer.AuthorizeTable(Callers.User(), Req(Operation.ResetServiceState), codeEnrolled: false).Verdict);
+        Assert.Equal(Verdict.NeedGrant, Authorizer.AuthorizeTable(Callers.User() with { IsAdminGroupEnabled = true }, Req(Operation.ResetServiceState), codeEnrolled: false).Verdict);
         Assert.Equal(Verdict.Allow, Authorizer.AuthorizeTable(Callers.ElevatedAdmin(), Req(Operation.ResetServiceState), codeEnrolled: false).Verdict);
         Assert.Equal(RateBucket.Housekeeping, RateLimiter.BucketFor(Operation.ResetServiceState));
     }
+
     [Fact]
     public void No_argument_type_carries_an_account()
     {

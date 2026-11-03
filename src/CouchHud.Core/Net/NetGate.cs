@@ -22,12 +22,11 @@ public enum NetService
     /// on (the age ratings keep the limits from getting looser); Offline stops it.
     /// </summary>
     GameInfo,
-    /// <summary>The weather service (NetWeather).</summary>
-    Weather,
-    /// <summary>News feeds (NetNews).</summary>
-    News,
-    /// <summary>The AI assistant's cloud provider (NetAssistant).</summary>
-    Assistant,
+    /// <summary>
+    /// A network service a plugin declared (SDK 5: weather, news, the assistant's providers …). Each has its own switch in Settings › Privacy,
+    /// checked by the plugin's client itself (PluginHttpHandler, by plugin and service); the gate only adds Offline.
+    /// </summary>
+    Plugin,
     /// <summary>The clock check of the parental controls. No switch of its own: only Offline stops it (the limits then count by the PC's clock).</summary>
     Time
 }
@@ -63,9 +62,7 @@ public sealed class NetPolicy(Func<AppConfig> config)
             NetService.Artwork => c.OnlineArtwork,
             NetService.GameInfo => c.OnlineArtwork || c.ParentalEnabled,
             NetService.Saves => c.NetSaves,
-            NetService.Weather => c.NetWeather,
-            NetService.News => c.NetNews,
-            NetService.Assistant => c.NetAssistant,
+            NetService.Plugin => true,
             NetService.Time => true,
             _ => false
         };

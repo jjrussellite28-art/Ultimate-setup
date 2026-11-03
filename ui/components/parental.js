@@ -8,6 +8,7 @@ import { $, el, keepInView, setFocused } from '../core/dom.js';
 import { attempt, toast } from '../core/feedback.js';
 import { move, push, removePage, render } from '../core/nav.js';
 import { state } from '../core/state.js';
+import { timeUpAction } from '../core/stack-rules.js';
 import { sound } from '../sound.js';
 import { t } from '../core/i18n.js';
 import { chooseDialog, closeOverlay } from './overlay.js';
@@ -56,6 +57,15 @@ export async function refreshParental() {
   return parental.status;
 }
 
+/** The status as it is now, or null when it could not be read (then nothing may be decided from it). */
+export async function refreshParentalFresh() {
+  const status = await attempt(() => api.getParental?.());
+  if (status === undefined || status === null) return null;
+  parental.status = status;
+  showBadge();
+  return status;
+}
+
 export function startParental({ detailPage, closeQuickMenu, redrawQuick } = {}) {
   quickHooks = { close: closeQuickMenu ?? quickHooks.close, redraw: redrawQuick ?? quickHooks.redraw };
   detailPage?.extraActions.push((item) => itemLockAction(item));
@@ -87,7 +97,19 @@ export function startParental({ detailPage, closeQuickMenu, redrawQuick } = {}) 
       render();
     }
   });
-  setInterval(refreshParental, 60_000);
+  // The time-up page is put back whenever it is missing while the session is over its time (nothing may take it away for good), every minute and when the window is in front again.
+  const check = () => refreshParentalFresh().then(reassertTimeUp);
+  setInterval(check, 60_000);
+  window.addEventListener('focus', check);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+}
+
+/** Puts the time-up page back on the stack when it is missing while the time is up, and takes it away when the time is not up any more or the game is gone (timeUpAction): a sticky page can never hang because an event was missed. */
+export function reassertTimeUp(freshStatus = null) {
+  // Only a status that was just read successfully may close the page; a failed read (null) decides nothing, and the cached one only puts the page back.
+  const action = timeUpAction({ page: timeUp, stack: state.stack, status: freshStatus ?? parental.status, session: state.session, fresh: !!freshStatus });
+  if (action === 'close') closeTimeUp();
+  else if (action === 'push') push(timeUp);
 }
 
 // ---------------------------------------------------------------------------
@@ -121,13 +143,15 @@ async function extendFlow() {
 
 /** The screen that stays until the parents decide or the game is closed. Nothing but its two buttons works. */
 export function timeUpPage() {
-  if (timeUp) return;
+  if (timeUp) return reassertTimeUp();
   quickHooks.close();
   if (document.querySelector('#overlay:not([hidden])')) closeOverlay();
   const advisory = !!parental.status?.advisory;
   const page = {
     id: 'parental-timeup',
     name: t('parental.timeUp'),
+    // Sticky: no tab switch, home, chip or guide menu closes it (clearStack keeps it); only closeTimeUp, when the time is added or the game is gone.
+    sticky: true,
     index: 0,
     closing: false,
     // Whether the game really is frozen (session.paused): one with an anti-cheat is not, the HUD only covers it; the text says which.
@@ -269,6 +293,7 @@ export function lockedGamesPage() {
       this.scroller = el('ul', { className: 'check-list list-scroll' }, this.items);
       root.append(el('div', { className: 'files' },
         el('div', { className: 'files-head' }, el('h2', { textContent: t('parental.lockedTitle') })),
+        el('p', { className: 'meta', textContent: t('parental.lockedPerProfile') }),
         this.list.length ? this.scroller : el('p', { className: 'empty-note', textContent: t('parental.lockedEmpty') })));
       this.update({ instant: true });
     },

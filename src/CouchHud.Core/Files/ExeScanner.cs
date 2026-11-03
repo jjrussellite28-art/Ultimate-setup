@@ -1,16 +1,17 @@
 using System.Diagnostics;
-using System.Text.RegularExpressions;
+using CouchHud.Core.Library;
 using CouchHud.Core.Localization;
 
 namespace CouchHud.Core.Files;
 
-public sealed record ExeCandidate(string Name, string Path, long Size);
+/// <param name="LegacyPaths">Every exe of the folder, helpers included: the older scan picked one of them, and its entry id came from that path (see FolderIdMigration).</param>
+public sealed record ExeCandidate(string Name, string Path, long Size, IReadOnlyList<string>? LegacyPaths = null);
 
 /// <summary>
 /// Finds the likely game executables below a folder like D:\Games: one per
 /// subfolder, skipping installers, uninstallers, crash reporters and runtimes.
 /// </summary>
-public static partial class ExeScanner
+public static class ExeScanner
 {
     private const int MaxDepth = 4;
 
@@ -18,6 +19,8 @@ public static partial class ExeScanner
     {
         if (!Directory.Exists(root)) throw new DirectoryNotFoundException(Strings.Get("files.folderNotFound", root));
 
+        // A watched Steam library (X:\SteamLibrary\steamapps\common): its games belong to the Steam scanner.
+        if (InSteamApps(root)) return [];
         var rootDir = new DirectoryInfo(root);
         var subfolders = rootDir.EnumerateDirectories("*", new EnumerationOptions { IgnoreInaccessible = true }).ToList();
         // A folder with exes directly inside is itself a game folder (e.g. the user picked "D:\Games\Hades").
@@ -27,16 +30,44 @@ public static partial class ExeScanner
         foreach (var group in groups)
         {
             ct.ThrowIfCancellationRequested();
-            var best = Executables(group, ct)
-                .Where(f => !IsJunk(f.Name))
-                // Prefer exes named like the folder, then the biggest one: game binaries dwarf helpers.
-                .OrderByDescending(f => Similar(f.Name, group.Name))
-                .ThenBy(f => Depth(group, f))
-                .ThenByDescending(f => f.Length)
-                .FirstOrDefault();
-            if (best is not null) result.Add(new ExeCandidate(SuggestName(best, group), best.FullName, best.Length));
+            // A Steam library or client folder: its games belong to the Steam scanner (and are not walked through here).
+            if (Directory.Exists(Path.Combine(group.FullName, "steamapps")) || InSteamApps(group.FullName)) continue;
+            var files = Executables(group, ct).ToList();
+            // The version resource is read only for exes whose name already passes (helpers are skipped without opening them), and for
+            // at most MaxVersionReads of them (the shallower first): a folder with thousands of exes must not stall the scan.
+            var reads = 0;
+            var facts = files.OrderBy(f => Path.GetRelativePath(group.FullName, f.FullName).Count(c => c is '\\' or '/'))
+                .Select(f => Facts(group, f, ref reads)).ToList();
+            if (GameDetection.Pick(group.Name, facts) is not { } pick) continue;
+            var full = Path.Combine(group.FullName, pick.Exe.RelativePath);
+            var size = files.FirstOrDefault(f => string.Equals(f.FullName, full, StringComparison.OrdinalIgnoreCase))?.Length ?? pick.Exe.Size;
+            result.Add(new ExeCandidate(pick.Name, full, size, files.Select(f => f.FullName).ToList()));
         }
         return result.OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+    }
+
+    /// <summary>At most this many version resources are read per game folder.</summary>
+    internal const int MaxVersionReads = 64;
+
+    /// <summary>Whether a folder path has a "steamapps" segment.</summary>
+    internal static bool InSteamApps(string path) =>
+        path.Split('\\', '/').Any(seg => seg.Equals("steamapps", StringComparison.OrdinalIgnoreCase));
+
+    private static ExeFacts Facts(DirectoryInfo group, FileInfo file, ref int reads)
+    {
+        var relative = Path.GetRelativePath(group.FullName, file.FullName).Replace('/', '\\');
+        var bare = new ExeFacts(relative, file.Length);
+        if (GameDetection.IsJunk(bare) || reads >= MaxVersionReads) return bare;
+        reads++;
+        try
+        {
+            var info = FileVersionInfo.GetVersionInfo(file.FullName);
+            return bare with { ProductName = info.ProductName?.Trim(), FileDescription = info.FileDescription?.Trim() };
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FileNotFoundException)
+        {
+            return bare;
+        }
     }
 
     private static IEnumerable<FileInfo> Executables(DirectoryInfo dir, CancellationToken ct)
@@ -51,51 +82,9 @@ public static partial class ExeScanner
         foreach (var file in dir.EnumerateFiles("*.exe", options))
         {
             if (ct.IsCancellationRequested) yield break;
-            if (JunkFolders().IsMatch(file.DirectoryName ?? "")) continue;
             yield return file;
         }
     }
 
-    internal static bool IsJunk(string fileName) => JunkExe().IsMatch(Path.GetFileNameWithoutExtension(fileName));
-
-    private static int Similar(string fileName, string folderName)
-    {
-        var a = Normalize(Path.GetFileNameWithoutExtension(fileName));
-        var b = Normalize(folderName);
-        return a.Length > 0 && b.Length > 0 && (a.Contains(b) || b.Contains(a)) ? 1 : 0;
-    }
-
-    private static int Depth(DirectoryInfo root, FileInfo file) =>
-        Path.GetRelativePath(root.FullName, file.DirectoryName ?? root.FullName).Count(c => c is '\\' or '/');
-
-    private static string Normalize(string s) => new(s.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
-
-    /// <summary>Product name from the exe's version info, otherwise a cleaned-up folder name.</summary>
-    internal static string SuggestName(FileInfo exe, DirectoryInfo folder)
-    {
-        try
-        {
-            var product = FileVersionInfo.GetVersionInfo(exe.FullName).ProductName?.Trim();
-            if (!string.IsNullOrEmpty(product) && !GenericProduct().IsMatch(product)) return product;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
-        var name = Separators().Replace(folder.Name, " ").Trim();
-        return name.Length > 0 ? name : Path.GetFileNameWithoutExtension(exe.Name);
-    }
-
-    [GeneratedRegex(@"unins|uninstall|setup|install|redist|vcredist|vc_redist|directx|dxsetup|dxwebsetup|dotnet|ndp\d|crash|report|bugsplat|updater|update|patcher|helper|prereq|physx|oalinst|easyanticheat|battleye|eac_|cefsharp|unitycrashhandler|notification_helper|quicksfv|config|settings|benchmark|server$|dedicated|editor|sdk|tool",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex JunkExe();
-
-    [GeneratedRegex(@"[\\/](_?commonredist|redist|redistributables?|directx|support|installers?|__installer|prereqs?|_CommonRedist|EasyAntiCheat|BattlEye|Engine[\\/]Binaries[\\/]ThirdParty)([\\/]|$)",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex JunkFolders();
-
-    [GeneratedRegex(@"^(unity|unreal|microsoft|windows|game|launcher|application|app)\b", RegexOptions.IgnoreCase)]
-    private static partial Regex GenericProduct();
-
-    [GeneratedRegex(@"[_.\-]+")]
-    private static partial Regex Separators();
+    internal static bool IsJunk(string fileName) => GameDetection.IsJunkName(fileName);
 }

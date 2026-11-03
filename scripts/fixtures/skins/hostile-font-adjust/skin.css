@@ -1,0 +1,2 @@
+/* For scripts/tabs-check.mjs, never for the catalog. */
+[data-skin="user:hostile-font-adjust"] #tab-list li { font-size-adjust: 0.001; }

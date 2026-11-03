@@ -12,10 +12,13 @@ public enum Verdict
 }
 
 /// <summary>The decision and, for a denial, why (for the log; the caller only sees the error code).</summary>
-public sealed record AuthorizationDecision(Verdict Verdict, string? Reason = null)
+/// <param name="ApprovalOnly">With <see cref="Verdict.NeedGrant"/>: only a grant a parent or an administrator confirmed counts (never the caller's own unlock or the couch code).</param>
+public sealed record AuthorizationDecision(Verdict Verdict, string? Reason = null, bool ApprovalOnly = false)
 {
     public static readonly AuthorizationDecision Allowed = new(Verdict.Allow);
     public static readonly AuthorizationDecision GrantNeeded = new(Verdict.NeedGrant);
+    /// <summary>A grant is needed and it must be a parent's or an administrator's approval (<see cref="GrantKinds.ParentOrAdmin"/>).</summary>
+    public static readonly AuthorizationDecision ApprovalNeeded = new(Verdict.NeedGrant, null, true);
 
     public static AuthorizationDecision Denied(string reason) => new(Verdict.Deny, reason);
 }
@@ -66,7 +69,8 @@ public static class Authorizer
         if (table.Verdict == Verdict.Deny) return table;
         var state = checks.Run(OperationPolicy.For(request)!, caller!, request);
         if (state.Verdict == Verdict.Deny) return state;
-        return table.Verdict == Verdict.NeedGrant || state.Verdict == Verdict.NeedGrant ? AuthorizationDecision.GrantNeeded : AuthorizationDecision.Allowed;
+        if (table.Verdict != Verdict.NeedGrant && state.Verdict != Verdict.NeedGrant) return AuthorizationDecision.Allowed;
+        return table.ApprovalOnly || state.ApprovalOnly ? AuthorizationDecision.ApprovalNeeded : AuthorizationDecision.GrantNeeded;
     }
 
     /// <summary>The table alone, without the state checks: internal, so nothing outside the tests decides on it.</summary>

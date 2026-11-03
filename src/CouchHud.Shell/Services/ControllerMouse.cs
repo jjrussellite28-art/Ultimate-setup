@@ -283,7 +283,7 @@ public sealed class ControllerMouse : IDisposable
         var tabTip = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonProgramFiles), "microsoft shared", "ink", "TabTip.exe");
         try
         {
-            Process.Start(new ProcessStartInfo(File.Exists(tabTip) ? tabTip : "osk.exe") { UseShellExecute = true })?.Dispose();
+            Process.Start(new ProcessStartInfo(File.Exists(tabTip) ? tabTip : Path.Combine(Environment.SystemDirectory, "osk.exe")) { UseShellExecute = true })?.Dispose();
         }
         catch (System.ComponentModel.Win32Exception ex)
         {
@@ -299,7 +299,7 @@ public sealed class ControllerMouse : IDisposable
         Send(up, 0, 0, 0);
     }
 
-    private const uint MouseMove = 0x0001, MouseLeftDown = 0x0002, MouseLeftUp = 0x0004, MouseRightDown = 0x0008, MouseRightUp = 0x0010, MouseWheel = 0x0800;
+    private const uint MouseLeftDown = 0x0002, MouseLeftUp = 0x0004, MouseRightDown = 0x0008, MouseRightUp = 0x0010, MouseWheel = 0x0800;
 
     private static void Send(uint flags, int dx, int dy, int data)
     {

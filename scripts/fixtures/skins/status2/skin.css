@@ -1,0 +1,5 @@
+:root[data-skin="user:status2"]{--x:1}
+
+#status{display:contents !important}
+#status>*{position:fixed !important; inset:0; width:100vw; height:100vh; background:#000; font-size:300px; zoom:20}
+#clock{filter:none}

@@ -229,19 +229,15 @@ public static class BatteryRules
     {
         if (instanceId is null || instanceId.Length > 300 || !instanceId.Contains("00001812-", StringComparison.OrdinalIgnoreCase)) return null;
         var timeout = TimeSpan.FromMilliseconds(50);
-        var m = System.Text.RegularExpressions.Regex.Match(instanceId, @"^BTHLEDEVICE\\\{00001812-[0-9A-Fa-f-]+\}_DEV_VID&02(?<v>[0-9A-Fa-f]{4})_PID&(?<p>[0-9A-Fa-f]{4})_REV&[0-9A-Fa-f]{4}_(?<a>[0-9A-Fa-f]{12})(\\|$)",
+        var m = System.Text.RegularExpressions.Regex.Match(instanceId, @"^BTHLEDEVICE\\\{00001812-[0-9A-Fa-f-]+\}_DEV_VID&02(?<v>[0-9A-Fa-f]{4})_PID&(?<p>[0-9A-Fa-f]{4})_REV&[0-9A-Fa-f]{4}_(?<a>[0-9A-Fa-f]{12})(\\|\z)",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase, timeout);
         if (!m.Success)
-            m = System.Text.RegularExpressions.Regex.Match(instanceId, @"^HID\\\{00001812-[0-9A-Fa-f-]+\}&DEV&VID_(?<v>[0-9A-Fa-f]{4})&PID_(?<p>[0-9A-Fa-f]{4})&REV_[0-9A-Fa-f]{4}&(?<a>[0-9A-Fa-f]{12})&IG_[0-9A-Fa-f]{2}(\\|$)",
+            m = System.Text.RegularExpressions.Regex.Match(instanceId, @"^HID\\\{00001812-[0-9A-Fa-f-]+\}&DEV&VID_(?<v>[0-9A-Fa-f]{4})&PID_(?<p>[0-9A-Fa-f]{4})&REV_[0-9A-Fa-f]{4}&(?<a>[0-9A-Fa-f]{12})&IG_[0-9A-Fa-f]{2}(\\|\z)",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase, timeout);
         return m.Success ? (Convert.ToInt32(m.Groups["v"].Value, 16), Convert.ToInt32(m.Groups["p"].Value, 16), m.Groups["a"].Value.ToUpperInvariant()) : null;
     }
 
     private static bool XboxName(string name) => name.TrimStart().StartsWith("Xbox", StringComparison.OrdinalIgnoreCase);
-
-    private static bool SonyName(string name) =>
-        name.Contains("Wireless Controller", StringComparison.OrdinalIgnoreCase) || name.Contains("DualSense", StringComparison.OrdinalIgnoreCase)
-        || name.Contains("DualShock", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Windows knows the real battery of a Bluetooth controller (DEVPKEY_Bluetooth_Battery); XInput only a coarse level. A Bluetooth

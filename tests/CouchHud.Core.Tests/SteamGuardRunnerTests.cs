@@ -337,6 +337,58 @@ public sealed class SteamGuardRunnerTests : IDisposable
     }
 
     [Fact]
+    public void ARunEntryWithNothingPendingIsRemoved()
+    {
+        // The state is back (or its file is gone), but the Run entry was left: the next pass removes it, with Steam running or not.
+        _reg.WriteString(SteamGuardRunner.RunKey, SteamGuardRunner.RunValue, Command);
+        _steam.Running = true;
+        var runner = Runner();
+        runner.Sync(want: false, allowCycle: false, quick: true);
+        Assert.False(RunEntry);
+        Assert.False(runner.HasPending);
+        Assert.False(runner.Deferred);
+
+        // The Run entry's own process ends at once instead of waiting for Steam.
+        _reg.WriteString(SteamGuardRunner.RunKey, SteamGuardRunner.RunValue, Command);
+        var slept = _steam.Slept;
+        Runner().ReleaseWhenSteamEnds(TimeSpan.FromHours(2), TimeSpan.FromSeconds(20));
+        Assert.False(RunEntry);
+        Assert.Equal(slept, _steam.Slept);
+        Assert.Equal(0, _steam.ShutdownRequests);
+    }
+
+    [Fact]
+    public void AfterTheValuesAreBackALaterPassLeavesNoRunEntry()
+    {
+        _steam.Running = false;
+        var runner = Runner();
+        runner.Sync(want: true);
+        runner.Sync(want: false);
+        Assert.False(RunEntry);
+        // Something wrote the entry again (an older CouchHud, a restore of the registry): gone with the next pass.
+        _reg.WriteString(SteamGuardRunner.RunKey, SteamGuardRunner.RunValue, Command);
+        _steam.Running = true;
+        runner.Sync(want: false);
+        Assert.False(RunEntry);
+        Assert.False(Applied);
+    }
+
+    [Fact]
+    public void TheRunEntryStaysWhileOurValuesWaitForSteam()
+    {
+        // Applied, then Steam runs: the values can only go back when Steam ends, so the entry is still needed.
+        _steam.Running = false;
+        var runner = Runner();
+        runner.Sync(want: true);
+        _steam.Running = true;
+        runner.Sync(want: true, allowCycle: false);
+        Assert.True(RunEntry);
+        runner.Sync(want: false);
+        Assert.True(RunEntry);
+        Assert.True(runner.HasPending);
+    }
+
+    [Fact]
     public void TheRunEntryPathGivesUpAfterItsLifetime()
     {
         _steam.Running = false;

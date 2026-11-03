@@ -1,0 +1,4 @@
+/* A reviewer's skin from the 0.6.4 reviews (the bypasses of the runtime check), for scripts/tabs-check.mjs, never for the catalog. Its old selectors name the
+   tab bar that a skin cannot reach any more; the block at the end tries the same on what a skin can still reach. */
+[data-skin="user:review-slit3"] body::after { content:""; position: fixed; left:0; right:0; top:0; height:100px; z-index: 9999; pointer-events: none;
+  background: linear-gradient(to bottom, #000 0 40px, transparent 40px 48px, #000 48px 100px); }

@@ -16,6 +16,7 @@ import deDownloads from './de/downloads.js';
 import deTv from './de/tv.js';
 import deProfiles from './de/profiles.js';
 import dePlugins from './de/plugins.js';
+import deCompanions from './de/companions.js';
 import enSettings from './en/settings.js';
 import enSetup from './en/setup.js';
 import enTransparency from './en/transparency.js';
@@ -32,10 +33,11 @@ import enDownloads from './en/downloads.js';
 import enTv from './en/tv.js';
 import enProfiles from './en/profiles.js';
 import enPlugins from './en/plugins.js';
+import enCompanions from './en/companions.js';
 
-export const FILES = ['settings', 'setup', 'transparency', 'legal', 'system', 'views1', 'views2', 'components1', 'components2', 'core', 'mock', 'wizard', 'downloads', 'tv', 'profiles', 'plugins'];
+export const FILES = ['settings', 'setup', 'transparency', 'legal', 'system', 'views1', 'views2', 'components1', 'components2', 'core', 'mock', 'wizard', 'downloads', 'tv', 'profiles', 'plugins', 'companions'];
 
 export const dictionaries = {
-  de: Object.assign({}, deSettings, deSetup, deTransparency, deLegal, deSystem, deViews1, deViews2, deComponents1, deComponents2, deCore, deMock, deWizard, deDownloads, deTv, deProfiles, dePlugins),
-  en: Object.assign({}, enSettings, enSetup, enTransparency, enLegal, enSystem, enViews1, enViews2, enComponents1, enComponents2, enCore, enMock, enWizard, enDownloads, enTv, enProfiles, enPlugins)
+  de: Object.assign({}, deSettings, deSetup, deTransparency, deLegal, deSystem, deViews1, deViews2, deComponents1, deComponents2, deCore, deMock, deWizard, deDownloads, deTv, deProfiles, dePlugins, deCompanions),
+  en: Object.assign({}, enSettings, enSetup, enTransparency, enLegal, enSystem, enViews1, enViews2, enComponents1, enComponents2, enCore, enMock, enWizard, enDownloads, enTv, enProfiles, enPlugins, enCompanions)
 };

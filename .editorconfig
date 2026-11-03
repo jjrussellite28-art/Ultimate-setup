@@ -1,0 +1,25 @@
+root = true
+
+[src/**.cs]
+# Only rules that catch real bugs, held at zero findings so they stay there. No style rules.
+# A new finding fails the build: fix it, or (with a reason) suppress that one place.
+
+# Native libraries load from System32 only (see NativeSearchPath.cs in each project with P/Invoke)
+dotnet_diagnostic.CA5392.severity = error
+# Broken or weak crypto
+dotnet_diagnostic.CA5350.severity = error
+dotnet_diagnostic.CA5351.severity = error
+# Correctness
+dotnet_diagnostic.CA2016.severity = error
+dotnet_diagnostic.CA2201.severity = error
+dotnet_diagnostic.CA2208.severity = error
+dotnet_diagnostic.CS0675.severity = error
+# Dead code
+dotnet_diagnostic.CS0168.severity = error
+dotnet_diagnostic.CS0219.severity = error
+dotnet_diagnostic.IDE0051.severity = error
+dotnet_diagnostic.IDE0052.severity = error
+
+# PrintMembers of the records that keep secrets out of ToString is called by the compiler, not by name
+[{src/CouchHud.Service.Contracts/**.cs,src/CouchHud.Service/Authorization/GrantStore.cs}]
+dotnet_diagnostic.IDE0051.severity = none

@@ -10,6 +10,8 @@ namespace CouchHud.Core.Library;
 /// <param name="RedirectBelow">A junction, mount point or link on the way from the install folder (root) down to the path
 /// (<see cref="Saves.SavePathGuard.HasReparsePointBelow"/>); null: that one.</param>
 /// <param name="Fingerprint">Size and SHA-256 of a file, null when it cannot be read; null: <see cref="FileFingerprint.Read"/>.</param>
+/// <param name="LibraryFolders">The folders that are no game's own folder, asked for an entry by its id: the watched game folders and the install
+/// folders of the other entries (<see cref="LaunchOverrides.ScriptRoot"/> never reaches or contains one); null: none known.</param>
 public sealed record LaunchFileSystem(
     Func<string, bool> FileExists,
     Func<string, bool> DirectoryExists,
@@ -17,13 +19,16 @@ public sealed record LaunchFileSystem(
     Func<string, bool> IsRedirect,
     string WindowsDir,
     Func<string, string, bool>? RedirectBelow = null,
-    Func<string, FileFingerprint?>? Fingerprint = null)
+    Func<string, FileFingerprint?>? Fingerprint = null,
+    Func<string, IReadOnlyList<string>>? LibraryFolders = null)
 {
     public static LaunchFileSystem Real => new(File.Exists, Directory.Exists, LocalPaths.IsNetworkDrive, Saves.SavePathGuard.IsRedirect,
         Environment.GetFolderPath(Environment.SpecialFolder.Windows), (root, path) => Saves.SavePathGuard.HasReparsePointBelow(root, path), FileFingerprint.Read);
 
     public bool HasRedirectBelow(string root, string path) =>
         RedirectBelow is { } below ? below(root, path) : Saves.SavePathGuard.HasReparsePointBelow(root, path);
+
+    public IReadOnlyList<string> LibraryFoldersFor(string itemId) => LibraryFolders?.Invoke(itemId) ?? [];
 
     public FileFingerprint? FingerprintOf(string path) => (Fingerprint ?? FileFingerprint.Read)(path);
 }
@@ -175,11 +180,20 @@ public static class LaunchOverrides
         if (DeviceNames.Contains(stem) || full.Split('\\').Skip(1).Any(part => DeviceNames.Contains(Path.GetFileNameWithoutExtension(part).TrimEnd(' ', '.'))))
             throw new ArgumentException(Strings.Get("entry.targetInvalid", text));
         if (LaunchOptions.IsScript(full) && !LaunchOptions.IsScriptPathSafe(full)) throw new ArgumentException(Strings.Get("entry.scriptPathInvalid", full));
-        var root = GameSessionTracker.InstallRoot(item) ?? throw new ArgumentException(Strings.Get("entry.targetNoFolder"));
-        if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException(Strings.Get("entry.targetOutside", root.TrimEnd('\\')));
+        var installRoot = GameSessionTracker.InstallRoot(item) ?? throw new ArgumentException(Strings.Get("entry.targetNoFolder"));
+        // A batch file may also sit in the game's main folder above a program folder (Call of Duty\start.cmd next to _retail_\cod.exe).
+        var root = LaunchOptions.IsScript(full) ? RootFor(full, item, fs) : full.StartsWith(installRoot, StringComparison.OrdinalIgnoreCase) ? installRoot : null;
+        if (root is null)
+        {
+            throw new ArgumentException(LaunchOptions.IsScript(full)
+                ? Strings.Get("entry.scriptOutside", (ScriptRoot(item, fs) ?? installRoot).TrimEnd('\\'))
+                : Strings.Get("entry.targetOutside", installRoot.TrimEnd('\\')));
+        }
         if (!fs.FileExists(full)) throw new ArgumentException(Strings.Get("entry.targetMissing", full));
         // Neither the file nor a folder between the install folder and it may lead elsewhere (a junction "bin" swapped in after the approval).
         // The install folder itself may be one (a library moved to another drive): the scanned start and the play time go by it as well.
+        // The main folder above the install folder (a batch file there) is no link either.
+        if (!string.Equals(root, installRoot, StringComparison.OrdinalIgnoreCase) && fs.IsRedirect(root.TrimEnd('\\'))) throw new ArgumentException(Strings.Get("entry.targetInvalid", full));
         if (fs.IsRedirect(full) || fs.HasRedirectBelow(root, full)) throw new ArgumentException(Strings.Get("entry.targetInvalid", full));
         if (item.Type == ItemType.Game && !GameEntryRules.MayBeGame(full, fs.WindowsDir)) throw new ArgumentException(Strings.Get("entry.notAGame", item.Name));
         return full;
@@ -197,23 +211,95 @@ public static class LaunchOverrides
     }
 
     /// <summary>
-    /// A batch file's working folder: the install folder or one inside it, reached without a link to elsewhere. cmd.exe looks for a program the
-    /// script names without a path in the working folder first, so a folder outside would decide what the approved script runs.
+    /// A batch file's working folder: inside the folder a batch file may be in (<see cref="RootFor"/>), reached without a link to elsewhere.
+    /// cmd.exe looks for a program the script names without a path in the working folder first, so a folder outside would decide what the
+    /// approved script runs.
     /// </summary>
     private static bool ScriptCwdAllowed(string cwd, LibraryItem item, LaunchFileSystem fs)
     {
-        if (GameSessionTracker.InstallRoot(item) is not { } root) return false;
         var folder = Path.TrimEndingDirectorySeparator(cwd);
-        if (!(folder + "\\").StartsWith(root, StringComparison.OrdinalIgnoreCase)) return false;
-        return folder.Length + 1 == root.Length || (!fs.IsRedirect(folder) && !fs.HasRedirectBelow(root, folder));
+        if (RootFor(folder + "\\", item, fs) is not { } root) return false;
+        if (folder.Length + 1 == root.Length) return true;
+        // Below the root: when the root is the game's main folder (above the install folder), that folder is no link either.
+        var installRoot = GameSessionTracker.InstallRoot(item);
+        if (installRoot is not null && !string.Equals(root, installRoot, StringComparison.OrdinalIgnoreCase) && fs.IsRedirect(root.TrimEnd('\\'))) return false;
+        return !fs.IsRedirect(folder) && !fs.HasRedirectBelow(root, folder);
+    }
+
+    /// <summary>
+    /// Names of the folders games keep their program in below their main folder: Call of Duty's _retail_, Unreal's Binaries\Win64,
+    /// bin\x64 and the like. Only these lead up to the main folder, so a batch file never reaches a library folder (steamapps\common, D:\Games).
+    /// </summary>
+    private static readonly HashSet<string> ProgramFolderNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "_retail_", "_ptr_", "_beta_", "retail", "bin", "bin32", "bin64", "binaries", "win32", "win64", "x64", "x86", "x86_64", "shipping"
+    };
+
+    /// <summary>
+    /// Where a batch file (and its working folder) may be: the install folder, or the game's main folder when the install folder is a program
+    /// folder below it (up to three levels of <see cref="ProgramFolderNames"/>), and never a drive, Windows, the program folders or the profile
+    /// (<see cref="GameSessionTracker.SaneRoot"/>). cmd.exe is no game process, so the wider folder changes nothing for the play time.
+    /// </summary>
+    internal static string? ScriptRoot(LibraryItem item, LaunchFileSystem fs)
+    {
+        var library = fs.LibraryFoldersFor(item.Id);
+        if (GameSessionTracker.InstallRoot(item) is not { } root) return null;
+        var folder = root.TrimEnd('\\');
+        for (var i = 0; i < 3 && ProgramFolderNames.Contains(Path.GetFileName(folder)); i++)
+        {
+            if (Path.GetDirectoryName(folder) is not { } parent || GameSessionTracker.SaneRoot(parent) is null || IsLibraryFolder(parent, library, fs)) break;
+            folder = parent;
+        }
+        return folder + "\\";
+    }
+
+    /// <summary>
+    /// A folder that holds games rather than being one: a watched game folder or the install folder of another entry is it or lies in it, it is a
+    /// Steam library's <c>steamapps</c> or <c>common</c>, or it holds a <c>steamapps\common</c>. A batch file never reaches such a folder, so
+    /// <c>D:\Games\bin\game.exe</c> stops at <c>bin</c> and never gets to D:\Games.
+    /// </summary>
+    private static bool IsLibraryFolder(string parent, IReadOnlyList<string> library, LaunchFileSystem? fs)
+    {
+        var folder = Path.TrimEndingDirectorySeparator(parent);
+        var name = Path.GetFileName(folder);
+        if (name.Equals("steamapps", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("common", StringComparison.OrdinalIgnoreCase) && Path.GetFileName(Path.GetDirectoryName(folder) ?? "").Equals("steamapps", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (fs?.DirectoryExists(Path.Combine(folder, "steamapps", "common")) == true) return true;
+        foreach (var other in library)
+        {
+            if (string.IsNullOrWhiteSpace(other)) continue;
+            string full;
+            try
+            {
+                full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(other));
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                continue;
+            }
+            if (full.Equals(folder, StringComparison.OrdinalIgnoreCase) || full.StartsWith(folder + "\\", StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// The folder a batch file's checks start from: the install folder when it is inside (as before: that folder itself may be a link, a library
+    /// moved to another drive), else the main folder above it (<see cref="ScriptRoot"/>), where the program folder on the way is checked as
+    /// well; null outside both.
+    /// </summary>
+    private static string? RootFor(string path, LibraryItem item, LaunchFileSystem fs)
+    {
+        if (GameSessionTracker.InstallRoot(item) is { } root && path.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return root;
+        return ScriptRoot(item, fs) is { } main && path.StartsWith(main, StringComparison.OrdinalIgnoreCase) ? main : null;
     }
 
     /// <summary>The honest refusal for a batch file over <see cref="FileFingerprint.MaxScriptBytes"/>.</summary>
     internal static string ScriptTooLarge(string script) =>
         Strings.Get("entry.scriptTooLarge", Path.GetFileName(script), FileFingerprint.MaxScriptBytes / (1024 * 1024));
 
-    private static string ScriptCwdOutside(LibraryItem item) =>
-        Strings.Get("entry.scriptCwdOutside", (GameSessionTracker.InstallRoot(item) ?? "").TrimEnd('\\'));
+    private static string ScriptCwdOutside(LibraryItem item, LaunchFileSystem fs) =>
+        Strings.Get("entry.scriptCwdOutside", (ScriptRoot(item, fs) ?? "").TrimEnd('\\'));
 
     /// <summary>
     /// Applies a change to the override, all checks first (nothing is changed when one fails). Going back to the automatic start target
@@ -267,7 +353,7 @@ public static class LaunchOverrides
         {
             LaunchOptions.CheckScriptArguments(args ?? (target is null ? item.Launch.Args : []));
             // Also a folder kept from before (set for an .exe target) must fit a batch file.
-            if (cwd is not null && !ScriptCwdAllowed(cwd, item, fs)) throw new ArgumentException(ScriptCwdOutside(item));
+            if (cwd is not null && !ScriptCwdAllowed(cwd, item, fs)) throw new ArgumentException(ScriptCwdOutside(item, fs));
         }
         o.LaunchTarget = target;
         o.LaunchArgs = args;
@@ -307,14 +393,14 @@ public static class LaunchOverrides
             }
             var cwd = o.LaunchCwd;
             if (cwd is not null && !LocalPaths.IsAllowed(cwd, fs.IsNetworkDrive)) throw new InvalidOperationException(Strings.Get("entry.cwdMissing", cwd));
-            if (cwd is not null && LaunchOptions.IsScript(target) && !ScriptCwdAllowed(cwd, item, fs)) throw new InvalidOperationException(ScriptCwdOutside(item));
+            if (cwd is not null && LaunchOptions.IsScript(target) && !ScriptCwdAllowed(cwd, item, fs)) throw new InvalidOperationException(ScriptCwdOutside(item, fs));
             return new LaunchTarget(LaunchKind.Exe, target) { Args = o.LaunchArgs ?? [], WorkingDirectory = cwd ?? Path.GetDirectoryName(target) };
         }
         if (item.Launch.Kind == LaunchKind.Exe && item.Source != "custom")
         {
             if (o.LaunchCwd is { } cwd && !LocalPaths.IsAllowed(cwd, fs.IsNetworkDrive)) throw new InvalidOperationException(Strings.Get("entry.cwdMissing", cwd));
             if (o.LaunchCwd is { } scriptCwd && LaunchOptions.IsScript(item.Launch.Target) && !ScriptCwdAllowed(scriptCwd, item, fs))
-                throw new InvalidOperationException(ScriptCwdOutside(item));
+                throw new InvalidOperationException(ScriptCwdOutside(item, fs));
             return item.Launch with { Args = o.LaunchArgs ?? item.Launch.Args, WorkingDirectory = o.LaunchCwd ?? item.Launch.WorkingDirectory };
         }
         return item.Launch;

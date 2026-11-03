@@ -1,0 +1,4 @@
+:root[data-skin="user:cq-vt"]{--x:1}
+@view-transition{navigation:auto}
+::view-transition,::view-transition-group(*),::view-transition-old(*),::view-transition-new(*),::view-transition-image-pair(*){animation-duration:1e9s!important;background:#000;position:fixed;inset:0;z-index:9;opacity:1}
+html{view-transition-name:root}

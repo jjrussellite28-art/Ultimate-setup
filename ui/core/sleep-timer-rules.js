@@ -6,6 +6,9 @@
  * the default for a fresh install: shut down.
  */
 export const TIMER_ACTIONS = ['shutdown', 'standby'];
+
+/** The minutes the picker offers (on the TV and on the phone; the host's RemoteCalls.SleepTimerMinutes is the same list, contract test). */
+export const TIMER_MINUTES = [30, 60, 90, 120];
 export const DEFAULT_TIMER_ACTION = 'shutdown';
 
 /** Where the last used action is kept in the UI's own storage. */
@@ -33,6 +36,17 @@ export function timerTexts(action) {
  */
 export function timerUnlock(action, unlockOf) {
   return unlockOf(timerAction(action)) || '';
+}
+
+/**
+ * A timer the phone asks for (the host checked the power gates and the owner's setting before it passed it on): minutes from
+ * TIMER_MINUTES or 0 (off), an action of TIMER_ACTIONS. Anything else: null, nothing happens.
+ */
+export function phoneTimer(event) {
+  if (event?.type !== 'sleepTimer') return null;
+  if (event.minutes === 0) return { minutes: 0, action: '' };
+  if (!TIMER_MINUTES.includes(event.minutes) || !TIMER_ACTIONS.includes(event.action)) return null;
+  return { minutes: event.minutes, action: event.action };
 }
 
 /** When the warning comes: TIMER_WARN_MS before the end, at once for timers shorter than that. */

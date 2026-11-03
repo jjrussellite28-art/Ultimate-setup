@@ -12,7 +12,7 @@ public readonly record struct SemVer(int Major, int Minor, int Patch, string Pre
     /// <summary>Optional fourth number (1.2.3.4), as in assembly versions; compared right after the patch.</summary>
     public int Revision { get; init; }
 
-    private static readonly Regex Pattern = new(@"^v?(\d+)\.(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$", RegexOptions.Compiled);
+    private static readonly Regex Pattern = new(@"^v?(\d+)\.(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?\z", RegexOptions.Compiled);
 
     public static bool TryParse(string? text, out SemVer version)
     {
@@ -147,6 +147,9 @@ public sealed record CatalogEntry(
 
     /// <summary>Package size in bytes, as the index says (the statement's counts when there is one).</summary>
     public long? Size { get; init; }
+
+    /// <summary>One of <see cref="CatalogCategories.All"/>; set from the index's "category" (an unknown or missing one: Other, for a skin Skins).</summary>
+    public string Category { get; init; } = CatalogCategories.Other;
 }
 
 /// <summary>A revoked plugin (only from the signed default index): these versions (all when empty) or everything signed with this key.</summary>
@@ -176,8 +179,8 @@ public sealed class CatalogException(string message) : Exception(message);
 public static class CatalogParser
 {
     public const int MaxEntries = 500;
-    private static readonly Regex IdPattern = new(@"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", RegexOptions.Compiled);
-    private static readonly Regex HashPattern = new(@"^[0-9a-fA-F]{64}$", RegexOptions.Compiled);
+    private static readonly Regex IdPattern = new(@"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z", RegexOptions.Compiled);
+    private static readonly Regex HashPattern = new(@"^[0-9a-fA-F]{64}\z", RegexOptions.Compiled);
 
     /// <param name="allowLocal">Developer switch: also accept http://127.0.0.1, localhost and file: URLs.</param>
     /// <param name="language">"de" or "en"; falls back to the other language.</param>
@@ -323,7 +326,8 @@ public static class CatalogParser
             IconSha256 = Str(item, "iconSha256") is { } ih && HashPattern.IsMatch(ih) ? ih.ToLowerInvariant() : null,
             Screenshots = Urls(item, "screenshots", allowLocal),
             Changelog = Str(item, "changelog") is { Length: <= 4000 } cl ? cl : null,
-            Size = item.TryGetProperty("size", out var sz) && sz.ValueKind == JsonValueKind.Number && sz.TryGetInt64(out var n) && n > 0 ? n : null
+            Size = item.TryGetProperty("size", out var sz) && sz.ValueKind == JsonValueKind.Number && sz.TryGetInt64(out var n) && n > 0 ? n : null,
+            Category = CatalogCategories.Normalize(Str(item, "category"), kind.Value)
         };
     }
 
@@ -434,7 +438,7 @@ public static class CatalogRules
     /// <summary>The hash check is mandatory: no expected hash, or a different one, means the file is rejected.</summary>
     public static void VerifySha256(string file, string? expected)
     {
-        if (expected is null || !Regex.IsMatch(expected, "^[0-9a-fA-F]{64}$")) throw new CatalogException(Strings.Get("catalog.noChecksumInstall"));
+        if (expected is null || !Regex.IsMatch(expected, @"^[0-9a-fA-F]{64}\z")) throw new CatalogException(Strings.Get("catalog.noChecksumInstall"));
         using var stream = File.OpenRead(file);
         var actual = Convert.ToHexString(SHA256.HashData(stream));
         if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase)) throw new CatalogException(Strings.Get("catalog.checksumMismatch"));

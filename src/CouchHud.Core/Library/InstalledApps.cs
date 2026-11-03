@@ -101,7 +101,7 @@ public static partial class InstalledApps
         return entry;
     }
 
-    [GeneratedRegex(@"^\{(?<guid>[0-9A-Fa-f-]{36})\}[\\/](?<rest>.+)$")]
+    [GeneratedRegex(@"^\{(?<guid>[0-9A-Fa-f-]{36})\}[\\/](?<rest>.+)\z")]
     private static partial Regex KnownFolderId();
 
     /// <summary>A rooted path, or "{KnownFolderGuid}\rest" turned into one; null for anything else.</summary>

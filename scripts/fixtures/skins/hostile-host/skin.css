@@ -1,0 +1,39 @@
+/* Everything a skin can still reach around the tab bar, for scripts/tabs-check.mjs, never for the catalog: the bar's host (#top), its pseudo
+   elements and backdrop, the ancestors, layers of the page at the highest z-index, the status area that is slotted into the bar, and the
+   popover rules. Every tab must stay visible and readable with the skin active. */
+:root[data-skin="user:hostile-host"] {
+  --bg: #111;
+  --fg: #f2f5fa;
+}
+
+[data-skin="user:hostile-host"] #top {
+  display: none !important; opacity: 0 !important; visibility: hidden !important; transform: scale(0) !important; translate: 0 -500px !important; rotate: 90deg !important;
+  filter: blur(50px) opacity(0) !important; clip-path: inset(100%) !important; mask: linear-gradient(transparent, transparent) !important; mix-blend-mode: difference !important;
+  backdrop-filter: blur(9px) !important; contain: strict !important; content-visibility: hidden !important; height: 0 !important; width: 0 !important; overflow: hidden !important;
+  position: absolute !important; top: -999px !important; left: -9999px !important; zoom: 0.01 !important; pointer-events: none !important; z-index: -1 !important;
+  background: #000 !important; box-shadow: 0 0 0 100vmax #000 !important; border: 50vh solid #000 !important; padding: 50vh !important; margin: 50vh !important;
+  animation: hostile-host-away 0.2s 1s both !important; transition: all 30s !important; isolation: isolate !important; perspective: 1px !important;
+  writing-mode: vertical-rl !important; direction: rtl !important; text-indent: -9999px !important;
+}
+@keyframes hostile-host-away { to { opacity: 0; transform: scale(0); } }
+[data-skin="user:hostile-host"] #top::before, [data-skin="user:hostile-host"] #top::after {
+  content: "" !important; position: fixed !important; inset: 0 !important; background: #000 !important; z-index: 2147483647 !important; display: block !important; width: 100vw !important; height: 100vh !important;
+}
+[data-skin="user:hostile-host"] #top::backdrop { background: #000 !important; }
+[data-skin="user:hostile-host"] [popover], [data-skin="user:hostile-host"] [popover]:popover-open { display: none !important; opacity: 0 !important; }
+:root[data-skin="user:hostile-host"] { zoom: 0.01 !important; filter: blur(30px) !important; opacity: 0.05 !important; clip-path: inset(99%) !important; display: none !important; content-visibility: hidden !important; }
+[data-skin="user:hostile-host"] body { zoom: 0.01 !important; content-visibility: hidden !important; display: none !important; filter: brightness(0) !important; mask-image: linear-gradient(transparent, transparent) !important; opacity: 0 !important; }
+[data-skin="user:hostile-host"] body::before, [data-skin="user:hostile-host"] body::after, :root[data-skin="user:hostile-host"]::after {
+  content: ""; position: fixed; inset: 0; z-index: 2147483647 !important; background: #000; pointer-events: none;
+}
+/* The status area is slotted into the bar: it tries to be the whole screen, above everything. */
+[data-skin="user:hostile-host"] #status { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; background: #000 !important; z-index: 2147483647 !important; font-size: 90vh !important; transform: scale(30) !important; }
+[data-skin="user:hostile-host"] #status::before, [data-skin="user:hostile-host"] #status::after { content: ""; position: fixed; inset: 0; background: #000; z-index: 2147483647; }
+[data-skin="user:hostile-host"] #top *, [data-skin="user:hostile-host"] #top *::before, [data-skin="user:hostile-host"] #top *::after { visibility: hidden !important; opacity: 0 !important; box-shadow: 0 0 0 100vmax #000 !important; }
+/* The core's own overlays, made visible and full screen while they are shut: they are not in the top layer then, so they stay under the bar. */
+[data-skin="user:hostile-host"] #quick { transform: none !important; width: 100vw !important; opacity: 1 !important; visibility: visible !important; background: #000 !important; z-index: 2147483647 !important; }
+[data-skin="user:hostile-host"] #overlay, [data-skin="user:hostile-host"] #overlay[hidden] { display: grid !important; background: #000 !important; z-index: 2147483647 !important; }
+[data-skin="user:hostile-host"] #toast, [data-skin="user:hostile-host"] #toast[hidden], [data-skin="user:hostile-host"] #shot-toast, [data-skin="user:hostile-host"] #shot-toast[hidden] {
+  display: block !important; position: fixed !important; inset: 0 !important; width: 100vw !important; max-width: none !important; height: 100vh !important; background: #000 !important; transform: none !important; z-index: 2147483647 !important;
+}
+[data-skin="user:hostile-host"] #boot, [data-skin="user:hostile-host"] #boot.done { opacity: 1 !important; visibility: visible !important; z-index: 2147483647 !important; background: #000 !important; }

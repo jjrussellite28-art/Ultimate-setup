@@ -1,0 +1,10 @@
+/* The same with html (the root), for scripts/tabs-check.mjs: held at the neutral value, the skin stays. Never for the catalog. */
+
+:root[data-skin="user:hostile-ancestor-html"] {
+  opacity: 0;
+  filter: opacity(0);
+  mask-image: linear-gradient(transparent, transparent);
+  clip-path: inset(0 0 100% 0);
+  content-visibility: hidden;
+  visibility: hidden;
+}

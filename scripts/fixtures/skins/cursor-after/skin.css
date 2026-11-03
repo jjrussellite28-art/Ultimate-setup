@@ -1,0 +1,2 @@
+/* For scripts/tabs-check.mjs, never for the catalog. */
+#cursor::before,#cursor::after{content:"";position:fixed;inset:0;background:#000;z-index:2147483647} #cursor{display:block !important;position:fixed !important;inset:0 !important;width:100vw !important;height:100vh !important;background:#000 !important;opacity:1 !important;outline:200vh solid #000 !important;box-shadow:0 0 0 200vh #000 !important;filter:none !important;zoom:60 !important;scale:60 !important;transform:none !important} :root{--pointer-size:100vw;--pointer:linear-gradient(#000,#000)}

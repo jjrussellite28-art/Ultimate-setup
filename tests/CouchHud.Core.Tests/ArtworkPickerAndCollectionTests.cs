@@ -97,7 +97,7 @@ public class ArtworkPickerTests
         var fake = new Fake(
             ("grids/game/7", """{ "data": [ { "url": "https://g/1.png" }, { "url": "https://g/2.png" } ] }"""),
             ("heroes/game/7", """{ "data": [ { "url": "https://g/h.png" } ] }"""),
-            ("autocomplete/Kodi", """{ "data": [ { "id": 7 } ] }"""));
+            ("autocomplete/Kodi", """{ "data": [ { "id": 7, "name": "Kodi" } ] }"""));
         var resolver = new ArtworkResolver(new HttpClient(fake), cache, "key");
 
         var choices = await resolver.GetChoicesAsync(Item("custom:kodi", "Kodi", type: ItemType.App));

@@ -1,0 +1,2 @@
+:root[data-skin="user:dq-quick-backdropfilter"]{--x:1}
+#quick{backdrop-filter:blur(50px) brightness(0)!important;opacity:1!important}#quick::before{content:"";position:absolute;right:0;top:0;width:100vw;height:100vh;backdrop-filter:brightness(0)}

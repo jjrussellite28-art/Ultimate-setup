@@ -9,6 +9,8 @@ export const state = {
   tab: 0,
   /** Pages opened on top of the current tab (detail page, settings pages, ...). B pops them. */
   stack: [],
+  // Where the browser tab came from ({ tab, stack: pages put aside }) while it is in front, else null (views/browser.js); switchTab and home forget it.
+  browserOrigin: null,
   /** Open modal menu, see components/overlay.js. */
   overlay: null,
   /** Open side panel (the guide menu); takes input before the view. */

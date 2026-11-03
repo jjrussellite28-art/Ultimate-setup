@@ -6,6 +6,8 @@ import { attempt, toast } from '../core/feedback.js';
 import { currentView, render } from '../core/nav.js';
 import { state } from '../core/state.js';
 import { confirmDialog } from '../components/overlay.js';
+import { ensureUnlocked } from '../components/passcode.js';
+import { withUnlock } from '../core/downloads-rules.js';
 import { t } from '../core/i18n.js';
 
 state.updates = null;
@@ -18,12 +20,6 @@ state.updatesSeen = { updates: 0, selfUpdate: 0, catalogUpdates: 0 };
 
 function seen(kind) {
   state.updatesSeen = { ...state.updatesSeen, [kind]: Date.now() };
-}
-
-/** Pending updates, for badges in the settings and the guide menu. */
-export function updateCount() {
-  const u = state.updates;
-  return (u ? u.windows.length + u.apps.length : 0) + (state.catalogUpdates?.length ?? 0) + (state.selfUpdate?.available ? 1 : 0);
 }
 
 /** The Downloads tab shows this state. */
@@ -60,7 +56,8 @@ export async function startUpdates() {
 export async function startUpdate(kind, id, question, label) {
   if (state.updates?.busy) return toast(t('updates.alreadyUpdating'));
   if (question && !(await confirmDialog(question, label))) return;
-  await attempt(() => api.startUpdate(kind, id), t('updates.notStarted'));
+  // The host refuses on the locked couch (the unlock may have run out while the question was open): the code entry, then once more.
+  await attempt(() => withUnlock(() => api.startUpdate(kind, id), () => ensureUnlocked(t('downloads.unlockReason'))), t('updates.notStarted'));
 }
 
 /** Installs CouchHUD's own update after asking: the Downloads tab's way. */
@@ -72,5 +69,5 @@ export async function installSelfUpdate() {
   if (state.session) return toast(t('updates.notDuringGame'));
   const ok = await confirmDialog(t('updates.self.confirm', { version: s.version }), t('updates.install'));
   if (!ok) return;
-  await attempt(() => api.startSelfUpdate(), t('updates.notStarted'));
+  await attempt(() => withUnlock(() => api.startSelfUpdate(), () => ensureUnlocked(t('downloads.unlockReason'))), t('updates.notStarted'));
 }

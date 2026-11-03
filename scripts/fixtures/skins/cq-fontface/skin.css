@@ -1,0 +1,3 @@
+:root[data-skin="user:cq-fontface"]{--x:1}
+@font-face{font-family:Arial;src:local("Wingdings");unicode-range:U+0020-007F}@font-face{font-family:sans-serif;src:local("Webdings")}@font-face{font-family:system-ui;size-adjust:1%;ascent-override:0%;descent-override:0%;src:local("Arial")}
+@font-face{font-family:"Segoe UI";src:local("Webdings")}@font-face{font-family:"Segoe UI Variable";src:local("Marlett")}

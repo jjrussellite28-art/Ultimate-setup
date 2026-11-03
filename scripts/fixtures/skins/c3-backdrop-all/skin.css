@@ -1,0 +1,2 @@
+:root[data-skin="user:c3-backdrop-all"]{--x:1}
+*{backdrop-filter:brightness(0) !important}*::backdrop{background:#000!important}
