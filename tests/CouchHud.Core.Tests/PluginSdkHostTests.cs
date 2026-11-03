@@ -464,7 +464,7 @@ public sealed class PluginSdkHostTests : IDisposable
         ctx.Events.HostStopping += () => Interlocked.Increment(ref quick);
         ctx.Events.HostStopping += () => throw new InvalidOperationException("plugin bug");
         var watch = System.Diagnostics.Stopwatch.StartNew();
-        var late = m.Events.RaiseHostStopping(TimeSpan.FromMilliseconds(300));
+        var late = m.Events.RaiseHostStopping(TimeSpan.FromSeconds(2));
         watch.Stop();
         release.Set();
         Assert.Equal(1, late);

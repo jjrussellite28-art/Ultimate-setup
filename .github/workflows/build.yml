@@ -55,7 +55,8 @@ jobs:
         run: dotnet build CouchHud.slnx --no-restore -c Release
 
       - name: Test
-        run: dotnet test CouchHud.slnx --no-build -c Release --logger "console;verbosity=normal"
+        # One test assembly at a time: the runner has few cores, and the time-bound tests (a hung handler, a slow source) must not starve each other.
+        run: dotnet test CouchHud.slnx --no-build -c Release --logger "console;verbosity=normal" -- RunConfiguration.MaxCpuCount=1
 
       # Same UI checks as scripts/check.sh: every file parsed as an ES module, ESLint (eslint.config.mjs), de/en kept in step.
       # The C# analyzer rules (.editorconfig) are part of the Build step: a new finding fails it.

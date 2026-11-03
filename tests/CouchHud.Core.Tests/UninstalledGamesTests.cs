@@ -566,7 +566,7 @@ public class UninstalledGamesTests
         });
         var broken = new FakeSource("Broken", _ => throw new InvalidDataException("boom"));
         var fine = new FakeSource("Fine", _ => [G("epic:A", "Fine")]);
-        var lib = new UninstalledLibrary([slow, broken, fine]) { SourceTimeout = TimeSpan.FromMilliseconds(200) };
+        var lib = new UninstalledLibrary([slow, broken, fine]) { SourceTimeout = TimeSpan.FromSeconds(2) };
         await lib.RefreshAsync([]);
         Assert.Equal(["Fine"], lib.All.Select(g => g.Name));
     }
