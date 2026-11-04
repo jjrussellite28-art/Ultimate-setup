@@ -11,9 +11,9 @@ import { state } from '../core/state.js';
 import { sound } from '../sound.js';
 
 /** Raise when the texts change in a way users should confirm again. */
-export const TERMS_VERSION = 1;
+export const TERMS_VERSION = 2;
 
-const REPO = 'github.com/kewe87/CouchHUD';
+const REPO = 'github.com/jjrussellite28-art/Ultimate-setup';
 
 export const DISCLAIMER = () => [
   [t('legal.disclaimer.warrantyTitle'), t('legal.disclaimer.warrantyText')],

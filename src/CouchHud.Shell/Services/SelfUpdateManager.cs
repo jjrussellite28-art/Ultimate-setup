@@ -113,7 +113,7 @@ public sealed class SelfUpdateManager
             if (state.Available && state.Ready && UpdateAnnouncements.SelfIsNew(_service.Announced, state.Version))
             {
                 _service.MarkAnnounced(state.Version!);
-                _notify("CouchHUD", Strings.Ref("selfupdate.available", state.Version), FirstLine(state.Notes) ?? Strings.Ref("selfupdate.availableBody"));
+                _notify("Mega Hub", Strings.Ref("selfupdate.available", state.Version), FirstLine(state.Notes) ?? Strings.Ref("selfupdate.availableBody"));
             }
             return (state, true);
         }

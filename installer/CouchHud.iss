@@ -22,7 +22,7 @@
   #define PublishDir "..\publish"
 #endif
 
-#define AppName "CouchHUD"
+#define AppName "Mega Hub"
 ; Folder and file names stay "CouchHud": settings and the shell entry of existing installs depend on them.
 #define AppDir "CouchHud"
 #define AppExe "CouchHud.exe"
@@ -68,10 +68,10 @@ AppId={{6E3C2B8A-4F1D-4C7E-9A52-1B7D0C9E3F21}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
-AppPublisher=kewe87
-AppPublisherURL=https://github.com/kewe87/CouchHUD
-AppSupportURL=https://github.com/kewe87/CouchHUD/issues
-AppUpdatesURL=https://github.com/kewe87/CouchHUD/releases
+AppPublisher=jjrussellite28-art (independent CouchHUD fork)
+AppPublisherURL=https://github.com/jjrussellite28-art/Ultimate-setup
+AppSupportURL=https://github.com/jjrussellite28-art/Ultimate-setup/pulls
+AppUpdatesURL=https://github.com/jjrussellite28-art/Ultimate-setup/releases
 AppCopyright=Copyright © 2026 kewe87
 VersionInfoVersion={#NumericVersion}
 ; Program Files, always: the service runs as SYSTEM from {app}\service, so {app} must be a folder only administrators can

@@ -490,7 +490,7 @@ public sealed partial class Hud
         // Only on an unlocked couch, and marked as shown only then: a guest at the controller never uses the hint up (it comes at the next
         // unlocked look, see GetPluginSuggestionsAsync).
         if (Locked || !WandSetup.HintDue(config.Current.WandCompanionHintShown, WandPluginInstalled())) return;
-        PostNotification("CouchHUD", Strings.Ref("wand.hint.title"), Strings.Ref("wand.hint.body"));
+        PostNotification("Mega Hub", Strings.Ref("wand.hint.title"), Strings.Ref("wand.hint.body"));
         config.Update(c => c.WandCompanionHintShown = true);
     }
 
@@ -511,7 +511,7 @@ public sealed partial class Hud
     private void OnCompanionSignature(string appId, bool valid, string? newHash)
     {
         var wasInvalid = valid ? _signatureInvalid.TryRemove(appId, out _) : !_signatureInvalid.TryAdd(appId, 0);
-        if (!valid && !wasInvalid) Ui(() => PostNotification("CouchHUD", Strings.Ref("companion.signatureInvalid.title"), Strings.Ref("companion.signatureInvalid.body")));
+        if (!valid && !wasInvalid) Ui(() => PostNotification("Mega Hub", Strings.Ref("companion.signatureInvalid.title"), Strings.Ref("companion.signatureInvalid.body")));
         if (newHash is null) return;
         Ui(() => config.Update(c =>
         {

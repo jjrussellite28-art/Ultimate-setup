@@ -1754,7 +1754,7 @@ function categories() {
         ...(state.info.isShell ? [] : [action(t('settings.info.quit'), t('settings.info.quitDesc'), guarded(t('settings.info.quit'), () => attempt(() => api.quit())), '✕', t('settings.hint.quit'))]),
         info(t('settings.info.guide'), t('settings.info.guideDesc')),
         info(t('settings.info.version'), state.info.version || '–'),
-        info(t('settings.info.license'), 'GPL-3.0 · © 2026 kewe87'),
+        info(t('settings.info.license'), 'GPL-3.0 · © 2026 kewe87 · fork: jjrussellite28-art'),
         // How CouchHUD starts is the status line in Console.
         ...expert(
           info(t('settings.info.config'), s.configPath || '–'),

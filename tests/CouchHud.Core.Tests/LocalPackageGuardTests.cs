@@ -169,7 +169,7 @@ public class LocalPackageGuardTests : IDisposable
         {
             Strings.Use("en");
             var message = PluginPolicy.DeclaredMessage(PluginOrigin.Local, ["browser.signin"]);
-            Assert.Equal("This capability is only for CouchHUD's own plugins: browser.signin", message);
+            Assert.Equal("This capability is only for Mega Hub's own plugins: browser.signin", message);
         }
         finally
         {

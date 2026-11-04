@@ -1,4 +1,7 @@
-﻿CouchHUD – bevor es losgeht
+Mega Hub — independent development fork by jjrussellite28-art; based on CouchHUD by kewe87.
+Not approved for release. See README.md and docs/RELEASE-CHECKLIST.md in the source.
+
+CouchHUD – bevor es losgeht
 
 CouchHUD ist die Konsolen-Oberfläche für deinen Windows-PC am Fernseher.
 

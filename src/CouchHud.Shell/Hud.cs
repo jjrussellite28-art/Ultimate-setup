@@ -67,7 +67,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// <summary>Save game backups (Ludusavi manifest); the manifest is ~20 MB, so it gets a client with a longer timeout.</summary>
     public CouchHud.Core.Saves.SaveGameService Saves => _saves ??= new CouchHud.Core.Saves.SaveGameService(
         config, library.Find, name => library.Items.Count(i => i.Name == name),
-        new CouchHud.Core.Saves.ManifestStore(CouchHud.Core.Net.NetGate.CreateClient(CouchHud.Core.Net.NetService.Saves, net, TimeSpan.FromMinutes(5), userAgent: "CouchHUD"), Path.Combine(dataDir, "saves")),
+        new CouchHud.Core.Saves.ManifestStore(CouchHud.Core.Net.NetGate.CreateClient(CouchHud.Core.Net.NetService.Saves, net, TimeSpan.FromMinutes(5), userAgent: "MegaHub"), Path.Combine(dataDir, "saves")),
         dataDir,
         () => new WindowsRegistry().ReadString(@"HKCU\Software\Valve\Steam", "SteamPath")?.Replace('/', '\\'),
         // Running through CouchHUD, or any process started from the install folder (launched elsewhere).
@@ -346,13 +346,13 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         {
             var reconcile = shell.Reconcile(config.Current.IntegrationMode);
             if (reconcile.ForceFull) config.Update(c => c.IntegrationMode = "full");
-            foreach (var note in reconcile.Notes) PostNotification("CouchHUD", Strings.Ref("hud.shellEntry"), note, security: true);
+            foreach (var note in reconcile.Notes) PostNotification("Mega Hub", Strings.Ref("hud.shellEntry"), note, security: true);
         });
         if (config.Current.ShellRemovedReason.Length > 0)
         {
             optional.Run("shell removed notice", () =>
             {
-                PostNotification("CouchHUD", Strings.Ref("hud.shellRemoved"), Strings.Ref("hud.shellRemoved.body", config.Current.ShellRemovedReason), security: true);
+                PostNotification("Mega Hub", Strings.Ref("hud.shellRemoved"), Strings.Ref("hud.shellRemoved.body", config.Current.ShellRemovedReason), security: true);
                 config.Update(c => c.ShellRemovedReason = "");
             });
         }
@@ -361,8 +361,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         optional.Run("key notice", () =>
         {
             if (DataKey.Get(dataDir) is not null) return;
-            if (DataKey.Unreadable) PostNotification("CouchHUD", Strings.Ref("hud.keyUnreadable"), Strings.Ref("hud.keyUnreadable.body"), security: true);
-            else if (DataKey.Failed) PostNotification("CouchHUD", Strings.Ref("hud.keyFailed"), Strings.Ref("hud.keyFailed.body"), security: true);
+            if (DataKey.Unreadable) PostNotification("Mega Hub", Strings.Ref("hud.keyUnreadable"), Strings.Ref("hud.keyUnreadable.body"), security: true);
+            else if (DataKey.Failed) PostNotification("Mega Hub", Strings.Ref("hud.keyFailed"), Strings.Ref("hud.keyFailed.body"), security: true);
         });
         if (config.Fault is { } fault)
         {
@@ -376,7 +376,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 ConfigFault.Missing => "hud.configFault.missing",
                 _ => "hud.configFault.unreadable"
             };
-            optional.Run("config fault notice", () => PostNotification("CouchHUD", Strings.Ref("hud.configFault"), Strings.Ref(body, effect), security: true));
+            optional.Run("config fault notice", () => PostNotification("Mega Hub", Strings.Ref("hud.configFault"), Strings.Ref(body, effect), security: true));
         }
         else if (config.ReadRestoredNotice() is { } restored)
         {
@@ -385,7 +385,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             Console.WriteLine($"[hud] config.json was restored from {restored.Source ?? "a copy"} at {restored.At:u}{(restored.Broken is null ? "" : $", broken file kept as {restored.Broken}")}");
             optional.Run("config restored notice", () =>
             {
-                PostNotification("CouchHUD", Strings.Ref("hud.configRestored"), Strings.Ref("hud.configRestored.body"), security: true);
+                PostNotification("Mega Hub", Strings.Ref("hud.configRestored"), Strings.Ref("hud.configRestored.body"), security: true);
                 // Only once it was shown: a start that fails before this shows it next time.
                 config.ClearRestoredNotice();
             });
@@ -757,7 +757,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 // No play time toast for a game while Gaming is switched off (the minutes are still counted for the limits).
                 if (minutes >= 1 && Areas.Shows(item))
                 {
-                    PostNotification("CouchHUD", item.Name, Strings.Ref("hud.played", MinutesRef(minutes), MinutesRef(item.PlaytimeMinutes)));
+                    PostNotification("Mega Hub", item.Name, Strings.Ref("hud.played", MinutesRef(minutes), MinutesRef(item.PlaytimeMinutes)));
                 }
             }
             catch (KeyNotFoundException)
@@ -930,7 +930,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     private void OnClientNeedsAttention(string family, string process)
     {
         var name = ClientName(family) is { Length: > 0 } known ? known : process;
-        PostNotification("CouchHUD", Strings.Ref("hud.needsAttention", name),
+        PostNotification("Mega Hub", Strings.Ref("hud.needsAttention", name),
             Strings.Ref("hud.needsAttention.body"));
     }
 
@@ -988,7 +988,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             if (wasOpening && errors.Count == 0 && !config.Current.GameBarHintShown)
             {
                 config.Update(c => c.GameBarHintShown = true);
-                PostNotification("CouchHUD", Strings.Ref("hud.xboxButton"), Strings.Ref("hud.xboxButton.body"));
+                PostNotification("Mega Hub", Strings.Ref("hud.xboxButton"), Strings.Ref("hud.xboxButton.body"));
             }
         }
         catch (Exception ex)
@@ -3781,12 +3781,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                         break;
                     case CloseDecision.Downloading:
                         Console.WriteLine($"[launchers] {l.Name} is downloading, left open");
-                        if (pcMode) PostNotification("CouchHUD", Strings.Ref("hud.clientBusy", l.Name), Strings.Ref("hud.clientBusy.body"));
+                        if (pcMode) PostNotification("Mega Hub", Strings.Ref("hud.clientBusy", l.Name), Strings.Ref("hud.clientBusy.body"));
                         break;
                     case CloseDecision.GameRunning:
                     case CloseDecision.Unsafe:
                         Console.WriteLine($"[launchers] {l.Name} left open");
-                        if (pcMode) PostNotification("CouchHUD", Strings.Ref("hud.clientKept", l.Name), Strings.Ref("hud.clientKept.body"));
+                        if (pcMode) PostNotification("Mega Hub", Strings.Ref("hud.clientKept", l.Name), Strings.Ref("hud.clientKept.body"));
                         break;
                     default:
                         if (!running) _clients.NoteEnded(id);
@@ -3866,12 +3866,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 if (shown)
                 {
                     _window?.Hide();
-                    PostNotification("CouchHUD", Strings.Ref("hud.launcherOpen", l.Name), Strings.Ref("hud.launcherOpen.body"));
+                    PostNotification("Mega Hub", Strings.Ref("hud.launcherOpen", l.Name), Strings.Ref("hud.launcherOpen.body"));
                 }
                 else
                 {
                     EndMouseMode();
-                    PostNotification("CouchHUD", Strings.Ref("hud.launcherNoWindow", l.Name), Strings.Ref("hud.launcherNoWindow.body"));
+                    PostNotification("Mega Hub", Strings.Ref("hud.launcherNoWindow", l.Name), Strings.Ref("hud.launcherNoWindow.body"));
                 }
             });
         });
@@ -4119,7 +4119,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         var folders = new List<(string, string)>
         {
             // CouchHUD's own (Guide + Y), first: a folder found twice keeps this label.
-            (CouchHud.Core.Files.ScreenshotFiles.Folder(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)), "CouchHUD"),
+            (CouchHud.Core.Files.ScreenshotFiles.Folder(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)), "Mega Hub"),
             (Path.Combine(videos, "Captures"), "Game Bar"),
             (Path.Combine(pictures, "Screenshots"), "Windows"),
             (Path.Combine(videos, "NVIDIA"), "NVIDIA"),
@@ -5545,7 +5545,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             var names = Firewall.BlockingRuleNames();
             if (names.Count == 0) return;
             Console.Error.WriteLine($"[remote] Windows blocks CouchHud.exe with its own firewall rules: {string.Join(", ", names)}");
-            Ui(() => PostNotification("CouchHUD", Strings.Ref("remote.firewallBlocked"), Strings.Ref("remote.firewallBlocked.body")));
+            Ui(() => PostNotification("Mega Hub", Strings.Ref("remote.firewallBlocked"), Strings.Ref("remote.firewallBlocked.body")));
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -5711,12 +5711,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             {
                 case LockWatchAction.Warn:
                     Console.Error.WriteLine($"[service] the couch lock needs the service ({status.Name}, policies failing: {PolicyHelper.FailingSince is not null}): the Windows policies are not active");
-                    Ui(() => PostNotification("CouchHUD", Strings.Ref("service.warn.title"), Strings.Ref("service.warn.body", Strings.Get(ServiceTexts.StateKey(status.State))), security: true));
+                    Ui(() => PostNotification("Mega Hub", Strings.Ref("service.warn.title"), Strings.Ref("service.warn.body", Strings.Get(ServiceTexts.StateKey(status.State))), security: true));
                     break;
                 case LockWatchAction.LockWindows:
                     Console.Error.WriteLine($"[service] the couch lock has no working service ({status.Name}, policies failing: {PolicyHelper.FailingSince is not null}): locking Windows (fail-closed)");
                     WindowsLock.LockIfConfigured(dataDir);
-                    Ui(() => PostNotification("CouchHUD", Strings.Ref("service.alarm.title"), Strings.Ref(status.Health == ServiceHealth.Alarm ? "service.alarm.squatted" : "service.alarm.gone"), security: true));
+                    Ui(() => PostNotification("Mega Hub", Strings.Ref("service.alarm.title"), Strings.Ref(status.Health == ServiceHealth.Alarm ? "service.alarm.squatted" : "service.alarm.gone"), security: true));
                     break;
             }
         }
@@ -6026,7 +6026,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             PolicyHelper.WaitIdle(TimeSpan.FromSeconds(30));
             if (StuckPolicyGroups().Count == 0) return;
             Console.Error.WriteLine("[lock] policies with the lock's values are stuck: no lock, no mark, no state");
-            Ui(() => PostNotification("CouchHUD", Strings.Ref("stuck.title"), Strings.Ref("stuck.body"), security: true));
+            Ui(() => PostNotification("Mega Hub", Strings.Ref("stuck.title"), Strings.Ref("stuck.body"), security: true));
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -8111,7 +8111,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         AutoLogon.OpenDialog();
         _mouse?.Start();
         _window?.Hide();
-        PostNotification("CouchHUD", Strings.Ref("hud.autoLogonTitle"),
+        PostNotification("Mega Hub", Strings.Ref("hud.autoLogonTitle"),
             Strings.Ref("hud.autoLogonHelp"));
     }
 
@@ -8278,7 +8278,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     {
         try
         {
-            _tray?.ShowBalloonTip(6000, "CouchHUD", text, System.Windows.Forms.ToolTipIcon.None);
+            _tray?.ShowBalloonTip(6000, "Mega Hub", text, System.Windows.Forms.ToolTipIcon.None);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -8311,7 +8311,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             var tray = new System.Windows.Forms.NotifyIcon
             {
                 Icon = (Environment.ProcessPath is { } exe ? System.Drawing.Icon.ExtractAssociatedIcon(exe) : null) ?? System.Drawing.SystemIcons.Application,
-                Text = "CouchHUD",
+                Text = "Mega Hub",
                 ContextMenuStrip = menu,
                 Visible = true
             };

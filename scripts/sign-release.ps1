@@ -17,7 +17,7 @@
 # Needs the GitHub CLI (gh), signed in with write access to the repository.
 param(
     [Parameter(Mandatory)] [string] $Tag,
-    [string] $Repo = 'kewe87/CouchHUD',
+    [string] $Repo = 'jjrussellite28-art/Ultimate-setup',
     # Default: a release without a verified build attestation is not signed. Only for a gh that cannot check one (and a setup you built yourself).
     [switch] $SkipAttestation,
     [string] $KeyFile = (Join-Path $env:USERPROFILE '.couchhud\catalog-signing.key')
