@@ -3,7 +3,7 @@ using System.Globalization;
 namespace CouchHud.Core.Localization;
 
 /// <summary>
-/// The one size format of Ultimate Setup: decimal units (1 MB = 1,000,000 bytes, 1 GB = 1,000 MB), the way Windows Update, Steam and the stores
+/// The one size format of Mega Hub: decimal units (1 MB = 1,000,000 bytes, 1 GB = 1,000 MB), the way Windows Update, Steam and the stores
 /// count. The page uses the same rule (ui/core/size.js), so a size reads the same in a host text and on the page.
 /// </summary>
 public static class ByteSize

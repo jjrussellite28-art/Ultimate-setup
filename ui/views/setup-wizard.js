@@ -691,7 +691,7 @@ function wizardPage({ firstRun = false, startAt = null } = {}) {
         dots,
         el('header', { className: 'wizard-head' },
           def.hero
-            ? el('div', { className: 'wizard-logo' }, el('img', { src: 'assets/icon.svg', alt: '' }), el('span', { className: 'wizard-brand' }, 'Couch', el('b', { textContent: 'HUD' })))
+            ? el('div', { className: 'wizard-logo' }, el('img', { src: 'assets/mega-hub-original.jpg', alt: '' }), el('span', { className: 'wizard-brand' }, 'Mega ', el('b', { textContent: 'Hub' })))
             : el('span', { className: 'wizard-icon' }, def.glyph ? iconEl(def.glyph) : categoryIcon(def.icon)),
           el('h2', { textContent: def.title() }),
           def.lead ? el('p', { className: 'wizard-lead', textContent: def.lead() }) : null),

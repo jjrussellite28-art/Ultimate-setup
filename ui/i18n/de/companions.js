@@ -31,7 +31,7 @@ export default {
   'companion.flag.minimized': 'Minimiert',
   'companion.flag.locked': 'Auch bei gesperrter Couch',
   'companion.close': 'Mit dem Spiel beenden',
-  'companion.closeDetail': 'Nur wenn Ultimate Setup die App selbst gestartet hat und es noch derselbe Prozess ist',
+  'companion.closeDetail': 'Nur wenn Mega Hub die App selbst gestartet hat und es noch derselbe Prozess ist',
   'companion.minimized': 'Minimiert im Hintergrund starten',
   'companion.minimizedDetail': 'Das Spiel bleibt vorn. Nimmt sich ein Fenster doch den Fokus, wird es wieder minimiert',
   'companion.locked': 'Auch bei gesperrter Couch starten',

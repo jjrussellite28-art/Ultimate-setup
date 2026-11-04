@@ -1,4 +1,4 @@
-# Ultimate Setup release checklist
+# Mega Hub release checklist
 
 Status: DEVELOPMENT ONLY. No approved public or commercial release.
 
@@ -12,7 +12,8 @@ Status: DEVELOPMENT ONLY. No approved public or commercial release.
 
 ## Required before any installer is published
 
-- [ ] Choose the final logo, record its origin/rights, replace application icons, branding variants and installer wizard artwork; refresh screenshots.
+- [x] Select the Mega Hub logo and retain its original file and Bing generation source.
+- [ ] Complete remaining branding variants and installer wizard artwork; refresh screenshots.
 - [ ] Isolate installation ID, folders, service/pipe names, mutexes, data, registry/task/firewall identities from CouchHUD, or implement and test an explicit migration that cannot damage an upstream install.
 - [ ] Configure a fork-owned release signing identity and verification key. Do not weaken signature validation or claim an upstream signature authenticates this fork.
 - [ ] Decide whether to use the upstream catalog; label it accurately and verify its permitted use, or provision a fork catalog and trust key.

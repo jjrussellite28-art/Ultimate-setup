@@ -1,8 +1,12 @@
-# Ultimate Setup
+# Mega Hub
+
+<img src="ui/assets/mega-hub-original.jpg" alt="Mega Hub logo: a silver key with teal panels on a dark blue background" width="480">
+
+Logo generated with Bing Image Creator and supplied by jjrussellite28-art. [Source and provenance](ui/assets/MEGA-HUB-LOGO.md).
 
 A controller-first Windows TV interface, independently maintained by **jjrussellite28-art**.
 
-**Development preview — no Ultimate Setup release is published yet.**
+**Development preview — no Mega Hub release is published yet.**
 This is a fork of [CouchHUD](https://github.com/kewe87/CouchHUD) by **kewe87 and contributors**,
 under the GNU GPL v3. It is not an official CouchHUD product and is not endorsed or supported by that project.
 
@@ -15,14 +19,14 @@ still use CouchHUD terminology; they are being reviewed for this fork.
 
 ## Changes in this fork
 
-This preparation introduces the Ultimate Setup identity, preserves upstream attribution,
+This preparation introduces the Mega Hub identity, preserves upstream attribution,
 points app updates and project links at this repository, packages licensing/source information,
 and prevents automatic release publication. See [FORK-CHANGES.md](FORK-CHANGES.md).
 These changes do not claim authorship of the inherited application or new game-launcher features.
 
 ## Downloads and support
 
-There is currently **no approved Ultimate Setup installer**. Do not treat upstream CouchHUD installers
+There is currently **no approved Mega Hub installer**. Do not treat upstream CouchHUD installers
 as builds of this fork. Future reviewed builds will appear only on
 [this repository's releases page](https://github.com/jjrussellite28-art/Ultimate-setup/releases).
 For development feedback, use [pull requests](https://github.com/jjrussellite28-art/Ultimate-setup/pulls).
@@ -57,6 +61,6 @@ See [SOURCE.md](SOURCE.md) and the [release checklist](docs/RELEASE-CHECKLIST.md
 
 ## Before public distribution
 
-Final logo replacement, installer isolation, fork-owned release signing, third-party commercial-use review,
+Remaining installer artwork, installer isolation, fork-owned release signing, third-party commercial-use review,
 and Windows installer/shell recovery testing remain open. A README update is not certification of release readiness.
 No release should be published until the checklist is complete.

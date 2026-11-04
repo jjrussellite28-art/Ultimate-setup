@@ -207,7 +207,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         run: |
-          $header = "# Ultimate Setup — development draft`n`nIndependent fork of CouchHUD by kewe87 and contributors. GPL-3.0-only.`n`nNot approved for public or commercial distribution. See docs/RELEASE-CHECKLIST.md.`n`nSource commit: $env:GITHUB_SHA`n`nExact source is attached as Ultimate-setup-source-$env:GITHUB_SHA.zip. Retain LICENSE and notices.`n`n"
+          $header = "# Mega Hub — development draft`n`nIndependent fork of CouchHUD by kewe87 and contributors. GPL-3.0-only.`n`nNot approved for public or commercial distribution. See docs/RELEASE-CHECKLIST.md.`n`nSource commit: $env:GITHUB_SHA`n`nExact source is attached as Ultimate-setup-source-$env:GITHUB_SHA.zip. Retain LICENSE and notices.`n`n"
           [IO.File]::WriteAllText('release-notes.md', $header + (Get-Content FORK-CHANGES.md -Raw), [Text.UTF8Encoding]::new($false))
 
       - name: Prepare draft release (never publish automatically)

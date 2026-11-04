@@ -22,7 +22,7 @@
   #define PublishDir "..\publish"
 #endif
 
-#define AppName "Ultimate Setup"
+#define AppName "Mega Hub"
 ; Folder and file names stay "CouchHud": settings and the shell entry of existing installs depend on them.
 #define AppDir "CouchHud"
 #define AppExe "CouchHud.exe"

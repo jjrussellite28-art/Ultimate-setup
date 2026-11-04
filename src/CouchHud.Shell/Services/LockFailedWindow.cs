@@ -26,7 +26,7 @@ public sealed class LockFailedWindow : Window
 
     public LockFailedWindow()
     {
-        Title = "CouchHUD";
+        Title = "Mega Hub";
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
         WindowState = WindowState.Maximized;

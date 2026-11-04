@@ -1,4 +1,4 @@
-Ultimate Setup — independent development fork by jjrussellite28-art; based on CouchHUD by kewe87.
+Mega Hub — independent development fork by jjrussellite28-art; based on CouchHUD by kewe87.
 Not approved for release. See README.md and docs/RELEASE-CHECKLIST.md in the source.
 
 CouchHUD – bevor es losgeht
