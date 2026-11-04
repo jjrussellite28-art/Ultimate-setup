@@ -125,6 +125,24 @@ public static class AdminService
     /// </summary>
     public static Func<IReadOnlyList<Operation>, string?, Task> AnnounceApproval { get; set; } = (_, _) => Task.CompletedTask;
 
+    private static readonly AsyncLocal<string?> CodeKindBeingReplaced = new();
+
+    /// <summary>Which code an approval for ChangePasscode/EnrollPasscode replaces: "both" (parents' and couch code) or "couch"; null when not known.</summary>
+    public static string? ApprovalCodeKind => CodeKindBeingReplaced.Value;
+
+    /// <summary>For the duration of the returned scope the announcement before the UAC prompt names the code being replaced.</summary>
+    public static IDisposable AnnounceCodeKind(string? kind)
+    {
+        var before = CodeKindBeingReplaced.Value;
+        CodeKindBeingReplaced.Value = kind;
+        return new Scope(() => CodeKindBeingReplaced.Value = before);
+    }
+
+    private sealed class Scope(Action restore) : IDisposable
+    {
+        public void Dispose() => restore();
+    }
+
     /// <summary>
     /// "Needs a parent or an administrator", the fallback where the parents' code did not do (no parents' code, locked out, or a planted one),
     /// through UAC only (P9 review M-c): the service registers what is to be approved (<paramref name="ops"/>, each once; none: a confirmation

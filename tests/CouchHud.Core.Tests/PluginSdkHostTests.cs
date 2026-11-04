@@ -384,18 +384,31 @@ public sealed class PluginSdkHostTests : IDisposable
     public void Changes_that_come_close_together_are_merged_into_one_call()
     {
         var (m, ctx) = Load("p", PluginOrigin.FirstParty, [PluginCapabilities.HostState]);
+        // A fake clock: the merge window ends only when the test moves time, so a burst cannot straddle it on a slow machine.
+        var time = new ManualTimeProvider();
+        m.HostTime = time;
         m.HostChangeInterval = TimeSpan.FromMilliseconds(120);
         var calls = 0;
         ctx.Host!.Changed += () => Interlocked.Increment(ref calls);
-        for (var i = 0; i < 20; i++) m.NotifyHostChanged();
+        // The first change after a quiet time is told at once.
+        m.NotifyHostChanged();
         Assert.Equal(1, Wait(() => Volatile.Read(ref calls), n => n >= 1));
-        Thread.Sleep(300);
+        // A burst inside the window waits for its end and is one call.
+        for (var i = 0; i < 20; i++) m.NotifyHostChanged();
+        time.Advance(TimeSpan.FromMilliseconds(119));
+        Thread.Sleep(50);
         Assert.Equal(1, Volatile.Read(ref calls));
-        // The next burst after the gap is one more call.
-        for (var i = 0; i < 5; i++) m.NotifyHostChanged();
+        time.Advance(TimeSpan.FromMilliseconds(1));
         Assert.Equal(2, Wait(() => Volatile.Read(ref calls), n => n >= 2));
-        Thread.Sleep(300);
+        Thread.Sleep(100);
         Assert.Equal(2, Volatile.Read(ref calls));
+        // The next burst after the gap is one more call.
+        time.Advance(TimeSpan.FromMilliseconds(60));
+        for (var i = 0; i < 5; i++) m.NotifyHostChanged();
+        time.Advance(TimeSpan.FromMilliseconds(60));
+        Assert.Equal(3, Wait(() => Volatile.Read(ref calls), n => n >= 3));
+        Thread.Sleep(100);
+        Assert.Equal(3, Volatile.Read(ref calls));
     }
 
     [Fact]
@@ -464,12 +477,14 @@ public sealed class PluginSdkHostTests : IDisposable
         ctx.Events.HostStopping += () => Interlocked.Increment(ref quick);
         ctx.Events.HostStopping += () => throw new InvalidOperationException("plugin bug");
         var watch = System.Diagnostics.Stopwatch.StartNew();
-        var late = m.Events.RaiseHostStopping(TimeSpan.FromSeconds(2));
+        // The limit is long enough for the quick handlers to run on a loaded machine; the hanging handler waits 30 s, so returning
+        // before it is released proves the limit is kept.
+        var late = m.Events.RaiseHostStopping(TimeSpan.FromSeconds(5));
         watch.Stop();
         release.Set();
         Assert.Equal(1, late);
         Assert.Equal(1, Volatile.Read(ref quick));
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"took {watch.Elapsed}");
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(25), $"took {watch.Elapsed}");
     }
 
     [Fact]

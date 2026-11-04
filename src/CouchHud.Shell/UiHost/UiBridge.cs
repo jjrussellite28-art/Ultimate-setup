@@ -276,6 +276,10 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                 return hud.GetCompanions();
             case "setCompanion":
                 return hud.SetCompanion(StringArg(0), Arg(1).Deserialize<CompanionChange>(Json) ?? new CompanionChange());
+            case "confirmCompanion":
+                return hud.ConfirmCompanion(StringArg(0), StringArg(1), StringArg(2), Arg(3).ValueKind == JsonValueKind.True);
+            case "previewCompanion":
+                return hud.PreviewCompanion(StringArg(0));
             case "removeCompanion":
                 return hud.RemoveCompanion(StringArg(0));
             case "setupWand":
@@ -527,7 +531,9 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "setParental":
                 return await hud.SetParentalAsync(StringArg(0), Arg(1));
             case "setParentalItemLock":
-                return hud.SetParentalItemLock(StringArg(0), Arg(1).ValueKind == JsonValueKind.True);
+                return hud.SetParentalItemLock(StringArg(0), Arg(1).ValueKind == JsonValueKind.True, Arg(2).ValueKind == JsonValueKind.True);
+            case "resetParentalAllChildrenLocks":
+                return hud.ResetParentalAllChildrenLocks();
             case "parentalCheck":
                 return await hud.ParentalCheckAsync(StringArg(0));
             case "parentalExtend":
@@ -752,6 +758,9 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                 return await hud.TwoFactorByAdminAsync(StringArg(0));
             case "getRemote":
                 return hud.GetRemote(Arg(0).ValueKind == JsonValueKind.True);
+            case "leavePairing":
+                hud.LeavePairing();
+                return null;
             case "codeEntryState":
                 // Only makes screenshots refuse while true: no harm in any value.
                 hud.SetCodeEntryState(Arg(0).ValueKind == JsonValueKind.True);
@@ -847,6 +856,8 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                     Css = LocalFiles.Rewrite(s.Css),
                     Sounds = s.Sounds.ToDictionary(kv => kv.Key, kv => LocalFiles.Rewrite(kv.Value))
                 });
+            case "uninstallSkin":
+                return await hud.UninstallSkinAsync(StringArg(0));
             case "setSkin":
                 hud.SetSkin(StringArg(0));
                 return null;

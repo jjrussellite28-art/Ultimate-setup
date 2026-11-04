@@ -44,7 +44,12 @@ public sealed partial class Hud
     /// The UI page starts anew (navigation, a crashed renderer): what it reported on screen is gone with it. Until it reports again
     /// once loaded (both states, at start) no screenshot is taken: a lost report must not let one through (audit 0.5 A3).
     /// </summary>
-    public void ResetUiScreenState() => _uiScreen.Reset();
+    public void ResetUiScreenState()
+    {
+        _uiScreen.Reset();
+        // A reloaded or crashed page calls no onClose: the pairing code it had asked for goes with it.
+        ForgetPairCode(true);
+    }
 
     /// <summary>
     /// The chord is armed on the couch, not in PC mode (the Game Bar has the button there), not on the couch browser's pages (web pages

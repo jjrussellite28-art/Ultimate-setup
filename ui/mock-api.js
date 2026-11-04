@@ -589,7 +589,7 @@ const parentalState = () => {
     windowStart: parental.windowStart, windowEnd: parental.windowEnd, perGameMinutes: parental.perGameMinutes, maxAge: shownLimit(),
     ratingSystem: parental.ratingSystem, ratingSystemActive: activeRatingSystem(), ratingSystemRegion: regionSystem(), ratingSystemSaved: savedRatingSystem(),
     maxAgeSaved: savedRatingSystem() && parental.maxAge ? Math.min(parental.maxAge, Math.max(...ratingSteps(savedRatingSystem()))) : null, anyAgeLimit: parental.maxAge > 0,
-    lockedItems: [...parental.lockedItems], remainingSeconds: parental.enabled ? remaining : null, limiter: parental.enabled && remaining != null ? 'day' : null,
+    lockedItems: [...parental.lockedItems], lockedItemsAllChildren: [...(parental.lockedAllChildren ?? [])], lockedItemsAllChildrenUnreadable: !!parental.lockedAllUnreadable || new URLSearchParams(location.search).has('lockBroken'), childProfiles: 1, remainingSeconds: parental.enabled ? remaining : null, limiter: parental.enabled && remaining != null ? 'day' : null,
     inWindow: true, usedMinutes: parental.usedMinutes, bonusMinutes: parental.bonusMinutes, clockJumped: false,
     expired: parental.expired, closing: false, closeFailed: false, graceSeconds: 60, blockUnknownAge: parental.blockUnknownAge ?? true, countApps: parental.countApps ?? true, tampered: !!parental.tampered, timeZoneChanged: false, codeProblem: null, game: session?.name ?? null
   };
@@ -1257,6 +1257,16 @@ window.couchhud = {
     emit('catalogUpdates', catalogUpdates());
     return { gone: true, stoppedNow: true, plugins: structuredClone(plugins) };
   },
+  // Like the host: a catalog skin goes, the Couch skin never; the skin in use falls back to Couch.
+  uninstallSkin: async (id) => {
+    const c = catalog.find((x) => x.id === id && x.kind === 'skin');
+    if (!c || c.status === 'notInstalled' || id === 'default') throw new Error(t('mock.notInCatalog'));
+    Object.assign(c, { status: 'notInstalled', installedVersion: null });
+    const reset = skin === `user:${id}`;
+    if (reset) skin = 'default';
+    emit('catalogUpdates', catalogUpdates());
+    return { reset };
+  },
   acceptRevokedPlugin: async (folder) => ((plugins.find((p) => p.folder === folder).revoked = false), structuredClone(plugins)),
   // One plugin tab (Lumen, capability "tabs"): ?notab leaves it out, ?tabglyph shows a built-in glyph instead of the PNG.
   getPluginTabs: async () => {
@@ -1386,6 +1396,14 @@ window.couchhud = {
     Object.assign(rule, change);
     return companionView();
   },
+  previewCompanion: async (appId) => {
+    log('previewCompanion', appId);
+    return { appId, name: appId, digest: `3:${'a'.repeat(64)}`, digestAllow: `3:${'b'.repeat(64)}`, hash: 'a1b2c3d4e5f6', size: 48234496, modified: '2026-10-30 09:12 UTC', signer: null, version: '1.2.3', folderWritable: true, changed: false };
+  },
+  confirmCompanion: async (appId, digest, hash) => {
+    log('confirmCompanion', appId, digest, hash);
+    return companionView();
+  },
   removeCompanion: async (appId) => {
     log('removeCompanion', appId);
     companionRules.splice(0, companionRules.length, ...companionRules.filter((r) => r.appId !== appId));
@@ -1479,6 +1497,7 @@ window.couchhud = {
       { id: 'p2', name: 'iPhone', paired: Date.now() - 40 * 86_400_000, level: 'control', channel: false, child: false }
     ]
   }),
+  leavePairing: async () => null,
   revokeRemote: async () => null,
   revokeRemoteDevice: async () => null,
   setRemoteDeviceLevel: async () => null,
@@ -1623,16 +1642,29 @@ window.couchhud = {
     if (key === 'maxAge' && parental.maxAge > 0) parental.ratingSaved = activeRatingSystem();
     return parentalState();
   },
-  setParentalItemLock: async (id, locked) => {
+  resetParentalAllChildrenLocks: async () => {
     takeGrant();
-    parental.lockedItems = parental.lockedItems.filter((x) => x !== id);
-    if (locked) parental.lockedItems.push(id);
+    parental.lockedAllChildren = [];
+    parental.lockedAllUnreadable = false;
+    return parentalState();
+  },
+  setParentalItemLock: async (id, locked, allChildren = false) => {
+    takeGrant();
+    parental.lockedAllChildren ??= [];
+    if (allChildren) {
+      parental.lockedAllChildren = parental.lockedAllChildren.filter((x) => x !== id);
+      if (locked) parental.lockedAllChildren.push(id);
+      else parental.lockedItems = parental.lockedItems.filter((x) => x !== id);
+    } else {
+      parental.lockedItems = parental.lockedItems.filter((x) => x !== id);
+      if (locked) parental.lockedItems.push(id);
+    }
     return parentalState();
   },
   parentalCheck: async (id) => {
     const s = parentalState();
     if (!s.enabled) return { ok: true };
-    const needsCode = parental.lockedItems.includes(id) && Date.now() >= grantUntil;
+    const needsCode = (parental.lockedItems.includes(id) || (parental.lockedAllChildren ?? []).includes(id)) && Date.now() >= grantUntil;
     if (parental.expired) return s.enforced ? { ok: false, reason: 'day', message: t('mock.parentalDayOver'), needsCode: false } : { ok: true, advisory: true, message: t('mock.parentalAdvisoryDayOver') };
     if (needsCode) return s.enforced ? { ok: false, reason: null, message: t('mock.parentalCodeOnly'), needsCode: true } : { ok: true, advisory: true, message: t('mock.parentalAdvisoryCodeOnly') };
     return { ok: true };

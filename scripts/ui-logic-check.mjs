@@ -23,6 +23,8 @@ import {
 import { BAR_RANGES, BAR_SKIN_VARS, GENERIC_FONTS, GLOW_MAX_REM, SCRIM_ALPHA, SYSTEM_FONTS, familyKey, fontStack, lengthIn, readBarSkin } from '../ui/core/tab-skin.js';
 import { LAYER_RANK, NO_LINGER, layerOrder, overlayIsOpen } from '../ui/core/layers.js';
 import { tabNotes, tabProblems } from './skin-rules.mjs';
+import { BOOT_FADE_MS, SHIELDED_EVENTS, endBoot, inputOpen, installShield, openInput, resetGate, shield } from '../ui/core/boot-gate.js';
+import { Input } from '../ui/input.js';
 import { createRequire } from 'node:module';
 import { chipAction, clearStackOf, enterBrowser, leaveBrowser, navAllowed, restoreStack, takeOverStack, timeUpAction } from '../ui/core/stack-rules.js';
 import { barStops, chipsBlocked, nextStop } from '../ui/core/tab-cycle.js';
@@ -1218,6 +1220,27 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
     assert.equal(nr.listenerNeedsParent(key, true, false), false, key);
   }
   assert.equal(nr.listenerNeedsParent('remotePower', true, true), false);
+  // A new pairing code takes the parents' code with parental controls on; the current code and parental off stay free; cancel opens nothing.
+  assert.equal(nr.pairingNeedsParent(true, true), true);
+  assert.equal(nr.pairingNeedsParent(false, true), false);
+  assert.equal(nr.pairingNeedsParent(true, false), false);
+  const phonePage = readFileSync(new URL('../ui/views/phone.js', import.meta.url), 'utf8');
+  assert.ok(/action: 'remotePair'/.test(phonePage) && /admitProtectedChange\(/.test(phonePage), 'pairing: the parents code through admitProtectedChange');
+  assert.ok(/handle\(action\) \{\s*if \(action === 'x'\) this\.newCode\(\);/.test(phonePage), 'X goes through newCode, never straight to load(true)');
+  assert.ok(phonePage.indexOf('admitProtectedChange(') < phonePage.indexOf('await this.load(true)'), 'pairing: ask first, then load the new code');
+  // The code made under the grant is shown only while the page that asked for it is open: the page and the keyboard's phone panel tell the host when they close.
+  assert.ok(/onClose\(\) \{\s*api\.leavePairing\?\.\(\)/.test(phonePage), 'pairing page: onClose calls leavePairing');
+  const keyboardSrc = readFileSync(new URL('../ui/components/keyboard.js', import.meta.url), 'utf8');
+  assert.ok(/if \(!secret && !state\.stack\.some\(\(p\) => p\.id === 'pairing'\)\) api\.leavePairing\?\.\(\)/.test(keyboardSrc), 'keyboard phone panel: closing calls leavePairing, but never while the pairing page is open underneath (it owns its code)');
+  assert.ok(readFileSync(new URL('../ui/bridge.js', import.meta.url), 'utf8').includes("leavePairing: () => call('leavePairing')"), 'bridge: leavePairing');
+  assert.ok(phonePage.includes("t('phone.codeHidden')"), 'pairing: without a live issued code the page says the code is hidden');
+  // Console setup: the locked refusal is a dialog (focus on Cancel), not a toast; the parental refusal likewise.
+  const consoleSrc = readFileSync(new URL('../ui/views/console-setup.js', import.meta.url), 'utf8');
+  assert.ok(/confirmDialog\(t\('consoleSetup\.refused\.title'\), t\('passcode\.enter'\), \{ message: t\('consoleSetup\.refused\.locked'\), focusCancel: true \}\)/.test(consoleSrc), 'console setup: locked refusal dialog');
+  assert.ok(!/toast\(blockedText/.test(consoleSrc), 'console setup: blocked refusal is no toast');
+  // Parental page: no parents' code in the service while parental controls are on: recommendation and a button to the code row.
+  const settingsSrc = readFileSync(new URL('../ui/views/settings.js', import.meta.url), 'utf8');
+  assert.ok(/p\.enabled && security\?\.couchLock === 'code' && security\?\.serviceCodes && security\.serviceCodes\.parent !== true\s*\? \[info\(t\('settings\.parental\.noParentCode'\)[\s\S]*?settingsView\.jump\('console', 'code'\)/.test(settingsSrc), 'parental page: recommendation to set a parents code');
   const settingsPage = readFileSync(new URL('../ui/views/settings.js', import.meta.url), 'utf8');
   for (const key of nr.LISTENER_KEYS) assert.ok(settingsPage.includes(`listenerToggle('${key}'`), `${key} uses the guarded toggle`);
   assert.ok(!/[^r]toggle\('(remoteEnabled|mcpEnabled|mcpLan)'/.test(settingsPage), 'no plain toggle for a listener');
@@ -1268,6 +1291,24 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   assert.equal(pr.isDelisted({ id: 'kodi', folder: 'Kodi', origin: 'thirdParty', userInstalled: true }, undefined), false);
   assert.equal(pr.isDelisted({ id: 'mine', folder: 'Mine', origin: 'local', userInstalled: true }, listed), false);
   assert.equal(pr.isDelisted({ id: 'shipped', folder: 'Shipped', origin: 'firstParty', userInstalled: false }, listed), false);
+  // After an uninstall the catalog row says "not installed" at once (the list was read before), for that plugin only: not for another one or a skin of the same id.
+  {
+    const rows = [{ id: 'wand', kind: 'plugin', status: 'installed', installedVersion: '1.0.0' }, { id: 'wand', kind: 'skin', status: 'installed' }, { id: 'other', kind: 'plugin', status: 'update', installedVersion: '1.0.0' }];
+    const after = pr.afterUninstall(rows, { id: 'wand', folder: 'Wand' });
+    assert.equal(after[0].status, 'notInstalled');
+    assert.equal(after[0].installedVersion, null);
+    assert.equal(pr.entryState(after[0], undefined), 'new');
+    assert.equal(after[1], rows[1]);
+    assert.equal(after[2], rows[2]);
+    assert.equal(rows[0].status, 'installed', 'the old list is not changed');
+    assert.deepEqual(pr.afterUninstall(undefined, { id: 'x', folder: 'X' }), []);
+    // Files still held: the plugin stays in the list as "removing", which wins over the corrected row.
+    assert.equal(pr.entryState(after[0], { removedAtRestart: true }), 'removing');
+    const src = readFileSync(new URL('../ui/views/plugins.js', import.meta.url), 'utf8');
+    assert.match(src, /async function uninstall\(plugin, store\) \{[^]*?api\.uninstallPlugin\(plugin\.folder\)[^]*?store\.catalog = \{ \.\.\.store\.catalog, entries: afterUninstall\(store\.catalog\.entries, plugin\) \}/);
+    assert.match(src, /uninstall\(installed, store\)/);
+    assert.match(src, /uninstall\(p, store\)/);
+  }
   // A skin with the id of a plugin is not that plugin.
   assert.equal(pr.installedFor({ id: 'wand', kind: 'skin' }, [{ id: 'wand', folder: 'W' }]), undefined);
   assert.equal(pr.installedFor({ id: 'WAND', kind: 'plugin' }, [{ id: 'wand', folder: 'W' }])?.id, 'wand');
@@ -1286,8 +1327,26 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   assert.equal(pr.installBlock({ ...third }, { expert: false }), 'expert');
   assert.equal(pr.installBlock({ ...third }, { expert: true }), null);
   assert.deepEqual(pr.entryActions({ ...third }, undefined, { expert: true }), ['install']);
-  // A skin can only be installed or updated: no enable, no uninstall.
-  assert.deepEqual(pr.entryActions({ id: 's', kind: 'skin', origin: 'local', status: 'update' }, undefined, {}), ['update']);
+  // A skin has no enable switch; it is installed, updated and, once installed, uninstalled. The Couch skin ('default', built in) never has the action.
+  assert.deepEqual(pr.entryActions({ id: 's', kind: 'skin', origin: 'local', status: 'update' }, undefined, {}), ['update', 'uninstall']);
+  assert.deepEqual(pr.entryActions({ id: 's', kind: 'skin', origin: 'local', status: 'installed' }, undefined, {}), ['uninstall']);
+  assert.deepEqual(pr.entryActions({ id: 's', kind: 'skin', origin: 'local', status: 'notInstalled' }, undefined, { expert: true }), ['install']);
+  assert.deepEqual(pr.entryActions({ id: 'default', kind: 'skin', origin: 'local', status: 'installed' }, undefined, {}), []);
+  assert.deepEqual(pr.entryActions({ id: 's', kind: 'skin', origin: 'local', status: 'unavailable' }, undefined, {}), []);
+  {
+    const rows = [{ id: 'Nova', kind: 'skin', status: 'installed', installedVersion: '1' }, { id: 'nova', kind: 'plugin', status: 'installed' }, { id: 'other', kind: 'skin', status: 'installed' }];
+    const after = pr.afterSkinUninstall(rows, 'nova');
+    assert.equal(after[0].status, 'notInstalled');
+    assert.equal(after[1], rows[1], 'a plugin of the same id stays');
+    assert.equal(after[2], rows[2]);
+    const src = readFileSync(new URL('../ui/views/plugins.js', import.meta.url), 'utf8');
+    assert.match(src, /async function uninstallSkin\(entry, store\) \{[^]*?gateOpen\('uninstall', 'skin'\)[^]*?runGates\([^]*?api\.uninstallSkin\(entry\.id\)[^]*?afterSkinUninstalled\(\)/);
+    // A failed call resyncs the page too: the settings may already have fallen back to the Couch skin.
+    assert.match(src, /api\.uninstallSkin\(entry\.id\)[^]*?if \(!result\) \{[^}]*await afterSkinUninstalled\(\);\s*return;/);
+    assert.match(src, /if \(e\.kind === 'skin'\) await uninstallSkin\(e, store\);/);
+    const menu = readFileSync(new URL('../ui/components/skin-menu.js', import.meta.url), 'utf8');
+    assert.match(menu, /export async function afterSkinUninstalled\(\) \{[^]*?applySkin\(BUILTIN_SKINS\[0\]\);/);
+  }
 
   // Capabilities in plain words: known ids map to keys that exist in both languages; an unknown id never reaches the text.
   const { dictionaries } = await import('../ui/i18n/index.js');
@@ -1403,7 +1462,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   // The official source row has no remove action in the page.
   assert.match(pluginsSrc, /run: src\.removable \? \(\) => removeSource\(src, page\) : undefined/);
   // Every change goes through runGates (or the gates of the add and remove flows) right before its call.
-  for (const name of ['api.installCatalogEntry(', 'api.uninstallPlugin(', 'api.acceptRevokedPlugin(', 'api.setPluginEnabled(', 'api.removeCatalogSource(', 'api.approvePlugin(']) {
+  for (const name of ['api.installCatalogEntry(', 'api.uninstallPlugin(', 'api.uninstallSkin(', 'api.acceptRevokedPlugin(', 'api.setPluginEnabled(', 'api.removeCatalogSource(', 'api.approvePlugin(']) {
     const at = pluginsSrc.indexOf(name);
     assert.ok(at > 0, `${name} is used`);
     const gateAt = pluginsSrc.lastIndexOf('runGates(', at);
@@ -1492,8 +1551,8 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   // A foreign skin update is blocked outside expert mode and then warns; an own skin never warns.
   assert.deepEqual(pr.installPlan(foreignSkin, { expert: false, update: true }), { blocked: 'expert', steps: [] });
   assert.deepEqual(pr.installPlan(foreignSkin, { expert: true, update: true }).steps, ['warning', 'code']);
-  assert.deepEqual(pr.entryActions(foreignSkin, undefined, { expert: false }), []);
-  assert.deepEqual(pr.entryActions(foreignSkin, undefined, { expert: true }), ['update']);
+  assert.deepEqual(pr.entryActions(foreignSkin, undefined, { expert: false }), ['uninstall']);
+  assert.deepEqual(pr.entryActions(foreignSkin, undefined, { expert: true }), ['update', 'uninstall']);
   assert.deepEqual(pr.installPlan(ownSkin, { expert: false, update: true }).steps, ['confirm', 'code']);
   // A third-party plugin update that adds capabilities is an install: warning, expert mode, code.
   const addsUpdate = { id: 'k', kind: 'plugin', origin: 'thirdParty', status: 'update', addsCapabilities: true };
@@ -1508,6 +1567,14 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   // Stepper settle -> redraw, and a push that arrives while a value waits or is on its way (the settler removes its entry only after the send).
   const { settler } = await import('../ui/core/settle.js');
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Waits for a condition, not for the clock: the limit only ends a test that would hang.
+  const until = async (cond, ms = 20000) => {
+    const end = Date.now() + ms;
+    while (!cond()) {
+      assert.ok(Date.now() < end, 'timed out waiting for the condition');
+      await delay(2);
+    }
+  };
   const make = () => {
     const s = settler(20);
     const log = [];
@@ -1517,7 +1584,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   {
     const { s, log, sync } = make();
     s.set('a', 5, () => sync.send(async () => { log.push('send'); await delay(10); }));
-    await delay(80);
+    await until(() => log.includes('render'));
     assert.deepEqual(log, ['send', 'render']);
   }
   {
@@ -1525,14 +1592,14 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
     const { s, log, sync } = make();
     s.set('a', 5, () => sync.send(async () => { log.push('send'); await delay(10); }));
     assert.equal(sync.push(), false);
-    await delay(80);
+    await until(() => log.includes('load'));
     assert.deepEqual(log, ['send', 'load']);
   }
   {
     // A push in the middle of the send: not read at once, read once afterwards.
     const { s, log, sync } = make();
     s.set('a', 5, () => sync.send(async () => { log.push('send'); await delay(10); sync.push(); await delay(10); }));
-    await delay(100);
+    await until(() => log.includes('load'));
     assert.deepEqual(log, ['send', 'load']);
     assert.equal(sync.dirty, false);
   }
@@ -1540,9 +1607,9 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
     // A newer step while the first is on its way: only after the last send the page is drawn.
     const { s, log, sync } = make();
     s.set('a', 5, () => sync.send(async () => { log.push('send5'); await delay(40); }));
-    await delay(35);
+    await until(() => log.includes('send5'));
     s.set('a', 10, () => sync.send(async () => { log.push('send10'); await delay(5); }));
-    await delay(150);
+    await until(() => log.includes('render'));
     assert.deepEqual(log, ['send5', 'send10', 'render']);
   }
   {
@@ -2446,10 +2513,16 @@ assert.equal(ptabs.isPinnedTab(null), false);
   assert.equal(stripLayersAndImports('@x url(/*);@import "e.css" layer(ch);/* */'), '@x url(/*);/* */');
   assert.equal(stripLayersAndImports('a{content:"\r}@layer ch{x{y:z}}"}'), 'a{content:"\r}x{y:z}"}');
   assert.equal(stripLayersAndImports('a{content:"\f}@layer ch{x{y:z}}"}'), 'a{content:"\f}x{y:z}"}');
-  // ...and what survives anyway is refused: the backstop.
-  for (const css of ['a{content:"@layer x"}', '/* @import */', 'a{b:url(@layer)}', 'a{content:"\\40 LAYER"}', 'a{content:"x\\\n}@layer ch{c{d:e}}"}', '@layerx{}']) {
+  // ...and what is an at-keyword anyway (here: joined by the removal of a statement in between) is refused: the backstop.
+  for (const css of ['@lay@import "x";er x;a{b:c}', '@imp@import "x";ort "y";a{b:c}', '@\\6c @import "x";ayer x;a{b:c}']) {
     assert.equal(sanitize(css).refused, true, css);
     assert.equal(sanitize(css).css, '');
+  }
+  // The words in a comment, a string, a url( ) token, a name or an attribute value are no at-keyword: served as they are.
+  for (const css of ['a{content:"@layer x"}', '/* @import */a{b:c}', 'a{b:url(@layer)}', 'a{content:"\\40 LAYER"}', 'a{content:"x\\\n}@layer ch{c{d:e}}"}', '@layerx{}',
+    ':root{--n:"@layer"}', 'a[x="@import"]{b:c}', '.a\\@layer{b:c}', '#\\@LAYER{b:c}']) {
+    assert.deepEqual(sanitize(css), { css, refused: false }, css);
+    assert.equal(mentionsLayerOrImport(css), false, css);
   }
   // Another charset hides text from the scan: the host sends charset=utf-8, and what could still change the reading is refused (the charset, controls, the bytes).
   for (const css of ['@charset "iso-2022-jp";\n@\u001b(Blayer ch{x{y:z}}', '@charset "utf-16";a{b:c}', "@charset 'utf-8';a{b:c}", 'a{b:c}\u0000', '@l\u001bayer ch{}', 'a{b:c}\u000b']) assert.equal(sanitize(css).refused, true, JSON.stringify(css));
@@ -4440,6 +4513,35 @@ console.log('phone seal: ok');
 }
 console.log('phone sleep timer: ok');
 
+// The limit pickers: steps below an hour (15, 30, 45 min), sorted, "none" first, inside the host's 0 to 1440 and not above the old top step.
+{
+  const { DAILY_LIMIT_MINUTES, GAME_LIMIT_MINUTES } = await import('../ui/core/settings-rules.js');
+  for (const steps of [DAILY_LIMIT_MINUTES, GAME_LIMIT_MINUTES]) {
+    assert.equal(steps[0], 0);
+    assert.deepEqual(steps, [...steps].sort((a, b) => a - b));
+    assert.equal(new Set(steps).size, steps.length);
+    assert.ok(steps.every((m) => Number.isInteger(m) && m >= 0 && m <= 1440));
+    assert.deepEqual(steps.slice(1, 4), [15, 30, 45]);
+  }
+  assert.equal(Math.max(...DAILY_LIMIT_MINUTES), 360);
+  assert.equal(Math.max(...GAME_LIMIT_MINUTES), 120);
+  const settings = readFileSync(new URL('../ui/views/settings.js', import.meta.url), 'utf8');
+  assert.match(settings, /const limitOptions = \(\) => DAILY_LIMIT_MINUTES\.map/);
+  assert.match(settings, /const gameLimitOptions = \(\) => GAME_LIMIT_MINUTES\.map/);
+}
+console.log('limit pickers: ok');
+
+// "Pausiert seit" after more time: every resume (the extension, "continue", the task list) thaws the game, and the thaw tells the page, because the HUD
+// losing the focus afterwards emits nothing any more (nothing is frozen by then). The home shelf reads session.paused on every session event.
+{
+  const hudSrc = readFileSync(new URL('../src/CouchHud.Shell/Hud.cs', import.meta.url), 'utf8');
+  assert.match(hudSrc, /var wasPaused = GamePause\.IsPaused;\s+GamePause\.ResumeAll\(\);[^]*?if \(wasPaused\) Ui\(\(\) => Emit\("session", SessionDto\(\)\)\);/);
+  assert.match(hudSrc, /public object ParentalExtend\(int minutes\)[^]*?ResumeGame\(\);/);
+  assert.match(readFileSync(new URL('../ui/views/home.js', import.meta.url), 'utf8'), /state\.session\.paused \? 'home\.meta\.pausedSince' : 'home\.meta\.runningSince'/);
+  assert.match(readFileSync(new URL('../ui/app.js', import.meta.url), 'utf8'), /state\.session = session;[^]*?currentView\(\) === homeView && !state\.overlay\) render\(\);/);
+}
+console.log('paused since after more time: ok');
+
 // Settings that change from outside the page (the phone remote, a tool): the language reloads the page only between known values, the screensaver and the
 // settings page follow, and the phone's own page offers the settings of the host's positive list only (RemoteSettings.cs).
 {
@@ -4514,6 +4616,16 @@ console.log('phone settings: ok');
   assert.equal(cr.problemKey('missing'), 'companion.problem.missing');
   assert.equal(cr.problemKey('signature'), 'companion.problem.signature');
   assert.equal(cr.problemKey('Script'), 'companion.problem.other');
+  assert.equal(cr.problemKey('pinMissing'), 'companion.problem.pinMissing');
+  assert.equal(cr.problemKey('pinChanged'), 'companion.problem.pinChanged');
+  assert.equal(cr.problemKey('folderWritable'), 'companion.problem.folderWritable');
+  assert.equal(cr.formatSize(512), '512 B');
+  assert.equal(cr.formatSize(48234496), '46.0 MB');
+  const tt = (key, params) => `${key}:${JSON.stringify(params ?? {})}`;
+  const lines = cr.pinLines({ hash: 'a1b2c3d4e5f6', size: 1024, modified: 'm', signer: null, version: '1.0', changed: true, folderWritable: true }, tt);
+  assert.deepEqual(lines.map((l) => l.split(':')[0]), ['companion.confirmFile', 'companion.confirmUnsigned', 'companion.confirmVersion', 'companion.confirmChanged', 'companion.confirmFolder']);
+  assert.deepEqual(cr.pinLines({ hash: 'x', size: 1, modified: 'm', signer: 'Wand Inc', changed: false, folderWritable: false }, tt).map((l) => l.split(':')[0]), ['companion.confirmFile', 'companion.confirmSigned']);
+  assert.ok(cr.confirmable('pinMissing') && cr.confirmable('pinChanged') && cr.confirmable('folderWritable') && !cr.confirmable('signature') && !cr.confirmable(null));
   assert.deepEqual(cr.gameRows([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], ['b']), [{ id: 'a', name: 'A', checked: false }, { id: 'b', name: 'B', checked: true }]);
   // Wand: offered when found and not yet a companion.
   assert.equal(cr.wandOffer({ found: true, hasRule: false }), true);
@@ -4659,3 +4771,96 @@ console.log('catalog categories and plugins without a restart: ok');
 }
 console.log('second factor: ok');
 
+
+// The boot screen swallows all input until it is gone (core/boot-gate.js): closed from the start, opened only by the end of the boot screen.
+{
+  resetGate();
+  assert.equal(inputOpen(), false, 'fail closed: an unknown state blocks');
+  // Controller, keyboard and phone all end in Input.press: nothing is acted on or remembered as held, and no repeat starts.
+  const seen = [];
+  const input = new Input((b) => seen.push(b));
+  input.press('a');
+  input.press('down', 'keyboard');
+  input.attachNative({ onInput: (cb) => { input.native = cb; } });
+  input.native({ type: 'down', button: 'start' });
+  assert.deepEqual(seen, []);
+  assert.equal(input.held.size, 0);
+  assert.equal(input.timers.size, 0);
+  // The raw events (key, mouse, pointer, touch, wheel, text) are stopped, with the page's own listeners behind the shield.
+  for (const name of ['keydown', 'keyup', 'mousedown', 'click', 'pointerdown', 'touchstart', 'wheel', 'contextmenu', 'input']) assert.ok(SHIELDED_EVENTS.includes(name), name);
+  const ev = () => { const e = { stopped: 0, prevented: 0 }; e.stopImmediatePropagation = () => e.stopped++; e.preventDefault = () => e.prevented++; return e; };
+  const blocked = ev();
+  assert.equal(shield(blocked), true);
+  assert.deepEqual([blocked.stopped, blocked.prevented], [1, 1]);
+  const registered = [];
+  installShield({ addEventListener: (name, fn, opts) => registered.push([name, fn, opts]) });
+  assert.equal(registered.length, SHIELDED_EVENTS.length);
+  assert.ok(registered.every(([, fn, o]) => fn === shield && o.capture === true), 'capture phase, first on the window');
+  // The end of the boot screen: the fade first, then input opens. Already faded by itself opens too; no node at all opens at once.
+  const node = { classList: { s: new Set(), contains(c) { return this.s.has(c); }, add(c) { this.s.add(c); } } };
+  let timer = null;
+  assert.equal(endBoot(node, (fn, ms) => { timer = { fn, ms }; }), true);
+  assert.equal(timer.ms, BOOT_FADE_MS);
+  assert.equal(inputOpen(), false, 'still blocked while the boot screen fades');
+  input.press('a');
+  assert.deepEqual(seen, []);
+  timer.fn();
+  assert.equal(inputOpen(), true);
+  input.press('a');
+  assert.deepEqual(seen, ['a']);
+  const open = ev();
+  assert.equal(shield(open), false);
+  assert.equal(open.stopped + open.prevented, 0, 'open: events pass');
+  resetGate();
+  assert.equal(endBoot(node, (fn) => fn()), false, 'already done: no second start sound');
+  assert.equal(inputOpen(), true);
+  resetGate();
+  assert.equal(endBoot(null), false);
+  assert.equal(inputOpen(), true);
+  resetGate();
+  // Wiring: the page's action handler asks the gate, the shield module is the first import, and nothing but the boot end opens it.
+  const app = readFileSync(new URL('../ui/app.js', import.meta.url), 'utf8');
+  assert.match(app, /function onAction\(action\) \{[^}]*?if \(!inputOpen\(\)\) return;/);
+  assert.ok(app.indexOf("from './core/boot-gate.js'") < app.indexOf("from './core/api.js'"));
+  assert.match(app, /endBoot\(document\.querySelector\('#boot'\)\)/);
+  assert.equal([...app.matchAll(/openInput\(/g)].length, 0, 'only endBoot opens input');
+  assert.match(readFileSync(new URL('../ui/input.js', import.meta.url), 'utf8'), /if \(!inputOpen\(\)\) return;/);
+  void openInput;
+}
+console.log('boot input gate: ok');
+
+// Locks of one entry: for this profile only or for all child profiles.
+{
+  const { lockScope, lockChoices, needsQuestion, lockedRows } = await import('../ui/core/item-lock-rules.js');
+  const st = (own, all, kids = 1) => ({ lockedItems: own, lockedItemsAllChildren: all, childProfiles: kids });
+  assert.equal(lockScope(st([], []), 'a'), 'none');
+  assert.equal(lockScope(st(['a'], []), 'a'), 'profile');
+  assert.equal(lockScope(st([], ['a']), 'a'), 'all');
+  assert.equal(lockScope(st(['a'], ['a']), 'a'), 'both');
+  assert.equal(lockScope({}, 'a'), 'none', 'an older status without the new list');
+  assert.deepEqual(lockChoices(st([], []), 'a'), [{ locked: true, all: false }, { locked: true, all: true }]);
+  assert.deepEqual(lockChoices(st([], [], 0), 'a'), [{ locked: true, all: false }], 'no child profile: nothing to choose');
+  assert.equal(needsQuestion(lockChoices(st([], [], 0), 'a')), false);
+  assert.equal(needsQuestion(lockChoices(st(['a'], [], 0), 'a')), false, 'plain unlock of the own entry, nothing to widen to');
+  assert.deepEqual(lockChoices(st([], ['a']), 'a'), [{ locked: false, all: true }]);
+  assert.deepEqual(lockChoices(st(['a'], []), 'a'), [{ locked: false, all: false }, { locked: true, all: true }], 'a profile lock can be widened without unlocking first');
+  assert.deepEqual(lockChoices(st(['a'], [], 0), 'a'), [{ locked: false, all: false }], 'no child profile: nothing to widen to');
+  assert.equal(needsQuestion(lockChoices(st(['a'], []), 'a')), true);
+  const { grantAction, listDamaged } = await import('../ui/core/item-lock-rules.js');
+  assert.equal(grantAction({ locked: true, all: false }), 'lock');
+  assert.equal(grantAction({ locked: false, all: true }), 'lockAll', 'the grant is bound to the scope');
+  assert.equal(grantAction({ locked: true, all: true }), 'lockAll');
+  assert.equal(listDamaged({ lockedItemsAllChildrenUnreadable: true }), true);
+  assert.equal(listDamaged({}), false);
+  assert.equal(listDamaged(null), false);
+  assert.equal(needsQuestion(lockChoices(st([], ['a']), 'a')), true, 'a lock for all child profiles is lifted on purpose, never silently');
+  assert.deepEqual(lockChoices(st(['a'], ['a']), 'a'), [{ locked: false, all: false }, { locked: false, all: true }]);
+  const rows = lockedRows(st(['a'], ['a', 'b', 'gone']), (id) => (id === 'gone' ? undefined : { id }));
+  assert.deepEqual(rows.map((r) => [r.item.id, r.scope]), [['a', 'both'], ['b', 'all']]);
+  const de = (await import('../ui/i18n/de/components2.js')).default;
+  const en = (await import('../ui/i18n/en/components2.js')).default;
+  for (const k of ['lockForAll', 'lockForProfile', 'unlockForAll', 'unlockForProfile', 'scope.all', 'scope.both', 'lockedAllToast', 'unlockedStillAllToast', 'allDamaged', 'resetAllAction', 'resetAllDetail', 'resetAllReason', 'resetAllDone']) {
+    assert.ok(de[`parental.${k}`] && en[`parental.${k}`], k);
+  }
+}
+console.log('item locks per profile or for all children: ok');

@@ -21,6 +21,9 @@ public sealed class UninstalledLibrary(IEnumerable<IOwnedGamesSource> sources, F
     /// <summary>Longest time one source may take (appinfo.vdf of a big library is the slow one).</summary>
     public TimeSpan SourceTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>The clock of <see cref="SourceTimeout"/> (tests pass a fake one).</summary>
+    public TimeProvider Time { get; init; } = TimeProvider.System;
+
     /// <summary>A worker that is still busy this long after its start (despite the cancel) is logged once; no new scan starts until it ends.</summary>
     public TimeSpan StuckAfter { get; init; } = TimeSpan.FromMinutes(2);
 
@@ -129,12 +132,16 @@ public sealed class UninstalledLibrary(IEnumerable<IOwnedGamesSource> sources, F
 
     private async Task<IReadOnlyList<UninstalledGame>> ScanOne(IOwnedGamesSource source, List<Task> workers, CancellationToken ct)
     {
-        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(SourceTimeout);
+        var limit = new CancellationTokenSource(SourceTimeout, Time);
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, limit.Token);
         // Off the caller's thread: the files can be large and the UI thread must never wait for them. The worker gets the token and
         // stops at its next check; the token source lives until the worker has ended.
         var worker = Task.Run(() => source.Scan(cts.Token), CancellationToken.None);
-        _ = worker.ContinueWith(_ => cts.Dispose(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        _ = worker.ContinueWith(_ =>
+        {
+            cts.Dispose();
+            limit.Dispose();
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         lock (workers) workers.Add(worker);
         // A reader stuck in one long call ignores its token; that blocks every later scan, so it is worth one line in the log.
         _ = Task.WhenAny(worker, Task.Delay(StuckAfter, CancellationToken.None)).ContinueWith(_ =>
@@ -143,7 +150,7 @@ public sealed class UninstalledLibrary(IEnumerable<IOwnedGamesSource> sources, F
         }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         try
         {
-            return await worker.WaitAsync(SourceTimeout, ct);
+            return await worker.WaitAsync(SourceTimeout, Time, ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {

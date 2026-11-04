@@ -205,8 +205,10 @@ public sealed class CodeStore : ICodeState
     /// store; anything else that is wrong makes it unavailable, and the file stays as it is for an administrator to look at.
     /// </summary>
     /// <param name="verify">The PBKDF2 check (tests pass a fast one); default <see cref="Passcode.Verify"/>.</param>
-    public static CodeStore Open(string? folder, IEventSink log, IMonotonicClock clock, Func<long> bootTimeMs, Func<IReadOnlyList<string>, string, bool>? verify = null)
+    /// <param name="sleep">The pause between the read retries (tests pass their own); default is Thread.Sleep.</param>
+    public static CodeStore Open(string? folder, IEventSink log, IMonotonicClock clock, Func<long> bootTimeMs, Func<IReadOnlyList<string>, string, bool>? verify = null, Action<TimeSpan>? sleep = null)
     {
+        sleep ??= Thread.Sleep;
         if (folder is null)
         {
             log.Error("[codes] no trusted data folder: codes cannot be checked, every account counts as having one");
@@ -218,7 +220,7 @@ public sealed class CodeStore : ICodeState
         foreach (var delay in ReadRetryDelays)
         {
             if (outcome != LoadOutcome.ReadError) break;
-            Thread.Sleep(delay);
+            sleep(delay);
             outcome = Load(file, log, out data, out legacy);
         }
         var store = new CodeStore(file, data, log, clock, bootTimeMs, verify) { _state = outcome, _lastReadTry = clock.Now };

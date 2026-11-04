@@ -242,9 +242,10 @@ function stepsPage({ id, title, intro, notes, doneNotes = () => [], startLabel, 
       if (!(await this.unlock())) return;
       // Parental controls on and the way back still to take: it cannot work, so nothing is begun (no steps run and undone for nothing).
       if (await this.lookBlocked()) {
-        toast(blockedText, 7000);
         phase = 'overview';
         this.paint();
+        // A dialog, not a short toast: it says why and offers the way to the setting that has to change first (B or Cancel changes nothing).
+        if (await confirmDialog(t('consoleSetup.refused.title'), t('consoleSetup.action.openParental'), { message: blockedText, focusCancel: true })) await this.openBlockSetting();
         return;
       }
       // A record of the other direction would be overwritten by this switch: it has to be settled first (the next start asks about it).
@@ -263,9 +264,15 @@ function stepsPage({ id, title, intro, notes, doneNotes = () => [], startLabel, 
       if (!begun.ok) {
         if (begun.error) console.warn(`console setup not started: ${errorText(begun.error)}`);
         const reason = begun.reason === 'configFault' ? t('wizard.configFault') : begun.reason === 'locked' ? t('consoleSetup.notUnlocked') : t('consoleSetup.notStarted', { error: errorText(begun.error) });
-        toast(reason, 7000);
         phase = 'overview';
         this.paint();
+        if (begun.reason !== 'locked') {
+          toast(reason, 7000);
+          return;
+        }
+        // The couch locked again before the run began: a dialog (not a toast) says why; "Enter code" asks the unlock and begins again.
+        // Focus starts on Cancel, the safe answer.
+        if (await confirmDialog(t('consoleSetup.refused.title'), t('passcode.enter'), { message: t('consoleSetup.refused.locked'), focusCancel: true })) return this.start();
         return;
       }
       phase = 'running';

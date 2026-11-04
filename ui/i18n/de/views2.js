@@ -120,6 +120,8 @@ export default {
   'phone.paired': 'Gekoppelt: {names}',
   'phone.noneYet': 'Noch kein Handy gekoppelt.',
   'phone.hint.newCode': 'Neuer Code',
+  'phone.codeHidden': 'X drücken für einen neuen Code (Eltern-Code nötig)',
+  'phone.parentReason': 'Ein neues Handy koppeln nur die Eltern',
   'phone.hint.back': 'Zurück',
 
 };

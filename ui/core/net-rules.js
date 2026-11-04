@@ -43,3 +43,9 @@ export const updateChoices = (choices) => ({
  */
 export const LISTENER_KEYS = ['remoteEnabled', 'mcpEnabled', 'mcpLan'];
 export const listenerNeedsParent = (key, turningOn, parentalOn) => !!turningOn && !!parentalOn && LISTENER_KEYS.includes(key);
+
+/**
+ * A new pairing code (the QR code of the pairing page) takes the parents' code with parental controls on (host: PairingGrant, action
+ * "remotePair"); showing the current code and parental controls off stay as they were.
+ */
+export const pairingNeedsParent = (newCode, parentalOn) => !!newCode && !!parentalOn;

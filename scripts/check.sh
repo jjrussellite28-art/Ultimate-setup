@@ -32,6 +32,9 @@ scripts/node_modules/.bin/eslint
 echo "› UI logic"
 node scripts/ui-logic-check.mjs
 
+echo "› Edge profile cleanup (fake temp folder, no Edge)"
+node scripts/edge-profile-check.mjs
+
 echo "› UI in headless Edge (browser, companion apps)"
 # The two page checks drive the mock UI in headless Edge (--headless=new --mute-audio, no window, no sound). EDGE names msedge.exe when it is elsewhere.
 edge_found=0
@@ -75,6 +78,16 @@ if [ "${SKIP_BROWSER_UI:-}" = "1" ]; then
   echo "tabs: skipped (SKIP_BROWSER_UI=1)"
 else
   node scripts/tabs-check.mjs
+fi
+
+echo "› Release notes (newest CHANGELOG version has a Kurz / Summary block)"
+if command -v pwsh >/dev/null 2>&1; then
+  newest=$(grep -m1 -oE '^## [0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | cut -c4-)
+  notes=$(mktemp)
+  pwsh -NoProfile -File scripts/release-notes.ps1 -Tag "v$newest" -Out "$notes"
+  rm -f "$notes"
+else
+  echo "release notes: skipped (no pwsh)"
 fi
 
 echo "✓ alles grün"

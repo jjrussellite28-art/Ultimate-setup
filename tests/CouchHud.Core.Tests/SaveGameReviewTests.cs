@@ -591,13 +591,14 @@ public sealed class SaveGameReviewTests : IDisposable
             if (!first) return false;
             first = false;
             entered.Set();
-            gate.Wait(TimeSpan.FromSeconds(10));
+            // Held until the test has made its second call, however long that takes; the two minutes only end a stuck test.
+            gate.Wait(TimeSpan.FromMinutes(2));
             return false;
         });
         Write(Path.Combine(item.InstallDir!, "saves", "a.sav"));
 
         var one = svc.BackupAsync(item.Id);
-        Assert.True(entered.Wait(TimeSpan.FromSeconds(10)));
+        Assert.True(entered.Wait(TimeSpan.FromMinutes(2)));
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.BackupAsync(item.Id));
         Assert.Contains("schon", ex.Message);
         gate.Set();

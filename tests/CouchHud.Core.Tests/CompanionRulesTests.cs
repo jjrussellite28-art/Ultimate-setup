@@ -148,6 +148,39 @@ public class CompanionRulesTests
         Assert.Empty(Plan(self, [new CompanionRule { AppId = "loop", Mode = "all" }], [self]).Start);
     }
 
+    private static readonly string Pin = CompanionPin.Version + new string('a', 64);
+
+    [Fact]
+    public void A_locked_couch_starts_only_a_companion_whose_file_hash_was_confirmed()
+    {
+        var wand = App("wand", @"C:\Users\kid\Games\Wand.exe");
+        var game = Game("elden");
+        var unpinned = new[] { new CompanionRule { AppId = "wand", Mode = "all", WhenLocked = true } };
+        var plan = Plan(game, unpinned, [wand, game], locked: true);
+        Assert.Empty(plan.Start);
+        Assert.Equal("unpinned", Assert.Single(plan.Skipped).Reason);
+        var confirmed = new[] { new CompanionRule { AppId = "wand", Mode = "all", WhenLocked = true, LockedSha256 = Pin } };
+        var start = Assert.Single(Plan(game, confirmed, [wand, game], locked: true).Start);
+        Assert.True(start.Locked);
+        // A signature rule (Sha256) needs no separate confirmation.
+        var signed = new[] { new CompanionRule { AppId = "wand", Mode = "all", WhenLocked = true, Sha256 = new string('a', 64) } };
+        Assert.Single(Plan(game, signed, [wand, game], locked: true).Start);
+        // An open couch is judged by the person's own right, as before; the start is not marked locked, so the host compares no hash.
+        Assert.False(Assert.Single(Plan(game, unpinned, [wand, game], locked: false).Start).Locked);
+        Assert.False(Assert.Single(Plan(game, confirmed, [wand, game], locked: false).Start).Locked);
+    }
+
+    [Fact]
+    public void A_hand_edited_locked_hash_that_is_no_pin_counts_as_not_confirmed()
+    {
+        var rules = CompanionRules.Sanitize([
+            new CompanionRule { AppId = "a", LockedSha256 = "nothex" },
+            new CompanionRule { AppId = "b", LockedSha256 = CompanionPin.Version + new string('F', 64) },
+            new CompanionRule { AppId = "c", LockedSha256 = new string('f', 64) }   // the old format: a bare hash
+        ]);
+        Assert.Equal(["", CompanionPin.Version + new string('f', 64), ""], rules.Select(r => r.LockedSha256));
+    }
+
     [Fact]
     public void A_locked_couch_starts_none_unless_the_rule_says_so_and_never_a_tool()
     {
@@ -159,7 +192,7 @@ public class CompanionRulesTests
         var plan = Plan(game, closed, library, locked: true);
         Assert.Empty(plan.Start);
         Assert.Equal("locked", Assert.Single(plan.Skipped).Reason);
-        var open = new[] { new CompanionRule { AppId = "wand", Mode = "all", WhenLocked = true }, new CompanionRule { AppId = "shell", Mode = "all", WhenLocked = true } };
+        var open = new[] { new CompanionRule { AppId = "wand", Mode = "all", WhenLocked = true, LockedSha256 = Pin }, new CompanionRule { AppId = "shell", Mode = "all", WhenLocked = true, LockedSha256 = Pin } };
         var locked = Plan(game, open, library, locked: true);
         Assert.Equal(["wand"], locked.Start.Select(s => s.App.Id));
         // A command shell as a companion is no way out of the lock, whatever the rule says.
@@ -213,7 +246,7 @@ public class CompanionRulesTests
         // Pinned: a rule can only name a library app by id, so it can never start anything the library does not offer as an app.
         var names = typeof(CompanionRule).GetProperties().Select(p => p.Name).Order().ToList();
         // Sha256 is set by the host (the file that was checked), never by the page: it is not in CompanionChange.
-        Assert.Equal(["AppId", "CloseWithGame", "GameIds", "Minimized", "Mode", "Sha256", "WhenLocked"], names);
+        Assert.Equal(["AllowWritableFolder", "AppId", "CloseWithGame", "GameIds", "LockedSha256", "Minimized", "Mode", "Sha256", "WhenLocked"], names);
         var change = typeof(CompanionChange).GetProperties().Select(p => p.Name).Order().ToList();
         Assert.Equal(["CloseWithGame", "GameIds", "Minimized", "Mode", "WhenLocked"], change);
     }
@@ -250,7 +283,7 @@ public class CompanionRulesTests
         var hud = Source("src", "CouchHud.Shell", "HudCompanions.cs");
         // Planned twice (at the game's start and again after the wait for the foreground), each time with the person's own gate and the lock.
         // Planned three times: at the game's start, again after the wait for the foreground, and before every single start.
-        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(hud, System.Text.RegularExpressions.Regex.Escape("CompanionPlanFor(session, openAtLaunch)")).Count);
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(hud, System.Text.RegularExpressions.Regex.Escape("CompanionPlanFor(session, OpenAtLaunch(session))")).Count);
         Assert.Contains("CompanionLauncher.StartAsync(plan, session.Item.Id, host, Environment.ProcessId, start =>", hud);
         Assert.Contains("CompanionRules.Plan(session.Item, rules, library.Find, app => library.EffectiveLaunch(app), CompanionGate,", hud);
         Assert.Contains("Locked && !openAtLaunch", hud);
@@ -299,14 +332,16 @@ public class CompanionRulesTests
         Assert.Contains("if (!verified && !acceptUnverified) throw", hud);
         Assert.Contains("if (!verified) return GetCompanions();", hud);
         // L1: the gate is asked before every start. L7: names go through the plugin log sanitiser. L8: the hint waits for the unlock.
-        Assert.Contains("start =>\n                Application.Current.Dispatcher.Invoke(() => CompanionPlanFor(session, openAtLaunch)", hud);
+        Assert.Contains("start =>\n                Application.Current.Dispatcher.Invoke(() => CompanionPlanFor(session, OpenAtLaunch(session))", hud);
         Assert.DoesNotContain("{session.Item.Name}", hud);
         Assert.DoesNotContain("{skip.AppId}", hud);
         Assert.Contains("if (Locked || !WandSetup.HintDue(", hud);
         // L2: the open-couch note is made only after the start itself.
         var main = Source("src", "CouchHud.Shell", "Hud.cs");
         Assert.True(main.IndexOf("Launcher.Launch(item, start, LaunchOverrides.PinFor(start, own));", StringComparison.Ordinal)
-            < main.IndexOf("NoteOpenLaunch(item);", StringComparison.Ordinal));
+            < main.IndexOf("NoteOpenLaunch(item, launchSerial, openCouch);", StringComparison.Ordinal));
+        // The note is made after ForgetUnlock (which ends an earlier launch's note) and from the lock state read before it.
+        Assert.True(main.IndexOf("var openCouch = !Locked;", StringComparison.Ordinal) < main.IndexOf("ForgetUnlock();\n        NoteOpenLaunch(item, launchSerial, openCouch);", StringComparison.Ordinal));
         // The Wand signature is checked with WinVerifyTrust, with no network lookup.
         var auth = Source("src", "CouchHud.Shell", "Services", "Authenticode.cs");
         Assert.Contains("WinVerifyTrust", auth);
@@ -326,7 +361,7 @@ public class CompanionRulesTests
     [Fact]
     public void The_bridge_calls_belong_to_gaming_or_apps_and_stay_closed_on_a_locked_couch()
     {
-        foreach (var call in new[] { "getCompanions", "setCompanion", "removeCompanion", "setupWand" })
+        foreach (var call in new[] { "getCompanions", "setCompanion", "removeCompanion", "confirmCompanion", "setupWand" })
         {
             Assert.Equal(FeatureAreas.Games, FeatureAreas.BridgeMethods[call]);
             Assert.DoesNotContain(call, LockPolicy.OpenWhileLocked);
@@ -351,7 +386,7 @@ public class CompanionRulesTests
         foreach (var file in new[] { new[] { "src", "CouchHud.Shell", "Services", "HudTools.cs" }, new[] { "src", "CouchHud.Shell", "Services", "RemoteHost.cs" } })
         {
             var text = Source(file);
-            foreach (var call in new[] { "SetCompanion", "RemoveCompanion", "SetupWand", "SetGuideApp", "setCompanion", "setupWand", "setGuideApp" })
+            foreach (var call in new[] { "SetCompanion", "RemoveCompanion", "ConfirmCompanion", "confirmCompanion", "SetupWand", "SetGuideApp", "setCompanion", "setupWand", "setGuideApp" })
                 Assert.DoesNotContain(call, text);
         }
     }

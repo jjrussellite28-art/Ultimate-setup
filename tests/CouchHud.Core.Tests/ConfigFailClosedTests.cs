@@ -295,4 +295,131 @@ public class ConfigFailClosedTests : IDisposable
         Assert.Equal("code", store.Current.CouchLock);
         Assert.Equal("full", store.Current.IntegrationMode);
     }
+
+    private static string Padded(string json, long size) => json + new string(' ', (int)(size - json.Length));
+
+    [Fact]
+    public void An_oversized_file_counts_as_damaged_and_starts_locked_without_being_overwritten()
+    {
+        // Valid JSON that would switch everything off, but larger than the cap: never read in full, never taken.
+        File.WriteAllText(File_, Padded("""{"couchLock":"off","parental":{"enabled":false}}""", ConfigStore.MaxPeekBytes + 1));
+        var length = new FileInfo(File_).Length;
+
+        var store = new ConfigStore(_dir, 1, Quick);
+
+        Assert.Equal(ConfigFault.Invalid, store.Fault);
+        Assert.Equal("windows", store.Current.CouchLock);
+        Assert.True(store.Current.Parental.Enabled);
+        Assert.False(store.Update(c => c.CouchLock = "off"));
+        Assert.Equal("windows", store.Current.CouchLock);
+        Assert.Equal(length, new FileInfo(File_).Length);
+    }
+
+    [Fact]
+    public void An_oversized_file_is_replaced_by_a_valid_backup_and_kept_aside()
+    {
+        File.WriteAllText(File_, Padded("""{"couchLock":"off"}""", ConfigStore.MaxPeekBytes + 1));
+        File.WriteAllText(File_ + ".bak", LockedConfig);
+
+        var store = new ConfigStore(_dir, 1, Quick);
+
+        Assert.Null(store.Fault);
+        Assert.True(store.RestoredFromBackup);
+        Assert.Equal("code", store.Current.CouchLock);
+        Assert.True(store.Current.Parental.Enabled);
+        Assert.Single(Directory.GetFiles(_dir, "config.json.broken-*"));
+    }
+
+    [Fact]
+    public void A_file_of_exactly_the_limit_still_loads()
+    {
+        File.WriteAllText(File_, Padded(LockedConfig, ConfigStore.MaxPeekBytes));
+        Assert.Equal(ConfigStore.MaxPeekBytes, new FileInfo(File_).Length);
+
+        var store = new ConfigStore(_dir, 1, Quick);
+
+        Assert.Null(store.Fault);
+        Assert.Equal("code", store.Current.CouchLock);
+        Assert.Equal("hash-of-the-parents", store.Current.PasscodeHash);
+    }
+
+    [Fact]
+    public void A_missing_config_with_only_an_oversized_backup_starts_locked()
+    {
+        File.WriteAllText(File_ + ".bak", Padded("""{"couchLock":"off"}""", ConfigStore.MaxPeekBytes + 1));
+
+        var store = new ConfigStore(_dir, 1, Quick);
+
+        Assert.Equal(ConfigFault.Missing, store.Fault);
+        Assert.Equal("windows", store.Current.CouchLock);
+        Assert.True(store.Current.Parental.Enabled);
+        Assert.False(File.Exists(File_));
+    }
+
+    [Fact]
+    public void A_missing_config_with_only_an_invalid_backup_or_leftover_temp_file_starts_locked()
+    {
+        File.WriteAllText(File_ + ".bak", "{ broken");
+        Assert.Equal(ConfigFault.Missing, new ConfigStore(_dir, 1, Quick).Fault);
+
+        File.Delete(File_ + ".bak");
+        File.WriteAllText(File_ + ".0123456789abcdef.tmp", "{ broken");
+        var store = new ConfigStore(_dir, 1, Quick);
+        Assert.Equal(ConfigFault.Missing, store.Fault);
+        Assert.True(store.Current.Parental.Enabled);
+    }
+
+    [Fact]
+    public void A_true_first_install_without_any_trace_starts_normally_and_saves_defaults()
+    {
+        var store = new ConfigStore(_dir, 1, Quick);
+
+        Assert.Null(store.Fault);
+        Assert.Equal("off", store.Current.CouchLock);
+        Assert.True(File.Exists(File_));
+        Assert.True(store.Current.SetupWizardDone < int.MaxValue);
+    }
+
+    [Fact]
+    public void An_oversized_earlier_broken_copy_does_not_stop_a_new_bad_copy_from_being_kept()
+    {
+        var old = File_ + ".broken-20200101-000000-000";
+        File.WriteAllText(old, Padded("{ broken", ConfigStore.MaxPeekBytes + 1));
+        File.WriteAllText(File_, "{ broken");
+
+        var store = new ConfigStore(_dir, 1, Quick);
+
+        Assert.Equal(ConfigFault.Invalid, store.Fault);
+        Assert.Equal(2, Directory.GetFiles(_dir, "config.json.broken-*").Length);
+    }
+
+    [Fact]
+    public void An_oversized_recovery_notes_file_counts_as_no_notes_and_does_not_throw()
+    {
+        File.WriteAllText(File_, "{ broken");
+        File.WriteAllText(File_ + ".recovery", Padded("""{"ShellRemovedReason":"x","PendingShellRestore":true}""", ConfigStore.MaxPeekBytes + 1));
+
+        var store = new ConfigStore(_dir, 1, Quick);
+
+        Assert.Equal(ConfigFault.Invalid, store.Fault);
+        Assert.False(store.Current.PendingShellRestore);
+        Assert.Equal("windows", store.Current.CouchLock);
+    }
+
+    [Fact]
+    public void DurableFile_takes_the_backup_when_the_file_is_oversized_and_nothing_when_both_are()
+    {
+        var file = Path.Combine(_dir, "state.json");
+        File.WriteAllText(file, Padded("{}", CouchHud.Core.Files.DurableFile.MaxReadBytes + 1));
+        File.WriteAllText(CouchHud.Core.Files.DurableFile.BackupOf(file), "{\"ok\":1}");
+
+        Assert.Equal("{\"ok\":1}", CouchHud.Core.Files.DurableFile.ReadValid(file, _ => true, out var fromBackup));
+        Assert.True(fromBackup);
+
+        File.WriteAllText(CouchHud.Core.Files.DurableFile.BackupOf(file), Padded("{}", CouchHud.Core.Files.DurableFile.MaxReadBytes + 1));
+        Assert.Null(CouchHud.Core.Files.DurableFile.ReadValid(file, _ => true, out _));
+
+        File.WriteAllText(file, Padded("{}", CouchHud.Core.Files.DurableFile.MaxReadBytes));
+        Assert.NotNull(CouchHud.Core.Files.DurableFile.ReadValid(file, _ => true, out _));
+    }
 }

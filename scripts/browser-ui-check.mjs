@@ -8,9 +8,9 @@
 // (none at EDGE or the usual places) or Node 22 it says "skipped" and exits 0, so scripts/check.sh stays usable on machines without
 // Edge; in CI (CI=true) the same is a failure (exit 1), so a runner without them never passes unseen. A watchdog ends the run
 // after 180 s (cleanup, exit 1).
-import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { spawn } from 'node:child_process';
+import { createProfile, guard } from './edge-profile.mjs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
@@ -57,21 +57,11 @@ if (typeof WebSocket === 'undefined') {
 const server = spawn(process.execPath, [join(here, 'preview-server.js')], { env: { ...process.env, PORT: opt.port }, stdio: 'ignore' });
 let serverGone = null;
 server.on('exit', (code) => { serverGone = code; });
-const profile = mkdtempSync(join(tmpdir(), 'couchhud-edge-'));
+const profile = createProfile();
 const browser = spawn(edge, [`--remote-debugging-port=${opt.debug}`, '--headless=new', '--mute-audio', '--disable-gpu', '--disable-extensions',
   '--no-first-run', `--user-data-dir=${profile}`, '--window-size=1920,1080', 'about:blank'], { stdio: 'ignore' });
-const browserGone = new Promise((r) => browser.once('exit', r));
-// Edge runs as a process tree; on Windows only taskkill /T ends the children that hold the profile folder (only while Edge runs: a finished PID may be reused).
-const killBrowser = () => { if (process.platform === 'win32' && browser.pid && browser.exitCode === null && browser.signalCode === null) spawnSync('taskkill', ['/pid', String(browser.pid), '/T', '/F'], { stdio: 'ignore' }); browser.kill(); };
-const cleanup = () => { server.kill(); killBrowser(); };
-process.on('exit', cleanup);
-// Remove the Edge profile only after Edge has let go of it; an 'exit' handler cannot wait, so this runs before process.exit.
-async function removeProfile() {
-  cleanup();
-  await Promise.race([browserGone, new Promise((r) => setTimeout(r, 5000))]);
-  try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch { /* still held: left in %TEMP% */ }
-}
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => removeProfile().finally(() => process.exit(130)));
+// Processes and profile folder are cleaned up on every way out (see edge-profile.mjs); removeProfile() waits for Edge to exit first.
+const removeProfile = guard({ children: [server], browser, dirs: [profile] });
 // A hung Edge or DevTools connection never holds the check up: after 180 s it ends as a failure.
 setTimeout(() => {
   console.log('browser ui: FAIL, watchdog: no result after 180 s');
@@ -160,7 +150,7 @@ if (mods !== true) {
   console.log(`FAIL the app modules did not load: ${mods}`);
   process.exit(1);
 }
-await evaluate('document.querySelector("#boot")?.classList.add("done")');
+await evaluate(`import('/core/boot-gate.js').then((m) => { m.openInput(); document.querySelector("#boot")?.classList.add("done"); return true; })`);
 
 try {
   // 0. Menus: an ungrouped menu renders as before (no headings, a detail on every entry, plain list); the grouped power menu in
@@ -430,7 +420,7 @@ try {
       if (!up) await sleep(250);
     }
     if (!up) throw new Error(`the app page did not load for ?${query}`);
-    await evaluate('document.querySelector("#boot")?.classList.add("done")');
+    await evaluate(`import('/core/boot-gate.js').then((m) => { m.openInput(); document.querySelector("#boot")?.classList.add("done"); return true; })`);
   };
   const openTv = async () => {
     await evaluate(`import('/views/tv.js').then(async (m) => { await m.refreshTv(false); (await import('/core/nav.js')).push(m.tvPage()); })`);

@@ -29,24 +29,21 @@ public sealed partial class Hud
     private readonly CompanionRegistry _companions = new();
     // Signed companions (Wand) whose file changed and no longer carries a valid signature by a known publisher: not started, shown as such.
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _signatureInvalid = new(StringComparer.Ordinal);
-    private OpenLaunch? _openLaunch;
-
-    private sealed record OpenLaunch(string ItemId, DateTimeOffset At);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _pinChanged = new(StringComparer.Ordinal);
+    private OpenLaunchNote? _openLaunch;
 
     private static string WindowsFolder => Environment.GetFolderPath(Environment.SpecialFolder.Windows);
 
     /// <summary>
     /// A game was started from here while the couch was open: its companions are judged as at an open couch (the unlock is forgotten right after
-    /// the start, but the start itself was allowed). Only for this game and only for a few minutes.
+    /// the start, but the start itself was allowed). The note belongs to that launch (its serial), and ends with its session, with a trip back
+    /// to the HUD and with any newer launch.
     /// </summary>
-    private void NoteOpenLaunch(LibraryItem item) =>
-        Interlocked.Exchange(ref _openLaunch, Locked ? null : new OpenLaunch(item.Id, DateTimeOffset.UtcNow));
+    private void NoteOpenLaunch(LibraryItem item, long serial, bool couchWasOpen) =>
+        Interlocked.Exchange(ref _openLaunch, couchWasOpen ? new OpenLaunchNote(item.Id, serial, DateTimeOffset.UtcNow) : null);
 
-    private bool TakeOpenLaunch(string itemId)
-    {
-        var note = Interlocked.Exchange(ref _openLaunch, null);
-        return note is not null && note.ItemId == itemId && DateTimeOffset.UtcNow - note.At < TimeSpan.FromMinutes(5);
-    }
+    /// <summary>Is this session the one from the noted open launch (read live, never remembered by the callers).</summary>
+    private bool OpenAtLaunch(GameSession session) => _openLaunch is { } note && note.Belongs(session) && !session.External;
 
     private IReadOnlySet<int> CompanionGamePids()
     {
@@ -60,7 +57,7 @@ public sealed partial class Hud
     private string? CompanionGate(LibraryItem app)
     {
         if (!Areas.Shows(app)) return "area";
-        var rules = config.Current.Profile(Parental.ProfileId).Rules;
+        var rules = config.Current.Profile(Parental.ProfileId).EffectiveRules;
         if (!rules.Enabled) return null;
         // The child's list and age rules, then the time rules and "cannot be tracked": a start that would ask for the parents' code (or only
         // advise) does not happen on its own.
@@ -86,16 +83,19 @@ public sealed partial class Hud
     private void OnCompanionGameStarted(GameSession session)
     {
         if (session.Item.Type != ItemType.Game) return;
-        var open = TakeOpenLaunch(session.Item.Id);
-        Ui(() => _ = RunCompanionsAsync(session, open));
+        // A note that does not fit this session (another launch, too old, started outside CouchHud) is dropped: this session is judged by the lock.
+        var note = _openLaunch;
+        if (note is not null && !note.Accepts(session, DateTimeOffset.UtcNow)) Interlocked.CompareExchange(ref _openLaunch, null, note);
+        Ui(() => _ = RunCompanionsAsync(session));
     }
 
-    private async Task RunCompanionsAsync(GameSession session, bool openAtLaunch)
+    private async Task RunCompanionsAsync(GameSession session)
     {
         try
         {
-            if (CompanionPlanFor(session, openAtLaunch).Start.Count == 0) return;
-            var host = new CompanionHost(CompanionGamePids, OnCompanionSignature);
+            if (CompanionPlanFor(session, OpenAtLaunch(session)).Start.Count == 0) return;
+            var host = new CompanionHost(CompanionGamePids, OnCompanionSignature, OnCompanionLockedPin,
+                () => Application.Current.Dispatcher.Invoke(() => Locked && !OpenAtLaunch(session)));
             // After the game is in front, at most 15 seconds: the game got the foreground through CouchHUD's permission, and a program started
             // afterwards has none. Before that it would race the game for it.
             for (var i = 0; i < 60; i++)
@@ -106,11 +106,11 @@ public sealed partial class Hud
             }
             if (_sessions.Current?.Item.Id != session.Item.Id) return;
             // Decided again now: the lock, the profile or the library may have changed during the wait (no stale decision is used).
-            var plan = await Application.Current.Dispatcher.InvokeAsync(() => CompanionPlanFor(session, openAtLaunch));
+            var plan = await Application.Current.Dispatcher.InvokeAsync(() => CompanionPlanFor(session, OpenAtLaunch(session)));
             if (plan.Start.Count == 0 || _sessions.Current?.Item.Id != session.Item.Id) return;
             // Asked again before every single start, on the UI thread: the lock, the profile, the rules and the program may have changed since the plan.
             var runs = await CompanionLauncher.StartAsync(plan, session.Item.Id, host, Environment.ProcessId, start =>
-                Application.Current.Dispatcher.Invoke(() => CompanionPlanFor(session, openAtLaunch).Start.Any(s => s.App.Id == start.App.Id)));
+                Application.Current.Dispatcher.Invoke(() => CompanionPlanFor(session, OpenAtLaunch(session)).Start.Any(s => s.App.Id == start.App.Id && s.Locked == start.Locked)));
             _companions.Add(runs);
             // The game ended while the companions were starting: they are ended now, as with the game's end.
             if (_sessions.Current?.Item.Id != session.Item.Id) await StopCompanionsAsync(session);
@@ -122,7 +122,12 @@ public sealed partial class Hud
     }
 
     /// <summary>A game ended: its companions with "end with the game" are ended, exactly the processes CouchHUD started.</summary>
-    private void OnCompanionGameEnded(GameSession session) => _ = StopCompanionsAsync(session);
+    private void OnCompanionGameEnded(GameSession session)
+    {
+        // The open-couch note ends with the session it was made for.
+        if (_openLaunch is { } note && note.Belongs(session)) Interlocked.CompareExchange(ref _openLaunch, null, note);
+        _ = StopCompanionsAsync(session);
+    }
 
     private async Task StopCompanionsAsync(GameSession session)
     {
@@ -171,6 +176,26 @@ public sealed partial class Hud
             var start = SafeEffective(app);
             return start is null ? "start" : CompanionRules.Eligible(app, start, WindowsFolder).ToString();
         }
+        // Only a rule that starts on the locked couch has a pin to miss; "pinChanged" is what the last locked start found on the file.
+        string? PinProblem(CompanionRule r, LibraryItem? app)
+        {
+            var folder = false;
+            if (r.WhenLocked && string.IsNullOrEmpty(r.Sha256) && CompanionPin.IsPin(r.LockedSha256) && app is not null && SafeEffective(app) is { } target)
+            {
+                // The same held, canonical path as the preview and the start; anything that cannot be read or held counts as writable.
+                try
+                {
+                    var plan = Core.Library.LaunchOptions.Plan(target);
+                    using var held = CompanionPin.Hold(plan);
+                    folder = held is null || CompanionFolders.Writable(plan, held);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException)
+                {
+                    folder = true;
+                }
+            }
+            return CompanionPin.Problem(r, _pinChanged.ContainsKey(r.AppId), folder);
+        }
         object View(CompanionRule r)
         {
             var app = library.Find(r.AppId);
@@ -183,7 +208,7 @@ public sealed partial class Hud
                 closeWithGame = r.CloseWithGame,
                 minimized = r.Minimized,
                 whenLocked = r.WhenLocked,
-                problem = _signatureInvalid.ContainsKey(r.AppId) || SignedProgram.IsBroken(r.Sha256) ? "signature" : Problem(app) is var p && p != nameof(CompanionVerdict.Ok) ? p : null
+                problem = _signatureInvalid.ContainsKey(r.AppId) || SignedProgram.IsBroken(r.Sha256) ? "signature" : Problem(app) is var p && p != nameof(CompanionVerdict.Ok) ? p : PinProblem(r, app)
             };
         }
         return new
@@ -233,21 +258,164 @@ public sealed partial class Hud
         var before = config.Current.Companions.FirstOrDefault(r => r.AppId == appId);
         var nowLocked = change.WhenLocked ?? before?.WhenLocked ?? false;
         var nowAll = (change.Mode ?? before?.Mode ?? CompanionRule.ModeGames) == CompanionRule.ModeAll;
-        if ((nowLocked && before?.WhenLocked != true) || (nowAll && before?.Mode != CompanionRule.ModeAll))
-            RequireSecondFactorFor(SecondFactorActions.CompanionLocked, true, app.Name, appId, nowLocked ? "locked" : "-", nowAll ? "all" : "games");
+        // A rule that newly starts on the locked couch confirms the program for it: a digest over the held file's path, arguments, folder and
+        // SHA-256. It is made before the second factor and bound into it, and the file stays held until the setting is written. A signature
+        // rule (Sha256, Wand) needs no pin; an unlocked start is never held to it.
+        var plan = Core.Library.LaunchOptions.Plan(start);
+        HeldProgram? held = null;
+        try
+        {
+            string? pin = null;
+            if (CompanionPin.ShouldPin(before, nowLocked))
+            {
+                held = CompanionPin.Hold(plan) ?? throw new ArgumentException(Strings.Get("companion.notEligible"));
+                pin = CompanionPin.DigestOf(plan, held);
+            }
+            if ((nowLocked && before?.WhenLocked != true) || (nowAll && before?.Mode != CompanionRule.ModeAll))
+                RequireSecondFactorFor(SecondFactorActions.CompanionLocked, true, app.Name, appId, nowLocked ? "locked" : "-", nowAll ? "all" : "games", pin ?? "-");
+            config.UpdateOrThrow(c =>
+            {
+                var list = CompanionRules.Sanitize(c.Companions);
+                var rule = list.FirstOrDefault(r => r.AppId == appId);
+                if (rule is null) list.Add(rule = new CompanionRule { AppId = appId });
+                if (pin is not null)
+                {
+                    // Newly confirmed for the locked couch: a writable folder is not allowed until the parent says so when confirming.
+                    rule.LockedSha256 = pin;
+                    rule.AllowWritableFolder = false;
+                }
+                if (change.Mode is { } mode) rule.Mode = mode;
+                if (games is not null) rule.GameIds = games;
+                if (change.CloseWithGame is { } close) rule.CloseWithGame = close;
+                if (change.Minimized is { } minimized) rule.Minimized = minimized;
+                if (change.WhenLocked is { } locked)
+                {
+                    rule.WhenLocked = locked;
+                    if (!locked) rule.AllowWritableFolder = false;
+                }
+                c.Companions = CompanionRules.Sanitize(list);
+            });
+            if (pin is not null || change.WhenLocked == false) _pinChanged.TryRemove(appId, out _);
+        }
+        finally
+        {
+            held?.Dispose();
+        }
+        return GetCompanions();
+    }
+
+    /// <summary>
+    /// What the parent sees before confirming a companion program for the locked couch: the digest the confirmation and its second factor are
+    /// bound to, the first 12 hex digits of the file's SHA-256, size, modified time, the Authenticode signer and file version if present, and
+    /// whether others can write in its folder (a warning, not a refusal). Nothing is changed.
+    /// </summary>
+    public object PreviewCompanion(string appId)
+    {
+        RefuseWhileConfigFaulted();
+        RequireProfileChosen();
+        RequireUnlocked();
+        var (app, start, rule) = CompanionForPin(appId);
+        var plan = Core.Library.LaunchOptions.Plan(start);
+        using var held = CompanionPin.Hold(plan) ?? throw new ArgumentException(Strings.Get("companion.notEligible"));
+        var (signer, version) = SignerAndVersion(held);
+        // Two digests: the pin without and with the "allow a writable folder anyway" choice; the second factor is bound to the chosen one.
+        var digest = CompanionPin.DigestOf(plan, held);
+        var digestAllow = CompanionPin.DigestOf(plan, held, allowWritableFolder: true);
+        var current = CompanionPin.DigestOf(plan, held, rule.AllowWritableFolder);
+        return new
+        {
+            appId,
+            name = app.Name,
+            digest,
+            digestAllow,
+            hash = CompanionPin.Short(held.Sha256Hex()),
+            size = held.Stream.Length,
+            modified = File.GetLastWriteTimeUtc(held.Path).ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture),
+            signer,
+            version,
+            folderWritable = CompanionFolders.Writable(plan, held),
+            changed = rule.LockedSha256.Length > 0 && !string.Equals(rule.LockedSha256, current, StringComparison.OrdinalIgnoreCase)
+        };
+    }
+
+    private (LibraryItem App, LaunchTarget Start, CompanionRule Rule) CompanionForPin(string appId)
+    {
+        var app = library.Find(appId) ?? throw new KeyNotFoundException($"unknown item {appId}");
+        if (!Areas.Shows(app) || !Areas.Games) throw new InvalidOperationException(Strings.Get("areas.off"));
+        var start = SafeEffective(app) ?? throw new InvalidOperationException(Strings.Get("companion.notEligible"));
+        if (CompanionRules.Eligible(app, start, WindowsFolder) != CompanionVerdict.Ok) throw new ArgumentException(Strings.Get("companion.notEligible"));
+        var rule = CompanionRules.Sanitize(config.Current.Companions).FirstOrDefault(r => r.AppId == appId);
+        // The rule must exist, start on the locked couch and carry no signature rule (the digest is judged later, on the held file).
+        var probe = CompanionPin.Version + new string('0', 64);
+        if (CompanionPin.ConfirmRefusal(rule, probe, probe) is not null) throw new ArgumentException(Strings.Get("companion.notEligible"));
+        return (app, start, rule!);
+    }
+
+    /// <summary>
+    /// Confirms the program's current file for the locked couch again (a legacy rule, or a program that changed): one action, behind the same
+    /// unlock, parents' code and second factor as turning "also when locked" on. <paramref name="seenDigest"/> and <paramref name="seenHash"/>
+    /// are what the parent saw in <see cref="PreviewCompanion"/>; the second factor is bound to that digest, and the confirmation is refused if
+    /// the file is another one now. The grant and the second factor come first, then the file is held, hashed and kept held until the write.
+    /// </summary>
+    public object ConfirmCompanion(string appId, string seenDigest, string seenHash, bool allowWritableFolder = false)
+    {
+        RefuseWhileConfigFaulted();
+        RequireProfileChosen();
+        RequireUnlocked();
+        var (app, start, rule) = CompanionForPin(appId);
+        if (!CompanionPin.IsPin(seenDigest) || seenHash is not { Length: 12 } || !seenHash.All(Uri.IsHexDigit)) throw new ArgumentException(Strings.Get("companion.notEligible"));
+        if (config.Current.ParentalEnabled) RequireParentGrant("companions", appId);
+        RequireSecondFactorFor(SecondFactorActions.CompanionLocked, true, $"{app.Name} · {seenHash.ToLowerInvariant()}{(allowWritableFolder ? " · " + Strings.Get("companion.allowDetail") : "")}", appId, "locked", rule.Mode == CompanionRule.ModeAll ? "all" : "games", seenDigest.ToLowerInvariant(), allowWritableFolder ? "allow-writable-folder" : "-");
+        var plan = Core.Library.LaunchOptions.Plan(start);
+        using var held = CompanionPin.Hold(plan) ?? throw new ArgumentException(Strings.Get("companion.notEligible"));
+        // "Allow anyway" only means something for a folder that is writable now; the digest carries the choice, so the one the parent saw
+        // (and the second factor was bound to) must be the one computed here.
+        var allow = allowWritableFolder && CompanionFolders.Writable(plan, held);
+        var digest = CompanionPin.DigestOf(plan, held, allow);
+        if (CompanionPin.ConfirmRefusal(rule, seenDigest, digest) is not null || !string.Equals(CompanionPin.Short(held.Sha256Hex()), seenHash, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(Strings.Get("companion.changedSinceShown"));
         config.UpdateOrThrow(c =>
         {
             var list = CompanionRules.Sanitize(c.Companions);
-            var rule = list.FirstOrDefault(r => r.AppId == appId);
-            if (rule is null) list.Add(rule = new CompanionRule { AppId = appId });
-            if (change.Mode is { } mode) rule.Mode = mode;
-            if (games is not null) rule.GameIds = games;
-            if (change.CloseWithGame is { } close) rule.CloseWithGame = close;
-            if (change.Minimized is { } minimized) rule.Minimized = minimized;
-            if (change.WhenLocked is { } locked) rule.WhenLocked = locked;
-            c.Companions = CompanionRules.Sanitize(list);
+            if (list.FirstOrDefault(r => r.AppId == appId) is { } r)
+            {
+                r.LockedSha256 = digest;
+                r.AllowWritableFolder = allow;
+            }
+            c.Companions = list;
         });
+        _pinChanged.TryRemove(appId, out _);
         return GetCompanions();
+    }
+
+    private static (string? Signer, string? Version) SignerAndVersion(HeldProgram held)
+    {
+        string? signer = null;
+        System.Security.Cryptography.X509Certificates.X509Certificate2Collection? roots = null;
+        try
+        {
+            roots = Authenticode.MachineRoots();
+            using var cert = Authenticode.Verify(held, roots);
+            signer = cert?.GetNameInfo(System.Security.Cryptography.X509Certificates.X509NameType.SimpleName, false);
+        }
+        catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or IOException or DllNotFoundException or EntryPointNotFoundException)
+        {
+        }
+        finally
+        {
+            if (roots is not null) foreach (var root in roots) root.Dispose();
+        }
+        string? version = null;
+        try { version = System.Diagnostics.FileVersionInfo.GetVersionInfo(held.Path).FileVersion; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        return (signer, string.IsNullOrWhiteSpace(version) ? null : version);
+    }
+
+    /// <summary>The host's word from a locked start: the file was the confirmed one or not. A changed file shows on the Companions page.</summary>
+    private void OnCompanionLockedPin(string appId, bool same)
+    {
+        if (same) _pinChanged.TryRemove(appId, out _);
+        else _pinChanged.TryAdd(appId, 0);
     }
 
     /// <summary>Takes a rule away. It narrows what starts, so the unlock is enough.</summary>
@@ -257,6 +425,7 @@ public sealed partial class Hud
         RequireProfileChosen();
         RequireUnlocked();
         config.UpdateOrThrow(c => c.Companions = CompanionRules.Sanitize(c.Companions).Where(r => r.AppId != appId).ToList());
+        _pinChanged.TryRemove(appId, out _);
         return GetCompanions();
     }
 
@@ -270,7 +439,7 @@ public sealed partial class Hud
     public object GetGuideApps()
     {
         var c = config.Current;
-        var rules = c.Profile(Parental.ProfileId).Rules;
+        var rules = c.Profile(Parental.ProfileId).EffectiveRules;
         var all = library.Items;
         var visible = ProfileHeld
             ? []

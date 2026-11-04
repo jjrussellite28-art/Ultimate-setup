@@ -78,6 +78,7 @@ export default {
   'plugins.act.disable': "Deaktivieren",
   'plugins.act.uninstall': "Deinstallieren",
   'plugins.removedAtRestart.detail': "Deinstalliert und abgeschaltet. Die Dateien sind noch belegt und werden beim nächsten Start entfernt; bis dahin lässt sich das Plugin nicht mehr einschalten.",
+  'plugins.uninstallSkin.ask': "{name} deinstallieren? Wird der Skin gerade benutzt, gilt wieder der Couch-Skin.",
   'plugins.uninstall.ask': "{name} deinstallieren? Es wird nicht mehr geladen.",
   'plugins.uninstall.done': "{name} wurde entfernt",
   'plugins.uninstall.atRestart': "{name} ist abgeschaltet und wird beim nächsten Start entfernt; eigene Hintergrundaufgaben des Plugins enden erst dann",

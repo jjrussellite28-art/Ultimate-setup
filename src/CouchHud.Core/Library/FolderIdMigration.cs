@@ -104,7 +104,7 @@ public static class FolderIdMigration
     }
 
     private static bool Has(AppConfig c, string id) =>
-        c.Overrides.ContainsKey(id) || c.GameProfiles.ContainsKey(id)
+        c.Overrides.ContainsKey(id) || c.GameProfiles.ContainsKey(id) || c.LockedItemsAllChildren?.Contains(id) == true
         || c.AllProfiles.Any(p => p.Favorites.Contains(id) || p.LastLaunched.ContainsKey(id) || p.PlaytimeMinutes.ContainsKey(id)
             || p.LastSessionMinutes.ContainsKey(id) || p.Rules.LockedItems.Contains(id)
             || p.Collections.Any(x => x?.Items?.Contains(id) == true));
@@ -118,6 +118,7 @@ public static class FolderIdMigration
             old.Hidden |= mine.Hidden;
             return old;
         });
+        if (c.LockedItemsAllChildren is { } sharedLocks) MoveInList(sharedLocks, from, to);
         foreach (var p in c.AllProfiles)
         {
             MoveInList(p.Favorites, from, to);

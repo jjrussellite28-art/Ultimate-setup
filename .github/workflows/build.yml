@@ -185,8 +185,8 @@ jobs:
             installer/output/*.exe
             installer/output/*.sha256
 
-      # The release page carries this version's section of CHANGELOG.md. GitHub caps the text at 125000
-      # characters; a longer section keeps its German part and links to the full file at the tag.
+      # The release page carries the short "Kurz / Summary" block of this version in CHANGELOG.md plus a link to
+      # the full section; the step fails when the block is missing.
       - name: Release notes
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
@@ -200,4 +200,3 @@ jobs:
             installer/output/*.exe
             installer/output/*.sha256
           body_path: release-notes.md
-          generate_release_notes: true

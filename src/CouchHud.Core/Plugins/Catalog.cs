@@ -431,6 +431,17 @@ public static class CatalogRules
         return CatalogUrl.Same(entry.Source, origin) ? null : Strings.Get("catalog.otherSource");
     }
 
+    /// <summary>
+    /// The short line of the list. The signed statement carries one text in one language (English); the index of the official source is signed
+    /// as well and carries the text per language, so for it the UI language wins. A source the user added is shown from its signed statement.
+    /// </summary>
+    public static string ShownSummary(CatalogEntry entry, string? signed) =>
+        !entry.Extra && !string.IsNullOrWhiteSpace(entry.Description) ? entry.Description : signed ?? entry.Description;
+
+    /// <summary>The detail page's text, chosen like <see cref="ShownSummary"/>.</summary>
+    public static string? ShownLongDescription(CatalogEntry entry, string? signed) =>
+        !entry.Extra && !string.IsNullOrWhiteSpace(entry.LongDescription) ? entry.LongDescription : signed ?? entry.LongDescription;
+
     public static string? Reason(CatalogEntry entry, SemVer app) =>
         entry.Problem ?? (NeedsNewerSdk(entry.Sdk) ? Strings.Get("catalog.needsSdk", entry.Sdk)
             : IsCompatible(entry, app) ? null : Strings.Get("catalog.needsVersion", entry.MinCouchHud, app));

@@ -20,6 +20,15 @@ export async function reloadSkins() {
   return state.skins;
 }
 
+/** A skin was uninstalled: the list is read again, and when the skin on screen is gone the Couch skin takes its place (the host saved that too). */
+export async function afterSkinUninstalled() {
+  await reloadSkins();
+  if (!state.skins.some((s) => s.id === state.skin?.id)) {
+    applySkin(BUILTIN_SKINS[0]);
+    state.info.skin = BUILTIN_SKINS[0].id;
+  }
+}
+
 /** Skin picker with live preview while browsing; B reverts. The list is read again first (see reloadSkins). */
 export async function skinMenu() {
   await reloadSkins();

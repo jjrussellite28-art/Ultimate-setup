@@ -6,16 +6,18 @@
 // Steps:  skin:deepsea   key:ArrowDown   key:Enter   keys:ArrowDown*3   wait:300
 //         (skin:user:<folder> shows a skin from the folder given with --catalog, see below)
 //         waitfor:js (poll the page until js is truthy, at most 30 s, else the run fails)   settle:ms:js (poll until js returns the same value for ms, at most 15 s)
+//         --steps FILE (JSON array of steps)   reload (load the page again in the same Edge: a fresh page, the skin and all page state gone)   size:WxH (another viewport, then reload)
 //         mouse:x,y (move the mouse: shows the pointer)  shot:name  eval:<js>       contrast:label   text:abc (type into page)
 // Keys: Arrow*, Enter=A, Escape=B, q/e=LB/RB, x, y, m=Start, Home=Guide.
 // Options: --path remote/index.html (another page of ui/, e.g. the phone page against the preview server's pretend PC; add --mobile 1
 //          for a phone viewport; its language follows Edge's), --query lang=en (URL query of the preview page), --catalog DIR (a folder with skin folders, served like installed skins,
 //          for skins from the catalog: skin:user:<folder>).
+// --finishbg 1: before a screenshot the slow background animation (6 s, .bg-layer) is jumped to its end instead of waited for (it is the same picture, the checks that read the bar do not need the 6 s).
 // --ready js: instead of the fixed 3.5 s after the page loaded, poll until js is truthy (at most 30 s). A failing step ends the run with an error on stderr and status 1.
-// Env: EDGE (path to msedge.exe).
-import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+// Env: EDGE (path to msedge.exe), UI_SHOT_TIMING=1 (prints how long each step took to stderr).
+import { spawn } from 'node:child_process';
+import { createProfile, guard } from './edge-profile.mjs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
@@ -29,27 +31,19 @@ for (let i = 0; i < args.length; i++) {
   if (args[i].startsWith('--')) opt[args[i].slice(2)] = args[++i];
   else steps.push(args[i]);
 }
+// --steps FILE: more steps from a JSON array of strings (a Windows command line holds 32767 characters; a long run does not fit on it), after those on the command line.
+if (opt.steps) steps.push(...JSON.parse(readFileSync(opt.steps, 'utf8')));
 const [W, H] = opt.size.split('x').map(Number);
 mkdirSync(opt.out, { recursive: true });
 
 const edge = process.env.EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const server = spawn(process.execPath, [join(here, 'preview-server.js')], { env: { ...process.env, PORT: opt.port, ...(opt.catalog ? { CATALOG_SKINS: opt.catalog } : {}) }, stdio: 'ignore' });
-const profile = mkdtempSync(join(tmpdir(), 'couchhud-edge-'));
+const profile = createProfile();
 const browser = spawn(edge, [`--remote-debugging-port=${opt.debug}`, '--headless=new', '--mute-audio', '--disable-gpu', '--disable-extensions', '--force-color-profile=srgb',
   '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update', '--disable-sync', '--disable-default-apps', '--disable-features=Translate,MediaRouter,OptimizationHints', `--user-data-dir=${profile}`,
   `--window-size=${W},${H}`, '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
-const browserGone = new Promise((r) => browser.once('exit', r));
-// Edge runs as a process tree; on Windows only taskkill /T ends the children that hold the profile folder (only while Edge runs: a finished PID may be reused).
-const killBrowser = () => { if (process.platform === 'win32' && browser.pid && browser.exitCode === null && browser.signalCode === null) spawnSync('taskkill', ['/pid', String(browser.pid), '/T', '/F'], { stdio: 'ignore' }); browser.kill(); };
-const cleanup = () => { server.kill(); killBrowser(); };
-process.on('exit', cleanup);
-// Remove the Edge profile only after Edge has let go of it; an 'exit' handler cannot wait, so this runs before process.exit.
-async function removeProfile() {
-  cleanup();
-  await Promise.race([browserGone, new Promise((r) => setTimeout(r, 5000))]);
-  try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch { /* still held: left in %TEMP% */ }
-}
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => removeProfile().finally(() => process.exit(130)));
+// Processes and profile folder are cleaned up on every way out (see edge-profile.mjs); removeProfile() waits for Edge to exit first.
+const removeProfile = guard({ children: [server], browser, dirs: [profile] });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const getJson = (url) => new Promise((res, rej) => http.get(url, (r) => { let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
@@ -105,6 +99,7 @@ async function settle(arg) {
 // (a slow runner draws a menu that is still opening, or a bar behind it, later than a fast machine). A page that never gets quiet is read after 8 s anyway.
 const IDLE_JS = `(async () => {
   await document.fonts.ready;
+  ${opt.finishbg ? "document.getAnimations().forEach((a) => { if (a.effect?.target?.classList?.contains('bg-layer')) a.finish(); });" : ''}
   if (document.getAnimations().some((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity)) return false;
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   return !document.getAnimations().some((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity);
@@ -148,13 +143,25 @@ const CONTRAST_JS = `(() => {
 })()`;
 
 await send('Page.enable');
-await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: +opt.dpr || 1, mobile: opt.mobile === '1' });
-await send('Page.navigate', { url: `http://127.0.0.1:${opt.port}/${opt.path ?? ''}${opt.query ? `?${opt.query}` : ""}` });
+const metrics = (w, h) => send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: +opt.dpr || 1, mobile: opt.mobile === '1' });
+const pageUrl = `http://127.0.0.1:${opt.port}/${opt.path ?? ''}${opt.query ? `?${opt.query}` : ""}`;
+await metrics(W, H);
+await send('Page.navigate', { url: pageUrl });
+// The page again in the same Edge (saves starting one more Edge, its server and profile). The old document is marked first, so that a
+// ready condition still true on it is not taken for the new one.
+async function reload() {
+  await evaluate('window.__stale = true').catch(() => {});
+  await send('Page.navigate', { url: pageUrl });
+  if (opt.ready) await poll(`!window.__stale && (${opt.ready})`, 30000, 'ready'); else await sleep(3500);
+  await openGate();
+}
+const openGate = () => evaluate(`import('/core/boot-gate.js').then((m) => { m.openInput(); document.querySelector("#boot")?.classList.add("done"); return true; })`);
 
 try {
   if (opt.ready) await poll(opt.ready, 30000, 'ready'); else await sleep(3500);
-  await evaluate('document.querySelector("#boot")?.classList.add("done")');
+  await openGate();
   for (const step of steps) {
+    const t0 = Date.now();
     const at = step.indexOf(':');
     const cmd = at < 0 ? step : step.slice(0, at);
     const arg = at < 0 ? '' : step.slice(at + 1);
@@ -163,6 +170,8 @@ try {
     else if (cmd === 'text') for (const ch of arg) await key(ch);
     else if (cmd === 'mouse') { const [x, y] = arg.split(',').map(Number); await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x - 20, y: y - 20 }); await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y }); await sleep(100); }
     else if (cmd === 'wait') await sleep(+arg);
+    else if (cmd === 'reload') await reload();
+    else if (cmd === 'size') { const [w, h] = arg.split('x').map(Number); await metrics(w, h); await reload(); }
     else if (cmd === 'waitfor') await poll(arg, 30000, 'waitfor');
     else if (cmd === 'settle') await settle(arg);
     else if (cmd === 'eval') console.log('eval ->', JSON.stringify(await evaluate(arg)));
@@ -205,6 +214,7 @@ try {
       console.log(`contrast ${arg}: ${bad.length} unter 4.5:1`);
       for (const b of bad) console.log('  ', JSON.stringify(b));
     } else console.log('unbekannter Schritt', step);
+    if (process.env.UI_SHOT_TIMING) console.error('step', Date.now() - t0, 'ms', step.slice(0, 50));
   }
 } catch (e) {
   console.error('ui-shot:', e.message ?? e);

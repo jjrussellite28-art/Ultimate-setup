@@ -13,6 +13,9 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
     /// <summary>A provider that takes longer (offline media server, hung plugin) is skipped for this scan.</summary>
     public TimeSpan ProviderTimeout { get; init; } = TimeSpan.FromSeconds(20);
 
+    /// <summary>The clock of <see cref="ProviderTimeout"/> (tests drive it by hand).</summary>
+    internal TimeProvider Time { get; init; } = TimeProvider.System;
+
     private readonly List<ILibraryProvider> _providers = [.. providers];
     private readonly object _lock = new();
     private IReadOnlyList<LibraryItem> _items = [];
@@ -879,14 +882,14 @@ public sealed class LibraryService(ConfigStore config, ArtworkResolver artwork, 
     }
 
     /// <summary>The provider's entries; null when it failed or did not answer in time (an empty list from a provider is a real answer).</summary>
-    private static async Task<IReadOnlyList<LibraryItem>?> SafeScan(ILibraryProvider provider, TimeSpan timeout, CancellationToken ct)
+    private async Task<IReadOnlyList<LibraryItem>?> SafeScan(ILibraryProvider provider, TimeSpan timeout, CancellationToken ct)
     {
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(timeout);
+        using var cts = new CancellationTokenSource(timeout, Time);
+        using var link = ct.Register(static s => ((CancellationTokenSource)s!).Cancel(), cts);
         try
         {
             // Task.Run: a provider that blocks before returning its task must not freeze the UI thread.
-            return await Task.Run(() => provider.GetItemsAsync(cts.Token), cts.Token).WaitAsync(timeout, ct);
+            return await Task.Run(() => provider.GetItemsAsync(cts.Token), cts.Token).WaitAsync(timeout, Time, ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {

@@ -18,7 +18,7 @@ namespace CouchHud.Shell.Services;
 /// new process (start time, image) is read from the process handle CreateProcess returned, before that handle is closed.
 /// </para>
 /// </summary>
-public sealed class CompanionHost(Func<IReadOnlySet<int>> gamePids, Action<string, bool, string?>? signatureChecked = null) : ICompanionHost
+public sealed class CompanionHost(Func<IReadOnlySet<int>> gamePids, Action<string, bool, string?>? signatureChecked = null, Action<string, bool>? lockedPinChecked = null, Func<bool>? isLockedNow = null) : ICompanionHost
 {
     private const int ShowMinNoActive = 7;
     private const int ShowNoActivate = 4;
@@ -131,7 +131,7 @@ public sealed class CompanionHost(Func<IReadOnlySet<int>> gamePids, Action<strin
         if (plan.Direct || plan.PackagedAppId is not null) throw new InvalidOperationException("not a plain program");
         // The file is held open (nobody may write or delete it) while it is judged again and started: what was checked is what runs. If the
         // real path is not the one that was verified a moment ago, nothing starts.
-        using var held = CompanionPath.Hold(plan.FileName);
+        using var held = CompanionPin.Hold(plan);
         if (held is null || !string.Equals(held.Path, canonical, StringComparison.OrdinalIgnoreCase)
             || CompanionPath.Judge(plan.FileName, held.Path, WindowsDir) != CompanionVerdict.Ok)
         {
@@ -150,8 +150,23 @@ public sealed class CompanionHost(Func<IReadOnlySet<int>> gamePids, Action<strin
                 return null;
             }
         }
+        // A locked couch bypasses the child's own list, and the file may sit where the child can write: only exactly what the parent confirmed
+        // starts (path, arguments, folder, file), judged on this held file. In this order: the digest of the held file first (the slow part),
+        // then the lock, read as late as possible so that locked now counts even if the plan was made unlocked, then the decision, which for
+        // a locked start also reads the folder ACLs now (a folder that became writable since the confirmation blocks the start unless the
+        // parent allowed that). An unlocked start (an adult) is not held to the pin.
+        var digest = CompanionPin.DigestOf(plan, held, start.Rule.AllowWritableFolder);
+        var lockedNow = isLockedNow?.Invoke() ?? false;
+        var pinDecision = CompanionPin.Decide(start.Rule, start.Locked, lockedNow, digest, () => CompanionFolders.Writable(plan, held));
+        if (string.IsNullOrEmpty(start.Rule.Sha256) && (start.Locked || lockedNow) && pinDecision is PinStart.Start or PinStart.SkipChanged or PinStart.SkipFolderWritable)
+            lockedPinChecked?.Invoke(start.App.Id, pinDecision != PinStart.SkipChanged);
+        if (pinDecision != PinStart.Start)
+        {
+            Log($"companion {Name(start)}: not started on the locked couch ({pinDecision})");
+            return null;
+        }
         var line = ($"\"{held.Path}\" {plan.Arguments}".TrimEnd() + "\0").ToCharArray();
-        var folder = string.IsNullOrWhiteSpace(plan.WorkingDirectory) ? Path.GetDirectoryName(held.Path) : plan.WorkingDirectory;
+        var folder = CompanionPin.EffectiveFolder(plan, held.Path);
         var info = new StartupInfo
         {
             cb = Marshal.SizeOf<StartupInfo>(),

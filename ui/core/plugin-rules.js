@@ -70,9 +70,19 @@ export function isDelisted(plugin, catalogEntries) {
 export const installedFor = (entry, plugins) => (entry.kind === 'skin' ? undefined : (plugins ?? []).find((p) => [String(p.id).toLowerCase(), String(p.folder).toLowerCase()].includes(String(entry.id).toLowerCase())));
 
 /**
+ * The catalog entries as they are once a plugin was uninstalled: the entry of that plugin is "not installed" again at once (the list the page holds
+ * was read before; the host reads the installed state afresh on every load). Other entries stay the same objects.
+ */
+export const afterUninstall = (entries, plugin) => (entries ?? []).map((e) => (e.kind !== 'skin' && installedFor(e, [plugin]) ? { ...e, status: 'notInstalled', installedVersion: null, restartPending: false } : e));
+
+/** The catalog entries once a skin was uninstalled: that skin's entry is "not installed" again (the Couch skin is not in the catalog and never matches). */
+export const afterSkinUninstall = (entries, id) => (entries ?? []).map((e) => (e.kind === 'skin' && String(e.id).toLowerCase() === String(id).toLowerCase() ? { ...e, status: 'notInstalled', installedVersion: null } : e));
+
+/**
  * The actions of a catalog entry, in the order the page lists them:
  * install | update | enable | disable | uninstall | acceptRevoked. A third-party plugin cannot even be installed outside expert mode
- * (the host refuses it; the page says so instead of offering it). A skin can only be installed or updated.
+ * (the host refuses it; the page says so instead of offering it). A skin can be installed, updated and uninstalled (when it is installed; the Couch skin is
+ * built in and not in the catalog, so it never has the action).
  */
 export function entryActions(entry, installed, { expert = false } = {}) {
   const state = entryState(entry, installed);
@@ -87,6 +97,7 @@ export function entryActions(entry, installed, { expert = false } = {}) {
     // An update that works like an install for a third party (it adds permissions, or it is a skin of an added catalog) needs expert mode too.
     if (!(isThirdParty(entry) && !expert && usesInstallGate(entry, true))) actions.push('update');
   }
+  if (entry.kind === 'skin' && (state === 'installed' || state === 'update') && entry.id !== 'default') actions.push('uninstall');
   if (own && state !== 'revoked') actions.push(installed.enabled ? 'disable' : 'enable');
   if (own && installed.userInstalled) actions.push('uninstall');
   return actions;

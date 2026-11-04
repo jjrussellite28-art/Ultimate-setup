@@ -92,7 +92,7 @@ public static class FeatureAreas
         // Scanning a folder for games (Settings › Library › Scan a folder).
         ["scanFolder"] = Games,
         // Companion apps start next to a game: they go with Gaming. Wand is set up as one.
-        ["getCompanions"] = Games, ["setCompanion"] = Games, ["removeCompanion"] = Games, ["setupWand"] = Games,
+        ["getCompanions"] = Games, ["setCompanion"] = Games, ["removeCompanion"] = Games, ["confirmCompanion"] = Games, ["previewCompanion"] = Games, ["setupWand"] = Games,
         // Apps: the list of installed Windows programs to add from, and their icons; the apps in the Guide menu.
         ["getInstalledApps"] = Apps, ["addInstalledApp"] = Apps, ["getAppIcons"] = Apps, ["getGuideApps"] = Apps, ["setGuideApp"] = Apps,
         // Browser: the couch browser itself, its window, focus and dialogs, its bookmarks, links that open in it.
@@ -119,7 +119,7 @@ public static class FeatureAreas
         // Console, settings (per key), lock, codes, parental controls and profiles.
         "systemInfo", "setShell", "enterPcMode", "power", "sleepTimerWarning", "sleepTimerArm", "quit", "restartCouchHud", "getSettings", "setFeatureAreas", "setSetting", "setIntegrationMode",
         "displayOn", "displayOff", "getSecurity", "getServiceStatus", "repairService", "resetCodeStore", "resetServiceState", "getParental", "setParental",
-        "setParentalItemLock", "parentalCheck", "parentalExtend", "parentalAuth", "confirmWindowsUnlock", "parentalReset",
+        "setParentalItemLock", "resetParentalAllChildrenLocks", "parentalCheck", "parentalExtend", "parentalAuth", "confirmWindowsUnlock", "parentalReset",
         "parentalAcceptClock", "parentalAdoptZone", "parentalCloseGame", "getProfiles", "switchProfile", "profileScreen", "profileIdle",
         "addProfile", "renameProfile", "setProfileLook", "setProfileRestricted", "setProfileCode", "removeProfile", "getProfileRules",
         "setProfileRule", "unlock", "windowsSignIn", "setPasscode", "setCouchLock", "setParentCode", "readClipboard",
@@ -134,10 +134,10 @@ public static class FeatureAreas
         // Plugins and skins.
         "getPlugins", "setPluginEnabled", "setPluginSetting", "checkPluginSetting", "openPluginSettingPage", "setPluginFunctionLevel", "endPluginVisit", "getPluginPage", "getPluginTabs", "getPluginGate", "activatePluginRow", "activatePluginAction", "getQuickActions", "approvePlugin",
         "runQuickAction", "installPackage", "getCatalog", "getCatalogUpdates", "installCatalogEntry", "updateCatalogEntry", "getCatalogDetail", "getCatalogSources", "addCatalogSource", "removeCatalogSource", "uninstallPlugin", "acceptRevokedPlugin",
-        "confirmPluginExe", "getPluginSuggestions", "dismissPluginSuggestion", "changePluginRow", "listSkins", "setSkin",
+        "confirmPluginExe", "getPluginSuggestions", "dismissPluginSuggestion", "changePluginRow", "listSkins", "setSkin", "uninstallSkin",
         // Notifications, Bluetooth, Wi-Fi, phone remote, firewall.
         "getNotifications", "markNotificationsRead", "clearNotifications", "getBluetooth", "scanBluetooth", "pairBluetooth",
-        "unpairBluetooth", "getWifi", "scanWifi", "connectWifi", "disconnectWifi", "answerBluetoothRecovery", "setBluetooth", "getRemote",
+        "unpairBluetooth", "getWifi", "scanWifi", "connectWifi", "disconnectWifi", "answerBluetoothRecovery", "setBluetooth", "getRemote", "leavePairing",
         "codeEntryState", "pairingState", "keyboardState", "sleepTimerState", "revokeRemote", "revokeRemoteDevice", "setRemoteDeviceLevel", "allowFirewall", "getSecondFactor", "setSecondFactor", "twoFactorState", "twoFactorCancel", "twoFactorAdmin",
         // Startup, services, policies, processes, updates.
         "getStartup", "setStartupMode", "applyStartupSuggestions", "getServices", "toggleCouchService", "setupServiceTask",

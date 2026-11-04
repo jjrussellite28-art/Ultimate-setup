@@ -4,7 +4,8 @@ namespace CouchHud.Core.Security;
 /// <param name="Sid">The trustee as a SID string (S-1-5-32-545 …).</param>
 /// <param name="Rights">FileSystemRights bits.</param>
 /// <param name="AppliesHere">False for an inherit-only entry: it is for the children, not for this folder.</param>
-public readonly record struct AclEntry(string Sid, int Rights, bool AppliesHere = true);
+/// <param name="ObjectInherit">The entry is inherited by the files in the folder (OI), also when it is inherit-only.</param>
+public readonly record struct AclEntry(string Sid, int Rights, bool AppliesHere = true, bool ObjectInherit = false);
 
 /// <summary>
 /// Decides from the ACL whether a folder is protected, i.e. only administrators (and the system) can change what is in it.

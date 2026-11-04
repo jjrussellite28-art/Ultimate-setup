@@ -416,6 +416,15 @@ public sealed class AppConfig
     public CouchHud.Core.Parental.ParentalConfig Parental { get; set; } = new();
 
     /// <summary>
+    /// Games locked for every child's profile, those added later too (the locks of a single profile are in its rules). Read through
+    /// <see cref="ProfileView.EffectiveRules"/>; an adult's profile ignores it. Null (only in memory) counts as unreadable: everything locked.
+    /// </summary>
+    public List<string>? LockedItemsAllChildren { get; set; } = [];
+
+    /// <summary>The list above was damaged in the file: for the child's profiles everything needs the parents' code until the parents set it again.</summary>
+    public bool LockedItemsAllChildrenUnreadable { get; set; }
+
+    /// <summary>
     /// The age rating system the age limit and the age badge go by, for the whole household: "auto" (by the Windows region), "usk",
     /// "pegi" or "esrb". Anything else (an edited file) counts as the strictest rating of all systems (<see cref="CouchHud.Core.Parental.AgeRatings.Resolve"/>).
     /// </summary>
@@ -501,6 +510,13 @@ public sealed class AppConfig
         (Profiles ??= []).Add(entry);
         return new ProfileView(this, entry);
     }
+
+    /// <summary>
+    /// Clamps and repairs what a read config.json holds (numbers to the settings page's ranges, lists and names cut, invalid choices and ports back to
+    /// their defaults) and logs each correction once. Never loosens a protection: an unreadable lock mode becomes a lock, a bad port keeps its listener
+    /// off. Called once by <see cref="ConfigStore.Parse"/>; the corrected values are written with the next ordinary save (a read never writes).
+    /// </summary>
+    public IReadOnlyList<string> Sanitize() => ConfigSanitizer.Run(this);
 
     /// <summary>The most profiles a household has, the default one included.</summary>
     public const int MaxProfiles = 8;
@@ -1063,7 +1079,7 @@ public sealed class ConfigStore
             }
             // Swapped for a link while it was opened: what was read is not taken.
             if (IsLink(file) || IsLink(System.IO.Path.GetDirectoryName(file)!)) return null;
-            return ParseUsable(text);
+            return ParseUsable(text, file);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -1103,9 +1119,12 @@ public sealed class ConfigStore
             return FaultConfig();
         }
 
+        // Larger than the cap: damaged, the same way as invalid JSON (the file is never read in full).
+        if (read == ReadResult.TooLarge) return StartDamaged($"[config] {FilePath} is invalid ({error})", null);
+
         try
         {
-            var config = ParseUsable(json!);
+            var config = ParseUsable(json!, FilePath);
             _lastSeenWrite = File.GetLastWriteTimeUtc(FilePath);
             config = AdoptNewerTemps(config);
             ApplyRecoveryNotes(config);
@@ -1113,21 +1132,29 @@ public sealed class ConfigStore
         }
         catch (JsonException ex)
         {
-            Console.Error.WriteLine(DurableFile.IsBlank(json)
+            return StartDamaged(DurableFile.IsBlank(json)
                 ? $"[config] {FilePath} is empty or only zero bytes (a save cut off by a reset or power loss?)"
-                : $"[config] {FilePath} is invalid ({ex.Message})");
-            // The copy from before the last save keeps the lock and the parental rules; the broken file is put aside, never overwritten.
-            if (RestoreFromBackup(broken: true) is { } restored) return restored;
-            // No usable copy: keep the user's broken file where it is and do not write defaults over it (the lock and the parental rules
-            // are in there). The store runs locked until the file is repaired or removed.
-            Console.Error.WriteLine($"[config] no usable backup ({BackupPath}); starting locked");
-            KeepBadCopy(json!);
-            Fault = ConfigFault.Invalid;
-            _lastSeenWrite = File.GetLastWriteTimeUtc(FilePath);
-            var locked = FaultConfig();
-            if (ReadRecoveryNotes() is { } notes) Apply(locked, notes);
-            return locked;
+                : $"[config] {FilePath} is invalid ({ex.Message})", json);
         }
+    }
+
+    /// <summary>
+    /// config.json is damaged (invalid, empty or too large; <paramref name="json"/> is null for the last). The copy from before the last
+    /// save keeps the lock and the parental rules; the damaged file is put aside, never overwritten. Without a usable copy the file stays
+    /// where it is, no defaults are written over it, and the store runs on the locked stand-in (<see cref="FaultConfig"/>: couch lock on,
+    /// parental controls on) until the file is repaired or removed.
+    /// </summary>
+    private AppConfig StartDamaged(string message, string? json)
+    {
+        Console.Error.WriteLine(message);
+        if (RestoreFromBackup(broken: true) is { } restored) return restored;
+        Console.Error.WriteLine($"[config] no usable backup ({BackupPath}); starting locked");
+        if (json is not null) KeepBadCopy(json);
+        Fault = ConfigFault.Invalid;
+        _lastSeenWrite = File.GetLastWriteTimeUtc(FilePath);
+        var locked = FaultConfig();
+        if (ReadRecoveryNotes() is { } notes) Apply(locked, notes);
+        return locked;
     }
 
     /// <summary>
@@ -1156,7 +1183,7 @@ public sealed class ConfigStore
     /// </summary>
     public static string? EarlierInstallTraces(string directory)
     {
-        string[] patterns = ["config.json.broken-*", "config.json.recovery", "config.json.restored", "playtime*.json*", "lockout*.json*", "parental.key"];
+        string[] patterns = ["config.json.broken-*", "config.json.bak", "config.json.*.tmp", "config.json.recovery", "config.json.restored", "playtime*.json*", "lockout*.json*", "parental.key"];
         try
         {
             FileAttributes attributes;
@@ -1251,7 +1278,7 @@ public sealed class ConfigStore
         if (ReadFile(out var now, out _) != ReadResult.Ok) return null;
         try
         {
-            var config = ParseUsable(now!);
+            var config = ParseUsable(now!, FilePath);
             _lastSeenWrite = File.GetLastWriteTimeUtc(FilePath);
             return config;
         }
@@ -1276,7 +1303,7 @@ public sealed class ConfigStore
                 var time = File.GetLastWriteTimeUtc(path);
                 if (best is { } b && time <= b.Time) continue;
                 var text = ReadShared(path);
-                best = (text, ParseUsable(text), path, time);
+                best = (text, ParseUsable(text, path), path, time);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
             {
@@ -1369,7 +1396,7 @@ public sealed class ConfigStore
             var target = TargetOf(temp);
             if (File.Exists(target) && time <= File.GetLastWriteTimeUtc(target)) return null;
             var text = ReadShared(temp);
-            ParseUsable(text);
+            ParseUsable(text, BackupPath);
             return text;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
@@ -1426,7 +1453,7 @@ public sealed class ConfigStore
                     TryDelete(temp);
                     return config;
                 }
-                config = ParseUsable(newer.Text);
+                config = ParseUsable(newer.Text, FilePath);
                 MoveOver(temp, FilePath);
                 _lastSeenWrite = File.GetLastWriteTimeUtc(FilePath);
                 Console.Error.WriteLine($"[config] {FilePath} was older than the save {newer.Path} a reset left behind; that save is in place now");
@@ -1511,10 +1538,10 @@ public sealed class ConfigStore
     /// <see cref="Parse"/> for a file that must hold settings: an empty file, one of zero bytes or the JSON <c>null</c> is broken, never
     /// "all defaults" (that would be no lock and no parental controls).
     /// </summary>
-    internal static AppConfig ParseUsable(string json)
+    internal static AppConfig ParseUsable(string json, string? path = null)
     {
         if (DurableFile.IsBlank(json)) throw new JsonException("the file is empty");
-        return Parse(json) ?? throw new JsonException("the file holds no settings");
+        return Parse(json, path) ?? throw new JsonException("the file holds no settings");
     }
 
     /// <summary>
@@ -1531,11 +1558,11 @@ public sealed class ConfigStore
             {
                 try
                 {
-                    if (File.ReadAllText(f) == json) return;
+                    if (ReadShared(f) == json) return;
                 }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
                 {
-                    // Cannot compare with this one: look at the next.
+                    // Cannot compare with this one (or it is larger than the cap, so it is different): look at the next.
                 }
             }
             var backup = BrokenName();
@@ -1553,10 +1580,12 @@ public sealed class ConfigStore
     /// Reads the JSON and mends what older versions left open: a phone paired before the use time was kept has no last use, so
     /// it counts as used now (otherwise its token would be judged by the day it was paired and expire at once).
     /// </summary>
-    internal static AppConfig? Parse(string json)
+    internal static AppConfig? Parse(string json, string? path = null)
     {
         var config = JsonSerializer.Deserialize<AppConfig>(json, JsonOptions);
         if (config is null) return null;
+        // First, so the migrations below never meet an empty block or an empty list entry (they would throw on a hand-edited file).
+        ConfigSanitizer.Run(config, path);
         var now = DateTimeOffset.UtcNow;
         foreach (var device in config.RemoteDevices ?? []) device.LastUsed ??= now;
         MigrateSaveLimits(config, json);
@@ -1596,12 +1625,32 @@ public sealed class ConfigStore
         if (!config.CatalogUpdateCheck || !config.NetCatalog) config.PluginAutoUpdate = false;
     }
 
+    /// <summary>A skin was uninstalled: the household and every profile that had it go back to the Couch skin. True when any did.</summary>
+    public static bool ForgetSkin(AppConfig config, string skinId)
+    {
+        var changed = false;
+        if (string.Equals(Skins.SkinCatalog.MigrateSkinId(config.Skin), skinId, StringComparison.OrdinalIgnoreCase))
+        {
+            config.Skin = Skins.SkinCatalog.BuiltinIds[0];
+            changed = true;
+        }
+        foreach (var profile in config.Profiles ?? [])
+        {
+            if (profile?.Data?.Settings is { } settings && string.Equals(Skins.SkinCatalog.MigrateSkinId(settings.Skin), skinId, StringComparison.OrdinalIgnoreCase))
+            {
+                settings.Skin = Skins.SkinCatalog.BuiltinIds[0];
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
     /// <summary>The skin of the household and the one each profile has set for itself (null where it follows the household).</summary>
     public static IEnumerable<string?> AskedSkins(AppConfig config) => (config.Profiles ?? []).Select(p => p?.Data?.Settings?.Skin).Append(config.Skin);
 
     /// <summary>
     /// Home became the Favorites tab (0.6): an unknown mode counts as the combined view, and every favorites list is cleaned (valid ids,
-    /// no duplicates; a long list is not cut). Favorites and the collections pinned to Home stay as they were; nothing else was pinned on Home.
+    /// no duplicates; an over-long list is cut by Sanitize before this runs). Favorites and the collections pinned to Home stay as they were; nothing else was pinned on Home.
     /// </summary>
     internal static void MigrateFavorites(AppConfig config)
     {
@@ -1680,7 +1729,7 @@ public sealed class ConfigStore
     {
         try
         {
-            return File.Exists(RecoveryPath) ? JsonSerializer.Deserialize<RecoveryNotes>(File.ReadAllText(RecoveryPath), JsonOptions) : null;
+            return File.Exists(RecoveryPath) ? JsonSerializer.Deserialize<RecoveryNotes>(ReadShared(RecoveryPath), JsonOptions) : null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -1728,7 +1777,8 @@ public sealed class ConfigStore
     {
         Ok,
         Missing,
-        Failed
+        Failed,
+        TooLarge
     }
 
     private ReadResult ReadFile(out string? json, out string? error)
@@ -1741,6 +1791,11 @@ public sealed class ConfigStore
             {
                 json = ReadShared(FilePath);
                 return ReadResult.Ok;
+            }
+            catch (ConfigTooLargeException ex)
+            {
+                error = ex.Message;
+                return ReadResult.TooLarge;
             }
             catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
             {
@@ -1842,7 +1897,7 @@ public sealed class ConfigStore
         if (read != ReadResult.Ok) return;
         try
         {
-            Current = ParseUsable(json!);
+            Current = ParseUsable(json!, FilePath);
             _lastSeenWrite = File.GetLastWriteTimeUtc(FilePath);
             Fault = null;
             Console.WriteLine($"[config] {FilePath} is usable again");
@@ -1859,7 +1914,7 @@ public sealed class ConfigStore
         {
             if (!File.Exists(FilePath) || File.GetLastWriteTimeUtc(FilePath) <= _lastSeenWrite) return;
             var json = ReadShared(FilePath);
-            Current = ParseUsable(json);
+            Current = ParseUsable(json, FilePath);
             _lastSeenWrite = File.GetLastWriteTimeUtc(FilePath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
@@ -1933,7 +1988,15 @@ public sealed class ConfigStore
     private static string ReadShared(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        using var reader = new StreamReader(stream, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        // Bounded on what is really read from the held stream (no length check first): a file that grows meanwhile is not read further.
+        var bytes = CouchHud.Core.Platform.BoundedFile.ReadAtMost(stream, MaxPeekBytes) ?? throw new ConfigTooLargeException(path);
+        using var reader = new StreamReader(new MemoryStream(bytes), System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         return reader.ReadToEnd();
     }
+
+    /// <summary>
+    /// A settings file (or copy) larger than <see cref="MaxPeekBytes"/>. It is a <see cref="JsonException"/>, so every reader treats it as
+    /// damaged and takes the recovery path (a valid .bak, else the locked stand-in), never as "all defaults".
+    /// </summary>
+    private sealed class ConfigTooLargeException(string path) : JsonException($"{System.IO.Path.GetFileName(path)} is larger than {MaxPeekBytes} bytes");
 }

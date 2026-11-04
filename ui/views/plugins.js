@@ -18,10 +18,11 @@ import { state } from '../core/state.js';
 import { sound } from '../sound.js';
 import { t, fmtDateTime } from '../core/i18n.js';
 import { declarativePage } from './plugin-page.js';
+import { afterSkinUninstalled } from '../components/skin-menu.js';
 import { withParentGrant } from '../core/parent-retry.js';
 import { withUnlock } from '../core/downloads-rules.js';
 import {
-  badgeOf, capabilityKeys, categoriesIn, categoryGroups, cleanKey, effectiveFilter, nextCategoryFilter, entryActions, entryState, grantAction, installBlock, installPlan, installedFor, isDelisted, isRisky,
+  afterSkinUninstall, afterUninstall, badgeOf, capabilityKeys, categoriesIn, categoryGroups, cleanKey, effectiveFilter, nextCategoryFilter, entryActions, entryState, grantAction, installBlock, installPlan, installedFor, isDelisted, isRisky,
   gateOrigin, grantChange, isPageSetting, isThirdParty, needsCode, publisherOf, runGates, safeImage, sourceAddCheck, sourceErrorKey, sourceRows, sourcesVisible, uninstallPlan
 } from '../core/plugin-rules.js';
 
@@ -298,7 +299,7 @@ async function pickFunctionLevel(plugin, fn, onDone) {
 }
 
 /** Removes a plugin: the question, the code step, then the call. */
-async function uninstall(plugin) {
+async function uninstall(plugin, store) {
   if (!(await gateOpen('uninstall'))) return undefined;
   const ok = await runGates(uninstallPlan().steps, {
     confirm: () => confirmDialog(t('plugins.uninstall.ask', { name: plugin.name }), t('plugins.act.uninstall'), { danger: true }),
@@ -306,10 +307,31 @@ async function uninstall(plugin) {
   });
   if (!ok) return undefined;
   const result = await attempt(() => api.uninstallPlugin(plugin.folder), t('plugins.notSaved'));
+  // The catalog list was read before: its row says "installed" until it is read again, so it is corrected here.
+  if (result && store?.catalog?.entries) store.catalog = { ...store.catalog, entries: afterUninstall(store.catalog.entries, plugin) };
   if (result && result.gone) toast(t('plugins.uninstall.done', { name: plugin.name }), 5000);
   else if (result && result.stoppedNow) toast(t('plugins.uninstall.stoppedFilesLater', { name: plugin.name }), 6000);
   else if (result) offerRestart(t('plugins.uninstall.atRestart', { name: plugin.name }));
   return result?.plugins;
+}
+
+/** Removes an installed catalog skin: the question, the unlock, then the call; the host checks the gate again and falls back to the Couch skin when it was in use. */
+async function uninstallSkin(entry, store) {
+  if (!(await gateOpen('uninstall', 'skin'))) return;
+  const ok = await runGates(uninstallPlan().steps, {
+    confirm: () => confirmDialog(t('plugins.uninstallSkin.ask', { name: entry.name }), t('plugins.act.uninstall'), { danger: true }),
+    code: () => ensureUnlocked(t('plugins.codeReason'))
+  });
+  if (!ok) return;
+  const result = await attempt(() => api.uninstallSkin(entry.id), t('plugins.notSaved'));
+  if (!result) {
+    // The settings may already have fallen back to the Couch skin before the folder could go: the page reads the list again and follows.
+    await afterSkinUninstalled();
+    return;
+  }
+  if (store?.catalog?.entries) store.catalog = { ...store.catalog, entries: afterSkinUninstall(store.catalog.entries, entry.id) };
+  await afterSkinUninstalled();
+  toast(t('plugins.uninstall.done', { name: entry.name }), 5000);
 }
 
 /** A withdrawn plugin only runs again after a red warning and the parents' code, for exactly the files it has now. */
@@ -694,7 +716,10 @@ function entryDetailPage(entry, store, { expert, setPlugins }) {
       refreshEntry();
       list = await attempt(() => api.getPlugins(), t('plugins.notLoaded'));
     } else if (action === 'enable' || action === 'disable') list = await setEnabled(installed, action === 'enable');
-    else if (action === 'uninstall') list = await uninstall(installed);
+    else if (action === 'uninstall') {
+      if (e.kind === 'skin') await uninstallSkin(e, store);
+      else list = await uninstall(installed, store);
+    }
     else if (action === 'acceptRevoked') list = await acceptRevoked(installed);
     if (list) setPlugins(list);
     if (currentView() === page) render();
@@ -935,7 +960,7 @@ function pluginPage(plugin, store, onChange) {
         label: t('plugins.act.uninstall'),
         hintLabel: t('plugins.act.uninstall'),
         run: async () => {
-          const list = await uninstall(p);
+          const list = await uninstall(p, store);
           if (list) {
             onChange(list);
             pop();

@@ -164,7 +164,7 @@ public sealed class ParentalController
         ProfileId = profile.Id;
         var file = ProfileIds.LedgerFile(dataDir, ProfileId);
         var ledger = new PlayLedger(file, key, expectExisting: PlayLedger.ShouldExist(file, profile.Rules.LedgerStarted), persist: persist);
-        Service = new ParentalService(() => _config.Current.Profile(ProfileId).Rules, ledger,
+        Service = new ParentalService(() => _config.Current.Profile(ProfileId).EffectiveRules, ledger,
             new TrustedClock(() => DateTimeOffset.UtcNow, () => Environment.TickCount64, ZoneOffset, ledger.LastUtc));
         Service.Warning += OnWarning;
         ApplyLimitKeyMoves();
@@ -447,7 +447,7 @@ public sealed class ParentalController
     /// <param name="grant">The parents just entered their code for this one start.</param>
     public LaunchCheck CheckLaunch(LibraryItem item, int? age, bool grant)
     {
-        var cfg = _config.Current.Profile(ProfileId).Rules;
+        var cfg = _config.Current.Profile(ProfileId).EffectiveRules;
         if (!cfg.Enabled) return new LaunchCheck(true, null, "", false, false);
         var enforced = _hooks.Enforced();
         var problems = new List<string>();

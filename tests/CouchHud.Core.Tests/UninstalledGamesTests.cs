@@ -559,15 +559,37 @@ public class UninstalledGamesTests
     [Fact]
     public async Task A_slow_or_broken_source_is_skipped_the_others_show()
     {
+        // The time limit runs on a fake clock: it ends exactly when the test says so, however slow the machine is.
+        var time = new ManualTimeProvider();
+        CancellationToken fineToken = default;
+        var fineRan = new TaskCompletionSource();
         var slow = new FakeSource("Slow", ct =>
         {
-            Task.Delay(TimeSpan.FromSeconds(30), ct).Wait(ct);
+            ct.WaitHandle.WaitOne(TimeSpan.FromSeconds(60));
+            ct.ThrowIfCancellationRequested();
             return [G("steam:9", "Slow")];
         });
         var broken = new FakeSource("Broken", _ => throw new InvalidDataException("boom"));
-        var fine = new FakeSource("Fine", _ => [G("epic:A", "Fine")]);
-        var lib = new UninstalledLibrary([slow, broken, fine]) { SourceTimeout = TimeSpan.FromSeconds(2) };
-        await lib.RefreshAsync([]);
+        var fine = new FakeSource("Fine", ct =>
+        {
+            fineToken = ct;
+            fineRan.SetResult();
+            return [G("epic:A", "Fine")];
+        });
+        var lib = new UninstalledLibrary([slow, broken, fine]) { SourceTimeout = TimeSpan.FromSeconds(2), Time = time };
+        var refresh = lib.RefreshAsync([]);
+        await fineRan.Task.WaitAsync(TimeSpan.FromSeconds(60));
+        // The worker of the good source is over (its token source is disposed then); only the slow one is still waiting.
+        var until = DateTime.UtcNow.AddSeconds(60);
+        while (DateTime.UtcNow < until)
+        {
+            try { _ = fineToken.WaitHandle; }
+            catch (ObjectDisposedException) { break; }
+            await Task.Delay(1);
+        }
+        for (var i = 0; i < 3; i++) await Task.Yield();
+        time.Advance(TimeSpan.FromSeconds(2));
+        await refresh.WaitAsync(TimeSpan.FromSeconds(60));
         Assert.Equal(["Fine"], lib.All.Select(g => g.Name));
     }
 

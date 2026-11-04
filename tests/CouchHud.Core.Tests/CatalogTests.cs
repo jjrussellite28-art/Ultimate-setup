@@ -368,7 +368,7 @@ public class CatalogTests : IDisposable
     {
         var zip = PluginZip("wand");
         var entry = Parsed(Entry(hash: Sha(zip)));
-        var outcome = Service(new FakeHandler(_ => Ok(""))).Install(entry, zip);
+        var outcome = Service(new FakeHandler(_ => Ok(""))).Install(entry, zip, null, Sha(zip));
         Assert.True(outcome.RestartNeeded);
         Assert.True(File.Exists(Path.Combine(_dir, "plugins", "wand", "x.dll")));
     }
@@ -382,7 +382,7 @@ public class CatalogTests : IDisposable
         var zip = PluginZip("wand");
         var entry = Parsed(Entry(version: "1.1.0", hash: Sha(zip)));
 
-        var outcome = Service(new FakeHandler(_ => Ok(""))).Install(entry, zip);
+        var outcome = Service(new FakeHandler(_ => Ok(""))).Install(entry, zip, null, Sha(zip));
 
         Assert.True(outcome.RestartNeeded);
         Assert.True(File.Exists(Path.Combine(pluginDir, "old.dll")));   // untouched while the old one may be loaded
@@ -404,7 +404,7 @@ public class CatalogTests : IDisposable
         Directory.CreateDirectory(pluginDir);
         var zip = PluginZip("wand");
         var entry = Parsed(Entry(version: "1.1.0", hash: Sha(zip)));
-        Service(new FakeHandler(_ => Ok(""))).Install(entry, zip);
+        Service(new FakeHandler(_ => Ok(""))).Install(entry, zip, null, Sha(zip));
 
         var (installed, version, pending, _) = new CatalogRegistry(_dir).Lookup(entry, []);
 

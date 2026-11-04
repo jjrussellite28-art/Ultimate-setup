@@ -51,6 +51,7 @@ import { admitProtectedChange, codeLockHeld, codeLockPlan } from '../core/lock-r
 import { listenerNeedsParent, privacyAfter, privacyDisabled, privacyDisabledReason, privacyShown } from '../core/net-rules.js';
 import { HISTORY_OFF_ACTION, historyOffNeedsParent } from '../core/browser-logic.js';
 import { AREAS, AREA_DESC_KEYS, AREA_ICONS, AREA_NAME_KEYS, areaOfSetting, areaOn, enabledAreas, setAreas, shownRows, toggleArea } from '../core/areas.js';
+import { DAILY_LIMIT_MINUTES, GAME_LIMIT_MINUTES } from '../core/settings-rules.js';
 import { RATING_CHOICES, activeSystem, ageChoices, ageLabels, limitText, shownLimit } from '../core/age-rating-rules.js';
 
 const audioModes = () => [
@@ -431,8 +432,8 @@ async function change(key, value, message) {
 // Jugendschutz (rules live in the host, see components/parental.js)
 
 const limitLabel = (m) => (m ? (m < 60 ? t('settings.parental.minutes', { m }) : formatRemaining(m * 60)) : t('settings.parental.unlimited'));
-const limitOptions = () => [0, 60, 90, 120, 150, 180, 240, 300, 360].map((m) => ({ label: limitLabel(m), value: m }));
-const gameLimitOptions = () => [0, 30, 45, 60, 90, 120].map((m) => ({ label: m ? limitLabel(m) : t('settings.common.off'), value: m }));
+const limitOptions = () => DAILY_LIMIT_MINUTES.map((m) => ({ label: limitLabel(m), value: m }));
+const gameLimitOptions = () => GAME_LIMIT_MINUTES.map((m) => ({ label: m ? limitLabel(m) : t('settings.common.off'), value: m }));
 // The age limit in the rating system that counts now (the host resolves "auto" by the Windows region).
 const ageOptions = (system) =>
   ageChoices(activeSystem(system), ageLabels(t)).map((o) => (o.value ? { ...o, detail: t('settings.parental.blockAgeDetail') } : o));
@@ -588,6 +589,12 @@ function parentalItems() {
       run: () => setParentalValue('enabled', !parental.status?.enabled, parental.status?.enabled ? t('settings.parental.off') : t('settings.parental.on'))
     },
     status,
+    // Parental controls on and only a couch code in the service: every parent action then asks Windows (UAC) as well. That stays by design;
+    // the recommendation and the way to the code row are the only addition.
+    ...(p.enabled && security?.couchLock === 'code' && security?.serviceCodes && security.serviceCodes.parent !== true
+      ? [info(t('settings.parental.noParentCode'), t('settings.parental.noParentCodeDesc')),
+        action(t('settings.parental.setParentCode'), t('settings.parental.setParentCodeDesc'), () => settingsView.jump('console', 'code'), '🔑')]
+      : []),
     info(t('settings.parental.today'), today),
     profilesAction(),
     ...(p.tampered ? [action(t('settings.parental.tamperedTitle'), t('settings.parental.tamperedDetail'), () => parentalAction(t('settings.parental.resetReason'), () => api.parentalReset(), t('settings.parental.resetDone')), '⚠')] : []),
@@ -665,7 +672,7 @@ function parentalItems() {
       value: () => !!parental.status?.countApps,
       run: () => setParentalValue('countApps', !parental.status?.countApps)
     },
-    action(t('settings.parental.locked'), t('settings.parental.lockedDesc', { entries: entriesLabel(p.lockedItems.length) }), () => openPage(lockedGamesPage(), t('settings.parental.title'))),
+    action(t('settings.parental.locked'), t('settings.parental.lockedDesc', { entries: entriesLabel(new Set([...p.lockedItems, ...(p.lockedItemsAllChildren ?? [])]).size) }), () => openPage(lockedGamesPage(), t('settings.parental.title'))),
     // A link to the code's only row (Console), which asks for the parents' code as before.
     ...(security?.couchLock === 'code' ? [action(t('settings.parental.changeCode'), t('settings.parental.changeCodeDesc'), () => settingsView.jump('console', 'code'))] : []),
     reliability,

@@ -58,8 +58,8 @@ public static class LockPolicy
         // The answer to the automatic Bluetooth switch-on's countdown: "now" or "leave it off" (the guest could switch the radio off with
         // the keyboard's airplane key anyway; switching it off in CouchHUD, "setBluetooth", needs the code).
         "answerBluetoothRecovery",
-        "getBluetooth", "getRemote", "keyboardState", "sleepTimerState", "codeEntryState", "pairingState", "getUpdates", "getCatalogUpdates", "getSelfUpdate", "refreshUpdates", "getWeather",
-        "listSkins", "setSkin", "getGameFolders", "getCollections", "getParental", "parentalCheck", "parentalCloseGame", "parentalAuth", "setParental", "setParentalItemLock", "parentalExtend", "parentalReset", "parentalAcceptClock", "parentalAdoptZone"
+        "getBluetooth", "getRemote", "leavePairing", "keyboardState", "sleepTimerState", "codeEntryState", "pairingState", "getUpdates", "getCatalogUpdates", "getSelfUpdate", "refreshUpdates", "getWeather",
+        "listSkins", "setSkin", "getGameFolders", "getCollections", "getParental", "parentalCheck", "parentalCloseGame", "parentalAuth", "setParental", "setParentalItemLock", "resetParentalAllChildrenLocks", "parentalExtend", "parentalReset", "parentalAcceptClock", "parentalAdoptZone"
     };
 
     /// <summary>

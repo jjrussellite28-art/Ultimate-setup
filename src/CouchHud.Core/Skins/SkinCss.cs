@@ -24,7 +24,7 @@ public static partial class SkinCss
 
     // An absolute or protocol-relative web address, not preceded by a letter or digit (so "a//b" in a text stays). Allowed:
     // the two virtual hosts of the app and the XML namespace of inline SVG (data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'>).
-    [GeneratedRegex(@"(?<![A-Za-z0-9_\-])(?:https?:)?//(?!(?:local|art|app)\.couchhud(?:[/:""')\s]|$)|www\.w3\.org/)[^\s""')]+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 200)]
+    [GeneratedRegex(@"(?<![A-Za-z0-9_\-])(?:https?:)?//(?!(?:local|art|app)\.couchhud(?:[/:""') \t\n\r\f]|$)|www\.w3\.org/)[^ \t\n\r\f""')]+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 200)]
     private static partial Regex External();
 
     /// <summary>The stylesheet as the host serves it; "" when it is refused (see <see cref="Sanitize(string, out bool)"/>).</summary>
@@ -44,13 +44,32 @@ public static partial class SkinCss
                 refused = true;
                 return "";
             }
-            var clean = StripLayersAndImports(css, out var badCharset);
-            if (badCharset || MentionsLayerOrImport(clean))
+            // The text that is served is the text that was scanned: the address replacement can swallow a backslash, a quote or a comment mark and so
+            // change what is a string or a comment, so strip and scan run again on its result until it changes nothing (a few rounds at most, else refused).
+            var text = css;
+            for (var round = 0; round < 6; round++)
             {
-                refused = true;
-                return "";
+                var clean = StripLayersAndImports(text, out var badCharset);
+                if (badCharset || MentionsLayerOrImport(clean))
+                {
+                    refused = true;
+                    return "";
+                }
+                var replaced = External().Replace(clean, Blank);
+                if (string.Equals(replaced, clean, StringComparison.Ordinal))
+                {
+                    // What the replacement leaves is judged as the URL parser reads it (escapes, deleted tabs and line breaks, backslashes): an address it could not see is refused.
+                    if (HasBadAddress(clean))
+                    {
+                        refused = true;
+                        return "";
+                    }
+                    return clean;
+                }
+                text = replaced;
             }
-            return External().Replace(clean, Blank);
+            refused = true;
+            return "";
         }
         catch (RegexMatchTimeoutException)
         {
@@ -344,23 +363,175 @@ public static partial class SkinCss
         return sb.ToString();
     }
 
-    /// <summary>Whether "@layer" or "@import" is anywhere in the text, escapes resolved, upper or lower case: in a string, a comment, a url, anywhere.</summary>
-    internal static bool MentionsLayerOrImport(string css)
+    /// <summary>
+    /// The text of a url or a string the way a URL parser reads it: CSS escapes decoded (a backslash and a line break is a continuation and vanishes), then TAB, LF and CR
+    /// deleted (the URL parser does that), a backslash made a slash (it does that for web addresses), leading control characters and spaces cut.
+    /// </summary>
+    internal static string AddressText(string s)
     {
-        var flat = new StringBuilder(css.Length);
+        var sb = new StringBuilder(s.Length);
+        for (var i = 0; i < s.Length; i++)
+        {
+            var c = s[i];
+            if (c != '\\') { sb.Append(c); continue; }
+            if (i + 1 >= s.Length) break;
+            var n = s[i + 1];
+            if (IsNl(n)) { if (n == '\r' && At(s, i + 2) == '\n') i++; i++; continue; }
+            if (IsHex(n))
+            {
+                var j = i + 1;
+                var digits = 0;
+                var code = 0;
+                while (j < s.Length && digits < 6 && IsHex(s[j])) { code = code * 16 + Convert.ToInt32(s[j].ToString(), 16); j++; digits++; }
+                if (code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff)) sb.Append(char.ConvertFromUtf32(code)); else sb.Append('�');
+                if (j < s.Length && IsWs(s[j])) { if (s[j] == '\r' && At(s, j + 1) == '\n') j++; j++; }
+                i = j - 1;
+            }
+            else { sb.Append(n); i++; }
+        }
+        var t = IgnoredInAddress().Replace(sb.ToString(), "").Replace('\\', '/');
+        var start = 0;
+        while (start < t.Length && t[start] <= ' ') start++;
+        return t[start..];
+    }
+
+    // TAB, LF and CR (the URL parser deletes them) and the code points the host name mapping (IDNA) drops or the text hides: they are deleted before an address is judged.
+    [GeneratedRegex("[\t\n\r\u00AD\u034F\u180B-\u180D\u200B-\u200D\u2060\uFE00-\uFE0F\uFEFF]", RegexOptions.CultureInvariant, 200)]
+    private static partial Regex IgnoredInAddress();
+
+    // The two virtual hosts of the app and the art host may be written out (the same exceptions as External).
+    [GeneratedRegex(@"^(?:https?:)?//(?:local|art|app)\.couchhud(?::[0-9]+)?(?:[/?#]|$)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, 200)]
+    private static partial Regex LocalAddress();
+
+    [GeneratedRegex(@"^([A-Za-z][A-Za-z0-9+.\-]*):", RegexOptions.CultureInvariant, 200)]
+    private static partial Regex SchemeStart();
+
+    // Schemes that reach out (or run code); a string that is no fetch (an attribute value like "user:nova", "a: b") may use any other scheme-like start, but not one of these.
+    private static readonly HashSet<string> NetworkSchemes = new(StringComparer.Ordinal)
+    {
+        "http", "https", "ftp", "ftps", "ws", "wss", "file", "blob", "filesystem", "javascript", "vbscript", "view-source", "chrome", "chrome-extension", "edge", "ms-appx", "ms-appx-web"
+    };
+
+    /// <summary>
+    /// Whether a url token or string is an address that leaves the app, judged as the URL parser would read it (after <see cref="AddressText"/>), whether or not it contains a literal "//":
+    /// it starts with "//", or with a scheme other than data: and about:blank (in a place that fetches: any scheme; elsewhere only a scheme of NetworkSchemes or one followed by a slash,
+    /// so "a: b" in a content string and "user:nova" in an attribute selector pass). The app's own hosts, written out, pass.
+    /// </summary>
+    internal static bool BadAddress(string raw, bool fetching)
+    {
+        var t = AddressText(raw);
+        // "//" and more slashes before a host; "// " (a decorative string) or "//" alone has no host.
+        if (t.StartsWith("//", StringComparison.Ordinal))
+        {
+            var rest = t.TrimStart('/');
+            return rest.Length > 0 && rest[0] != ' ' && !LocalAddress().IsMatch(t);
+        }
+        var m = SchemeStart().Match(t);
+        if (!m.Success) return false;
+        var scheme = m.Groups[1].Value.ToLowerInvariant();
+        if (scheme == "data") return false;
+        if (scheme == "about") return !t.StartsWith("about:blank", StringComparison.OrdinalIgnoreCase);
+        if (LocalAddress().IsMatch(t)) return false;
+        return fetching || NetworkSchemes.Contains(scheme) || (m.Length < t.Length && t[m.Length] == '/');
+    }
+
+    // Functions whose arguments (url tokens, strings) are fetched.
+    private static readonly HashSet<string> UrlishFunctions = new(StringComparer.Ordinal)
+    {
+        "url", "src", "image", "image-set", "-webkit-image-set", "cross-fade", "-webkit-cross-fade", "element"
+    };
+
+    /// <summary>
+    /// Whether any url token or any string in the sheet (custom properties included: var() carries a string into a fetch) is a bad address (<see cref="BadAddress"/>).
+    /// Fail closed: the whole stylesheet is refused; an honest skin writes its paths plainly.
+    /// </summary>
+    internal static bool HasBadAddress(string css)
+    {
+        var stack = new Stack<bool>();
+        var custom = false; // inside the value of a custom property (var() can carry its strings into a fetch): strings are judged as strictly as a url
+        var braces = 0; // { } nested inside that value
+        var last = '\0'; // the last character that was not white space or a comment
         var i = 0;
         while (i < css.Length)
         {
-            if (css[i] == '\\' && i + 1 < css.Length)
+            var c = css[i];
+            if (c is '"' or '\'')
             {
-                if (IsNl(css[i + 1])) { i += css[i + 1] == '\r' && At(css, i + 2) == '\n' ? 3 : 2; continue; }
-                var e = EscapeEnd(css, i + 1);
-                flat.Append(DecodeIdent(css, i, e));
+                var e = SkipString(css, i);
+                var body = css.Substring(i + 1, e - i - 1);
+                if (body.EndsWith(c)) body = body[..^1];
+                if (BadAddress(body, custom || (stack.Count > 0 && stack.Peek()))) return true;
+                i = e;
+                last = c;
+            }
+            else if (StartsIdent(css, i))
+            {
+                var e = IdentEnd(css, i);
+                var name = DecodeIdent(css, i, e).ToLowerInvariant();
+                if (At(css, e) == '(')
+                {
+                    if (name == "attr") return true; // attr() can hand an attribute's text to url() or image-set()
+                    var j = e + 1;
+                    while (j < css.Length && IsWs(css[j])) j++;
+                    if (name == "url" && At(css, j) != '"' && At(css, j) != '\'')
+                    {
+                        var end = SkipUrlBody(css, j);
+                        if (BadAddress(TrailingParen().Replace(css.Substring(j, end - j), ""), true)) return true;
+                        i = end;
+                        last = ')';
+                    }
+                    else { stack.Push(UrlishFunctions.Contains(name)); i = e + 1; last = '('; }
+                }
+                else
+                {
+                    if (name.StartsWith("--", StringComparison.Ordinal) && stack.Count == 0 && last is '\0' or '{' or ';' or '}')
+                    {
+                        var j = e;
+                        while (j < css.Length && IsWs(css[j])) j++;
+                        if (At(css, j) == ':') custom = true;
+                    }
+                    i = e;
+                    last = 'a';
+                }
+            }
+            else if (c == '(') { stack.Push(false); i++; last = c; }
+            else if (c == ')') { if (stack.Count > 0) stack.Pop(); i++; last = c; }
+            else if (c == '{') { if (custom) braces++; i++; last = c; }
+            else if (c == '}') { if (custom) { if (braces > 0) braces--; else custom = false; } i++; last = c; }
+            else if (c == ';') { if (custom && braces == 0 && stack.Count == 0) custom = false; i++; last = c; }
+            else
+            {
+                var e = AtomEnd(css, i);
+                if (!(c == '/' && At(css, i + 1) == '*') && !IsWs(c)) last = c;
                 i = e;
             }
-            else { flat.Append(css[i]); i++; }
         }
-        var low = flat.ToString().ToLowerInvariant();
-        return low.Contains("@layer", StringComparison.Ordinal) || low.Contains("@import", StringComparison.Ordinal);
+        return false;
+    }
+
+    [GeneratedRegex(@"\s*\)?$", RegexOptions.CultureInvariant, 200)]
+    private static partial Regex TrailingParen();
+
+    /// <summary>
+    /// Whether an at-keyword token "@layer" or "@import" (upper or lower case, escapes in the name resolved) is anywhere in the text, in any nesting.
+    /// The text is read again token by token, the way <see cref="Strip"/> reads it: what is inside a comment, a string, an unquoted url( ) token or an
+    /// identifier (a selector like .a\@layer, an attribute value, a custom property's string) is not an at-keyword to any parser and does not count.
+    /// Text that two removed statements joined into "@layer" is a token now and is found.
+    /// </summary>
+    internal static bool MentionsLayerOrImport(string css)
+    {
+        var i = 0;
+        while (i < css.Length)
+        {
+            if (css[i] == '@' && StartsIdent(css, i + 1))
+            {
+                var e = IdentEnd(css, i + 1);
+                var name = DecodeIdent(css, i + 1, e).ToLowerInvariant();
+                if (name is "layer" or "import") return true;
+                i = e;
+            }
+            else i = AtomEnd(css, i);
+        }
+        return false;
     }
 }

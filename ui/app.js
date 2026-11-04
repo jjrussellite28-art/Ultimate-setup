@@ -1,5 +1,7 @@
 // CouchHUD UI entry point: wires input, tabs, pages and the host bridge together.
 
+// First: the boot screen's input shield has to listen before any other code of the page does.
+import { endBoot, inputOpen } from './core/boot-gate.js';
 import { api } from './core/api.js';
 import { fmtTime, t } from './core/i18n.js';
 import { $ } from './core/dom.js';
@@ -179,6 +181,8 @@ function goHome() {
 const GLOBAL = new Set(['lb', 'rb', 'start', 'guide', 'b']);
 
 function onAction(action) {
+  // The boot screen is still up (or its state is unknown): nothing reaches the UI underneath, whichever way the press came.
+  if (!inputOpen()) return;
   if (screensaverInput()) return;
   if (launchInput(action)) return;
   if (state.overlay) return handleOverlay(action);
@@ -469,10 +473,7 @@ async function init() {
   render();
   const bootStarted = performance.now();
   const hideBoot = () => {
-    const boot = document.querySelector('#boot');
-    if (!boot || boot.classList.contains('done')) return;
-    boot.classList.add('done');
-    sound.boot();
+    if (endBoot(document.querySelector('#boot'))) sound.boot();
   };
   // The boot screen stays at most a moment, even if the library is slow.
   setTimeout(hideBoot, 2500);

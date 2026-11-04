@@ -603,19 +603,11 @@ public sealed class PluginFunctionTests : IDisposable
     {
         var ctx = Context(PluginOrigin.FirstParty, out var manager);
         ctx.RegisterFunctions(Fn("known"));
-        var original = Console.Error;
-        var sink = new StringWriter();
-        Console.SetError(sink);
-        try
-        {
-            for (var i = 0; i < 5; i++) Assert.Equal(PluginLevel.Admin, manager.LevelOf("tool", "ghost\u0007-" + Guid.NewGuid().ToString("N")[..0] + "x"));
-            Assert.Equal(PluginLevel.Admin, manager.LevelOf("tool", "known"));
-        }
-        finally
-        {
-            Console.SetError(original);
-        }
-        var lines = sink.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        // The manager's own log line is collected here; the process-wide console is shared with every test running in parallel.
+        var lines = new List<string>();
+        manager.LogLine = lines.Add;
+        for (var i = 0; i < 5; i++) Assert.Equal(PluginLevel.Admin, manager.LevelOf("tool", "ghost-" + Guid.NewGuid().ToString("N")[..0] + "x"));
+        Assert.Equal(PluginLevel.Admin, manager.LevelOf("tool", "known"));
         Assert.Single(lines);
         Assert.Contains("never declared", lines[0]);
         Assert.DoesNotContain('\u0007', lines[0]);

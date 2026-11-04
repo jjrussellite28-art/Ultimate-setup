@@ -73,13 +73,16 @@ public class ArtworkRecheckTests
         }
     }
 
-    /// <summary>Waits for a condition and fails the test after five seconds instead of hanging.</summary>
+    /// <summary>Only ends a test that is truly stuck; every wait below is for a condition, never for a time that has to be met.</summary>
+    private static readonly TimeSpan Ceiling = TimeSpan.FromMinutes(2);
+
+    /// <summary>Waits for a condition and fails the test after <see cref="Ceiling"/> instead of hanging.</summary>
     private static async Task WaitUntil(Func<bool> condition)
     {
-        var until = DateTime.UtcNow.AddSeconds(5);
+        var until = DateTime.UtcNow.Add(Ceiling);
         while (!condition())
         {
-            if (DateTime.UtcNow > until) throw new Xunit.Sdk.XunitException("Timed out after 5 s waiting for the condition.");
+            if (DateTime.UtcNow > until) throw new Xunit.Sdk.XunitException("Timed out waiting for the condition.");
             await Task.Delay(10);
         }
     }
@@ -302,26 +305,26 @@ public class ArtworkRecheckTests
         Assert.Equal(ArtworkResolver.ReloadResult.Busy, result);
 
         rig.Steam.Hold.SetResult();
-        await running.WaitAsync(TimeSpan.FromSeconds(5));
+        await running.WaitAsync(Ceiling);
     }
 
     [Fact]
     public async Task Only_one_reload_waits_in_the_queue_and_the_rest_are_turned_away_at_once()
     {
         var rig = new Rig();
-        rig.Resolver.ReloadWait = TimeSpan.FromSeconds(20);
+        rig.Resolver.ReloadWait = Timeout.InfiniteTimeSpan; // the waiting reload is released by the test, not by a clock
         rig.Steam.Hold = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var running = rig.Resolver.ReloadAsync(Rig.Game("1"));
         await WaitUntil(() => Volatile.Read(ref rig.Steam.StoreArrivals) >= 1);
+        // ReloadAsync takes its place in the queue before its first real await, so the third call below meets a full queue.
         var waiting = rig.Resolver.ReloadAsync(Rig.Game("2"));
-        await Task.Delay(100);
 
         var (_, third) = await rig.Resolver.ReloadAsync(Rig.Game("3"));
         Assert.Equal(ArtworkResolver.ReloadResult.Busy, third);
 
         rig.Steam.Hold.SetResult();
-        await running.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.NotEqual(ArtworkResolver.ReloadResult.Busy, (await waiting.WaitAsync(TimeSpan.FromSeconds(5))).Result);
+        await running.WaitAsync(Ceiling);
+        Assert.NotEqual(ArtworkResolver.ReloadResult.Busy, (await waiting.WaitAsync(Ceiling)).Result);
     }
 
     [Fact]
@@ -440,7 +443,7 @@ public class ArtworkRecheckTests
         var pass = rig.Resolver.ResolveAsync([game], cts.Token);
         await WaitUntil(() => Volatile.Read(ref rig.Steam.StoreArrivals) >= 2);
         cts.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pass.WaitAsync(TimeSpan.FromSeconds(5)));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pass.WaitAsync(Ceiling));
         rig.Steam.Hold.SetResult();
 
         // The entry is still due right away: nothing was counted against it.

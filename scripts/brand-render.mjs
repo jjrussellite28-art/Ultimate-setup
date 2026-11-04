@@ -3,8 +3,9 @@
 //   and src/CouchHud.Shell/couchhud.ico (PNG frames; 16-32 px from the simplified icon-small.svg), the setup pictures installer/wizard*.bmp.
 //
 //   node scripts/brand-render.mjs            Env: EDGE (path to msedge.exe)
-import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { createProfile, guard } from './edge-profile.mjs';
+import { mkdirSync, writeFileSync, readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -26,11 +27,11 @@ const jobs = [
   ...ICON_SIZES.map((s) => ({ src: s <= SMALL ? 'assets/branding/icon-small.svg' : 'docs/logo.svg', out: `assets/branding/png/icon-${s}.png`, w: s, h: s }))
 ];
 
-const profile = mkdtempSync(join(tmpdir(), 'couchhud-brand-'));
+const profile = createProfile();
 const browser = spawn(edge, [`--remote-debugging-port=${port}`, '--headless=new', '--mute-audio', '--disable-gpu', '--disable-extensions', '--force-color-profile=srgb',
   `--user-data-dir=${profile}`, '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
-const browserGone = new Promise((r) => browser.once('exit', r));
-process.on('exit', () => browser.kill());
+const dirs = [profile];
+const release = guard({ browser, dirs });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const getJson = (url) => new Promise((res, rej) => http.get(url, (r) => { let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
@@ -49,6 +50,7 @@ const send = (method, params = {}) => new Promise((res) => { waiting.set(++id, r
 
 await send('Page.enable');
 const tmp = mkdtempSync(join(tmpdir(), 'couchhud-brand-page-'));
+dirs.push(tmp);
 for (const job of jobs) {
   // The SVG is drawn as an <img> at the target size, so the browser scales it (crisp, no CSS from outside).
   const page = job.direct ? at(job.src) : join(tmp, 'page.html');
@@ -133,10 +135,6 @@ for (const job of bmpJobs) {
   writeFileSync(at(job.out), bmp);
   console.log('bmp', job.out);
 }
-// Edge runs as a process tree; on Windows only taskkill /T ends the children that hold the profile folder.
-if (process.platform === 'win32' && browser.pid && browser.exitCode === null && browser.signalCode === null) spawnSync('taskkill', ['/pid', String(browser.pid), '/T', '/F'], { stdio: 'ignore' });
-browser.kill();
-// Remove the Edge profile only after Edge has let go of it; an 'exit' handler cannot wait.
-await Promise.race([browserGone, new Promise((r) => setTimeout(r, 5000))]);
-for (const d of [profile, tmp]) try { rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch { /* still held: left in %TEMP% */ }
+// Kill the Edge tree, wait until it is gone, then remove the profile and page folders.
+await release();
 process.exit(0);

@@ -266,6 +266,7 @@ public sealed partial class Hud
         _parentCodeChainUntil = DateTimeOffset.MinValue;
         _browserRecentShown = false;
         _lastManageCode = null;
+        ForgetPairCode(true);
         if (_browser is not null) CloseBrowser(_browsing);
         _setupHoldUntil = DateTimeOffset.MinValue;
         ForgetUnlock();

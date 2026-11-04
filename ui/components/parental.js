@@ -12,6 +12,7 @@ import { timeUpAction } from '../core/stack-rules.js';
 import { sound } from '../sound.js';
 import { t } from '../core/i18n.js';
 import { chooseDialog, closeOverlay } from './overlay.js';
+import { grantAction, listDamaged, lockChoices, lockScope, lockedRows, needsQuestion } from '../core/item-lock-rules.js';
 import { ensureParentCode, ensureUnlocked } from './passcode.js';
 
 export const parental = { status: null };
@@ -259,23 +260,59 @@ export async function parentalGate(item) {
 // ---------------------------------------------------------------------------
 // Locked games (settings page and detail menu)
 
-/** "Nur mit Eltern-Code starten" toggle for one entry; asks for the code first. */
+/**
+ * "Nur mit Eltern-Code starten" for one entry; asks for the code first. With child profiles the parents choose between this
+ * profile only and all child profiles (also those made later); a lock for all child profiles is lifted by its own choice.
+ */
+const scopeText = (scope) => ({
+  profile: t('parental.scope.profile'), all: t('parental.scope.all'), both: t('parental.scope.both'), none: t('parental.scope.none')
+})[scope];
+
+const choiceLabel = (c) => (c.locked
+  ? (c.all ? t('parental.lockForAll') : t('parental.lockForProfile'))
+  : (c.all ? t('parental.unlockForAll') : t('parental.unlockForProfile')));
+
 export async function toggleItemLock(item) {
-  const locked = !!parental.status?.lockedItems?.includes(item.id);
-  if (!(await ensureParentGrant(locked ? t('parental.lockOffReason') : t('parental.lockOnReason'), { action: 'lock', item: item.id }))) return;
-  const status = await attempt(() => api.setParentalItemLock(item.id, !locked), t('parental.notSaved'));
+  const choices = lockChoices(parental.status, item.id);
+  let choice = choices[0];
+  if (needsQuestion(choices)) {
+    const scope = lockScope(parental.status, item.id);
+    const options = choices.map((c) => ({
+      value: c,
+      label: choiceLabel(c),
+      detail: !c.locked && !c.all && scope === 'both' ? t('parental.unlockProfileKeepsAll') : undefined,
+      icon: c.locked ? '🔒' : '🔓'
+    }));
+    choice = await chooseDialog(scope === 'none' ? t('parental.lockScopeTitle', { name: item.name }) : t('parental.unlockScopeTitle', { name: item.name, scope: scopeText(scope) }), options);
+    if (!choice) return;
+  }
+  if (!(await ensureParentGrant(choice.locked ? t('parental.lockOnReason') : t('parental.lockOffReason'), { action: grantAction(choice), item: item.id }))) return;
+  const status = await attempt(() => api.setParentalItemLock(item.id, choice.locked, choice.all), t('parental.notSaved'));
   if (!status) return;
   parental.status = status;
-  toast(locked ? t('parental.unlockedToast', { name: item.name }) : t('parental.lockedToast', { name: item.name }));
+  // Said out loud when the lock stays for another reason: a lock for all child profiles is never left in place silently.
+  const stays = !choice.locked && !choice.all && lockScope(status, item.id) === 'all';
+  toast(choice.locked ? (choice.all ? t('parental.lockedAllToast', { name: item.name }) : t('parental.lockedToast', { name: item.name }))
+    : stays ? t('parental.unlockedStillAllToast', { name: item.name }) : t('parental.unlockedToast', { name: item.name }));
   render();
 }
 
 /** Detail page row; null while the profile is off, so the menu stays as it was. */
 export const itemLockAction = (item) => {
   if (!parental.status?.enabled) return null;
-  const locked = !!parental.status.lockedItems?.includes(item.id);
+  const locked = lockScope(parental.status, item.id) !== 'none';
   return { label: locked ? t('parental.lockOff') : t('parental.lockOn'), icon: locked ? '🔓' : '🔒', run: () => toggleItemLock(item) };
 };
+
+/** The parents set the damaged list for all child profiles anew (its own code). */
+export async function resetAllChildrenLocks() {
+  if (!(await ensureParentGrant(t('parental.resetAllReason'), { action: 'lockAllReset' }))) return;
+  const status = await attempt(() => api.resetParentalAllChildrenLocks(), t('parental.notSaved'));
+  if (!status) return;
+  parental.status = status;
+  toast(t('parental.resetAllDone'));
+  render();
+}
 
 /** All locked entries; A takes the lock off again. */
 export function lockedGamesPage() {
@@ -284,16 +321,25 @@ export function lockedGamesPage() {
     name: t('parental.lockedPageName'),
     index: 0,
     build(root) {
-      const ids = parental.status?.lockedItems ?? [];
-      this.list = ids.map((id) => state.library.find((i) => i.id === id)).filter(Boolean);
+      this.damaged = listDamaged(parental.status);
+      const rows = lockedRows(parental.status, (id) => state.library.find((i) => i.id === id));
+      // A damaged household list comes first as an action row: the parents set it anew (own code), nothing else clears it.
+      const resetRow = { reset: true, name: t('parental.resetAllAction') };
+      this.list = [...(this.damaged ? [resetRow] : []), ...rows.map((r) => r.item)];
+      const scopes = [...(this.damaged ? [null] : []), ...rows.map((r) => r.scope)];
       this.index = Math.min(this.index, Math.max(0, this.list.length - 1));
-      this.items = this.list.map((i) => el('li', { className: 'check-row' },
-        el('span', { className: 'check-box', textContent: '🔒' }),
-        el('span', { className: 'check-main' }, el('strong', { textContent: i.name }), el('small', { textContent: i.type === 'app' ? t('parental.typeApp') : t('parental.typeGame') }))));
+      this.items = this.list.map((i, n) => (i.reset
+        ? el('li', { className: 'check-row' },
+          el('span', { className: 'check-box', textContent: '⚠' }),
+          el('span', { className: 'check-main' }, el('strong', { textContent: i.name }), el('small', { textContent: t('parental.resetAllDetail') })))
+        : el('li', { className: 'check-row' },
+          el('span', { className: 'check-box', textContent: '🔒' }),
+          el('span', { className: 'check-main' }, el('strong', { textContent: i.name }), el('small', { textContent: `${i.type === 'app' ? t('parental.typeApp') : t('parental.typeGame')} · ${scopeText(scopes[n])}` })))));
       this.scroller = el('ul', { className: 'check-list list-scroll' }, this.items);
       root.append(el('div', { className: 'files' },
         el('div', { className: 'files-head' }, el('h2', { textContent: t('parental.lockedTitle') })),
         el('p', { className: 'meta', textContent: t('parental.lockedPerProfile') }),
+        ...(this.damaged ? [el('p', { className: 'meta warn', textContent: t('parental.allDamaged') })] : []),
         this.list.length ? this.scroller : el('p', { className: 'empty-note', textContent: t('parental.lockedEmpty') })));
       this.update({ instant: true });
     },
@@ -308,12 +354,13 @@ export function lockedGamesPage() {
         case 'down': return move(this, 1, this.list.length, true);
         case 'a': {
           const item = this.list[this.index];
-          if (item) await toggleItemLock(item);
+          if (item?.reset) await resetAllChildrenLocks();
+          else if (item) await toggleItemLock(item);
         }
       }
     },
     hints() {
-      return this.list?.length ? [['A', t('parental.hintUnlock')], ['B', t('parental.hintBack')]] : [['B', t('parental.hintBack')]];
+      return this.list?.length ? [['A', this.list[this.index]?.reset ? t('parental.resetAllAction') : t('parental.hintUnlock')], ['B', t('parental.hintBack')]] : [['B', t('parental.hintBack')]];
     }
   };
 }

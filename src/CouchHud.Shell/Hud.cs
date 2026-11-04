@@ -228,7 +228,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         // What an administrator approves through UAC is said in the HUD first (P9 review M-c); a moment to read it before the prompt.
         AdminService.AnnounceApproval = async (ops, reason) =>
         {
-            Ui(() => Emit("adminApproval", new { what = ops.Select(o => o.ToString()).Distinct().ToArray(), reason }));
+            var codes = AdminService.ApprovalCodeKind;
+            Ui(() => Emit("adminApproval", new { what = ops.Select(o => o.ToString()).Distinct().ToArray(), reason, codes }));
             // The confirmation of the lock of 0.4.0 has more to say (why at all): more time to read it.
             await Task.Delay(TimeSpan.FromSeconds(reason is null ? 2 : 8));
         };
@@ -683,7 +684,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     {
         _homeHold?.Cancel();
         var cts = _homeHold = new CancellationTokenSource();
-        var holdMs = Math.Clamp(config.Current.ReturnHoldMs, 200, 5000);
+        var holdMs = Math.Clamp(config.Current.ReturnHoldMs, ConfigLimits.ReturnHoldMsMin, ConfigLimits.ReturnHoldMsMax);
         Task.Delay(holdMs, cts.Token).ContinueWith(t =>
         {
             if (!t.IsCanceled && HomeHeld()) Ui(action);
@@ -862,7 +863,11 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         ForgetUnlock();
         // The game goes in front now: an activation of the HUD that is still on its way must not freeze it again.
         _pauseOnActivate = false;
+        var wasPaused = GamePause.IsPaused;
         GamePause.ResumeAll();
+        // The page learns that the game is not frozen any more (the time-up page after more time, "Pausiert seit" on the home shelf): the
+        // HUD losing the focus emits nothing here, because by then nothing is frozen any more.
+        if (wasPaused) Ui(() => Emit("session", SessionDto()));
         return s.Pids;
     }
 
@@ -1128,6 +1133,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// <summary>The unlock and the release do not survive a game start or a trip back to the HUD.</summary>
     private void ForgetUnlock()
     {
+        // A trip back to the HUD, a profile switch or a new start ends the open-couch note of an earlier launch.
+        Interlocked.Exchange(ref _openLaunch, null);
         _unlockedUntil = DateTimeOffset.MinValue;
         _parentCodeChainUntil = DateTimeOffset.MinValue;
         _grant.Clear();
@@ -1238,6 +1245,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         try
         {
             // The HUD's own actions need no service operation: then a confirmation only, no grant at all (review L-a).
+            // A code change approved here replaces the parents' and couch code at once (parental controls on), or the couch code alone.
+            using var announce = AdminService.AnnounceCodeKind(action is "passcode" or "parentalOn" ? "both" : action is "lockModeCode" ? "couch" : null);
             if (!await AdminService.ObtainAdminGrantAsync(ops ?? [])) return new { ok = false };
         }
         catch (InvalidOperationException ex)
@@ -1459,6 +1468,10 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             blockUnknownAge = p.BlockUnknownAge,
             countApps = p.CountApps,
             lockedItems = p.LockedItems,
+            // Locks for every child profile (also those made later), shown apart so that a lock of one profile never hides them.
+            lockedItemsAllChildren = config.Current.LockedItemsAllChildren ?? [],
+            lockedItemsAllChildrenUnreadable = config.Current.LockedItemsAllChildrenUnreadable || config.Current.LockedItemsAllChildren is null,
+            childProfiles = config.Current.AllProfiles.Count(pr => ProfileSwitch.IsChild(config.Current, pr.Id)),
             remainingSeconds = st.RemainingSeconds,
             limiter = st.Limiter,
             inWindow = st.InWindow,
@@ -1759,17 +1772,53 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         });
     }
 
-    public object SetParentalItemLock(string id, bool locked)
+    /// <summary>
+    /// Locks or unlocks one entry. With <paramref name="allChildren"/> the lock is the household's list for every child's profile (those
+    /// created later too, an adult's profile ignores it); without, only the active profile's own list. Both need the same parents' grant.
+    /// Taking the lock off for all child profiles also clears the active profile's own entry; taking off only the active profile's
+    /// own entry leaves a lock for all child profiles in place (the page shows it and says so).
+    /// </summary>
+    public object SetParentalItemLock(string id, bool locked, bool allChildren = false)
     {
         RefuseWhileConfigFaulted();
-        RequireParentGrant("lock", id);
+        // The grant is bound to the scope: a code given for one profile's lock does not pay for the lock of all child profiles.
+        RequireParentGrant(allChildren ? "lockAll" : "lock", id);
         _ = library.Find(id) ?? throw new KeyNotFoundException($"unknown item {id}");
         var profileId = Parental.ProfileId;
         config.Update(c =>
         {
             var rules = c.Profile(profileId).Rules;
+            if (allChildren)
+            {
+                // The unreadable mark is not touched here: only ResetParentalAllChildrenLocks clears it.
+                var shared = c.LockedItemsAllChildren ??= [];
+                var had = shared.Remove(id);
+                if (locked)
+                {
+                    if (!had && shared.Count >= ConfigLimits.MaxListEntries) throw new InvalidOperationException(Strings.Get("parental.lockAllFull", ConfigLimits.MaxListEntries));
+                    shared.Add(id);
+                }
+                else rules.LockedItems.Remove(id);
+                return;
+            }
             rules.LockedItems.Remove(id);
             if (locked) rules.LockedItems.Add(id);
+        });
+        return GetParental();
+    }
+
+    /// <summary>
+    /// The parents set the list of locks for all child profiles anew after it was found damaged (it is empty then, and until now every entry is
+    /// locked for children). Its own grant; the only place that clears the unreadable mark.
+    /// </summary>
+    public object ResetParentalAllChildrenLocks()
+    {
+        RefuseWhileConfigFaulted();
+        RequireParentGrant("lockAllReset");
+        config.Update(c =>
+        {
+            c.LockedItemsAllChildren = [];
+            c.LockedItemsAllChildrenUnreadable = false;
         });
         return GetParental();
     }
@@ -2042,15 +2091,17 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         var windowsBefore = isUrl ? Win32ProcessProbe.WindowSnapshot() : null;
         StartClientForLaunch(item, start);
         Launcher.Launch(item, start, LaunchOverrides.PinFor(start, own));
-        // Only after a start that happened: companion apps of this game are judged as at an open couch when it is open now (the unlock is
-        // forgotten right below).
-        NoteOpenLaunch(item);
         // Used up only by a start that happened (a refused start target keeps it for another try).
         if (check.UsesCode) _grant.TryConsume("launch", item.Id);
         // A new start ends the hand-over of an earlier switch.
         CancelFrontLoop();
-        _sessions.Launched(item, DateTimeOffset.UtcNow);
+        // Only after a start that happened: companion apps of this game are judged as at an open couch when it is open now (read before the
+        // unlock is forgotten below). The note belongs to this launch's serial, is made after ForgetUnlock (which ends the note of any earlier
+        // launch) and ends with its session.
+        var openCouch = !Locked;
+        var launchSerial = _sessions.Launched(item, DateTimeOffset.UtcNow);
         ForgetUnlock();
+        NoteOpenLaunch(item, launchSerial, openCouch);
         if (releaseApp && LockOn)
         {
             _appsReleased = item.Name;
@@ -2433,7 +2484,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     {
         var c = config.Current;
         var areas = FeatureAreas.From(c);
-        var rules = c.Profile(Parental.ProfileId).Rules;
+        var rules = c.Profile(Parental.ProfileId).EffectiveRules;
         var all = library.Items;
         // One verdict per entry (the age lookup is not free); the shelf and the blocked list both read it.
         var verdict = new Dictionary<string, bool>(StringComparer.Ordinal);
@@ -2886,7 +2937,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             case "screensaverMinutes":
                 // With parental controls and several profiles the parents' (review NEU-1): it brings a protected profile back to the picker.
                 if (ProfilesGuarded) RequireParentGrant("idleSetting", key);
-                var saver = Math.Clamp(value.GetInt32(), 0, 240);
+                var saver = Math.Clamp(value.GetInt32(), 0, ConfigLimits.ScreensaverMinutesMax);
                 config.UpdateOrThrow(c => c.ScreensaverMinutes = saver);
                 break;
             case "screensaverStyle":
@@ -2896,7 +2947,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 break;
             case "displayOffMinutes":
                 if (ProfilesGuarded) RequireParentGrant("idleSetting", key);
-                var off = Math.Clamp(value.GetInt32(), 0, 480);
+                var off = Math.Clamp(value.GetInt32(), 0, ConfigLimits.DisplayOffMinutesMax);
                 config.UpdateOrThrow(c => c.DisplayOffMinutes = off);
                 break;
             case "tvInGuide":
@@ -2958,7 +3009,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             case "setupWizardDone":
                 // Only a marker: the assistant itself changes nothing, every choice in it goes through the setting it belongs to.
                 // Not a harmless setting: a locked couch cannot mark it (the assistant asks for the code first, like the settings).
-                var wizard = Math.Clamp(value.GetInt32(), 0, 1000);
+                var wizard = Math.Clamp(value.GetInt32(), 0, ConfigLimits.SetupWizardDoneMax);
                 config.UpdateOrThrow(c => c.SetupWizardDone = wizard);
                 break;
             case "autoLogonDeclined":
@@ -3008,11 +3059,11 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 SetGameBarButton(gameBar);
                 break;
             case "musicVolume":
-                var music = Math.Clamp(value.GetInt32(), 0, 100);
+                var music = Math.Clamp(value.GetInt32(), 0, ConfigLimits.VolumeMax);
                 config.UpdateOrThrow(c => c.ActiveProfile.MusicVolume = music);
                 break;
             case "soundVolume":
-                var volume = Math.Clamp(value.GetInt32(), 0, 100);
+                var volume = Math.Clamp(value.GetInt32(), 0, ConfigLimits.VolumeMax);
                 config.UpdateOrThrow(c => c.ActiveProfile.SoundVolume = volume);
                 break;
             case "soundSet":
@@ -3072,7 +3123,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 _night.Apply();
                 break;
             case "nightModeStrength":
-                var strength = Math.Clamp(value.GetInt32(), 0, 100);
+                var strength = Math.Clamp(value.GetInt32(), 0, ConfigLimits.NightModeStrengthMax);
                 config.UpdateOrThrow(c => c.NightModeStrength = strength);
                 _night.Apply();
                 break;
@@ -3159,7 +3210,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 config.UpdateOrThrow(c => c.AutoSwitchHeadphones = Bool());
                 break;
             case "returnHoldMs":
-                var ms = Math.Clamp(value.GetInt32(), 200, 5000);
+                var ms = Math.Clamp(value.GetInt32(), ConfigLimits.ReturnHoldMsMin, ConfigLimits.ReturnHoldMsMax);
                 config.UpdateOrThrow(c => c.ReturnHoldMs = ms);
                 break;
             case "weatherLocation":
@@ -4880,7 +4931,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         UseUp(ticket);
         plugins.RaiseTabsChanged();
         // stoppedNow: the plugin's own code is done too (false: it was cut off, but what it started itself ends with the next start).
-        return new { gone, stoppedNow = stop.FullyStopped, plugins = GetPlugins() };
+        return new { gone, stoppedNow = stop.FullyStopped, collected = stop.Collected, plugins = GetPlugins() };
     }
 
     // -----------------------------------------------------------------------
@@ -5363,26 +5414,77 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         _remote.Channel?.Publish("keyboard");
     }
 
+    /// <summary>The pairing code made under the parents' grant (or without parental controls); with parental controls on only this one is ever shown.</summary>
+    private volatile string? _issuedPairCode;
+
+    /// <summary>
+    /// The pairing page (or the keyboard's phone panel) was left: the code made under the parents' grant is no longer shown and
+    /// controls on or off, no longer valid either (<paramref name="invalidate"/>), so a QR code photographed or left on screen is of no use.
+    /// </summary>
+    private void ForgetPairCode(bool invalidate)
+    {
+        var code = Interlocked.Exchange(ref _issuedPairCode, null);
+        if (invalidate && code is not null) Pairing.Discard(code);
+    }
+
+    /// <summary>Called by the pairing page and the keyboard's phone panel when they close.</summary>
+    public void LeavePairing() => ForgetPairCode(true);
+
     public object GetRemote(bool newCode = false)
     {
         // A fresh pairing code lets a phone steer CouchHud: not for a locked couch, which also keeps the current code to itself.
         if (newCode) RequireUnlocked();
+        // With parental controls on the parents' code for exactly this pairing is checked first (not used up yet) and used up once everything else
+        // said yes, right before the code is made: a refused or failed try keeps it, a grant that is gone by then refuses (fail-closed).
+        var parentalOn = config.Current.ParentalEnabled;
+        var pairTicket = CouchHud.Core.Remote.PairingGrant.Check(Gate, newCode, parentalOn);
         // With the second factor on a new phone is confirmed on a phone that is paired already, before the QR code is shown at all.
         if (newCode) OpenPairingWindow();
         var c = config.Current;
         var address = Network.LanAddresses().FirstOrDefault();
         string? url = null, qr = null;
         var pairLocked = PairingWindowClosed();
+        var codeHidden = false;
         if (c.RemoteEnabled && address is not null && !Locked && !pairLocked)
         {
-            var code = newCode ? Pairing.NewCode(DateTimeOffset.UtcNow) : Pairing.CurrentCode(DateTimeOffset.UtcNow);
-            // The secret only in the fragment (#k=), which the phone's browser never sends: it seals the pairing request with it.
-            url = $"http://{address}:{c.RemotePort}/#k={code}";
-            qr = Qr.Svg(url);
+            string? code = null;
+            var now = DateTimeOffset.UtcNow;
+            if (newCode)
+            {
+                // The grant is used up only here, right before the code is made, so a call that shows no code burns nothing; when it is gone,
+                // the pairing window closes again and the call is refused.
+                try
+                {
+                    UseUp(pairTicket);
+                }
+                catch
+                {
+                    lock (_pairLock) _pairOpenUntil = DateTimeOffset.MinValue;
+                    throw;
+                }
+                code = Pairing.NewCode(now);
+                _issuedPairCode = code;
+            }
+            else if (!parentalOn) code = Pairing.CurrentCode(now);
+            else
+            {
+                // Parental controls on: showing the page never makes a code. Only the code made under the parents' grant is shown, and only
+                // while it lives (a used or expired code is gone from the pairing, so nothing matches).
+                code = CouchHud.Core.Remote.PairingGrant.CodeToShow(true, Pairing.PeekCode(now), _issuedPairCode);
+                codeHidden = code is null;
+            }
+            if (code is not null)
+            {
+                // The secret only in the fragment (#k=), which the phone's browser never sends: it seals the pairing request with it.
+                url = $"http://{address}:{c.RemotePort}/#k={code}";
+                qr = Qr.Svg(url);
+            }
         }
         return new
         {
             enabled = c.RemoteEnabled,
+            // Parental controls on and no code made under the parents' grant: the page says to ask for a new one.
+            codeHidden,
             running = _remote.Running,
             // The second factor is on and no phone confirmed this pairing yet: no QR code, the page asks first.
             pairLocked,
@@ -6296,7 +6398,29 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
 
     public void RemoveEntry(string id) => library.RemoveCustomEntry(id);
 
-    public IReadOnlyList<SkinInfo> ListSkins() => SkinCatalog.ListUserSkins(Path.Combine(dataDir, "skins"), Strings.Language);
+    public IReadOnlyList<SkinInfo> ListSkins()
+    {
+        CatalogService.ClearSkinLeftoversOnce(dataDir);
+        return SkinCatalog.ListUserSkins(Path.Combine(dataDir, "skins"), Strings.Language);
+    }
+
+    /// <summary>
+    /// Removes an installed catalog skin (by its catalog id): the unlocked couch and no child's profile, like installing one. Only a folder
+    /// directly below the skins folder goes (CatalogService.UninstallSkin). Whoever had it as their skin gets the Couch skin.
+    /// </summary>
+    public async Task<object> UninstallSkinAsync(string id)
+    {
+        RefuseWhileConfigFaulted();
+        RequireSkinChange();
+        // The folder as it is spelled on disk: the skin id on the page is made from it. Nobody keeps pointing at the skin: the settings are saved
+        // first, and when that fails nothing is deleted (the error reaches the page).
+        var folder = CatalogService.SkinFolderOnDisk(dataDir, CatalogService.SkinFolderOf(dataDir, id));
+        var reset = false;
+        config.UpdateOrThrow(c => reset = ConfigStore.ForgetSkin(c, SkinCatalog.UserId(folder)));
+        if (reset) _remote.Channel?.Publish("settings");
+        if (!await Task.Run(() => CatalogService.UninstallSkin(dataDir, folder))) throw new InvalidOperationException(Strings.Get("catalog.skinInUse", folder));
+        return new { reset };
+    }
 
     public void SetSkin(string id)
     {
@@ -7300,7 +7424,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
 
     public object SetBrowserZoom(int zoom)
     {
-        zoom = Math.Clamp(zoom, 50, 300);
+        zoom = Math.Clamp(zoom, ConfigLimits.BrowserZoomMin, ConfigLimits.BrowserZoomMax);
         // The pane at once; the file is written by the config's own update (one small JSON write).
         if (_browser is not null) _browser.Zoom = zoom;
         if (config.Current.BrowserZoom != zoom) config.Update(c => c.BrowserZoom = zoom);
@@ -7478,7 +7602,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             WatchBrowserUnlock();
             var locked = Locked && !dev;
             // Locked again: the service's grants of the unlock are of no use any more and are not kept around in memory.
-            if (Locked) AdminService.Ops.Cache.ClearUnlock();
+            if (Locked)
+            {
+                AdminService.Ops.Cache.ClearUnlock();
+                // A pairing code made under the parents' grant does not outlive the unlock it was made in.
+                ForgetPairCode(true);
+            }
             Hardening.Set(locked && !_hardeningHold);
             if (locked) EndMouseModeWhenLocked();
             if (_lastLocked != locked)

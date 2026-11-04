@@ -75,9 +75,9 @@ public sealed class PluginReviewTests : IDisposable
     private (string Zip, string Sha) InstalledThenStaged()
     {
         var first = Zip("v1");
-        Service().Install(Entry("1.0.0", Sha(first)), first, Statement("1.0.0", Sha(first)));
+        Service().Install(Entry("1.0.0", Sha(first)), first, Statement("1.0.0", Sha(first)), Sha(first));
         var update = Zip("v2");
-        var outcome = Service().Install(Entry("1.1.0", Sha(update)), update, Statement("1.1.0", Sha(update)));
+        var outcome = Service().Install(Entry("1.1.0", Sha(update)), update, Statement("1.1.0", Sha(update)), Sha(update));
         Assert.True(outcome.RestartNeeded);
         return (update, Sha(update));
     }
@@ -107,9 +107,9 @@ public sealed class PluginReviewTests : IDisposable
     public void An_unsigned_catalog_update_is_staged_with_its_hash_as_well()
     {
         var first = Zip("v1");
-        Service().Install(Entry("1.0.0", Sha(first)), first);
+        Service().Install(Entry("1.0.0", Sha(first)), first, null, Sha(first));
         var update = Zip("v2");
-        Service().Install(Entry("1.1.0", Sha(update)), update);
+        Service().Install(Entry("1.1.0", Sha(update)), update, null, Sha(update));
 
         Assert.Equal(Sha(update), new PluginTrust(_dir).PendingFor("tool")!.Hash);
         Assert.Equal(["plugin:tool"], PendingPackages.ApplyAll(_dir));
@@ -154,7 +154,7 @@ public sealed class PluginReviewTests : IDisposable
     public void A_damaged_trust_store_refuses_to_verify_without_throwing_anything_else()
     {
         var first = Zip("v1");
-        Service().Install(Entry("1.0.0", Sha(first)), first);
+        Service().Install(Entry("1.0.0", Sha(first)), first, null, Sha(first));
         var file = Path.Combine(_dir, "plugin-trust.json");
         File.WriteAllText(file, File.ReadAllText(file).Replace("tool", "toal"));
 
@@ -199,7 +199,7 @@ public sealed class PluginReviewTests : IDisposable
     public void A_plugin_that_cannot_be_removed_now_is_marked_never_loads_and_goes_at_the_next_start()
     {
         var first = Zip("v1");
-        Service().Install(Entry("1.0.0", Sha(first)), first);
+        Service().Install(Entry("1.0.0", Sha(first)), first, null, Sha(first));
         var dir = Path.Combine(PluginsDir, "tool");
         using (new FileStream(Path.Combine(dir, "readme.txt"), FileMode.Open, FileAccess.Read, FileShare.None))
         {
@@ -226,7 +226,7 @@ public sealed class PluginReviewTests : IDisposable
     public void An_uninstall_that_succeeds_leaves_no_plugin_trash_behind()
     {
         var first = Zip("v1");
-        Service().Install(Entry("1.0.0", Sha(first)), first);
+        Service().Install(Entry("1.0.0", Sha(first)), first, null, Sha(first));
 
         Assert.True(Service().UninstallPlugin("tool"));
 
@@ -262,13 +262,13 @@ public sealed class PluginReviewTests : IDisposable
     public void A_catalog_install_over_a_folder_that_waits_for_its_removal_is_refused_and_stages_nothing()
     {
         var first = Zip("v1");
-        Service().Install(Entry("1.0.0", Sha(first)), first);
+        Service().Install(Entry("1.0.0", Sha(first)), first, null, Sha(first));
         var dir = Path.Combine(PluginsDir, "tool");
         using (new FileStream(Path.Combine(dir, "readme.txt"), FileMode.Open, FileAccess.Read, FileShare.None))
         {
             Assert.False(Service().UninstallPlugin("tool"));
             var second = Zip("v2");
-            var ex = Assert.Throws<CatalogException>(() => Service().Install(Entry("1.0.1", Sha(second)), second));
+            var ex = Assert.Throws<CatalogException>(() => Service().Install(Entry("1.0.1", Sha(second)), second, null, Sha(second)));
             Assert.Contains("tool", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
         var trust = new PluginTrust(_dir);
@@ -292,7 +292,7 @@ public sealed class PluginReviewTests : IDisposable
         var trust = new PluginTrust(_dir);
         trust.MarkRemoved("tool");
         var zip = Zip("v1");
-        Service().Install(Entry("1.0.0", Sha(zip)), zip, Statement("1.0.0", Sha(zip)));
+        Service().Install(Entry("1.0.0", Sha(zip)), zip, Statement("1.0.0", Sha(zip)), Sha(zip));
         // The folder was gone, but the mark was still there: staged, and the next start removes and then installs.
         CatalogService.FinishRemovals(_dir);
         PendingPackages.ApplyAll(_dir);

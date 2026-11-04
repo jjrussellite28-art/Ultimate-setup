@@ -1,15 +1,14 @@
 #requires -Version 7
-# Writes the release page text for a tag: the section "## <version> (...)" of CHANGELOG.md without its heading.
-# GitHub caps a release text at 125000 characters and appends its own "Full Changelog" link, so a longer section
-# keeps its German part and links to the English part of CHANGELOG.md at the tag. Fails when the section is missing.
+# Writes the release page text for a tag: the "### Kurz / Summary" block of the section "## <version> (...)" of
+# CHANGELOG.md, followed by a link to that section of the full changelog at the tag. Fails when the section or its
+# summary block is missing, so a release cannot go out without a summary.
 #
-#   .\scripts\release-notes.ps1 -Tag v0.6.3 -Out release-notes.md
+#   .\scripts\release-notes.ps1 -Tag v0.7.0 -Out release-notes.md
 param(
     [Parameter(Mandatory)] [string] $Tag,
     [Parameter(Mandatory)] [string] $Out,
     [string] $Changelog = (Join-Path $PSScriptRoot '..' 'CHANGELOG.md'),
-    [string] $Repo = 'kewe87/CouchHUD',
-    [int] $MaxChars = 120000
+    [string] $Repo = 'kewe87/CouchHUD'
 )
 $ErrorActionPreference = 'Stop'
 
@@ -26,16 +25,22 @@ $end = $lines.Count
 for ($i = $start + 1; $i -lt $lines.Count; $i++) {
     if ($lines[$i] -match '^## ') { $end = $i; break }
 }
-$section = $lines[($start + 1)..($end - 1)]
-$body = ($section -join "`n").Trim()
 
-if ($body.Length -gt $MaxChars) {
-    $english = [array]::IndexOf($section, '### English')
-    if ($english -lt 0) { throw "Section $version is too long and has no '### English' part" }
-    $german = ($section[0..($english - 1)] -join "`n").Trim()
-    if ($german.Length -gt $MaxChars) { throw "Even the German part of $version is too long for a release page" }
-    $body = "$german`n`n### English`n`nDie englischen Notizen sind für diese Seite zu lang. / The English notes for $version are too long for this page; they are in [CHANGELOG.md](https://github.com/$Repo/blob/$Tag/CHANGELOG.md#english)."
+$summary = -1
+for ($i = $start + 1; $i -lt $end; $i++) {
+    if ($lines[$i] -eq '### Kurz / Summary') { $summary = $i; break }
 }
+if ($summary -lt 0) { throw "Section $version of CHANGELOG.md has no '### Kurz / Summary' block; add one directly under the version heading" }
+$summaryEnd = $end
+for ($i = $summary + 1; $i -lt $end; $i++) {
+    if ($lines[$i] -match '^###? ') { $summaryEnd = $i; break }
+}
+$text = ($lines[$summary..($summaryEnd - 1)] -join "`n").Trim()
+if ($text.Length -le "### Kurz / Summary".Length) { throw "The '### Kurz / Summary' block of $version is empty" }
 
+# GitHub's heading anchor: lower case, punctuation dropped (letters, digits, hyphens, spaces stay), spaces to hyphens.
+$anchor = ($lines[$start].Substring(3).ToLowerInvariant() -replace '[^\p{L}\p{N}\- _]', '') -replace ' ', '-'
+
+$body = "$text`n`nAlle Änderungen / All changes: [CHANGELOG.md](https://github.com/$Repo/blob/$Tag/CHANGELOG.md#$anchor)"
 [IO.File]::WriteAllText($Out, "$body`n", [Text.UTF8Encoding]::new($false))
 Write-Host "Release notes for $Tag`: $($body.Length) characters -> $Out"

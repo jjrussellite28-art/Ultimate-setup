@@ -58,10 +58,35 @@ export function flagKeys(rule) {
 }
 
 /** The host names the reason a rule cannot start in its words (CompanionVerdict names, "missing", "area", "start"); the page shows a text for it. */
-// i18n-used: companion.problem.missing companion.problem.area companion.problem.start companion.problem.signature companion.problem.other
+// i18n-used: companion.problem.missing companion.problem.area companion.problem.start companion.problem.signature companion.problem.pinMissing companion.problem.pinChanged companion.problem.folderWritable companion.problem.other
 export function problemKey(problem) {
   if (!problem) return null;
-  return ['missing', 'area', 'start', 'signature'].includes(problem) ? `companion.problem.${problem}` : 'companion.problem.other';
+  return ['missing', 'area', 'start', 'signature', 'pinMissing', 'pinChanged', 'folderWritable'].includes(problem) ? `companion.problem.${problem}` : 'companion.problem.other';
+}
+
+/** The problems a parent can clear with one "confirm" for the locked couch (no hash yet, or the program changed). */
+export const confirmable = (problem) => problem === 'pinMissing' || problem === 'pinChanged' || problem === 'folderWritable';
+
+/** File size for the confirm dialog (binary units, one decimal from KB up). */
+export function formatSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return `${n} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = n / 1024;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+  return `${value.toFixed(1)} ${units[i]}`;
+}
+
+/** The lines of the confirm dialog from the host's preview: hash prefix, size, date, signer or "unsigned", version, and the warnings. */
+// i18n-used: companion.confirmFile companion.confirmSigned companion.confirmUnsigned companion.confirmVersion companion.confirmChanged companion.confirmFolder
+export function pinLines(preview, t) {
+  const lines = [t('companion.confirmFile', { hash: preview.hash, size: formatSize(preview.size), modified: preview.modified })];
+  lines.push(preview.signer ? t('companion.confirmSigned', { signer: preview.signer }) : t('companion.confirmUnsigned'));
+  if (preview.version) lines.push(t('companion.confirmVersion', { version: preview.version }));
+  if (preview.changed) lines.push(t('companion.confirmChanged'));
+  if (preview.folderWritable) lines.push(t('companion.confirmFolder'));
+  return lines;
 }
 
 /** The game list after a toggle: added at the end, or taken out. Capped like the host. */

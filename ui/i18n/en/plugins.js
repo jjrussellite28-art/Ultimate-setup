@@ -78,6 +78,7 @@ export default {
   'plugins.act.disable': "Disable",
   'plugins.act.uninstall': "Uninstall",
   'plugins.removedAtRestart.detail': "Uninstalled and switched off. Its files are still in use and are removed at the next start; until then the plugin cannot be switched on again.",
+  'plugins.uninstallSkin.ask': "Uninstall {name}? If the skin is in use, the Couch skin takes its place.",
   'plugins.uninstall.ask': "Uninstall {name}? It will not be loaded any more.",
   'plugins.uninstall.done': "{name} was removed",
   'plugins.uninstall.atRestart': "{name} is switched off and removed at the next start; its own background work only ends then",

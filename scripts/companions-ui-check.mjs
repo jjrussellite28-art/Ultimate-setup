@@ -5,9 +5,8 @@
 //   node scripts/companions-ui-check.mjs [--port 5199] [--debug 9335]
 //
 // Env: EDGE (path to msedge.exe). Runs only headless (--headless=new --mute-audio); exit code 1 on a failed check.
-import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { spawn } from 'node:child_process';
+import { createProfile, guard } from './edge-profile.mjs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
@@ -19,21 +18,11 @@ for (let i = 0; i < args.length; i++) if (args[i].startsWith('--')) opt[args[i].
 
 const edge = process.env.EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const server = spawn(process.execPath, [join(here, 'preview-server.js')], { env: { ...process.env, PORT: opt.port }, stdio: 'ignore' });
-const profile = mkdtempSync(join(tmpdir(), 'couchhud-edge-'));
+const profile = createProfile();
 const browser = spawn(edge, [`--remote-debugging-port=${opt.debug}`, '--headless=new', '--mute-audio', '--disable-gpu', '--disable-extensions',
   '--no-first-run', `--user-data-dir=${profile}`, '--window-size=1920,1080', 'about:blank'], { stdio: 'ignore' });
-const browserGone = new Promise((r) => browser.once('exit', r));
-// Edge runs as a process tree; on Windows only taskkill /T ends the children that hold the profile folder (only while Edge runs: a finished PID may be reused).
-const killBrowser = () => { if (process.platform === 'win32' && browser.pid && browser.exitCode === null && browser.signalCode === null) spawnSync('taskkill', ['/pid', String(browser.pid), '/T', '/F'], { stdio: 'ignore' }); browser.kill(); };
-const cleanup = () => { server.kill(); killBrowser(); };
-process.on('exit', cleanup);
-// Remove the Edge profile only after Edge has let go of it; an 'exit' handler cannot wait, so this runs before process.exit.
-async function removeProfile() {
-  cleanup();
-  await Promise.race([browserGone, new Promise((r) => setTimeout(r, 5000))]);
-  try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch { /* still held: left in %TEMP% */ }
-}
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => removeProfile().finally(() => process.exit(130)));
+// Processes and profile folder are cleaned up on every way out (see edge-profile.mjs); removeProfile() waits for Edge to exit first.
+const removeProfile = guard({ children: [server], browser, dirs: [profile] });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const getJson = (url) => new Promise((res, rej) => http.get(url, (r) => { let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => { try { res(JSON.parse(d)); } catch (e) { rej(e); } }); }).on('error', rej));
@@ -86,7 +75,7 @@ await send('Page.enable');
 await send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
 await send('Page.navigate', { url: `http://127.0.0.1:${opt.port}/?lang=en&fresh&quiet` });
 await sleep(3500);
-await evaluate('document.querySelector("#boot")?.classList.add("done")');
+await evaluate(`import('/core/boot-gate.js').then((m) => { m.openInput(); document.querySelector("#boot")?.classList.add("done"); return true; })`);
 
 try {
   // 1. The list page: "Add" first, the Wand offer (Wand.exe found, not a companion yet), nothing else yet.

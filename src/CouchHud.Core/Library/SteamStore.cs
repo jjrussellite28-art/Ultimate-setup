@@ -53,6 +53,27 @@ public static class SteamStore
         return result;
     }
 
+    /// <summary>
+    /// The search the user typed; when the store finds nothing (it wants every word: "Mortal Kombat 1 Premium Edition" finds nothing), up to
+    /// <see cref="NameMatch.SearchFallbacks"/> shorter searches one after the other, the first with an answer wins. For a search the user starts,
+    /// not for the automatic match.
+    /// </summary>
+    public static async Task<IReadOnlyList<StoreCandidate>> SearchWithFallbackAsync(HttpClient http, string query, CancellationToken ct)
+    {
+        // All the searches together take 25 s at most (the caller's own limit still applies).
+        using var overall = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        overall.CancelAfter(TimeSpan.FromSeconds(25));
+        ct = overall.Token;
+        var found = await SearchAsync(http, query, ct);
+        if (found.Count > 0) return found;
+        foreach (var shorter in NameMatch.SearchFallbacks(query))
+        {
+            found = await SearchAsync(http, shorter, ct);
+            if (found.Count > 0) return found;
+        }
+        return found;
+    }
+
     /// <summary>Parses a JSON answer read up to <paramref name="maxBytes"/>; a longer one is refused instead of buffered.</summary>
     internal static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response, int maxBytes, CancellationToken ct)
     {

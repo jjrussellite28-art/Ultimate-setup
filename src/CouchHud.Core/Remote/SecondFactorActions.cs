@@ -81,6 +81,7 @@ public static class SecondFactorActions
         ["profileManage"] = Yes(ProfileRules),
         ["ratingSystem"] = Yes(ProfileRules),
         ["remoteLevel"] = Yes(RemoteLevel),
+        ["remotePair"] = Yes(RemotePair), // a new pairing code: with parental controls the parents' code for exactly this one (PairingGrant); the second factor confirms on a paired phone
         ["pluginApprove"] = Yes(PluginRights),
         ["pluginAcceptRevoked"] = Yes(PluginRights),
         ["pluginConfirmExe"] = Yes(PluginRights),
@@ -90,6 +91,8 @@ public static class SecondFactorActions
         ["extend"] = Not("everyday: a few more minutes of play time, bound to one grant"),
         ["launch"] = Not("starting one locked game: everyday, bound to the game"),
         ["lock"] = Not("locking or releasing one game: everyday, bound to the game"),
+        ["lockAll"] = Not("locking or releasing one game for all child profiles: the same everyday step as lock, bound to the game and to this scope"),
+        ["lockAllReset"] = Not("sets the damaged list of locks for all child profiles anew: the children are locked out of every game until then, so it only ever starts from the stricter state"),
         ["profileSwitch"] = Yes(ProfileUnrestrict),
         ["saveSettings"] = Not("backup limits only"),
         ["storeMatch"] = Not("which store entry fits a game: cosmetics"),

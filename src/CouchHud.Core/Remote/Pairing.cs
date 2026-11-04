@@ -78,6 +78,23 @@ public sealed class Pairing(Func<IReadOnlyList<RemoteDevice>> devices, Action<Ac
         }
     }
 
+    /// <summary>The current secret when there is a live one; never makes one (null when none, used up or expired).</summary>
+    public string? PeekCode(DateTimeOffset now)
+    {
+        lock (_lock) return _code is not null && now < _codeExpires ? _code : null;
+    }
+
+    /// <summary>Makes <paramref name="code"/> invalid when it is the current one (the page that showed it was left); true when it was dropped. Never makes a code.</summary>
+    public bool Discard(string? code)
+    {
+        lock (_lock)
+        {
+            if (code is null || _code != code) return false;
+            _code = null;
+            return true;
+        }
+    }
+
     /// <summary>Replaces the code, e.g. when the user asks for a new QR code.</summary>
     public string NewCode(DateTimeOffset now)
     {

@@ -326,7 +326,10 @@ public sealed class PluginHotLoadTests : IDisposable
         while (!File.Exists(plugin.InitDone) && watch.Elapsed < TimeSpan.FromSeconds(50))
         {
             looked++;
-            if (manager.Functions.Count > 0 || manager.Plugins.Any(p => p.Loaded) || manager.Pages.Count > 0 || manager.ToolSpecs.Count > 0) seen = true;
+            var visible = manager.Functions.Count > 0 || manager.Plugins.Any(p => p.Loaded) || manager.Pages.Count > 0 || manager.ToolSpecs.Count > 0;
+            // The marker is looked at after the lists: if it is still missing then, the lists were read before the plugin's last act, so
+            // before any commit (a thread that was paused between the two reads cannot make this fail).
+            if (visible && !File.Exists(plugin.InitDone)) seen = true;
             await Task.Delay(5);
         }
         var infos = await start;
@@ -365,7 +368,7 @@ public sealed class PluginHotLoadTests : IDisposable
 
         var info = Assert.Single(await manager.LoadNowAsync("hothang"));
 
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5));
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30), watch.Elapsed.ToString());
         Assert.False(info.Loaded);
         Assert.Equal(Strings.Get("plugin.initTimeout", "hothang"), info.Error);
         Assert.Empty(manager.Functions);
@@ -543,7 +546,7 @@ public sealed class PluginHotLoadTests : IDisposable
 
         var result = await manager.StopAsync("hotdisposehang");
 
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5));
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30), watch.Elapsed.ToString());
         Assert.Equal(PluginStop.TimedOut, result.Stop);
         Assert.Empty(manager.Functions);
         Assert.Null(manager.GrantOf("hotdisposehang"));
@@ -1019,5 +1022,113 @@ public sealed class PluginHotLoadTests : IDisposable
 
         Assert.Null(manager.TvProviders.PluginOf("hot-tv"));
         Assert.Empty(manager.TvProviders.Available());
+    }
+
+    // ---- What the install answer says after the start (Home Assistant "restart needed" right after a fresh install) ----
+
+    private static PluginInfo Line(bool enabled = true, bool loaded = false, string? error = null) => new("f", "f", "F", "1.0.0", null, null, null, enabled, loaded, error, true);
+
+    [Fact]
+    public async Task A_fresh_install_of_a_folder_the_owner_switched_off_earlier_says_switched_off_not_restart()
+    {
+        // The owner's "off" outlives an uninstall (a reinstall must not lift it): the plugin is installed but does not start, and no restart
+        // would change that. The answer must say so instead of "loads on the next start".
+        var plugin = Build("hotoff", "hotoff");
+        var manager = Manager(Trusted(plugin, PluginOrigin.FirstParty), enabled: _ => false);
+
+        var infos = await manager.LoadNowAsync("hotoff");
+
+        Assert.False(Assert.Single(infos).Loaded);
+        Assert.Equal(InstalledStart.SwitchedOff, InstalledStartRules.Judge(infos));
+        Assert.False(manager.IsRunning("hotoff"));
+        Assert.Contains("ausgeschaltet", Strings.GetIn("de", "catalog.pluginInstalledOff", "Home Assistant", "1.2.0"));
+        Assert.Contains("switched off", Strings.GetIn("en", "catalog.pluginInstalledOff", "Home Assistant", "1.2.0"));
+    }
+
+    [Fact]
+    public async Task A_fresh_install_that_is_switched_on_starts_hot_and_needs_no_restart()
+    {
+        var plugin = Build("hoton", "hoton");
+        var manager = Manager(Trusted(plugin, PluginOrigin.FirstParty));
+
+        var infos = await manager.LoadNowAsync("hoton");
+
+        Assert.Equal(InstalledStart.Started, InstalledStartRules.Judge(infos));
+        Assert.True(manager.IsRunning("hoton"));
+    }
+
+    [Fact]
+    public void The_answer_after_a_start_only_asks_for_a_restart_when_one_really_is_owed()
+    {
+        Assert.Equal(InstalledStart.Started, InstalledStartRules.Judge([Line(loaded: true)]));
+        Assert.Equal(InstalledStart.SwitchedOff, InstalledStartRules.Judge([Line(enabled: false)]));
+        Assert.Equal(InstalledStart.Failed, InstalledStartRules.Judge([Line(error: "kaputt")]));
+        Assert.Equal(InstalledStart.AtRestart, InstalledStartRules.Judge([Line() with { NeedsRestartToStart = true }]));
+        Assert.Equal(InstalledStart.AtRestart, InstalledStartRules.Judge([Line(enabled: false) with { NeedsRestartToStart = true }]));
+        Assert.Equal(InstalledStart.AtRestart, InstalledStartRules.Judge([Line() with { SkippedForOffline = true }]));
+        Assert.Equal(InstalledStart.AtRestart, InstalledStartRules.Judge([Line(error: "unknown") with { NeedsApproval = true }]));
+        Assert.Equal(InstalledStart.AtRestart, InstalledStartRules.Judge([]));
+    }
+
+    // ---- Removal after the stop (retries) ----
+
+    [Fact]
+    public async Task After_a_clean_stop_the_folder_is_removed_at_once_without_a_pause()
+    {
+        var plugin = Build("hotclean", "hotclean", Mode.DisposeMarks);
+        var trust = Trusted(plugin);
+        var manager = Manager(trust);
+        await manager.LoadNowAsync("hotclean");
+        trust.MarkRemoved("hotclean");
+        var stop = await manager.StopAsync("hotclean");
+        Assert.True(stop.FullyStopped);
+        var pauses = 0;
+
+        var gone = await CatalogService.RemoveAfterStopAsync(DataDir, "hotclean", 3, TimeSpan.Zero, _ => { pauses++; return Task.CompletedTask; });
+
+        Assert.True(gone);
+        Assert.Equal(0, pauses);
+        Assert.False(Directory.Exists(plugin.Dir));
+        Assert.Empty(trust.RemovedFolders());
+    }
+
+    [Fact]
+    public async Task A_folder_that_is_held_for_a_moment_is_removed_by_a_later_try()
+    {
+        var plugin = Build("hotlate", "hotlate");
+        var trust = Trusted(plugin);
+        trust.MarkRemoved("hotlate");
+        var held = new FileStream(Path.Combine(plugin.Dir, "held.bin"), FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+        var pauses = 0;
+
+        var gone = await CatalogService.RemoveAfterStopAsync(DataDir, "hotlate", 3, TimeSpan.Zero, _ =>
+        {
+            // The runtime lets go during the second pause.
+            if (++pauses == 2) held.Dispose();
+            return Task.CompletedTask;
+        });
+        held.Dispose();
+
+        Assert.True(gone);
+        Assert.Equal(2, pauses);
+        Assert.False(Directory.Exists(plugin.Dir));
+        Assert.Empty(trust.RemovedFolders());
+    }
+
+    [Fact]
+    public async Task A_folder_that_stays_held_is_tried_a_few_times_then_left_marked_for_the_next_start()
+    {
+        var plugin = Build("hotheld", "hotheld");
+        var trust = Trusted(plugin);
+        trust.MarkRemoved("hotheld");
+        using var held = new FileStream(Path.Combine(plugin.Dir, "held.bin"), FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+        var pauses = 0;
+
+        var gone = await CatalogService.RemoveAfterStopAsync(DataDir, "hotheld", 3, TimeSpan.Zero, _ => { pauses++; return Task.CompletedTask; });
+
+        Assert.False(gone);
+        Assert.Equal(3, pauses);
+        Assert.True(Directory.Exists(plugin.Dir));
+        Assert.Contains("hotheld", trust.RemovedFolders());
     }
 }

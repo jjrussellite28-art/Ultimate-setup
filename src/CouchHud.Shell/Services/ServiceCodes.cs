@@ -257,6 +257,8 @@ public static class ServiceCodes
     /// </summary>
     public static async Task StoreAsync(IReadOnlyList<string> sequence, bool parental)
     {
+        // The announcement before a UAC prompt says which code is replaced (an administrator needs not know the old one).
+        using var announce = AdminService.AnnounceCodeKind(parental ? "both" : "couch");
         var result = await CodeFlow.StoreAsync(AdminService.Ops, Passcode.Hash(sequence), parental, AdminService.WithGrantAsync).ConfigureAwait(false);
         Console.WriteLine($"[codes] new code to the service: {result}");
         await ThrowIfDamagedAsync(result).ConfigureAwait(false);

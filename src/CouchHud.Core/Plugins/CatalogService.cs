@@ -541,6 +541,7 @@ public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOn
         var temp = Path.Combine(dataDir, "catalog-temp");
         Directory.CreateDirectory(temp);
         var zip = Path.Combine(temp, $"{Guid.NewGuid():N}.zip");
+        FileStream? file = null;
         try
         {
             using (var idle = CancellationTokenSource.CreateLinkedTokenSource(ct))
@@ -551,8 +552,12 @@ public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOn
                     var (source, length) = await OpenAsync(entry.DownloadUrl, idle.Token);
                     await using var stream = source;
                     if (length > MaxPackageBytes) throw new CatalogException(Strings.Get("catalog.packageTooLarge"));
-                    await using var file = File.Create(zip);
+                    // Created new (never an existing file or link) and kept open: the handle that receives the download is the one that is
+                    // hashed, looked at, unpacked and staged below. Others may read it, nobody may write or replace it, and there is no
+                    // moment between "downloaded" and "checked" in which the path is the only thing that ties them together.
+                    file = CreateDownloadFile(zip);
                     await CopyLimitedAsync(stream, file, MaxPackageBytes, Strings.Get("catalog.packageTooLarge"), idle.Token, idle);
+                    await file.FlushAsync(idle.Token);
                 }
                 catch (Exception ex) when (ex is HttpRequestException or IOException || (ex is OperationCanceledException && !ct.IsCancellationRequested))
                 {
@@ -562,8 +567,7 @@ public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOn
 
             try
             {
-                // Hash, lint and unpack happen on one open handle that keeps writers out (the folder is writable by every program of the user).
-                return Install(entry, zip, statement, entry.Sha256, checkPackage, updateOnly);
+                return Install(entry, file!, zip, statement, entry.Sha256, checkPackage, updateOnly);
             }
             catch (InvalidDataException ex)
             {
@@ -572,18 +576,46 @@ public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOn
         }
         finally
         {
+            file?.Dispose();
             try { File.Delete(zip); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         }
     }
 
+    /// <summary>
+    /// The file the download is written to: created new (an existing file or link at that name fails closed, never reused or truncated), open
+    /// for reading by others only, so nobody can write or replace it until it is closed.
+    /// </summary>
+    internal static FileStream CreateDownloadFile(string path) => new(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read);
+
     /// <summary>Installs an already verified package (its statement, if it has one, verified by <see cref="VerifyEntry"/>).</summary>
-    internal InstallOutcome Install(CatalogEntry entry, string verifiedZip, VerifiedStatement? statement = null, string? expectedSha256 = null, Action<Stream>? checkPackage = null, bool updateOnly = false)
+    internal InstallOutcome Install(CatalogEntry entry, string verifiedZip, VerifiedStatement? statement, string expectedSha256, Action<Stream>? checkPackage = null, bool updateOnly = false)
     {
-        var registry = new CatalogRegistry(dataDir);
         // One handle for everything below: the package is hashed, looked at and unpacked from the same bytes, with no gap to swap the file in.
         using var held = new FileStream(verifiedZip, FileMode.Open, FileAccess.Read, FileShare.Read);
+        return Install(entry, held, verifiedZip, statement, expectedSha256, checkPackage, updateOnly);
+    }
+
+    /// <summary>
+    /// The same from an open handle that keeps writers out. Everything (hash, the caller's look, lint, unpacking, staging an update) reads this
+    /// handle; <paramref name="zipPath"/> is only a name for messages and is never opened again.
+    /// </summary>
+    internal InstallOutcome Install(CatalogEntry entry, FileStream held, string zipPath, VerifiedStatement? statement, string expectedSha256, Action<Stream>? checkPackage = null, bool updateOnly = false)
+    {
+        // One install at a time in the process: the check-then-write of the registry, the trust store and the staged package must not
+        // interleave with another install of the same entry (the manager's own gate covers the UI paths, this covers every caller, e.g. skin restore).
+        lock (InstallGate) return InstallLocked(entry, held, zipPath, statement, expectedSha256, checkPackage, updateOnly);
+    }
+
+    private static readonly object InstallGate = new();
+
+    private InstallOutcome InstallLocked(CatalogEntry entry, FileStream held, string zipPath, VerifiedStatement? statement, string expectedSha256, Action<Stream>? checkPackage, bool updateOnly)
+    {
+        // No hash, no install: the expected SHA-256 always comes with the entry.
+        if (string.IsNullOrWhiteSpace(expectedSha256)) throw new CatalogException(Strings.Get("catalog.noChecksumInstall"));
+        var registry = new CatalogRegistry(dataDir);
+        held.Position = 0;
         var sha = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(held));
-        if (expectedSha256 is not null && !PendingPackages.CryptographicEquals(sha, expectedSha256)) throw new CatalogException(Strings.Get("catalog.checksumMismatch"));
+        if (!PendingPackages.CryptographicEquals(sha, expectedSha256)) throw new CatalogException(Strings.Get("catalog.checksumMismatch"));
         held.Position = 0;
         // The caller's own look at the package (the automatic update compares plugin.json with the statement), on the same bytes that were hashed.
         checkPackage?.Invoke(held);
@@ -624,9 +656,39 @@ public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOn
         // An older copy may be loaded (and its DLLs locked): replace it before the next start loads anything. What was verified waits in the
         // protected trust store with the package's own SHA-256 (not next to the package or in catalog-installed.json, where any program of the
         // user could change it); the next start puts in place only a package that has this entry and this hash.
-        trust.StagePending(entry.Folder, statement is null ? new PluginTrustEntry { Hash = sha, Origin = PluginOrigin.Local } : statement.ToTrustEntry(sha));
-        PendingPackages.Stage(dataDir, entry, verifiedZip);
-        registry.Set(entry, pending: true);
+        // The package file first, then the trust entry, then the registry record: if any step fails (any exception, including a raw IOException),
+        // everything staged so far is taken back, so a trust entry never waits for a package that is not there, or the other way round.
+        // What was there before is not ours to lose: the registry record, an earlier pending trust entry and an earlier staged package are
+        // taken down first and put back on a failure; only what did not exist before is removed.
+        var key = CatalogRegistry.Key(entry.Kind, entry.Id);
+        var priorRecord = registry.Read().TryGetValue(key, out var existing) ? existing : null;
+        var priorPending = trust.PendingFor(entry.Folder);
+        var aside = PendingPackages.SetAside(dataDir, entry);
+        held.Position = 0;
+        try
+        {
+            PendingPackages.Stage(dataDir, entry, held, sha);
+            trust.StagePending(entry.Folder, statement is null ? new PluginTrustEntry { Hash = sha, Origin = PluginOrigin.Local } : statement.ToTrustEntry(sha));
+            registry.Set(entry, pending: true);
+        }
+        catch
+        {
+            PendingPackages.RestoreAside(dataDir, entry, aside);
+            try
+            {
+                if (priorPending is not null) trust.StagePending(entry.Folder, priorPending);
+                else trust.TakePending(entry.Folder);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException) { }
+            try
+            {
+                if (priorRecord is not null) registry.Set(key, priorRecord);
+                else registry.Remove(key);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException) { }
+            throw;
+        }
+        PendingPackages.DropAside(aside);
         return new InstallOutcome(Strings.Get("catalog.updateReady", entry.Name, entry.Version), true);
     }
 
@@ -649,6 +711,171 @@ public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOn
         trust.ClearRemoved(folder);
         EmptyTrash(dataDir);
         return true;
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex SkinFolderPattern = new(@"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62}[A-Za-z0-9_-])?\z", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>
+    /// Removes an installed skin (the host's gate comes first): its folder directly below <c>skins</c> and its record of the catalog install.
+    /// Only a folder name as the catalog allows it counts (no path, no dots-only name), never the Couch skin's id, and the folder must lie
+    /// directly in <c>skins</c> and not be a link, so nothing outside <c>%APPDATA%\CouchHud\skins</c> is ever touched. The folder is moved away
+    /// first (a skin list skips such a name, so it is gone for the page at once) and then deleted. False when it could not be moved now.
+    /// </summary>
+    public static bool UninstallSkin(string dataDir, string folder)
+    {
+        CheckSkinFolder(folder);
+        var skins = Path.GetFullPath(Path.Combine(dataDir, "skins"));
+        ClearSkinLeftovers(dataDir);
+        var dir = Path.GetFullPath(Path.Combine(skins, folder));
+        if (!string.Equals(Path.GetDirectoryName(dir), skins, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException(Strings.Get("catalog.badFolder"));
+        if (!Directory.Exists(dir))
+        {
+            ForgetSkinRecords(dataDir, folder);
+            return true;
+        }
+        // A link in its place (a junction put there by hand) is not followed and not deleted through: the skin stays, the person is told.
+        if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0) throw new ArgumentException(Strings.Get("catalog.badFolder"));
+        var aside = Path.Combine(skins, PackageInstaller.TempPrefix + "gone-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.Move(dir, aside);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"[catalog] skin {folder} stays: {ex.Message}");
+            return false;
+        }
+        ForgetSkinRecords(dataDir, folder);
+        try
+        {
+            DeleteTreeKeepingLinks(aside);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Hidden from the skin list by its name; ClearSkinLeftovers tries again at the next start and before the next uninstall.
+            Console.Error.WriteLine($"[catalog] could not delete {aside}: {ex.Message}");
+        }
+        return true;
+    }
+
+    /// <summary>Deletes a folder with everything in it; a link inside (a junction or symlink) is removed itself and never followed, so what it points to survives.</summary>
+    private static void DeleteTreeKeepingLinks(string root)
+    {
+        // Explicit stack, no recursion: a tree deeper than MaxDeleteDepth is left in place (and logged), never a stack overflow.
+        var order = new List<string>();
+        var pending = new Stack<(string Dir, int Depth)>();
+        pending.Push((root, 0));
+        var left = false;
+        while (pending.Count > 0)
+        {
+            var (dir, depth) = pending.Pop();
+            order.Add(dir);
+            foreach (var sub in Directory.EnumerateDirectories(dir))
+            {
+                if ((File.GetAttributes(sub) & FileAttributes.ReparsePoint) != 0)
+                {
+                    Directory.Delete(sub, recursive: false);
+                }
+                else if (depth + 1 > MaxDeleteDepth)
+                {
+                    left = true;
+                    Console.Error.WriteLine($"[catalog] {root} is nested deeper than {MaxDeleteDepth} levels: the rest stays");
+                }
+                else
+                {
+                    pending.Push((sub, depth + 1));
+                }
+            }
+            foreach (var file in Directory.EnumerateFiles(dir))
+            {
+                // A read-only file (a zip can bring one) must not keep the skin from going.
+                File.SetAttributes(file, FileAttributes.Normal);
+                File.Delete(file);
+            }
+        }
+        // Deepest first. A folder that still holds what was left in place stays too.
+        for (var i = order.Count - 1; i >= 0; i--)
+        {
+            try
+            {
+                File.SetAttributes(order[i], FileAttributes.Directory);
+                Directory.Delete(order[i], recursive: false);
+            }
+            catch (IOException) when (left)
+            {
+                // Holds the part that was left in place.
+            }
+        }
+        if (left) throw new IOException("the skin folder is nested too deeply to be deleted completely");
+    }
+
+    private const int MaxDeleteDepth = 64;
+
+    private static int _leftoversChecked;
+
+    /// <summary>Once per process: tidies the leftovers of an earlier uninstall on a thread of its own (it may have to wait for a file), never on the caller's.</summary>
+    public static void ClearSkinLeftoversOnce(string dataDir)
+    {
+        if (Interlocked.Exchange(ref _leftoversChecked, 1) == 0) _ = Task.Run(() => ClearSkinLeftovers(dataDir));
+    }
+
+    private static void CheckSkinFolder(string? folder)
+    {
+        if (string.IsNullOrEmpty(folder) || !SkinFolderPattern.IsMatch(folder) || CouchHud.Core.Skins.SkinCatalog.BuiltinIds.Contains(folder, StringComparer.OrdinalIgnoreCase))
+            throw new ArgumentException(Strings.Get("catalog.badFolder"));
+    }
+
+    /// <summary>
+    /// The folder as it is spelled on disk (Windows folder names are case-insensitive, the skin id on the page is not), or the given name when
+    /// there is none. Refuses a name that is no catalog folder, like <see cref="UninstallSkin"/>.
+    /// </summary>
+    public static string SkinFolderOnDisk(string dataDir, string folder)
+    {
+        CheckSkinFolder(folder);
+        var skins = Path.Combine(dataDir, "skins");
+        if (!Directory.Exists(skins)) return folder;
+        return Directory.EnumerateDirectories(skins).Select(Path.GetFileName).FirstOrDefault(n => string.Equals(n, folder, StringComparison.OrdinalIgnoreCase)) ?? folder;
+    }
+
+    /// <summary>
+    /// Deletes what an uninstall moved aside and could not delete at once (<c>.couchhud-gone-*</c> directly in <c>skins</c>; a link is never
+    /// followed or deleted through). Tried once per process start (ClearSkinLeftoversOnce) and before each uninstall; a failure is only logged.
+    /// </summary>
+    public static void ClearSkinLeftovers(string dataDir)
+    {
+        var skins = Path.Combine(dataDir, "skins");
+        if (!Directory.Exists(skins)) return;
+        try
+        {
+            foreach (var dir in Directory.EnumerateDirectories(skins, PackageInstaller.TempPrefix + "gone-*"))
+            {
+                if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0) continue;
+                try
+                {
+                    DeleteTreeKeepingLinks(dir);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Still in use: the next start tries again.
+                    Console.Error.WriteLine($"[catalog] could not delete {dir}: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"[catalog] skin leftovers: {ex.Message}");
+        }
+    }
+
+    /// <summary>The folder a catalog skin was installed into (its record), else the id; only a name, <see cref="UninstallSkin"/> checks it again.</summary>
+    public static string SkinFolderOf(string dataDir, string id) =>
+        new CatalogRegistry(dataDir).Read().GetValueOrDefault(CatalogRegistry.Key(CatalogKind.Skin, id))?.Folder ?? id;
+
+    private static void ForgetSkinRecords(string dataDir, string folder)
+    {
+        var registry = new CatalogRegistry(dataDir);
+        foreach (var (key, _) in registry.Read().Where(r => r.Key.StartsWith("skin:", StringComparison.Ordinal) && r.Value.Folder.Equals(folder, StringComparison.OrdinalIgnoreCase)).ToList())
+            registry.Remove(key);
     }
 
     /// <summary>The folder out of the plugins folder (into <c>plugin-trash</c>); true when it is gone (or was not there).</summary>
@@ -690,6 +917,31 @@ public sealed class CatalogService(HttpClient http, string dataDir, Func<IReadOn
             Console.Error.WriteLine($"[catalog] removing plugins: {ex.Message}");
         }
         EmptyTrash(dataDir);
+    }
+
+    /// <summary>How often <see cref="RemoveAfterStopAsync"/> tries again, and the pause between the tries.</summary>
+    public const int RemovalRetries = 3;
+
+    public static readonly TimeSpan RemovalRetryPause = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
+    /// After a clean stop the runtime may take a moment to let go of the plugin's files. Tries <see cref="FinishRemovals"/> up to
+    /// <paramref name="retries"/> more times, with a garbage collection and a pause (<paramref name="delay"/>) before each. True when the
+    /// folder is gone; false leaves the removal to the next start (the folder stays marked as removed).
+    /// </summary>
+    public static async Task<bool> RemoveAfterStopAsync(string dataDir, string folder, int retries, TimeSpan pause, Func<TimeSpan, Task> delay)
+    {
+        var path = Path.Combine(dataDir, "plugins", folder);
+        for (var attempt = 0; ; attempt++)
+        {
+            FinishRemovals(dataDir);
+            if (!Directory.Exists(path)) return true;
+            if (attempt >= retries) return false;
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            await delay(pause).ConfigureAwait(false);
+        }
     }
 
     /// <summary>Deletes what <see cref="UninstallPlugin"/> put aside (at start, before any plugin loads); what is still in use stays for next time.</summary>
@@ -792,10 +1044,106 @@ public static class PendingPackages
 {
     public static string Folder(string dataDir) => Path.Combine(dataDir, "pending");
 
-    internal static void Stage(string dataDir, CatalogEntry entry, string verifiedZip)
+    /// <summary>
+    /// Moves an earlier staged package of the entry out of the way (to a <c>*.tmp</c> next to it) before a new one is staged, so a failure
+    /// can put it back. Null when there was none.
+    /// </summary>
+    internal static string? SetAside(string dataDir, CatalogEntry entry)
+    {
+        var target = ZipFor(dataDir, CatalogRegistry.Key(entry.Kind, entry.Id));
+        if (!File.Exists(target)) return null;
+        var aside = target + "." + Guid.NewGuid().ToString("N") + ".prev.tmp";
+        File.Move(target, aside);
+        return aside;
+    }
+
+    /// <summary>A failed staging: what was staged is removed and the earlier package (if any) is back in place.</summary>
+    internal static void RestoreAside(string dataDir, CatalogEntry entry, string? aside)
+    {
+        var target = ZipFor(dataDir, CatalogRegistry.Key(entry.Kind, entry.Id));
+        try { File.Delete(target); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        if (aside is null) return;
+        try { File.Move(aside, target, overwrite: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>The staging worked: the earlier package is not needed any more.</summary>
+    internal static void DropAside(string? aside)
+    {
+        if (aside is null) return;
+        try { File.Delete(aside); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>The pending folder exists and is a plain directory (not a junction or symbolic link); a link is logged and left alone.</summary>
+    private static bool IsPlainFolder(string folder, Action<string>? log)
+    {
+        if (!Directory.Exists(folder)) return false;
+        if (!new DirectoryInfo(folder).Attributes.HasFlag(FileAttributes.ReparsePoint)) return true;
+        log?.Invoke("[catalog] the pending folder is a link, leftovers are not swept or restored");
+        return false;
+    }
+
+    /// <summary>
+    /// A crash between <see cref="SetAside"/> and the end of the install leaves the earlier package as <c>*.prev.tmp</c> and no package under
+    /// its name: it is put back (the newest one), so the staged update that still has its trust entry is not lost. True when it was restored.
+    /// </summary>
+    private static bool RestoreLeftover(string dataDir, string key, Action<string>? log)
+    {
+        var folder = Folder(dataDir);
+        if (!IsPlainFolder(folder, log)) return false;
+        var zip = ZipFor(dataDir, key);
+        var newest = Directory.EnumerateFiles(folder, Path.GetFileName(zip) + ".*.prev.tmp").OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault();
+        if (newest is null) return false;
+        try
+        {
+            File.Move(newest, zip, overwrite: false);
+            log?.Invoke($"[catalog] {key}: the staged package was put back after an interrupted install");
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Leftovers of a staging that was cut off (a crash between the temp file and the move) are removed. Only in a plain folder: if the
+    /// pending folder is a link (junction or symbolic link) to somewhere else nothing is deleted through it.
+    /// </summary>
+    internal static void SweepTemp(string dataDir, Action<string>? log = null)
+    {
+        var folder = Folder(dataDir);
+        if (!IsPlainFolder(folder, log)) return;
+        foreach (var file in Directory.EnumerateFiles(folder, "*.tmp"))
+        {
+            try { File.Delete(file); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+    }
+
+    /// <summary>
+    /// Writes the staged package from the bytes of the open, verified handle (not by copying a path again) and checks that what was written has
+    /// the verified hash, before it replaces the staged file. Throws (nothing staged) otherwise.
+    /// </summary>
+    internal static void Stage(string dataDir, CatalogEntry entry, Stream verified, string expectedSha256)
     {
         Directory.CreateDirectory(Folder(dataDir));
-        File.Copy(verifiedZip, ZipFor(dataDir, CatalogRegistry.Key(entry.Kind, entry.Id)), overwrite: true);
+        var target = ZipFor(dataDir, CatalogRegistry.Key(entry.Kind, entry.Id));
+        var tmp = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            using (var output = new FileStream(tmp, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None))
+            {
+                verified.CopyTo(output);
+                output.Flush();
+                output.Position = 0;
+                if (!CryptographicEquals(Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(output)), expectedSha256))
+                    throw new CatalogException(Strings.Get("catalog.checksumMismatch"));
+            }
+            File.Move(tmp, target, overwrite: true);
+        }
+        finally
+        {
+            try { File.Delete(tmp); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
     }
 
     private static string ZipFor(string dataDir, string key) => Path.Combine(Folder(dataDir), key.Replace(':', '-') + ".zip");
@@ -825,13 +1173,24 @@ public static class PendingPackages
         try
         {
             var registry = new CatalogRegistry(dataDir);
+            // Before the sweep: a package that an interrupted install set aside comes back under its name when none is there.
+            foreach (var (pendingKey, _) in registry.Read().Where(r => r.Value.Pending).ToList())
+            {
+                if (!File.Exists(ZipFor(dataDir, pendingKey))) RestoreLeftover(dataDir, pendingKey, log);
+            }
+            SweepTemp(dataDir, log);
             foreach (var (key, record) in registry.Read().Where(r => r.Value.Pending).ToList())
             {
                 var zip = ZipFor(dataDir, key);
                 try
                 {
                     registry.Set(key, record with { Pending = false });
-                    if (!File.Exists(zip)) throw new FileNotFoundException("staged package missing");
+                    if (!File.Exists(zip))
+                    {
+                        // Neither the package nor a set-aside one: the pending trust entry would wait for nothing, so it goes too.
+                        try { new PluginTrust(dataDir).TakePending(record.Folder); } catch (Exception ex) when (ex is not OutOfMemoryException) { }
+                        throw new FileNotFoundException("staged package missing");
+                    }
                     // The folder for staged packages and catalog-installed.json are writable by every program of the user: only a package
                     // that has its entry in the signed trust store, with the SHA-256 that was verified when it was downloaded, goes in. A
                     // record without such an entry (a folder added to the registry by something else) is refused.

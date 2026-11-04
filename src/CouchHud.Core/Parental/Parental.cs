@@ -25,6 +25,30 @@ public sealed class ParentalConfig
     /// <summary>Games that start only with the parents' code.</summary>
     public List<string> LockedItems { get; set; } = [];
     /// <summary>
+    /// Not stored. Set only on the copy a child's profile is judged by (<see cref="Config.ProfileView.EffectiveRules"/>) when the list of
+    /// locks for all child profiles could not be read: then every entry needs the parents' code (fail-closed).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool LockEverything { get; set; }
+
+    /// <summary>A copy for judging a child's profile: the profile's own locks plus the household's locks for all child profiles.</summary>
+    public ParentalConfig WithSharedLocks(IEnumerable<string>? shared, bool unreadable) => new()
+    {
+        Enabled = Enabled,
+        WeekdayMinutes = WeekdayMinutes,
+        WeekendMinutes = WeekendMinutes,
+        WindowStartMinute = WindowStartMinute,
+        WindowEndMinute = WindowEndMinute,
+        PerGameMinutes = PerGameMinutes,
+        LockedItems = [.. (LockedItems ?? []).Concat(shared ?? []).Where(i => i is not null).Distinct()],
+        LockEverything = unreadable || shared is null,
+        MaxAge = MaxAge,
+        BlockUnknownAge = BlockUnknownAge,
+        CountApps = CountApps,
+        TimeZoneId = TimeZoneId,
+        LedgerStarted = LedgerStarted
+    };
+    /// <summary>
     /// Games rated this age or older are locked, 0 = off. An age, not a system's code: a step of the active rating system (USK 6/12/16/18,
     /// PEGI 3/7/12/16/18, ESRB E 6, E10+ 10, T 13, M 17, AO 18, see <see cref="AgeRatings"/>), so a switch of the system keeps a safe
     /// value. Read through <see cref="AgeLimit"/>.
@@ -501,7 +525,7 @@ public sealed partial class ParentalService
 
     public static bool IsLocked(ParentalConfig c, LibraryItem item, IEnumerable<LibraryItem> all)
     {
-        if (c.LockedItems.Contains(item.Id)) return true;
+        if (c.LockEverything || c.LockedItems.Contains(item.Id)) return true;
         var key = LimitKey(item);
         return all.Any(i => c.LockedItems.Contains(i.Id) && LimitKey(i) == key);
     }

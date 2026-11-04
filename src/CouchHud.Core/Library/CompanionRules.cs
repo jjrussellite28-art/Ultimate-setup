@@ -37,7 +37,7 @@ public sealed class CompanionChange
 }
 
 /// <summary>One companion that is to start with a game, with the start the library decided on right now.</summary>
-public sealed record CompanionStart(CompanionRule Rule, LibraryItem App, LaunchTarget Start);
+public sealed record CompanionStart(CompanionRule Rule, LibraryItem App, LaunchTarget Start, bool Locked = false);
 
 /// <summary>An app that does not start, and why (<paramref name="Reason"/> is a short code for the log).</summary>
 public sealed record CompanionSkip(string AppId, string Reason);
@@ -89,6 +89,9 @@ public static class CompanionRules
                 WhenLocked = rule.WhenLocked,
                 // Empty stays empty (an ordinary companion). A hash stays a hash. Anything else was meant as a hash and is kept as "broken":
                 // such a rule does not start and shows as "signature invalid" instead of silently losing its signature requirement.
+                // Only a pin of the current format is kept; an older one counts as not confirmed (fail closed).
+                LockedSha256 = CompanionPin.Normalize(rule.LockedSha256),
+                AllowWritableFolder = rule.AllowWritableFolder,
                 Sha256 = string.IsNullOrWhiteSpace(rule.Sha256) ? "" : SignedProgram.IsHash(rule.Sha256.Trim()) ? rule.Sha256.Trim().ToLowerInvariant() : SignedProgram.Broken
             });
         }
@@ -147,6 +150,10 @@ public static class CompanionRules
             if (start.Count >= MaxStartsPerGame) { skipped.Add(new CompanionSkip(rule.AppId, "limit")); continue; }
             if (rule.AppId == game.Id || find(rule.AppId) is not { } app) { skipped.Add(new CompanionSkip(rule.AppId, "missing")); continue; }
             if (locked && !rule.WhenLocked) { skipped.Add(new CompanionSkip(rule.AppId, "locked")); continue; }
+            // On a locked couch the start bypasses the child's own list, and the file may sit in a folder the child can write to: it only starts
+            // when the parent confirmed its hash for the locked couch (LockedSha256, or the signature rule's Sha256). The host compares it on the held file
+            // right before CreateProcess (CompanionStart.Locked); an unlocked start does not look at LockedSha256.
+            if (locked && string.IsNullOrEmpty(rule.Sha256) && string.IsNullOrEmpty(rule.LockedSha256)) { skipped.Add(new CompanionSkip(rule.AppId, "unpinned")); continue; }
             if (SignedProgram.IsBroken(rule.Sha256)) { skipped.Add(new CompanionSkip(rule.AppId, "signature")); continue; }
             if (gate(app) is { } refused) { skipped.Add(new CompanionSkip(rule.AppId, refused)); continue; }
             LaunchTarget target;
@@ -162,7 +169,7 @@ public static class CompanionRules
             }
             var verdict = Eligible(app, target, windowsDir, resolve);
             if (verdict != CompanionVerdict.Ok) { skipped.Add(new CompanionSkip(rule.AppId, "not-eligible:" + verdict)); continue; }
-            start.Add(new CompanionStart(rule, app, target));
+            start.Add(new CompanionStart(rule, app, target, locked));
         }
         return new CompanionPlan(start, skipped);
     }

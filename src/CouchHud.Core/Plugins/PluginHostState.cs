@@ -210,6 +210,9 @@ public sealed partial class PluginManager
     private bool _hostPending;
     private DateTime _hostLast = DateTime.MinValue;
 
+    /// <summary>The clock of <see cref="HostChangeInterval"/> (tests pass a fake one).</summary>
+    internal TimeProvider HostTime { get; set; } = TimeProvider.System;
+
     /// <summary>The least time between two <see cref="IPluginHostState.Changed"/> calls.</summary>
     public TimeSpan HostChangeInterval { get; set; } = TimeSpan.FromMilliseconds(250);
 
@@ -225,10 +228,10 @@ public sealed partial class PluginManager
         {
             if (_hostPending) return;
             _hostPending = true;
-            wait = HostChangeInterval - (DateTime.UtcNow - _hostLast);
+            wait = HostChangeInterval - (HostTime.GetUtcNow().UtcDateTime - _hostLast);
             if (wait < TimeSpan.Zero) wait = TimeSpan.Zero;
         }
-        _ = Task.Delay(wait).ContinueWith(_ => FireHostChanged(), TaskScheduler.Default);
+        _ = Task.Delay(wait, HostTime).ContinueWith(_ => FireHostChanged(), TaskScheduler.Default);
     }
 
     private void FireHostChanged()
@@ -236,7 +239,7 @@ public sealed partial class PluginManager
         lock (_hostGate)
         {
             _hostPending = false;
-            _hostLast = DateTime.UtcNow;
+            _hostLast = HostTime.GetUtcNow().UtcDateTime;
         }
         List<(string Id, Context Context)> all;
         lock (_gate) all = [.. _contexts.Select(c => (c.Key, c.Value))];

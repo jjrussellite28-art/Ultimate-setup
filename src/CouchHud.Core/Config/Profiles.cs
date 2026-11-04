@@ -215,6 +215,25 @@ public sealed class ProfileView
         }
     }
 
+    /// <summary>
+    /// The rules this profile is judged by: <see cref="Rules"/>, and for a child's profile also the household's locks for all child profiles
+    /// (<see cref="AppConfig.LockedItemsAllChildren"/>), whether the child was added before or after the lock. A read-only copy: change
+    /// <see cref="Rules"/>. An adult's profile (a further profile that is not a child's, the default profile without limits) keeps its rules.
+    /// If the household list could not be read, every entry is locked for the child.
+    /// </summary>
+    public ParentalConfig EffectiveRules
+    {
+        get
+        {
+            var own = Rules;
+            var child = _entry is null ? ProfileCheck.HasLimits(_config.Parental) : _entry.Restricted;
+            if (!child) return own;
+            var shared = _config.LockedItemsAllChildren;
+            if (shared is { Count: 0 } && !_config.LockedItemsAllChildrenUnreadable) return own;
+            return own.WithSharedLocks(shared, _config.LockedItemsAllChildrenUnreadable);
+        }
+    }
+
     // --- Per-person UI settings: the same list as ProfileSettings. ---
 
     public string Skin

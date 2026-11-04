@@ -7,8 +7,8 @@
 // beats the important rules of everything after it, so a skin could take the core's pins apart). Both are removed here, reading the text the way CSS
 // Syntax Level 3 tokenizes it: comments, strings (which end at a newline, a carriage return or a form feed), unquoted url( ... ) tokens (which run to the
 // closing bracket and ignore comment and quote characters inside), numbers with units, escapes. A @layer block is unwrapped into ordinary rules.
-// Then a backstop: whatever is left is searched, escapes resolved, anywhere (strings, comments, url(), anything) for "@layer" or "@import"; if one is there the
-// whole stylesheet is refused (an honest skin has no reason to contain those words, so a false positive is fine). The text is read as UTF-8 only: the host sends
+// Then a backstop: whatever is left is read again token by token for an at-keyword "@layer" or "@import" (escapes in the name resolved, any nesting); if one is
+// there the whole stylesheet is refused. The words inside a comment, a string, a url( ) token or an identifier are not at-keywords and do not count. The text is read as UTF-8 only: the host sends
 // charset=utf-8, an @charset naming another charset refuses the stylesheet, and so do control characters (ESC, NUL ...) that another charset could use to hide text.
 
 const isNl = (c) => c === '\n' || c === '\r' || c === '\f';
@@ -209,24 +209,136 @@ function strip(css) {
   return { css: out, badCharset };
 }
 
-/** Whether "@layer" or "@import" is anywhere in the text, escapes resolved, upper or lower case: in a string, a comment, a url, anywhere. */
+/**
+ * Whether an at-keyword token "@layer" or "@import" (upper or lower case, escapes in the name resolved) is anywhere in the text, in any nesting.
+ * The text is read again token by token, the way strip() reads it: what is inside a comment, a string, an unquoted url( ) token or an identifier
+ * (a selector like .a\@layer, an attribute value, a custom property's string) is not an at-keyword to any parser and does not count. Text that two
+ * removed statements joined into "@layer" is a token now and is found.
+ */
 function mentionsLayerOrImport(css) {
-  let flat = '';
   let i = 0;
   while (i < css.length) {
-    if (css[i] === '\\' && i + 1 < css.length) {
-      if (isNl(css[i + 1])) { i += css[i + 1] === '\r' && css[i + 2] === '\n' ? 3 : 2; continue; }
-      const e = escapeEnd(css, i + 1);
-      flat += decodeIdent(css, i, e);
+    if (css[i] === '@' && startsIdent(css, i + 1)) {
+      const e = identEnd(css, i + 1);
+      const name = decodeIdent(css, i + 1, e).toLowerCase();
+      if (name === 'layer' || name === 'import') return true;
       i = e;
-    } else { flat += css[i]; i++; }
+    } else i = atomEnd(css, i);
   }
-  const low = flat.toLowerCase();
-  return low.includes('@layer') || low.includes('@import');
+  return false;
+}
+
+/**
+ * The text of a url or a string the way a URL parser reads it: CSS escapes decoded (a backslash and a line break is a continuation and vanishes), then TAB, LF and CR
+ * deleted (the URL parser does that), a backslash made a slash (it does that for web addresses), leading control characters and spaces cut.
+ */
+function addressText(s) {
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c !== '\\') { out += c; continue; }
+    const n = s[i + 1];
+    if (n === undefined) break;
+    if (isNl(n)) { if (n === '\r' && s[i + 2] === '\n') i++; i++; continue; }
+    if (isHex(n)) {
+      let j = i + 1;
+      let hex = '';
+      while (j < s.length && hex.length < 6 && isHex(s[j])) hex += s[j++];
+      const code = parseInt(hex, 16);
+      out += code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff) ? String.fromCodePoint(code) : '�';
+      if (j < s.length && isWs(s[j])) { if (s[j] === '\r' && s[j + 1] === '\n') j++; j++; }
+      i = j - 1;
+    } else { out += n; i++; }
+  }
+  return out.replace(/[\t\n\r\u00AD\u034F\u180B-\u180D\u200B-\u200D\u2060\uFE00-\uFE0F\uFEFF]/g, '').replace(/\\/g, '/').replace(/^[\u0000- ]+/, '');
+}
+
+// The two virtual hosts of the app and the art host may be written out (the same exceptions as EXTERNAL).
+const LOCAL_ADDRESS = /^(?:https?:)?\/\/(?:local|art|app)\.couchhud(?::\d+)?(?:[/?#]|$)/i;
+
+// Schemes that reach out (or run code); a string that is no fetch (an attribute value like "user:nova", "a: b") may use any other scheme-like start, but not one of these.
+const NETWORK_SCHEMES = new Set(['http', 'https', 'ftp', 'ftps', 'ws', 'wss', 'file', 'blob', 'filesystem', 'javascript', 'vbscript', 'view-source', 'chrome', 'chrome-extension', 'edge', 'ms-appx', 'ms-appx-web']);
+
+/**
+ * Whether a url token or string is an address that leaves the app, judged as the URL parser would read it (after addressText), whether or not it contains a literal "//":
+ * it starts with "//", or with a scheme other than data: and about:blank (in a place that fetches: any scheme; elsewhere only a scheme of NETWORK_SCHEMES or one followed by a slash,
+ * so "a: b" in a content string and "user:nova" in an attribute selector pass). The app's own hosts, written out, pass.
+ */
+function badAddress(raw, fetching) {
+  const t = addressText(raw);
+  // "//" and more slashes before a host; "// " (a decorative string) or "//" alone has no host.
+  if (t.startsWith('//')) {
+    const rest = t.replace(/^\/+/, '');
+    return rest.length > 0 && rest[0] !== ' ' && !LOCAL_ADDRESS.test(t);
+  }
+  const m = /^([A-Za-z][A-Za-z0-9+.-]*):/.exec(t);
+  if (!m) return false;
+  const scheme = m[1].toLowerCase();
+  if (scheme === 'data') return false;
+  if (scheme === 'about') return !t.toLowerCase().startsWith('about:blank');
+  if (LOCAL_ADDRESS.test(t)) return false;
+  return fetching || NETWORK_SCHEMES.has(scheme) || t[m[0].length] === '/';
+}
+
+// Functions whose arguments (url tokens, strings) are fetched.
+const URLISH = new Set(['url', 'src', 'image', 'image-set', '-webkit-image-set', 'cross-fade', '-webkit-cross-fade', 'element']);
+
+/**
+ * Whether any url token or any string in the sheet (custom properties included: var() carries a string into a fetch) is a bad address (badAddress). Fail closed: the whole
+ * stylesheet is refused; an honest skin writes its paths plainly.
+ */
+function hasBadAddress(css) {
+  const stack = [];
+  let custom = false; // inside the value of a custom property (var() can carry its strings into a fetch): strings are judged as strictly as a url
+  let braces = 0; // { } nested inside that value
+  let last = ''; // the last character that was not white space or a comment
+  let i = 0;
+  while (i < css.length) {
+    const c = css[i];
+    if (c === '"' || c === "'") {
+      const e = skipString(css, i);
+      const body = css.slice(i + 1, e);
+      if (badAddress(body.endsWith(c) ? body.slice(0, -1) : body, custom || (stack.length > 0 && stack[stack.length - 1]))) return true;
+      i = e;
+      last = c;
+    } else if (startsIdent(css, i)) {
+      const e = identEnd(css, i);
+      const name = decodeIdent(css, i, e).toLowerCase();
+      if (css[e] === '(') {
+        if (name === 'attr') return true; // attr() can hand an attribute's text to url() or image-set()
+        let j = e + 1;
+        while (j < css.length && isWs(css[j])) j++;
+        if (name === 'url' && css[j] !== '"' && css[j] !== "'") {
+          const end = skipUrlBody(css, j);
+          if (badAddress(css.slice(j, end).replace(/\s*\)?$/, ''), true)) return true;
+          i = end;
+          last = ')';
+        } else { stack.push(URLISH.has(name)); i = e + 1; last = '('; }
+      } else {
+        if (name.startsWith('--') && stack.length === 0 && (last === '' || last === '{' || last === ';' || last === '}')) {
+          let j = e;
+          while (j < css.length && isWs(css[j])) j++;
+          if (css[j] === ':') custom = true;
+        }
+        i = e;
+        last = 'a';
+      }
+    } else if (c === '(') { stack.push(false); i++; last = c; }
+    else if (c === ')') { stack.pop(); i++; last = c; }
+    else if (c === '{') { if (custom) braces++; i++; last = c; }
+    else if (c === '}') { if (custom) { if (braces > 0) braces--; else custom = false; } i++; last = c; }
+    else if (c === ';') { if (custom && braces === 0 && stack.length === 0) custom = false; i++; last = c; }
+    else {
+      const e = atomEnd(css, i);
+      if (!(c === '/' && css[i + 1] === '*') && !isWs(c)) last = c;
+      i = e;
+    }
+  }
+  return false;
 }
 
 // An absolute or protocol-relative web address, not preceded by a letter or digit (the same pattern as SkinCss.External in Core).
-const EXTERNAL = /(?<![A-Za-z0-9_-])(?:https?:)?\/\/(?!(?:local|art|app)\.couchhud(?:[/:"')\s]|$)|www\.w3\.org\/)[^\s"')]+/gi;
+const EXTERNAL = /(?<![A-Za-z0-9_-])(?:https?:)?\/\/(?!(?:local|art|app)\.couchhud(?:[/:"') \t\n\r\f]|$)|www\.w3\.org\/)[^ \t\n\r\f"')]+/gi;
 
 // C0 control characters other than tab, line feed, form feed and carriage return. In a stylesheet decoded from another charset (iso-2022-jp: ESC ( B
 // produces no character at all) they would hide "@layer" or "https://" from this scan while the browser reads them; an honest skin has none.
@@ -239,9 +351,18 @@ const FORBIDDEN_CONTROL = /[\u0000-\u0008\u000b\u000e-\u001f]/;
  */
 function sanitize(css) {
   if (FORBIDDEN_CONTROL.test(css)) return { css: '', refused: true };
-  const { css: clean, badCharset } = strip(css);
-  if (badCharset || mentionsLayerOrImport(clean)) return { css: '', refused: true };
-  return { css: clean.replace(EXTERNAL, 'about:blank'), refused: false };
+  // The text that is served is the text that was scanned: the address replacement can swallow a backslash, a quote or a comment mark and so change
+  // what is a string or a comment, so strip and scan run again on its result until it changes nothing (a few rounds at most, else refused).
+  let text = css;
+  for (let round = 0; round < 6; round++) {
+    const { css: clean, badCharset } = strip(text);
+    if (badCharset || mentionsLayerOrImport(clean)) return { css: '', refused: true };
+    const replaced = clean.replace(EXTERNAL, 'about:blank');
+    // What the replacement leaves is judged as the URL parser reads it (escapes, deleted tabs and line breaks, backslashes): an address it could not see is refused.
+    if (replaced === clean) return hasBadAddress(clean) ? { css: '', refused: true } : { css: clean, refused: false };
+    text = replaced;
+  }
+  return { css: '', refused: true };
 }
 
 /** The same for the bytes of the file: a UTF-16 byte order mark or bytes that are not valid UTF-8 refuse the stylesheet (a UTF-8 byte order mark is dropped). */

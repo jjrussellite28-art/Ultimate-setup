@@ -27,6 +27,8 @@ export default {
   'consoleSetup.summary.nothing': 'Nichts zu tun',
   'consoleSetup.cancelledNote': 'Abgebrochen. „Noch einmal versuchen“ macht weiter',
   'consoleSetup.needsFirst': 'Braucht zuerst: {step}',
+  'consoleSetup.refused.title': 'Das geht gerade nicht',
+  'consoleSetup.refused.locked': 'Die Couch ist gesperrt. Gib den Code ein, dann geht es weiter.',
   'consoleSetup.notUnlocked': 'Nicht entsperrt. „Noch einmal versuchen“ macht weiter',
   'consoleSetup.action.undo': 'Abbrechen und alles zurücknehmen',
   'consoleSetup.leadFailedUndo': 'Der Wechsel ist nicht fertig geworden. „Noch einmal versuchen“ macht weiter; „Abbrechen und alles zurücknehmen“ (oder B) stellt den Zustand von vorher wieder her.',

@@ -96,6 +96,9 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
       settled = true;
       window.removeEventListener('keydown', onKey, true);
       if (active === page) active = null;
+      // The phone panel is gone: a pairing code made under the parents' grant is not shown any more. Not when the pairing page is open
+      // underneath: its code belongs to that page, which discards it itself when it closes.
+      if (!secret && !state.stack.some((p) => p.id === 'pairing')) api.leavePairing?.()?.catch?.(() => {});
       report(null, false);
       resolve(result);
     };

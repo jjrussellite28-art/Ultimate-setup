@@ -375,8 +375,9 @@ internal sealed class OpsHarness : IDisposable
     public OperationsA Operations { get; private set; } = null!;
     public Harness Harness { get; private set; } = null!;
 
-    public OpsHarness(bool codeEnrolled = false, IGrantStoreFactory? grants = null, bool stateFolder = true, Action<string>? prepareState = null)
+    public OpsHarness(bool codeEnrolled = false, IGrantStoreFactory? grants = null, bool stateFolder = true, Action<string>? prepareState = null, TimeSpan? handlerTimeout = null)
     {
+        HandlerTimeout = handlerTimeout ?? TimeSpan.FromSeconds(60);
         StateFolder = System.IO.Path.Combine(Temp.Path, "state");
         AppDir = System.IO.Path.Combine(Temp.Path, "app");
         Directory.CreateDirectory(StateFolder);
@@ -401,12 +402,15 @@ internal sealed class OpsHarness : IDisposable
         Operations.Start();
         // As the service: the account's lock view knows a lock taken over from 0.4.0 (CodeHandlers.View).
         Harness = new Harness(grants: grants?.Create(), codeEnrolled: codeEnrolled, onServiceList: OnServiceList,
-            extraHandlers: Operations.AddHandlers, extraChecks: Operations.AddChecks,
+            extraHandlers: Operations.AddHandlers, handlerTimeout: HandlerTimeout, extraChecks: Operations.AddChecks,
             lockViews: sid => LockView.Closed with { Legacy = Operations.IsLegacyLocked(sid) },
             sessions: new SessionFacts(() => ConsoleSession, callerSession => Sessions.SignedInSids(callerSession)));
         Harness.State.MigrationLookup = Operations.MigrationOf;
         Harness.State.ReleaseLookup = () => Operations.ReleaseStatus;
     }
+
+    /// <summary>How long the dispatcher waits for a handler: generous, so a loaded machine never turns a slow handler into a timeout.</summary>
+    public TimeSpan HandlerTimeout { get; }
 
     public FakeSessions Sessions { get; } = new();
 

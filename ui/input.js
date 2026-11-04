@@ -1,6 +1,7 @@
 // Turns controller, keyboard and (fallback) browser gamepad input into one
 // stream of navigation actions, including key repeat for held directions.
 
+import { inputOpen } from './core/boot-gate.js';
 import { kindFromGamepadId, kindFromPresses } from './core/pad-glyphs.js';
 
 const REPEAT_DELAY = 380;
@@ -43,6 +44,8 @@ export class Input {
 
   /** source: 'pad' or 'keyboard', so hints can show the right buttons. */
   press(button, source = 'pad') {
+    // Behind the boot screen nothing is pressed: not remembered as held either, so no repeat starts when it opens.
+    if (!inputOpen()) return;
     if (this.held.has(button)) return;
     this.held.add(button);
     this.onAction(button, source);

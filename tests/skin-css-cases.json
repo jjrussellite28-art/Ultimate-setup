@@ -92,22 +92,22 @@
  {
   "name": "plain-string-mentions",
   "input": "a{content:\"@layer x;\"}",
-  "output": ""
+  "output": "a{content:\"@layer x;\"}"
  },
  {
   "name": "plain-string-import",
   "input": "a{content:'@import url(x)'}",
-  "output": ""
+  "output": "a{content:'@import url(x)'}"
  },
  {
   "name": "plain-comment",
   "input": "/* @layer x; @import url(x); */a{b:c}",
-  "output": ""
+  "output": "/* @layer x; @import url(x); */a{b:c}"
  },
  {
   "name": "plain-url-word",
   "input": "a{background:url(\"x@layer.png\")}",
-  "output": ""
+  "output": "a{background:url(\"x@layer.png\")}"
  },
  {
   "name": "plain-font-face",
@@ -117,7 +117,7 @@
  {
   "name": "plain-layerx",
   "input": "a{b:c}@layerx{d:e}",
-  "output": ""
+  "output": "a{b:c}@layerx{d:e}"
  },
  {
   "name": "unfinished-import",
@@ -222,7 +222,7 @@
  {
   "name": "layer-url-quote",
   "input": "a{b:url(')}@layer ch{c{d:e}}/* ')*/",
-  "output": ""
+  "output": "a{b:url(')}@layer ch{c{d:e}}/* ')*/"
  },
  {
   "name": "layer-url-escape-paren",
@@ -247,22 +247,22 @@
  {
   "name": "layer-dimension-url",
   "input": "a{b:1url(/*)}@layer ch{c{d:e}}/* */",
-  "output": ""
+  "output": "a{b:1url(/*)}@layer ch{c{d:e}}/* */"
  },
  {
   "name": "layer-ident-ends-url",
   "input": "a{b:foo-url(/*)}@layer ch{c{d:e}}/* */",
-  "output": ""
+  "output": "a{b:foo-url(/*)}@layer ch{c{d:e}}/* */"
  },
  {
   "name": "layer-escaped-newline-string",
   "input": "a{content:\"x\\\n}@layer ch{c{d:e}}\"}",
-  "output": ""
+  "output": "a{content:\"x\\\n}@layer ch{c{d:e}}\"}"
  },
  {
   "name": "layer-after-bad-string-comment",
   "input": "a{content:\"\n/*}@layer ch{c{d:e}}/* */",
-  "output": ""
+  "output": "a{content:\"\n/*}@layer ch{c{d:e}}/* */"
  },
  {
   "name": "url-quoted-ok",
@@ -277,17 +277,17 @@
  {
   "name": "hidden-mention-in-string",
   "input": "a{content:\"\\40layer\"}",
-  "output": ""
+  "output": "a{content:\"\\40layer\"}"
  },
  {
   "name": "hidden-mention-in-comment",
   "input": "/* @\\6c ayer */a{b:c}",
-  "output": ""
+  "output": "/* @\\6c ayer */a{b:c}"
  },
  {
   "name": "hidden-mention-in-url",
   "input": "a{b:url(@layer)}",
-  "output": ""
+  "output": "a{b:url(@layer)}"
  },
  {
   "name": "charset-utf8",
@@ -400,6 +400,746 @@
   "output": "a{b:c}\t\n\f\r\na{d:e}"
  },
  {
+  "name": "fp-comment-layer",
+  "input": "/* @layer is not allowed here */a{b:c}",
+  "output": "/* @layer is not allowed here */a{b:c}"
+ },
+ {
+  "name": "fp-comment-import",
+  "input": "/* we do not @import fonts */a{b:c}",
+  "output": "/* we do not @import fonts */a{b:c}"
+ },
+ {
+  "name": "fp-comment-escaped-in-text",
+  "input": "/* @\\6c ayer */a{b:c}",
+  "output": "/* @\\6c ayer */a{b:c}"
+ },
+ {
+  "name": "fp-string-layer",
+  "input": "a::before{content:\"@layer\"}",
+  "output": "a::before{content:\"@layer\"}"
+ },
+ {
+  "name": "fp-string-import-single",
+  "input": "a::before{content:'@import url(x.css)'}",
+  "output": "a::before{content:'@import url(x.css)'}"
+ },
+ {
+  "name": "fp-string-escaped-at",
+  "input": "a::before{content:\"\\40 layer and \\40import\"}",
+  "output": "a::before{content:\"\\40 layer and \\40import\"}"
+ },
+ {
+  "name": "fp-string-upper",
+  "input": "a::before{content:\"@LAYER @Import\"}",
+  "output": "a::before{content:\"@LAYER @Import\"}"
+ },
+ {
+  "name": "fp-url-unquoted-layer",
+  "input": "a{background:url(@layer.png)}",
+  "output": "a{background:url(@layer.png)}"
+ },
+ {
+  "name": "fp-url-unquoted-import",
+  "input": "a{background:url(img/@import/x.png)}",
+  "output": "a{background:url(img/@import/x.png)}"
+ },
+ {
+  "name": "fp-url-quoted-layer",
+  "input": "a{background:url(\"img/@layer/x.png\")}",
+  "output": "a{background:url(\"img/@layer/x.png\")}"
+ },
+ {
+  "name": "fp-url-upper",
+  "input": "a{background:URL(@LAYER)}",
+  "output": "a{background:URL(@LAYER)}"
+ },
+ {
+  "name": "fp-customprop-string",
+  "input": ":root{--note:\"@layer\";--b:'@import'}a{c:var(--note)}",
+  "output": ":root{--note:\"@layer\";--b:'@import'}a{c:var(--note)}"
+ },
+ {
+  "name": "fp-customprop-url",
+  "input": ":root{--bg:url(@layer.png)}a{background:var(--bg)}",
+  "output": ":root{--bg:url(@layer.png)}a{background:var(--bg)}"
+ },
+ {
+  "name": "fp-customprop-comment",
+  "input": ":root{--x:1/* @layer */ 2}a{b:var(--x)}",
+  "output": ":root{--x:1/* @layer */ 2}a{b:var(--x)}"
+ },
+ {
+  "name": "fp-attr-selector-string",
+  "input": "a[data-x=\"@layer\"],b[title='@import']{c:d}",
+  "output": "a[data-x=\"@layer\"],b[title='@import']{c:d}"
+ },
+ {
+  "name": "fp-attr-selector-prefix",
+  "input": "a[href^=\"@import\"]{c:d}",
+  "output": "a[href^=\"@import\"]{c:d}"
+ },
+ {
+  "name": "fp-class-escaped-at-layer",
+  "input": ".a\\@layer{b:c}",
+  "output": ".a\\@layer{b:c}"
+ },
+ {
+  "name": "fp-class-escaped-at-import",
+  "input": ".sm\\@import,.x\\40 layer{b:c}",
+  "output": ".sm\\@import,.x\\40 layer{b:c}"
+ },
+ {
+  "name": "fp-id-escaped",
+  "input": "#\\@LAYER{b:c}",
+  "output": "#\\@LAYER{b:c}"
+ },
+ {
+  "name": "fp-ident-like",
+  "input": "a{animation-name:atlayer;b:imports}",
+  "output": "a{animation-name:atlayer;b:imports}"
+ },
+ {
+  "name": "fp-layer-prefix-word",
+  "input": "@layers{a{b:c}}@importer x;",
+  "output": "@layers{a{b:c}}@importer x;"
+ },
+ {
+  "name": "fp-mixed-real-and-words",
+  "input": "/* @layer */@layer ch{a::before{content:\"@import\"}}b{c:url(@layer.png)}",
+  "output": "/* @layer */a::before{content:\"@import\"}b{c:url(@layer.png)}"
+ },
+ {
+  "name": "fp-mixed-import-and-words",
+  "input": "@import \"x.css\";a{content:\"@layer\"}/* @import */",
+  "output": "a{content:\"@layer\"}/* @import */"
+ },
+ {
+  "name": "fp-string-cr-then-real",
+  "input": "a{content:\"@layer\r}@layer ch{x{y:z}}\"}",
+  "output": "a{content:\"@layer\r}x{y:z}\"}"
+ },
+ {
+  "name": "fp-comment-between-tokens-not-an-atrule",
+  "input": "@/**/layer x;a{b:c}",
+  "output": "@/**/layer x;a{b:c}"
+ },
+ {
+  "name": "real-layer-comment-after-name",
+  "input": "@layer/**/ch;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "real-layer-comment-before-block",
+  "input": "@layer ch/**/{a{b:c}}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "real-layer-comment-in-prelude",
+  "input": "@layer a,/* ; */b;c{d:e}",
+  "output": "c{d:e}"
+ },
+ {
+  "name": "real-layer-escape-upper-hex",
+  "input": "@\\4C\\41YER ch;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "real-layer-escape-short-no-space",
+  "input": "@\\lAYER ch;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "real-layer-escape-crlf-terminator",
+  "input": "@\\6c\r\nayer ch;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "real-layer-escape-ff-terminator",
+  "input": "@\\6c\fayer ch;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "real-layer-escape-cr-terminator",
+  "input": "@\\6c\rayer ch;a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "real-import-escape-all",
+  "input": "@\\49 \\4d \\50 \\4f \\52 \\54 \"x.css\";a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "real-import-comment-after-name",
+  "input": "@import/**/\"x.css\";a{b:c}",
+  "output": "a{b:c}"
+ },
+ {
+  "name": "real-layer-after-string-cr",
+  "input": "a{content:\"x\r}@layer ch{c{d:e}}",
+  "output": "a{content:\"x\r}c{d:e}"
+ },
+ {
+  "name": "real-layer-after-string-ff",
+  "input": "a{content:\"x\f}@layer ch{c{d:e}}",
+  "output": "a{content:\"x\f}c{d:e}"
+ },
+ {
+  "name": "real-layer-inside-nested-rule",
+  "input": "a{b:c;@layer x{d{e:f}}}",
+  "output": "a{b:c;d{e:f}}"
+ },
+ {
+  "name": "real-layer-after-words",
+  "input": "a::before{content:\"@layer\"}@layer ch{b{c:d}}",
+  "output": "a::before{content:\"@layer\"}b{c:d}"
+ },
+ {
+  "name": "glued-by-removal-layer",
+  "input": "@lay@import \"x\";er x;a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "glued-by-removal-import",
+  "input": "@imp@import \"x\";ort \"y\";a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "glued-by-removal-escape",
+  "input": "@\\6c @import \"x\";ayer x;a{b:c}",
+  "output": ""
+ },
+ {
+  "name": "ext-swallows-escaped-dq",
+  "input": "a{content:\"//x\\\"} @layer base;\n",
+  "output": "a{content:\"about:blank\"} \n"
+ },
+ {
+  "name": "ext-swallows-escaped-dq-import",
+  "input": "a{content:\"//x\\\"}} @import \"evil.css\";\n",
+  "output": "a{content:\"about:blank\"}} \n"
+ },
+ {
+  "name": "ext-swallows-comment-opener",
+  "input": "a{}\n//x/*\n{}\n@layer base;\n*/\n",
+  "output": "a{}\nabout:blank\n{}\n\n*/\n"
+ },
+ {
+  "name": "ext-swallows-escaped-sq",
+  "input": "a{content:'//x\\'} @layer base;\n",
+  "output": "a{content:'about:blank'} \n"
+ },
+ {
+  "name": "ext-swallows-escaped-sq-import",
+  "input": "a{content:'//x\\'}} @import 'evil.css';\n",
+  "output": "a{content:'about:blank'}} \n"
+ },
+ {
+  "name": "ext-url-escaped-paren",
+  "input": "a{b:url(//x\\) } @layer base;\n/* )*/",
+  "output": "a{b:url(about:blank) } \n/* )*/"
+ },
+ {
+  "name": "ext-url-escaped-paren-import",
+  "input": "a{b:url(//x\\)} @import \"evil.css\";\n",
+  "output": "a{b:url(about:blank)} \n"
+ },
+ {
+  "name": "ext-swallows-comment-closer",
+  "input": "/* //x*/ @layer base;\n/* */a{b:c}",
+  "output": "/* about:blank \n/* */a{b:c}"
+ },
+ {
+  "name": "ext-comment-closer-then-import",
+  "input": "/* https://x*/ @import \"evil.css\"; /* */",
+  "output": "/* about:blank  /* */"
+ },
+ {
+  "name": "ext-comment-closer-protocol-relative",
+  "input": "/*\n//x*/@layer base;a{b:c}/**/",
+  "output": "/*\nabout:blank"
+ },
+ {
+  "name": "ext-glues-atkeyword",
+  "input": "a{b:c}@//x@layer base;\n",
+  "output": "a{b:c}@about:blank\n"
+ },
+ {
+  "name": "ext-glues-atkeyword-import",
+  "input": "a{b:c}@https://x@import \"e\";\n",
+  "output": "a{b:c}@about:blank\n"
+ },
+ {
+  "name": "ext-string-ends-at-newline",
+  "input": "a{content:\"//x\\\n} @layer base;\n\"}",
+  "output": "a{content:\"about:blank\n} \n\"}"
+ },
+ {
+  "name": "ext-plain-url",
+  "input": "a{background:url(https://example.com/x.png)}",
+  "output": "a{background:url(about:blank)}"
+ },
+ {
+  "name": "ext-plain-string",
+  "input": "a::before{content:\"see //example.com/x\"}",
+  "output": "a::before{content:\"see about:blank\"}"
+ },
+ {
+  "name": "esc-url-slash-backslash-slash",
+  "input": "a{background:url(/\\/evil.com/x.png)}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-hex-slash",
+  "input": "a{background:url(\\2f/e.com)}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-hex-slash-slash",
+  "input": "a{background:url(\\2f \\2f e.com)}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-hex-slash-padded",
+  "input": "a{background:url(\\00002f\\00002fe.com)}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-hex-colon",
+  "input": "a{background:url(https\\3a\\2f\\2fe.com/x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-colon-char",
+  "input": "a{background:url(https\\:/\\/e.com/x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-backslash-backslash",
+  "input": "a{background:url(\\\\\\\\e.com\\\\x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-hex-backslash",
+  "input": "a{background:url(\\5c \\5c e.com)}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-quoted-dq",
+  "input": "a{background:url(\"/\\/evil.com/x.png\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-quoted-sq-hex",
+  "input": "a{background:url('\\2f \\2f e.com')}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-quoted-continuation",
+  "input": "a{background:url(\"/\\\n/evil.com\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-upper-function",
+  "input": "a{background:URL(\\2f/e.com)}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-escaped-function-name",
+  "input": "a{background:u\\72l(\\2f/e.com)}",
+  "output": ""
+ },
+ {
+  "name": "esc-font-face-src",
+  "input": "@font-face{font-family:x;src:url(\\2f/e.com/f.woff2)}",
+  "output": ""
+ },
+ {
+  "name": "esc-font-face-src-quoted",
+  "input": "@font-face{font-family:x;src:url(\"/\\/e.com/f.woff2\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-image-set-string",
+  "input": "a{background-image:image-set(\"/\\/e.com/x.png\" 1x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-image-set-webkit",
+  "input": "a{background-image:-webkit-image-set(\"\\2f/e.com/x.png\" 1x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-image-set-url",
+  "input": "a{background-image:image-set(url(/\\/e.com/x.png) 1x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-nested-in-function",
+  "input": "a{background:linear-gradient(red,blue),url(/\\/e.com/x.png)}",
+  "output": ""
+ },
+ {
+  "name": "esc-src-function",
+  "input": "a{content:src(\"/\\/e.com/x.png\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-cross-fade",
+  "input": "a{background-image:cross-fade(url(\\2f/e.com/a.png),url(b.png),50%)}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-literal-tab",
+  "input": "a{background:url(\"/\t/evil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-literal-lf-in-escape-continuation",
+  "input": "a{background:url(\"/\\\n/evil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-hex-tab",
+  "input": "a{background:url(\"/\\9 /evil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-hex-lf",
+  "input": "a{background:url(\"/\\a /evil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-hex-cr",
+  "input": "a{background:url(\"/\\d /evil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-hex-tab-padded",
+  "input": "a{background:url(\"/\\000009/evil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-unquoted-hex-tab",
+  "input": "a{background:url(/\\9 /evil.com)}",
+  "output": ""
+ },
+ {
+  "name": "esc-url-unquoted-hex-tab-nospace",
+  "input": "a{background:url(/\\9/evil.com)}",
+  "output": ""
+ },
+ {
+  "name": "esc-imageset-hex-tab",
+  "input": "a{background-image:image-set(\"/\\9 /evil.com/x\" 1x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-imageset-url-hex-lf",
+  "input": "a{background-image:image-set(url(\"/\\a /evil.com/x\") 1x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-var-carrier-string",
+  "input": "a{--u:\"\\2f \\2f evil.com/x\";background-image:image-set(var(--u) 1x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-var-carrier-plain-slash",
+  "input": "a{--u:\"/\\2f evil.com/x\";background-image:image-set(var(--u) 1x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-var-carrier-tab",
+  "input": "a{--u:\"/\\9 /evil.com/x\";background-image:image-set(var(--u) 1x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-var-carrier-scheme",
+  "input": "a{--u:\"http:evil.com/x\";background-image:image-set(var(--u) 1x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-var-carrier-in-url",
+  "input": "a{--u:\"/\\/evil.com/x\";background-image:url(var(--u))}",
+  "output": ""
+ },
+ {
+  "name": "esc-scheme-no-slashes",
+  "input": "a{background:url(http:evil.com/x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-scheme-one-slash-quoted",
+  "input": "a{background:url(\"http:/evil.com\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-scheme-https-one-slash",
+  "input": "a{background:url(\"https:/evil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-scheme-upper",
+  "input": "a{background:url(\"HTTP:evil.com\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-scheme-hex-tab-inside",
+  "input": "a{background:url(\"ht\\9 tp:evil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-scheme-javascript",
+  "input": "a{background:url(\"javascript:alert(1)\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-scheme-ftp",
+  "input": "a{background:url(\"ftp:evil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-backslash-host",
+  "input": "a{background:url(\"\\\\\\\\evil.com\\\\x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-backslash-hex-host",
+  "input": "a{background:url(\"\\5c \\5c evil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-three-slashes-tab",
+  "input": "a{background:url(\"/\t/\\2fevil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-userinfo-local-lookalike",
+  "input": "a{background:url(\"https://local.couchhud:x@evil.com/y\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-userinfo-local-lookalike-var",
+  "input": "a{--u:\"https://local.couchhud:x@evil.com/y\";background-image:image-set(var(--u) 1x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-ignored-feff-after-slashes",
+  "input": "a{background:url(\"//﻿evil.com/x\")}",
+  "output": "a{background:url(\"about:blank\")}"
+ },
+ {
+  "name": "esc-ignored-200b-after-slashes",
+  "input": "a{background:url(\"//​evil.com/x\")}",
+  "output": "a{background:url(\"about:blank\")}"
+ },
+ {
+  "name": "esc-ignored-00ad-after-slashes",
+  "input": "a{background:url(\"//­evil.com/x\")}",
+  "output": "a{background:url(\"about:blank\")}"
+ },
+ {
+  "name": "esc-ignored-200c-200d-2060",
+  "input": "a{background:url(\"//‌‍⁠evil.com/x\")}",
+  "output": "a{background:url(\"about:blank\")}"
+ },
+ {
+  "name": "esc-ignored-fe0f-034f-180b",
+  "input": "a{background:url(\"//️͏᠋evil.com/x\")}",
+  "output": "a{background:url(\"about:blank\")}"
+ },
+ {
+  "name": "esc-space-0085-after-slashes",
+  "input": "a{background:url(\"//evil.com/x\")}",
+  "output": "a{background:url(\"about:blank\")}"
+ },
+ {
+  "name": "esc-space-00a0-after-slashes",
+  "input": "a{background:url(\"// evil.com/x\")}",
+  "output": "a{background:url(\"about:blank\")}"
+ },
+ {
+  "name": "esc-space-3000-after-slashes",
+  "input": "a{background:url(\"//　evil.com/x\")}",
+  "output": "a{background:url(\"about:blank\")}"
+ },
+ {
+  "name": "esc-ignored-feff-unquoted",
+  "input": "a{background:url(//﻿evil.com/x)}",
+  "output": "a{background:url(about:blank)}"
+ },
+ {
+  "name": "esc-ignored-feff-in-scheme",
+  "input": "a{background:url(\"ht﻿tp:evil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-ignored-200b-in-scheme",
+  "input": "a{background:url(\"https​:evil.com/x\")}",
+  "output": ""
+ },
+ {
+  "name": "esc-ignored-feff-first",
+  "input": "a{background:url(\"﻿//evil.com/x\")}",
+  "output": "a{background:url(\"﻿about:blank\")}"
+ },
+ {
+  "name": "esc-ignored-feff-in-var",
+  "input": "a{--u:\"//﻿evil.com/x\";background-image:image-set(var(--u) 1x)}",
+  "output": "a{--u:\"about:blank\";background-image:image-set(var(--u) 1x)}"
+ },
+ {
+  "name": "esc-ignored-feff-literal-address",
+  "input": "a{background:url(https://﻿evil.com/x)}",
+  "output": "a{background:url(about:blank)}"
+ },
+ {
+  "name": "esc-ignored-feff-decorative",
+  "input": "a::before{content:\"//﻿ \"}",
+  "output": "a::before{content:\"about:blank \"}"
+ },
+ {
+  "name": "esc-attr-url",
+  "input": "a{background:attr(data-x url)}",
+  "output": ""
+ },
+ {
+  "name": "esc-attr-image-set",
+  "input": "a{background-image:image-set(attr(data-x type(<string>)) 1x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-attr-content",
+  "input": "a::before{content:attr(title)}",
+  "output": ""
+ },
+ {
+  "name": "esc-attr-upper",
+  "input": "a{background:ATTR(data-x url)}",
+  "output": ""
+ },
+ {
+  "name": "esc-attr-escaped-name",
+  "input": "a{background:at\\74r(data-x url)}",
+  "output": ""
+ },
+ {
+  "name": "esc-attr-hex-escaped-name",
+  "input": "a{background:\\61ttr(data-x url)}",
+  "output": ""
+ },
+ {
+  "name": "esc-attr-in-var",
+  "input": "a{--u:attr(data-x url);background:var(--u)}",
+  "output": ""
+ },
+ {
+  "name": "esc-attr-word-in-string-ok",
+  "input": "a::before{content:\"attr(x)\"}b{font-family:\"attribute\"}",
+  "output": "a::before{content:\"attr(x)\"}b{font-family:\"attribute\"}"
+ },
+ {
+  "name": "esc-custom-string-scheme",
+  "input": "a{--u:\"foo:bar\";background-image:image-set(var(--u) 1x)}",
+  "output": ""
+ },
+ {
+  "name": "esc-custom-string-user-scheme",
+  "input": ":root{--skin:\"user:nova\"}",
+  "output": ""
+ },
+ {
+  "name": "esc-custom-string-scheme-after-brace",
+  "input": "a{b:c}:root{--x:\"x:y\"}",
+  "output": ""
+ },
+ {
+  "name": "esc-custom-string-scheme-after-semicolon",
+  "input": ":root{--a:1;--b:\"x:y\"}",
+  "output": ""
+ },
+ {
+  "name": "esc-custom-string-nested-braces",
+  "input": ":root{--a:{ \"k\": 1 };--b:\"x:y\"}",
+  "output": ""
+ },
+ {
+  "name": "esc-custom-string-after-comment",
+  "input": ":root{/* c */--b:\"x:y\"}",
+  "output": ""
+ },
+ {
+  "name": "esc-custom-ok-plain-strings",
+  "input": ":root{--font:\"Segoe UI\",sans-serif;--path:\"img/x.png\";--data:\"data:image/png;base64,AAAA\"}",
+  "output": ":root{--font:\"Segoe UI\",sans-serif;--path:\"img/x.png\";--data:\"data:image/png;base64,AAAA\"}"
+ },
+ {
+  "name": "esc-custom-string-colon-text",
+  "input": ":root{--label:\"a: b\"}",
+  "output": ""
+ },
+ {
+  "name": "esc-custom-then-normal-rule-ok",
+  "input": ":root{--a:1}b[data-skin=\"user:nova\"]{c:d}e::before{content:\"a:b\"}",
+  "output": ":root{--a:1}b[data-skin=\"user:nova\"]{c:d}e::before{content:\"a:b\"}"
+ },
+ {
+  "name": "esc-custom-ends-at-close-brace-ok",
+  "input": "a{--a:1}b::before{content:\"x:y\"}",
+  "output": "a{--a:1}b::before{content:\"x:y\"}"
+ },
+ {
+  "name": "esc-ok-local-hosts",
+  "input": "a{background:url(\"https://local.couchhud/a.png\")}b{background:url(//art.couchhud/b.png)}",
+  "output": "a{background:url(\"https://local.couchhud/a.png\")}b{background:url(//art.couchhud/b.png)}"
+ },
+ {
+  "name": "esc-ok-content-strings",
+  "input": "a::before{content:\"// \"}b::before{content:\"a: b\"}c::before{content:\"Note:\"}d{quotes:\"«\" \"»\"}",
+  "output": "a::before{content:\"// \"}b::before{content:\"a: b\"}c::before{content:\"Note:\"}d{quotes:\"«\" \"»\"}"
+ },
+ {
+  "name": "esc-ok-attribute-and-font-strings",
+  "input": "html[data-skin=\"user:nova\"]{font-family:\"Segoe UI\",\"Helvetica Neue\",sans-serif}@font-face{font-family:\"X Y\";src:url(\"fonts/x.woff2\") format(\"woff2\")}",
+  "output": "html[data-skin=\"user:nova\"]{font-family:\"Segoe UI\",\"Helvetica Neue\",sans-serif}@font-face{font-family:\"X Y\";src:url(\"fonts/x.woff2\") format(\"woff2\")}"
+ },
+ {
+  "name": "esc-ok-data-and-about",
+  "input": "a{background:url(\"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27/%3E\")}b{background:url(about:blank)}",
+  "output": "a{background:url(\"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27/%3E\")}b{background:url(about:blank)}"
+ },
+ {
+  "name": "esc-ok-relative-with-tab-escape",
+  "input": "a{background:url(\"img/\\9 x.png\")}b{background:url(\"./a/b.png\")}c{background:url(../up.png)}",
+  "output": "a{background:url(\"img/\\9 x.png\")}b{background:url(\"./a/b.png\")}c{background:url(../up.png)}"
+ },
+ {
+  "name": "esc-ok-plain-url",
+  "input": "a{background:url(img/x.png)}b{background:url(\"/art/y.png\")}c{background:url(data:image/png;base64,AAAA)}",
+  "output": "a{background:url(img/x.png)}b{background:url(\"/art/y.png\")}c{background:url(data:image/png;base64,AAAA)}"
+ },
+ {
+  "name": "esc-ok-escape-in-text-string",
+  "input": "a::before{content:\"\\2f\\2f\"}",
+  "output": "a::before{content:\"\\2f\\2f\"}"
+ },
+ {
+  "name": "esc-ok-escape-other-char",
+  "input": "a{background:url(img\\20x.png)}b{background:url(\"i\\41.png\")}",
+  "output": "a{background:url(img\\20x.png)}b{background:url(\"i\\41.png\")}"
+ },
+ {
+  "name": "esc-ok-escaped-paren-in-url",
+  "input": "a{background:url(x\\).png)}",
+  "output": "a{background:url(x\\).png)}"
+ },
+ {
+  "name": "custom-prop-bare-atkeyword",
+  "input": ":root{--x:@layer y}a{b:c}",
+  "output": ":root{--x:}a{b:c}"
+ },
+ {
   "name": "fuzz-0",
   "input": "@import(\n\u0000@import \"e.css\" layer(ch);@import url(e.css)-->;src:url(@\\6c ayer x;src:url(\t",
   "output": ""
@@ -407,7 +1147,7 @@
  {
   "name": "fuzz-1",
   "input": "url('@layer ch\\@layer a,b;\r}",
-  "output": ""
+  "output": "url('@layer ch\\@layer a,b;\r}"
  },
  {
   "name": "fuzz-2",
@@ -447,7 +1187,7 @@
  {
   "name": "fuzz-9",
   "input": ";<!--<!--\f\"{@import url(e.css)@import\\)*/[",
-  "output": ""
+  "output": ";<!--<!--\f\"{@import url(e.css)@import\\)*/["
  },
  {
   "name": "fuzz-10",
@@ -462,7 +1202,7 @@
  {
   "name": "fuzz-12",
   "input": " a@keyframes k{@media screen{\"@layer:\f@layer a,b;",
-  "output": ""
+  "output": " a@keyframes k{@media screen{\"@layer:\f"
  },
  {
   "name": "fuzz-13",
@@ -482,7 +1222,7 @@
  {
   "name": "fuzz-16",
   "input": "\r}][x\\40layer ch;",
-  "output": ""
+  "output": "\r}][x\\40layer ch;"
  },
  {
   "name": "fuzz-17",
@@ -492,12 +1232,12 @@
  {
   "name": "fuzz-18",
   "input": "'@layer a,b;url(/*[;src:url(/* ",
-  "output": ""
+  "output": "'@layer a,b;url(/*[;src:url(/* "
  },
  {
   "name": "fuzz-19",
   "input": "u+:u\\72l(:URL(-url(url( \n@import \"e.css\" layer(ch);@media screen{(\f\n@layer ch{",
-  "output": ""
+  "output": "u+:u\\72l(:URL(-url(url( \n@import \"e.css\" layer(ch);@media screen{(\f\n"
  },
  {
   "name": "fuzz-20",
@@ -507,7 +1247,7 @@
  {
   "name": "fuzz-21",
   "input": "1url(url( a@\\6c ayer x;",
-  "output": ""
+  "output": "1url(url( a@\\6c ayer x;"
  },
  {
   "name": "fuzz-22",
@@ -532,7 +1272,7 @@
  {
   "name": "fuzz-26",
   "input": "\\\n@\\6c ayer x;\\\nu\\72l(\n'@layer a,b;url(/*url('",
-  "output": ""
+  "output": "\\\n\\\nu\\72l(\n'@layer a,b;url(/*url('"
  },
  {
   "name": "fuzz-27",
@@ -542,12 +1282,12 @@
  {
   "name": "fuzz-28",
   "input": "\\@layer a,b;{URL(.5'\r",
-  "output": ""
+  "output": "\\@layer a,b;{URL(.5'\r"
  },
  {
   "name": "fuzz-29",
   "input": "u+-url(}<!--u\\72l(URL(/*u\\72l(/*@import \"e.css\" layer(ch);",
-  "output": ""
+  "output": "u+-url(}<!--u\\72l(URL(/*u\\72l(/*@import \"e.css\" layer(ch);"
  },
  {
   "name": "fuzz-30",
@@ -567,7 +1307,7 @@
  {
   "name": "fuzz-33",
   "input": "a.5(url('@import1url(-@layer ch{\nx@x .5@x u+",
-  "output": ""
+  "output": "a.5(url('@import1url(-@layer ch{\nx@x .5@x u+"
  },
  {
   "name": "fuzz-34",
@@ -582,7 +1322,7 @@
  {
   "name": "fuzz-36",
   "input": "src:url(\\40layer ch;)\\)<!--",
-  "output": ""
+  "output": "src:url(\\40layer ch;)\\)<!--"
  },
  {
   "name": "fuzz-37",
@@ -592,7 +1332,7 @@
  {
   "name": "fuzz-38",
   "input": "URL(*/-<!--@layer",
-  "output": ""
+  "output": "URL(*/-<!--@layer"
  },
  {
   "name": "fuzz-39",
@@ -602,12 +1342,12 @@
  {
   "name": "fuzz-40",
   "input": "-->\"u\\72l(\n{1e\\40layer ch;\\)",
-  "output": ""
+  "output": "-->\"u\\72l(\n{1e\\40layer ch;\\)"
  },
  {
   "name": "fuzz-41",
   "input": "url(\"::@layer ch{+URL(url(url('@import url(e.css)@\\6c ayer x;URL(}",
-  "output": ""
+  "output": "url(\"::@layer ch{+URL(url(url('@import url(e.css)@\\6c ayer x;URL(}"
  },
  {
   "name": "fuzz-42",
@@ -617,7 +1357,7 @@
  {
   "name": "fuzz-43",
   "input": "'@keyframes k{--> @media screen{1e[1url(@keyframes k{url(@x @import url(e.css)/*-",
-  "output": ""
+  "output": "'@keyframes k{--> @media screen{1e[1url(@keyframes k{url(@x @import url(e.css)/*-"
  },
  {
   "name": "fuzz-44",
@@ -632,7 +1372,7 @@
  {
   "name": "fuzz-46",
   "input": ")(URL(1url(@import \"e.css\" @importu\\72l(\\40layer ch;)",
-  "output": ""
+  "output": ")(URL(1url(@import \"e.css\" @importu\\72l(\\40layer ch;)"
  },
  {
   "name": "fuzz-47",
@@ -642,17 +1382,17 @@
  {
   "name": "fuzz-48",
   "input": "]a{b:c}url( url( 1e@media screen{a{b:c}\r+url(/*@\\6c ayer x;@layer ch",
-  "output": ""
+  "output": "]a{b:c}url( url( 1e@media screen{a{b:c}\r+url(/*@\\6c ayer x;@layer ch"
  },
  {
   "name": "fuzz-49",
   "input": "\"1url(*/u+(:\\40layer ch;@font-face{+\n)\f",
-  "output": ""
+  "output": "\"1url(*/u+(:\\40layer ch;@font-face{+\n)\f"
  },
  {
   "name": "fuzz-50",
   "input": "@font-face{ @importsrc:url(.5)\t\\)a{b:c}1ea{b:c}url(/*",
-  "output": ""
+  "output": "@font-face{ @importsrc:url(.5)\t\\)a{b:c}1ea{b:c}url(/*"
  },
  {
   "name": "fuzz-51",
@@ -662,7 +1402,7 @@
  {
   "name": "fuzz-52",
   "input": "URL(;@import url(e.css)@x src:url(@layer<!--url(@media screen{;\t",
-  "output": ""
+  "output": "URL(;@import url(e.css)@x src:url(@layer<!--url(@media screen{;\t"
  },
  {
   "name": "fuzz-53",
@@ -687,7 +1427,7 @@
  {
   "name": "fuzz-57",
   "input": "\t[)@import;.5{\\40layer ch;\\40layer ch;",
-  "output": ""
+  "output": "\t[).5{\\40layer ch;\\40layer ch;"
  },
  {
   "name": "fuzz-58",
@@ -697,7 +1437,7 @@
  {
   "name": "fuzz-59",
   "input": "(\t\\\r[\\40layer ch;@x @supports (a:b){",
-  "output": ""
+  "output": "(\t\\\r[\\40layer ch;@x @supports (a:b){"
  },
  {
   "name": "fuzz-60",
@@ -717,7 +1457,7 @@
  {
   "name": "fuzz-63",
   "input": "@keyframes k{@media screen{/*@keyframes k{\rURL(;url( @font-face{/*-url(*/url(\"@import",
-  "output": ""
+  "output": "@keyframes k{@media screen{/*@keyframes k{\rURL(;url( @font-face{/*-url(*/url(\"@import"
  },
  {
   "name": "fuzz-64",
@@ -727,7 +1467,7 @@
  {
   "name": "fuzz-65",
   "input": "<!--\\)u+url(/*}[a{b:c}u\\72l(@keyframes k{@layer ch@supports (a:b){}",
-  "output": ""
+  "output": "<!--\\)u+url(/*}[a{b:c}u\\72l(@keyframes k{@layer ch@supports (a:b){}"
  },
  {
   "name": "fuzz-66",
@@ -757,12 +1497,12 @@
  {
   "name": "fuzz-71",
   "input": "@supports (a:b){{\\40layer ch;",
-  "output": ""
+  "output": "@supports (a:b){{\\40layer ch;"
  },
  {
   "name": "fuzz-72",
   "input": "src:url(\\40layer ch;src:url(url(\"u\\72l(@import url(e.css)",
-  "output": ""
+  "output": "src:url(\\40layer ch;src:url(url(\"u\\72l(@import url(e.css)"
  },
  {
   "name": "fuzz-73",
@@ -772,7 +1512,7 @@
  {
   "name": "fuzz-74",
   "input": "\\@import \"e.css\"url(\"aurl(')",
-  "output": ""
+  "output": "\\@import \"e.css\"url(\"aurl(')"
  },
  {
   "name": "fuzz-75",
@@ -787,7 +1527,7 @@
  {
   "name": "fuzz-77",
   "input": "xurl(\n@import \"e.css\".5@\\6c ayer x;\t\f\\40layer ch;1e@keyframes k{",
-  "output": ""
+  "output": "xurl(\n\t\f\\40layer ch;1e@keyframes k{"
  },
  {
   "name": "fuzz-78",
@@ -797,7 +1537,7 @@
  {
   "name": "fuzz-79",
   "input": "url(\"[@import \"e.css\"\f@layer a,b;u\\72l(",
-  "output": ""
+  "output": "url(\"[@import \"e.css\"\fu\\72l("
  },
  {
   "name": "fuzz-80",
@@ -807,7 +1547,7 @@
  {
   "name": "fuzz-81",
   "input": "]<!--@supports (a:b){\turl(url('@layer a,b;\\)xurl( ",
-  "output": ""
+  "output": "]<!--@supports (a:b){\turl(url('@layer a,b;\\)xurl( "
  },
  {
   "name": "fuzz-82",
@@ -817,7 +1557,7 @@
  {
   "name": "fuzz-83",
   "input": "\r\"1url(@layer ch{@import \"e.css\" layer(ch);url(\"@layer ch{)/*]\\",
-  "output": ""
+  "output": "\r\"1url(@layer ch{@import \"e.css\" layer(ch);url(\")/*]\\"
  },
  {
   "name": "fuzz-84",
@@ -837,7 +1577,7 @@
  {
   "name": "fuzz-87",
   "input": ")/*@layer a,b;u\\72l(@layer a,b;[@supports (a:b){\fURL(@import url(e.css)-",
-  "output": ""
+  "output": ")/*@layer a,b;u\\72l(@layer a,b;[@supports (a:b){\fURL(@import url(e.css)-"
  },
  {
   "name": "fuzz-88",
@@ -847,7 +1587,7 @@
  {
   "name": "fuzz-89",
   "input": "/*url(\"1e@x url(/*@\\6c ayer x;@keyframes k{URL(a{b:c}",
-  "output": ""
+  "output": "/*url(\"1e@x url(/*@\\6c ayer x;@keyframes k{URL(a{b:c}"
  },
  {
   "name": "fuzz-90",
@@ -872,22 +1612,22 @@
  {
   "name": "fuzz-94",
   "input": "url( )url(/*@import url(e.css)/*.5@import \"e.css\"1eurl('src:url(",
-  "output": ""
+  "output": "url( )url(/*@import url(e.css)/*.5@import \"e.css\"1eurl('src:url("
  },
  {
   "name": "fuzz-95",
   "input": "url('-->\ra{b:c}url(-a(@\\6c ayer x;]a{b:c}\f",
-  "output": ""
+  "output": "url('-->\ra{b:c}url(-a(@\\6c ayer x;]a{b:c}\f"
  },
  {
   "name": "fuzz-96",
   "input": "-->1url(]@keyframes k{@layer ch{\\)<!--*/*/@supports (a:b){@import",
-  "output": ""
+  "output": "-->1url(]@keyframes k{\\)<!--*/*/@supports (a:b){@import"
  },
  {
   "name": "fuzz-97",
   "input": "u+url(/*: @layer\\\n@layer a,b;{\\<!--@layer ch{'@import \"e.css\"'",
-  "output": ""
+  "output": "u+url(/*: @layer\\\n@layer a,b;{\\<!--@layer ch{'@import \"e.css\"'"
  },
  {
   "name": "fuzz-98",
@@ -897,7 +1637,7 @@
  {
   "name": "fuzz-99",
   "input": "-->}1url(\\40layer ch;@x url( ",
-  "output": ""
+  "output": "-->}1url(\\40layer ch;@x url( "
  },
  {
   "name": "fuzz-100",
@@ -932,32 +1672,32 @@
  {
   "name": "fuzz-106",
   "input": "URL(\\@keyframes k{src:url(\\1e@layer ch@import",
-  "output": ""
+  "output": "URL(\\@keyframes k{src:url(\\1e@layer ch@import"
  },
  {
   "name": "fuzz-107",
   "input": "url( @supports (a:b){\f\raurl(\"]@font-face{@layer ch{<!--",
-  "output": ""
+  "output": "url( @supports (a:b){\f\raurl(\"]@font-face{@layer ch{<!--"
  },
  {
   "name": "fuzz-108",
   "input": "<!--@layer ch\\\n@font-face{'\\);@keyframes k{1url(@import*/aurl( ",
-  "output": ""
+  "output": "<!--'\\);@keyframes k{1url(@import*/aurl( "
  },
  {
   "name": "fuzz-109",
   "input": "u\\72l(\\\n*/@layer a,b;@layer ch{*/{x @keyframes k{(-url(/*",
-  "output": ""
+  "output": "u\\72l(\\\n*/@layer a,b;@layer ch{*/{x @keyframes k{(-url(/*"
  },
  {
   "name": "fuzz-110",
   "input": "@supports (a:b){URL(@layer churl('<!--url('",
-  "output": ""
+  "output": "@supports (a:b){URL(@layer churl('<!--url('"
  },
  {
   "name": "fuzz-111",
   "input": "a@supports (a:b){@layer a,b;-->'@layerurl(\"'URL(\\)",
-  "output": ""
+  "output": "a@supports (a:b){-->'@layerurl(\"'URL(\\)"
  },
  {
   "name": "fuzz-112",
@@ -967,7 +1707,7 @@
  {
   "name": "fuzz-113",
   "input": "@import \"e.css\" layer(ch);x[url(\"@import url(e.css)@layer a,b;URL(\"@layer a,b;-",
-  "output": ""
+  "output": "x[url(\"@import url(e.css)@layer a,b;URL(\"-"
  },
  {
   "name": "fuzz-114",
@@ -997,7 +1737,7 @@
  {
   "name": "fuzz-119",
   "input": "1url(\\@layer a,b;u+{+url(/*@font-face{\r-url(",
-  "output": ""
+  "output": "1url(\\@layer a,b;u+{+url(/*@font-face{\r-url("
  },
  {
   "name": "fuzz-120",
@@ -1007,7 +1747,7 @@
  {
   "name": "fuzz-121",
   "input": "url('@layer \\\n\t)",
-  "output": ""
+  "output": "url('@layer \\\n\t)"
  },
  {
   "name": "fuzz-122",
@@ -1022,22 +1762,22 @@
  {
   "name": "fuzz-124",
   "input": "\f\\40layer ch;u+\\\n@supports (a:b){",
-  "output": ""
+  "output": "\f\\40layer ch;u+\\\n@supports (a:b){"
  },
  {
   "name": "fuzz-125",
   "input": "]@layer ch{src:url(@layer a,b;}a{b:c}url(/*",
-  "output": ""
+  "output": "]src:url(@layer a,b;}a{b:c}url(/*"
  },
  {
   "name": "fuzz-126",
   "input": "a{b:c}\n(url(\"-url(@layer a,b;<!--u\\72l(/*",
-  "output": ""
+  "output": "a{b:c}\n(url(\"-url(@layer a,b;<!--u\\72l(/*"
  },
  {
   "name": "fuzz-127",
   "input": "@importurl('@layer ch{",
-  "output": ""
+  "output": "@importurl('@layer ch{"
  },
  {
   "name": "fuzz-128",
@@ -1052,12 +1792,12 @@
  {
   "name": "fuzz-130",
   "input": ";@keyframes k{[URL(@layer a,b;@import<!--:url('{\"@layer ch{-->@import \"e.css\"",
-  "output": ""
+  "output": ";@keyframes k{[URL(@layer a,b;@import<!--:url('{\"@layer ch{-->@import \"e.css\""
  },
  {
   "name": "fuzz-131",
   "input": "url( @layer ch{<!--url(src:url(@x */<!--\\)",
-  "output": ""
+  "output": "url( @layer ch{<!--url(src:url(@x */<!--\\)"
  },
  {
   "name": "fuzz-132",
@@ -1072,7 +1812,7 @@
  {
   "name": "fuzz-134",
   "input": ".5@import url(e.css)}}/*@import \"e.css\" layer(ch);{{@font-face{@layer",
-  "output": ""
+  "output": ".5}}/*@import \"e.css\" layer(ch);{{@font-face{@layer"
  },
  {
   "name": "fuzz-135",
@@ -1087,7 +1827,7 @@
  {
   "name": "fuzz-137",
   "input": "\r /*url( @layera{b:c}@media screen{-->a{b:c}url(;a{b:c}*/@layer a,b;",
-  "output": ""
+  "output": "\r /*url( @layera{b:c}@media screen{-->a{b:c}url(;a{b:c}*/"
  },
  {
   "name": "fuzz-138",
@@ -1097,7 +1837,7 @@
  {
   "name": "fuzz-139",
   "input": "url(*/'\"\\}1e@import\f1e",
-  "output": ""
+  "output": "url(*/'\"\\}1e@import\f1e"
  },
  {
   "name": "fuzz-140",
@@ -1122,7 +1862,7 @@
  {
   "name": "fuzz-144",
   "input": "{u\\72l(@x @import \"e.css\"+@font-face{",
-  "output": ""
+  "output": "{u\\72l(@x @import \"e.css\"+@font-face{"
  },
  {
   "name": "fuzz-145",
@@ -1162,7 +1902,7 @@
  {
   "name": "fuzz-152",
   "input": "\\40layer ch;url( \"",
-  "output": ""
+  "output": "\\40layer ch;url( \""
  },
  {
   "name": "fuzz-153",
@@ -1172,17 +1912,17 @@
  {
   "name": "fuzz-154",
   "input": "@font-face{u\\72l((@layer-@keyframes k{",
-  "output": ""
+  "output": "@font-face{u\\72l((@layer-@keyframes k{"
  },
  {
   "name": "fuzz-155",
   "input": " @keyframes k{\\40layer ch;-- '\\40layer ch;a{b:c}URL(",
-  "output": ""
+  "output": " @keyframes k{\\40layer ch;-- '\\40layer ch;a{b:c}URL("
  },
  {
   "name": "fuzz-156",
   "input": "\furl(/*u\\72l()src:url(<!--@media screen{:u\\72l(@layer ch[+url(-->",
-  "output": ""
+  "output": "\furl(/*u\\72l()src:url(<!--@media screen{:u\\72l(@layer ch[+url(-->"
  },
  {
   "name": "fuzz-157",
@@ -1202,7 +1942,7 @@
  {
   "name": "fuzz-160",
   "input": "@layer ch{@import \"e.css\" layer(ch);url( url(\"\tu+\"\\40layer ch;src:url(@import url(e.css)/*@layer ch{1e\\40layer ch;",
-  "output": ""
+  "output": "url( url(\"\tu+\"\\40layer ch;src:url(@import url(e.css)/*@layer ch{1e\\40layer ch;"
  },
  {
   "name": "fuzz-161",
@@ -1212,7 +1952,7 @@
  {
   "name": "fuzz-162",
   "input": "@import@import@import \"e.css\" layer(ch);@import@layer a,b;URL(@x 1url()\\@layer a,b;<!--\"]",
-  "output": ""
+  "output": "URL(@x 1url()\\@layer a,b;<!--\"]"
  },
  {
   "name": "fuzz-163",
@@ -1267,12 +2007,12 @@
  {
   "name": "fuzz-173",
   "input": "\\40layer ch;<!--@import \"e.css\" layer(ch);}@layer a,b;.5",
-  "output": ""
+  "output": "\\40layer ch;<!--}.5"
  },
  {
   "name": "fuzz-174",
   "input": "\f\\)url(/*@layer\n\f@layer cha{b:c}@import'url( url(\"url(/*",
-  "output": ""
+  "output": "\f\\)url(/*@layer\n\f@layer cha{b:c}@import'url( url(\"url(/*"
  },
  {
   "name": "fuzz-175",
@@ -1282,12 +2022,12 @@
  {
   "name": "fuzz-176",
   "input": "@media screen{-->@layer a,b;src:url( u+\\40layer ch;",
-  "output": ""
+  "output": "@media screen{-->src:url( u+\\40layer ch;"
  },
  {
   "name": "fuzz-177",
   "input": "]+\tURL(@import \"e.css\".5+",
-  "output": ""
+  "output": "]+\tURL(@import \"e.css\".5+"
  },
  {
   "name": "fuzz-178",
@@ -1337,12 +2077,12 @@
  {
   "name": "fuzz-187",
   "input": "\\-)\\40layer ch;\\\nurl(",
-  "output": ""
+  "output": "\\-)\\40layer ch;\\\nurl("
  },
  {
   "name": "fuzz-188",
   "input": "@font-face{\\40layer ch;-url(URL(",
-  "output": ""
+  "output": "@font-face{\\40layer ch;-url(URL("
  },
  {
   "name": "fuzz-189",
@@ -1362,7 +2102,7 @@
  {
   "name": "fuzz-192",
   "input": "\t{-url(@layer a,b;src:url(@layer",
-  "output": ""
+  "output": "\t{-url(src:url(@layer"
  },
  {
   "name": "fuzz-193",
@@ -1372,7 +2112,7 @@
  {
   "name": "fuzz-194",
   "input": "url(/*u\\72l(@importurl(+[1url(@layerxurl(\"",
-  "output": ""
+  "output": "url(/*u\\72l(@importurl(+[1url(@layerxurl(\""
  },
  {
   "name": "fuzz-195",
@@ -1382,12 +2122,12 @@
  {
   "name": "fuzz-196",
   "input": ".5::{-->url(\"@layer ch{1url(/*(@media screen{)u+",
-  "output": ""
+  "output": ".5::{-->url(\"@layer ch{1url(/*(@media screen{)u+"
  },
  {
   "name": "fuzz-197",
   "input": "url( a@media screen{[xu\\72l(@layer ch",
-  "output": ""
+  "output": "url( a@media screen{[xu\\72l(@layer ch"
  },
  {
   "name": "fuzz-198",
@@ -1402,7 +2142,7 @@
  {
   "name": "fuzz-200",
   "input": "@layer ch{ url(a@layer ch\n1e@layer a,b;src:url([",
-  "output": ""
+  "output": " url(a@layer ch\n1e@layer a,b;src:url(["
  },
  {
   "name": "fuzz-201",
@@ -1412,7 +2152,7 @@
  {
   "name": "fuzz-202",
   "input": "u\\72l(@import url(e.css)\t ",
-  "output": ""
+  "output": "u\\72l(@import url(e.css)\t "
  },
  {
   "name": "fuzz-203",
@@ -1427,7 +2167,7 @@
  {
   "name": "fuzz-205",
   "input": "@\\6c ayer x;\\40layer ch;\\40layer ch;[\r@import \"e.css\" layer(ch);@import \"e.css\" layer(ch);)",
-  "output": ""
+  "output": "\\40layer ch;\\40layer ch;[\r)"
  },
  {
   "name": "fuzz-206",
@@ -1442,7 +2182,7 @@
  {
   "name": "fuzz-208",
   "input": "url(/*@x @layer ch@supports (a:b){url(\") [@import \"e.css\"URL(",
-  "output": ""
+  "output": "url(/*@x @layer ch@supports (a:b){url(\") [@import \"e.css\"URL("
  },
  {
   "name": "fuzz-209",
@@ -1462,7 +2202,7 @@
  {
   "name": "fuzz-212",
   "input": "u\\72l(\\\n\\@x \"@layer ch{",
-  "output": ""
+  "output": "u\\72l(\\\n\\@x \"@layer ch{"
  },
  {
   "name": "fuzz-213",
@@ -1472,7 +2212,7 @@
  {
   "name": "fuzz-214",
   "input": "\\40layer ch;/*@import \"e.css\" layer(ch);-url(u\\72l(]",
-  "output": ""
+  "output": "\\40layer ch;/*@import \"e.css\" layer(ch);-url(u\\72l(]"
  },
  {
   "name": "fuzz-215",
@@ -1482,7 +2222,7 @@
  {
   "name": "fuzz-216",
   "input": "-->-->@layeru++\\40layer ch;-[\t",
-  "output": ""
+  "output": "-->-->@layeru++\\40layer ch;-[\t"
  },
  {
   "name": "fuzz-217",
@@ -1502,7 +2242,7 @@
  {
   "name": "fuzz-220",
   "input": "1url(@\\6c ayer x; \\40layer ch;[@import@layer ch{-@media screen{1url(@layer ch",
-  "output": ""
+  "output": "1url( \\40layer ch;[-@media screen{1url("
  },
  {
   "name": "fuzz-221",
@@ -1512,17 +2252,17 @@
  {
   "name": "fuzz-222",
   "input": "@layer ch@font-face{URL()@layer ch{x@layer-url(1url(",
-  "output": ""
+  "output": "URL()x@layer-url(1url("
  },
  {
   "name": "fuzz-223",
   "input": "url('[@font-face{x:@layer ch{\\)\\40layer ch; @import url(e.css)\f[{",
-  "output": ""
+  "output": "url('[@font-face{x:@layer ch{\\)\\40layer ch; @import url(e.css)\f[{"
  },
  {
   "name": "fuzz-224",
   "input": "url( ]-@supports (a:b){url(/*@layer ch{'url(\"@x @layer ch{",
-  "output": ""
+  "output": "url( ]-@supports (a:b){url(/*@layer ch{'url(\"@x @layer ch{"
  },
  {
   "name": "fuzz-225",
@@ -1547,7 +2287,7 @@
  {
   "name": "fuzz-229",
   "input": "\n url(\"<!--@media screen{{url(\"url(/**/@layer a,b;",
-  "output": ""
+  "output": "\n url(\"<!--@media screen{{url(\"url(/**/@layer a,b;"
  },
  {
   "name": "fuzz-230",
@@ -1572,7 +2312,7 @@
  {
   "name": "fuzz-234",
   "input": "\\40layer ch;\\)\"a@layer ch[@font-face{\n-url(",
-  "output": ""
+  "output": "\\40layer ch;\\)\"a@layer ch[@font-face{\n-url("
  },
  {
   "name": "fuzz-235",
@@ -1602,7 +2342,7 @@
  {
   "name": "fuzz-240",
   "input": "xa{b:c}\\40layer ch;+ @import \"e.css\"@font-face{@keyframes k{@layer a,b;",
-  "output": ""
+  "output": "xa{b:c}\\40layer ch;+ @keyframes k{"
  },
  {
   "name": "fuzz-241",
@@ -1617,17 +2357,17 @@
  {
   "name": "fuzz-243",
   "input": "/*@x -x@import \"e.css\" layer(ch);aurl(\"src:url(url( u\\72l(url(\"[@media screen{",
-  "output": ""
+  "output": "/*@x -x@import \"e.css\" layer(ch);aurl(\"src:url(url( u\\72l(url(\"[@media screen{"
  },
  {
   "name": "fuzz-244",
   "input": "'@layer cha{b:c}@font-face{@layer churl('@layer ch]",
-  "output": ""
+  "output": "'@layer cha{b:c}@font-face{@layer churl('"
  },
  {
   "name": "fuzz-245",
   "input": ":\\40layer ch; /*url('",
-  "output": ""
+  "output": ":\\40layer ch; /*url('"
  },
  {
   "name": "fuzz-246",
@@ -1637,7 +2377,7 @@
  {
   "name": "fuzz-247",
   "input": "{url(/*-url(\\\"@font-face{URL(@x @import \"e.css\" layer(ch);@layer ch\na{b:c}@layer\\40layer ch;",
-  "output": ""
+  "output": "{url(/*-url(\\\"@font-face{URL(@x @import \"e.css\" layer(ch);b:c@layer\\40layer ch;"
  },
  {
   "name": "fuzz-248",
@@ -1647,7 +2387,7 @@
  {
   "name": "fuzz-249",
   "input": "]:1e\ta]:\\40layer ch;",
-  "output": ""
+  "output": "]:1e\ta]:\\40layer ch;"
  },
  {
   "name": "fuzz-250",
@@ -1657,7 +2397,7 @@
  {
   "name": "fuzz-251",
   "input": ";URL(}@layer ch{)@keyframes k{;\n@layer",
-  "output": ""
+  "output": ";URL(}@layer ch{)@keyframes k{;\n"
  },
  {
   "name": "fuzz-252",
@@ -1672,7 +2412,7 @@
  {
   "name": "fuzz-254",
   "input": "\fURL(url( url('1ea{b:c}\\40layer ch;",
-  "output": ""
+  "output": "\fURL(url( url('1ea{b:c}\\40layer ch;"
  },
  {
   "name": "fuzz-255",
@@ -1717,7 +2457,7 @@
  {
   "name": "fuzz-263",
   "input": "]\\40layer ch;}-->)a{b:c}u\\72l(@layer a,b;:",
-  "output": ""
+  "output": "]\\40layer ch;}-->)a{b:c}u\\72l(@layer a,b;:"
  },
  {
   "name": "fuzz-264",
@@ -1727,12 +2467,12 @@
  {
   "name": "fuzz-265",
   "input": "\"']\\\n 1url(url(*/u+)@import \"e.css\" layer(ch);\\40layer ch; ",
-  "output": ""
+  "output": "\"']\\\n 1url(url(*/u+)@import \"e.css\" layer(ch);\\40layer ch; "
  },
  {
   "name": "fuzz-266",
   "input": "@import url(e.css)@supports (a:b){1e])]:\"@import \"e.css\"+-url(",
-  "output": ""
+  "output": "1e])]:\"@import \"e.css\"+-url("
  },
  {
   "name": "fuzz-267",
@@ -1757,12 +2497,12 @@
  {
   "name": "fuzz-271",
   "input": "@importurl(/*\\\n'-url(/*u+'",
-  "output": ""
+  "output": "@importurl(/*\\\n'-url(/*u+'"
  },
  {
   "name": "fuzz-272",
   "input": ";;.5url(\\40layer ch;\f",
-  "output": ""
+  "output": ";;.5url(\\40layer ch;\f"
  },
  {
   "name": "fuzz-273",
@@ -1772,7 +2512,7 @@
  {
   "name": "fuzz-274",
   "input": "}\t url('\\);\nurl( <!--@import \"e.css\"\t@keyframes k{url(/*",
-  "output": ""
+  "output": "}\t url('\\);\nurl( <!--@import \"e.css\"\t@keyframes k{url(/*"
  },
  {
   "name": "fuzz-275",
@@ -1787,7 +2527,7 @@
  {
   "name": "fuzz-277",
   "input": "src:url(u+@font-face{@layer a,b;@media screen{-url( \\\n ",
-  "output": ""
+  "output": "src:url(u+@font-face{@layer a,b;@media screen{-url( \\\n "
  },
  {
   "name": "fuzz-278",
@@ -1797,12 +2537,12 @@
  {
   "name": "fuzz-279",
   "input": "url(/*\f1e<!--\n@layer ch{@x ",
-  "output": ""
+  "output": "url(/*\f1e<!--\n@layer ch{@x "
  },
  {
   "name": "fuzz-280",
   "input": "aurl('url((\r:-->@layer1url(",
-  "output": ""
+  "output": "aurl('url((\r:-->@layer1url("
  },
  {
   "name": "fuzz-281",
@@ -1812,22 +2552,22 @@
  {
   "name": "fuzz-282",
   "input": "@importURL((@supports (a:b){@font-face{-:][",
-  "output": ""
+  "output": "@importURL((@supports (a:b){@font-face{-:]["
  },
  {
   "name": "fuzz-283",
   "input": "src:url(@import url(e.css)@font-face{",
-  "output": ""
+  "output": "src:url(@import url(e.css)@font-face{"
  },
  {
   "name": "fuzz-284",
   "input": "\rurl( \\40layer ch;url(-](:\r@import \"e.css\" layer(ch);\\\n",
-  "output": ""
+  "output": "\rurl( \\40layer ch;url(-](:\r@import \"e.css\" layer(ch);\\\n"
  },
  {
   "name": "fuzz-285",
   "input": "\\40layer ch;@layer a,b;[url(/*:",
-  "output": ""
+  "output": "\\40layer ch;[url(/*:"
  },
  {
   "name": "fuzz-286",
@@ -1837,7 +2577,7 @@
  {
   "name": "fuzz-287",
   "input": "  /*URL(url(\"/*\\\n\r.5url( @import \"e.css\".5",
-  "output": ""
+  "output": "  /*URL(url(\"/*\\\n\r.5url( @import \"e.css\".5"
  },
  {
   "name": "fuzz-288",
@@ -1887,7 +2627,7 @@
  {
   "name": "fuzz-297",
   "input": "url(/*url(\"@x u+@font-face{@supports (a:b){@supports (a:b){}\\40layer ch;]u+/*\t",
-  "output": ""
+  "output": "url(/*url(\"@x u+@font-face{@supports (a:b){@supports (a:b){}\\40layer ch;]u+/*\t"
  },
  {
   "name": "fuzz-298",
@@ -1902,12 +2642,12 @@
  {
   "name": "fuzz-300",
   "input": "-->{@importurl('url(\"'*/1url(\"@import \"e.css\" layer(ch);",
-  "output": ""
+  "output": "-->{@importurl('url(\"'*/1url(\"@import \"e.css\" layer(ch);"
  },
  {
   "name": "fuzz-301",
   "input": "url(url('url( u\\72l(@font-face{@import \"e.css\"@keyframes k{\\[u+:@supports (a:b){",
-  "output": ""
+  "output": "url(url('url( u\\72l(@font-face{@import \"e.css\"@keyframes k{\\[u+:@supports (a:b){"
  },
  {
   "name": "fuzz-302",
@@ -1927,7 +2667,7 @@
  {
   "name": "fuzz-305",
   "input": "]url(1url({@layer ch{",
-  "output": ""
+  "output": "]url(1url({@layer ch{"
  },
  {
   "name": "fuzz-306",
@@ -1942,7 +2682,7 @@
  {
   "name": "fuzz-308",
   "input": " <!--;\\40layer ch;@supports (a:b){.5@x \n\t",
-  "output": ""
+  "output": " <!--;\\40layer ch;@supports (a:b){.5@x \n\t"
  },
  {
   "name": "fuzz-309",
@@ -1952,7 +2692,7 @@
  {
   "name": "fuzz-310",
   "input": "1e@keyframes k{(u\\72l(:1url(\\40layer ch;:",
-  "output": ""
+  "output": "1e@keyframes k{(u\\72l(:1url(\\40layer ch;:"
  },
  {
   "name": "fuzz-311",
@@ -1967,7 +2707,7 @@
  {
   "name": "fuzz-313",
   "input": "xURL(@media screen{a{b:c}@x -\\40layer ch;@import\f.5\r",
-  "output": ""
+  "output": "xURL(@media screen{a{b:c}@x -\\40layer ch;"
  },
  {
   "name": "fuzz-314",
@@ -1977,12 +2717,12 @@
  {
   "name": "fuzz-315",
   "input": "/*src:url(1e@import url(e.css)\f\\;a1e\\)",
-  "output": ""
+  "output": "/*src:url(1e@import url(e.css)\f\\;a1e\\)"
  },
  {
   "name": "fuzz-316",
   "input": "url('\\src:url( ",
-  "output": "url('\\src:url( "
+  "output": ""
  },
  {
   "name": "fuzz-317",
@@ -1992,12 +2732,12 @@
  {
   "name": "fuzz-318",
   "input": "@layer a,b;(@\\6c ayer x;@layer{\"url(<!--@layer a,b;a",
-  "output": ""
+  "output": "(\"url(<!--@layer a,b;a"
  },
  {
   "name": "fuzz-319",
   "input": "@\\6c ayer x;\\\n.5x'@layer a,b;u\\72l(url('@font-face{@supports (a:b){url(\"@import \"e.css\" layer(ch);",
-  "output": ""
+  "output": "\\\n.5x'@layer a,b;u\\72l(url('@font-face{@supports (a:b){url(\"@import \"e.css\" layer(ch);"
  },
  {
   "name": "fuzz-320",
@@ -2012,7 +2752,7 @@
  {
   "name": "fuzz-322",
   "input": "\\)@media screen{1url(url('(xurl(\"a@import \"e.css\"'\f",
-  "output": ""
+  "output": "\\)@media screen{1url(url('(xurl(\"a@import \"e.css\"'\f"
  },
  {
   "name": "fuzz-323",
@@ -2022,22 +2762,22 @@
  {
   "name": "fuzz-324",
   "input": ".5 -[/*\\)-->@layer ch{\f",
-  "output": ""
+  "output": ".5 -[/*\\)-->@layer ch{\f"
  },
  {
   "name": "fuzz-325",
   "input": "url('}\"\\40layer ch;@x <!--1e@import \"e.css\"\\\nurl(\"@media screen{",
-  "output": ""
+  "output": "url('}\"\\40layer ch;@x <!--1e@import \"e.css\"\\\nurl(\"@media screen{"
  },
  {
   "name": "fuzz-326",
   "input": "\\40layer ch;@supports (a:b){url( ''@layer a,b;'@\\6c ayer x;url( @import url(e.css)-(",
-  "output": ""
+  "output": "\\40layer ch;@supports (a:b){url( '''@\\6c ayer x;url( @import url(e.css)-("
  },
  {
   "name": "fuzz-327",
   "input": "@import \"e.css\" layer(ch);src:url(\\40layer ch;URL(",
-  "output": ""
+  "output": "src:url(\\40layer ch;URL("
  },
  {
   "name": "fuzz-328",
@@ -2072,7 +2812,7 @@
  {
   "name": "fuzz-334",
   "input": "\n-->x@media screen{u\\72l(\"@keyframes k{@import \"e.css\" layer(ch);src:url(u+)u\\72l(",
-  "output": ""
+  "output": "\n-->x@media screen{u\\72l(\"@keyframes k{@import \"e.css\" layer(ch);src:url(u+)u\\72l("
  },
  {
   "name": "fuzz-335",
@@ -2082,7 +2822,7 @@
  {
   "name": "fuzz-336",
   "input": "-->:@\\6c ayer x;@font-face{@layer1url(\\",
-  "output": ""
+  "output": "-->:@font-face{@layer1url(\\"
  },
  {
   "name": "fuzz-337",
@@ -2092,7 +2832,7 @@
  {
   "name": "fuzz-338",
   "input": "+@import \"e.css\"@supports (a:b){\\\n@font-face{URL(\f@import \"e.css\" layer(ch);src:url(url(@import url(e.css)",
-  "output": ""
+  "output": "+\\\n@font-face{URL(\f@import \"e.css\" layer(ch);src:url(url(@import url(e.css)"
  },
  {
   "name": "fuzz-339",
@@ -2102,12 +2842,12 @@
  {
   "name": "fuzz-340",
   "input": "\\)(\\)[/*})1e\"@import \"e.css\"}src:url(",
-  "output": ""
+  "output": "\\)(\\)[/*})1e\"@import \"e.css\"}src:url("
  },
  {
   "name": "fuzz-341",
   "input": "(url('a@layer@font-face{@media screen{aURL(\"",
-  "output": ""
+  "output": "(url('a@layer@font-face{@media screen{aURL(\""
  },
  {
   "name": "fuzz-342",
@@ -2117,7 +2857,7 @@
  {
   "name": "fuzz-343",
   "input": "@import url(e.css)@layer<!--\\40layer ch;\t)URL(url(*/a{b:c}\\)@layer a,b;[*/",
-  "output": ""
+  "output": "\t)URL(url(*/a{b:c}\\)@layer a,b;[*/"
  },
  {
   "name": "fuzz-344",
@@ -2132,17 +2872,17 @@
  {
   "name": "fuzz-346",
   "input": ":{1url(]url( ]\"@layer a,b;/*x*/@layer",
-  "output": ""
+  "output": ":{1url(]url( ]\"@layer a,b;/*x*/@layer"
  },
  {
   "name": "fuzz-347",
   "input": ")aa{b:c}]url('src:url('+)URL(\f",
-  "output": ")aa{b:c}]url('src:url('+)URL(\f"
+  "output": ""
  },
  {
   "name": "fuzz-348",
   "input": "u\\72l(\t]'src:url(@layer ch{'",
-  "output": ""
+  "output": "u\\72l(\t]'src:url(@layer ch{'"
  },
  {
   "name": "fuzz-349",
@@ -2152,7 +2892,7 @@
  {
   "name": "fuzz-350",
   "input": "a{b:c}url(/*@import}\f@import \"e.css\"\"\n@layer a,b;'",
-  "output": ""
+  "output": "a{b:c}url(/*@import}\f@import \"e.css\"\"\n@layer a,b;'"
  },
  {
   "name": "fuzz-351",
@@ -2172,7 +2912,7 @@
  {
   "name": "fuzz-354",
   "input": "\\\n/*+a@\\6c ayer x;@import \"e.css\" layer(ch);]",
-  "output": ""
+  "output": "\\\n/*+a@\\6c ayer x;@import \"e.css\" layer(ch);]"
  },
  {
   "name": "fuzz-355",
@@ -2187,12 +2927,12 @@
  {
   "name": "fuzz-357",
   "input": "\turl(@layer a,b;/*",
-  "output": ""
+  "output": "\turl(@layer a,b;/*"
  },
  {
   "name": "fuzz-358",
   "input": "a{b:c}@supports (a:b){@x url(']/*\\a{b:c}@layer ch\r@supports (a:b){ @import \"e.css\" layer(ch);\\\n",
-  "output": ""
+  "output": "a{b:c}@supports (a:b){@x url(']/*\\a{b:c}@layer ch\r@supports (a:b){ \\\n"
  },
  {
   "name": "fuzz-359",
@@ -2217,7 +2957,7 @@
  {
   "name": "fuzz-363",
   "input": "@media screen{][\\40layer ch; @layer ch",
-  "output": ""
+  "output": "@media screen{][\\40layer ch; "
  },
  {
   "name": "fuzz-364",
@@ -2237,12 +2977,12 @@
  {
   "name": "fuzz-367",
   "input": "url(/*1url(}@import \"e.css\" layer(ch);\t-url(\"\\\n\r-*/u\\72l(@import \"e.css\"",
-  "output": ""
+  "output": "url(/*1url(}@import \"e.css\" layer(ch);\t-url(\"\\\n\r-*/u\\72l(@import \"e.css\""
  },
  {
   "name": "fuzz-368",
   "input": "url(  ;url(\"@import url(e.css))1e@import\"@x ",
-  "output": ""
+  "output": "url(  ;url(\"@import url(e.css))1e"
  },
  {
   "name": "fuzz-369",
@@ -2277,17 +3017,17 @@
  {
   "name": "fuzz-375",
   "input": "\t@import-@supports (a:b){-@keyframes k{",
-  "output": ""
+  "output": "\t@import-@supports (a:b){-@keyframes k{"
  },
  {
   "name": "fuzz-376",
   "input": "\t\\url(\"url(  @\\6c ayer x;@import \"e.css\" layer(ch);+a{b:c}",
-  "output": ""
+  "output": "\t\\url(\"url(  @\\6c ayer x;@import \"e.css\" layer(ch);+a{b:c}"
  },
  {
   "name": "fuzz-377",
   "input": "url(\"@import@layer a,b;a{b:c}",
-  "output": ""
+  "output": "url(\"@import@layer a,b;a{b:c}"
  },
  {
   "name": "fuzz-378",
@@ -2297,7 +3037,7 @@
  {
   "name": "fuzz-379",
   "input": "src:url(''/*+src:url(@import url(e.css)a\t",
-  "output": ""
+  "output": "src:url(''/*+src:url(@import url(e.css)a\t"
  },
  {
   "name": "fuzz-380",
@@ -2307,12 +3047,12 @@
  {
   "name": "fuzz-381",
   "input": "1url(-->@keyframes k{\fsrc:url(@\\6c ayer x;--->;+@media screen{",
-  "output": ""
+  "output": "1url(-->@keyframes k{\fsrc:url(@\\6c ayer x;--->;+@media screen{"
  },
  {
   "name": "fuzz-382",
   "input": "URL(-:url( \f1url(@importurl(/*",
-  "output": ""
+  "output": "URL(-:url( \f1url(@importurl(/*"
  },
  {
   "name": "fuzz-383",
@@ -2322,7 +3062,7 @@
  {
   "name": "fuzz-384",
   "input": ".5\\40layer ch;@layer:\\\n\\40layer ch;@layer\\\n\r@x ;@import url(e.css)",
-  "output": ""
+  "output": ".5\\40layer ch;"
  },
  {
   "name": "fuzz-385",
@@ -2337,7 +3077,7 @@
  {
   "name": "fuzz-387",
   "input": "x{\\)([@import \"e.css\" layer(ch);:a\\40layer ch;\"{",
-  "output": ""
+  "output": "x{\\)([:a\\40layer ch;\"{"
  },
  {
   "name": "fuzz-388",
@@ -2347,7 +3087,7 @@
  {
   "name": "fuzz-389",
   "input": "@layer a,b;].5\\@layer ch(",
-  "output": ""
+  "output": "].5\\@layer ch("
  },
  {
   "name": "fuzz-390",
@@ -2372,12 +3112,12 @@
  {
   "name": "fuzz-394",
   "input": "\\@\\6c ayer x;url(/* }@layer)xsrc:url(url('\\)a:",
-  "output": ""
+  "output": "\\@\\6c ayer x;url(/* }@layer)xsrc:url(url('\\)a:"
  },
  {
   "name": "fuzz-395",
   "input": "/*@layer ch@x @layer ch@import \"e.css\"@keyframes k{",
-  "output": ""
+  "output": "/*@layer ch@x @layer ch@import \"e.css\"@keyframes k{"
  },
  {
   "name": "fuzz-396",

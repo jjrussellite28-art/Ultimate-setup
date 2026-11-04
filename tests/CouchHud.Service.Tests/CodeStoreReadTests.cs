@@ -64,19 +64,19 @@ public class CodeStoreReadTests
     }
 
     [Fact]
-    public async Task A_file_held_only_for_a_moment_is_read_by_the_retries_at_the_start()
+    public void A_file_held_only_for_a_moment_is_read_by_the_retries_at_the_start()
     {
         using var dir = new TempDir();
         var file = Path.Combine(dir.Path, CodeStore.FileName);
         File.WriteAllText(file, ValidFile());
         var held = Hold(file);
-        var release = Task.Run(async () =>
+        // The file is let go during the first pause between the reads: no wall-clock race with a loaded machine.
+        var pauses = 0;
+        var store = CodeStore.Open(dir.Path, new CapturingSink(), new FakeClock(), () => 1, Codes.FastVerify, _ =>
         {
-            await Task.Delay(20);
-            held.Dispose();
+            if (pauses++ == 0) held.Dispose();
         });
-        var store = CodeStore.Open(dir.Path, new CapturingSink(), new FakeClock(), () => 1, Codes.FastVerify);
-        await release;
+        Assert.Equal(1, pauses);
         Assert.True(store.IsAvailable);
         Assert.True(store.Has(Sid, CodeKind.Parent));
     }

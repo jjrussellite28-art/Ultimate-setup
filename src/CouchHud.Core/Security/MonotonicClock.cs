@@ -31,6 +31,7 @@ public sealed class MonotonicClock
 /// </summary>
 public sealed class ParentGrant(Func<DateTimeOffset> now, TimeSpan lifetime)
 {
+    private readonly object _lock = new();
     private DateTimeOffset _until = DateTimeOffset.MinValue;
     private string? _action;
     private string? _item;
@@ -38,30 +39,45 @@ public sealed class ParentGrant(Func<DateTimeOffset> now, TimeSpan lifetime)
     /// <summary>Gives the grant. Without an action it fits any (the code was entered before the question was known).</summary>
     public void Give(string? action = null, string? item = null)
     {
-        _until = now() + lifetime;
-        _action = action;
-        _item = item;
+        lock (_lock)
+        {
+            _until = now() + lifetime;
+            _action = action;
+            _item = item;
+        }
     }
 
-    public bool Active => now() < _until;
+    public bool Active
+    {
+        get { lock (_lock) return now() < _until; }
+    }
 
     /// <summary>True (and used up) when the grant is alive and fits: an unbound grant fits everything, a bound one only its own action and entry.</summary>
     public bool TryConsume(string action, string? item = null)
     {
-        if (!Fits(action, item)) return false;
-        Clear();
-        return true;
+        // Atomic: of two calls racing for one grant, exactly one gets it.
+        lock (_lock)
+        {
+            if (!Fits(action, item)) return false;
+            Clear();
+            return true;
+        }
     }
 
     /// <summary>Alive and fitting, but not used up (a check before the action).</summary>
-    public bool Fits(string action, string? item = null) =>
-        Active && (_action is null || _action == action) && (_item is null || _item == item);
+    public bool Fits(string action, string? item = null)
+    {
+        lock (_lock) return Active && (_action is null || _action == action) && (_item is null || _item == item);
+    }
 
     public void Clear()
     {
-        _until = DateTimeOffset.MinValue;
-        _action = null;
-        _item = null;
+        lock (_lock)
+        {
+            _until = DateTimeOffset.MinValue;
+            _action = null;
+            _item = null;
+        }
     }
 }
 

@@ -47,6 +47,7 @@ const POINTER_CSS = `
 :host { all: initial !important; display: block !important; position: fixed !important; top: 0 !important; left: 0 !important; width: 0 !important; height: 0 !important;
   overflow: visible !important; pointer-events: none !important; opacity: 1 !important; visibility: visible !important; z-index: 2147483645 !important; zoom: 1 !important;
   content-visibility: visible !important; contain: none !important; aspect-ratio: auto !important; }
+:host(:not([data-live])), :host([data-off]), :host(:not(:popover-open):not([data-nopopover])) { display: none !important; }
 :host::before, :host::after { content: none !important; display: none !important; }
 :host::backdrop { display: none !important; background: none !important; }
 .pos { position: absolute; left: 0; top: 0; }
@@ -105,6 +106,7 @@ function show(x, y) {
   movingTimer = setTimeout(() => pointerParts.box.classList.remove('moving'), 180);
   sizePointer();
   document.body.classList.add('mouse-active');
+  cursor.toggleAttribute('data-live', true);
   clearTimeout(hideTimer);
   hideTimer = setTimeout(hide, HIDE_AFTER_MS);
 }
@@ -113,6 +115,7 @@ export function hide() {
   if (!cursor) return;
   clearTimeout(hideTimer);
   document.body.classList.remove('mouse-active');
+  cursor.removeAttribute('data-live');
   for (const n of document.querySelectorAll('.hover')) n.classList.remove('hover');
 }
 
@@ -196,6 +199,9 @@ export function attachMouse(dispatch, { pointer, mouseUnlocked } = {}) {
   art.style.display = 'contents';
   root.append(el('style', { textContent: POINTER_CSS }), pos);
   pointerParts = { pos, box, art };
+  // The host rules inside the root are !important and beat the UA rule that keeps a closed popover display:none, so the host says itself when it shows:
+  // only while the mouse is in use (data-live), never with the real Windows pointer (data-off), and in the top layer when popovers exist.
+  if (typeof HTMLElement.prototype.showPopover !== 'function') cursor.setAttribute('data-nopopover', '');
   document.body.append(cursor);
   setPointer(pointer, mouseUnlocked);
 

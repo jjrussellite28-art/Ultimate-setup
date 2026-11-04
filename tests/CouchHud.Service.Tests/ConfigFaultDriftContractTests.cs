@@ -40,7 +40,7 @@ public sealed class ConfigFaultDriftContractTests
         "public async Task<object> SetCouchLockAsync(string mode, string[]? sequence = null)",
         "public async Task<object> SetParentalAsync(string key, System.Text.Json.JsonElement value)",
         "public object SetParental(string key, System.Text.Json.JsonElement value)",
-        "public object SetParentalItemLock(string id, bool locked)",
+        "public object SetParentalItemLock(string id, bool locked, bool allChildren = false)",
         "public object ParentalAdoptZone()",
         "public bool SetShell(bool install)",
         "public object SetIntegrationMode(string mode)",

@@ -280,6 +280,185 @@ public class AutoUpdateTests : IDisposable
         Assert.True(update.RestartNeeded);
     }
 
+    [Fact]
+    public void A_staged_update_is_written_from_the_verified_handle_and_not_copied_again_by_path()
+    {
+        var good = Zip("""{ "capabilities": ["library"] }""");
+        var other = Zip("""{ "capabilities": ["library", "network"] }""");
+        var sha = PackageStatements.HashFile(good);
+        var service = new CatalogService(new HttpClient(), _dir, () => [], () => false);
+        service.Install(WandEntry(sha), good, null, sha);
+
+        // The path named is another file (swapped after the check): what is staged are the bytes of the handle that was hashed.
+        using (var held = new FileStream(good, FileMode.Open, FileAccess.Read, FileShare.Read))
+            service.Install(WandEntry(sha), held, other, null, sha);
+
+        var staged = Assert.Single(Directory.GetFiles(PendingPackages.Folder(_dir), "*.zip"));
+        Assert.Equal(sha, PackageStatements.HashFile(staged));
+        Assert.Empty(Directory.GetFiles(PendingPackages.Folder(_dir), "*.tmp"));
+    }
+
+    private (CatalogService Service, string Zip, string Sha) InstalledWand()
+    {
+        var zip = Zip("""{ "capabilities": ["library"] }""");
+        var sha = PackageStatements.HashFile(zip);
+        var service = new CatalogService(new HttpClient(), _dir, () => [], () => false);
+        service.Install(WandEntry(sha), zip, null, sha);
+        return (service, zip, sha);
+    }
+
+    [Fact]
+    public void A_staging_that_fails_before_anything_is_written_leaves_trust_and_registry_untouched()
+    {
+        var (service, zip, sha) = InstalledWand();
+        File.WriteAllText(PendingPackages.Folder(_dir), "a file where the pending folder should be");
+
+        Assert.ThrowsAny<Exception>(() => service.Install(WandEntry(sha), zip, null, sha));
+
+        Assert.Null(new PluginTrust(_dir).PendingFor("wand"));
+        Assert.DoesNotContain(new CatalogRegistry(_dir).Read().Values, r => r.Pending);
+    }
+
+    [Fact]
+    public void A_failure_after_the_package_is_staged_takes_the_package_and_the_trust_entry_back()
+    {
+        var (service, zip, sha) = InstalledWand();
+        // The registry file cannot be written (held open by something else): a raw IOException after the package was staged.
+        using (new FileStream(Path.Combine(_dir, "catalog-installed.json"), FileMode.Open, FileAccess.Read, FileShare.Read))
+            Assert.ThrowsAny<Exception>(() => service.Install(WandEntry(sha), zip, null, sha));
+
+        Assert.Null(new PluginTrust(_dir).PendingFor("wand"));
+        Assert.Empty(Directory.Exists(PendingPackages.Folder(_dir)) ? Directory.GetFiles(PendingPackages.Folder(_dir)) : []);
+        Assert.DoesNotContain(new CatalogRegistry(_dir).Read().Values, r => r.Pending);
+    }
+
+    [Fact]
+    public void A_failure_after_the_package_is_staged_restores_the_record_the_earlier_pending_entry_and_the_earlier_package()
+    {
+        var (service, _, _) = InstalledWand();
+        var firstUpdate = Zip("""{ "capabilities": ["library"], "note": "first update" }""");
+        var sha1 = PackageStatements.HashFile(firstUpdate);
+        service.Install(WandEntry(sha1), firstUpdate, null, sha1);   // an earlier update waits for the restart
+        var before = new CatalogRegistry(_dir).Read().Single();
+        Assert.True(before.Value.Pending);
+        var stagedBefore = Assert.Single(Directory.GetFiles(PendingPackages.Folder(_dir), "*.zip"));
+        var bytesBefore = File.ReadAllBytes(stagedBefore);
+        Assert.Equal(sha1, new PluginTrust(_dir).PendingFor("wand")!.Hash);
+
+        var secondUpdate = Zip("""{ "capabilities": ["library"], "note": "second update" }""");
+        var sha2 = PackageStatements.HashFile(secondUpdate);
+        // The registry cannot be written: the failure comes after the new package was staged and the trust entry replaced.
+        using (new FileStream(Path.Combine(_dir, "catalog-installed.json"), FileMode.Open, FileAccess.Read, FileShare.Read))
+            Assert.ThrowsAny<Exception>(() => service.Install(WandEntry(sha2), secondUpdate, null, sha2));
+
+        // Nothing that was there before is lost: the same record, the earlier pending entry, the earlier package (and no leftover).
+        Assert.Equal(before.Value, new CatalogRegistry(_dir).Read().Single().Value);
+        Assert.Equal(sha1, new PluginTrust(_dir).PendingFor("wand")!.Hash);
+        Assert.Equal(stagedBefore, Assert.Single(Directory.GetFiles(PendingPackages.Folder(_dir), "*.zip")));
+        Assert.Equal(bytesBefore, File.ReadAllBytes(stagedBefore));
+        Assert.Empty(Directory.GetFiles(PendingPackages.Folder(_dir), "*.tmp"));
+    }
+
+    private string StageFirstUpdate()
+    {
+        var (service, _, _) = InstalledWand();
+        var update = Zip("""{ "capabilities": ["library"], "note": "update" }""");
+        var sha = PackageStatements.HashFile(update);
+        service.Install(WandEntry(sha), update, null, sha);
+        return Assert.Single(Directory.GetFiles(PendingPackages.Folder(_dir), "*.zip"));
+    }
+
+    [Fact]
+    public void A_package_set_aside_by_an_interrupted_install_comes_back_under_its_name_and_is_applied()
+    {
+        var zip = StageFirstUpdate();
+        // The crash between setting the earlier package aside and the end of the install: no package under its name, one next to it.
+        var aside = zip + "." + Guid.NewGuid().ToString("N") + ".prev.tmp";
+        File.Move(zip, aside);
+
+        var applied = PendingPackages.ApplyAll(_dir);
+
+        Assert.Equal(["plugin:wand"], applied);
+        Assert.False(File.Exists(aside));
+        Assert.DoesNotContain(new CatalogRegistry(_dir).Read().Values, r => r.Pending);
+    }
+
+    [Fact]
+    public void A_pending_entry_with_neither_a_package_nor_a_set_aside_one_loses_its_trust_entry()
+    {
+        var zip = StageFirstUpdate();
+        File.Delete(zip);
+        Assert.NotNull(new PluginTrust(_dir).PendingFor("wand"));
+
+        Assert.Empty(PendingPackages.ApplyAll(_dir));
+
+        Assert.Null(new PluginTrust(_dir).PendingFor("wand"));
+        Assert.DoesNotContain(new CatalogRegistry(_dir).Read().Values, r => r.Pending);
+    }
+
+    [Fact]
+    public async Task Installs_of_the_same_entry_run_one_after_the_other()
+    {
+        var (service, zip, sha) = InstalledWand();
+        // Many installs at once of the same package: each one stages, the last state is consistent (one package, one trust entry, one record).
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+        {
+            using var held = new FileStream(zip, FileMode.Open, FileAccess.Read, FileShare.Read);
+            service.Install(WandEntry(sha), held, zip, null, sha);
+        })));
+        Assert.Single(Directory.GetFiles(PendingPackages.Folder(_dir), "*.zip"));
+        Assert.Empty(Directory.GetFiles(PendingPackages.Folder(_dir), "*.tmp"));
+        Assert.Equal(sha, new PluginTrust(_dir).PendingFor("wand")!.Hash);
+        Assert.True(Assert.Single(new CatalogRegistry(_dir).Read()).Value.Pending);
+    }
+
+    [Fact]
+    public void A_pending_folder_that_is_a_link_is_not_swept()
+    {
+        var elsewhere = Path.Combine(_dir, "elsewhere");
+        Directory.CreateDirectory(elsewhere);
+        var stale = Path.Combine(elsewhere, "keep-me.tmp");
+        File.WriteAllText(stale, "not ours");
+        using (var mk = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c mklink /J \"{PendingPackages.Folder(_dir)}\" \"{elsewhere}\"")
+        { CreateNoWindow = true, UseShellExecute = false, RedirectStandardOutput = true })!)
+        {
+            mk.WaitForExit();
+            Assert.Equal(0, mk.ExitCode);
+        }
+        try
+        {
+            var log = new List<string>();
+            PendingPackages.ApplyAll(_dir, log.Add);
+            Assert.True(File.Exists(stale));
+            Assert.Contains(log, l => l.Contains("link"));
+        }
+        finally
+        {
+            Directory.Delete(PendingPackages.Folder(_dir));   // removes the link only, not what it points to
+        }
+    }
+
+    [Fact]
+    public void Stale_temp_files_in_the_pending_folder_are_swept_at_start()
+    {
+        Directory.CreateDirectory(PendingPackages.Folder(_dir));
+        var stale = Path.Combine(PendingPackages.Folder(_dir), "plugin-wand.zip.0123.tmp");
+        var other = Path.Combine(PendingPackages.Folder(_dir), "keep.zip");
+        File.WriteAllText(stale, "half");
+        File.WriteAllText(other, "x");
+        PendingPackages.ApplyAll(_dir);
+        Assert.False(File.Exists(stale));
+        Assert.True(File.Exists(other));
+    }
+
+    [Fact]
+    public void Staging_refuses_bytes_that_do_not_have_the_verified_hash_and_leaves_nothing()
+    {
+        using var bytes = new MemoryStream("not the package"u8.ToArray());
+        Assert.Throws<CatalogException>(() => PendingPackages.Stage(_dir, WandEntry(new string('a', 64)), bytes, new string('b', 64)));
+        Assert.True(!Directory.Exists(PendingPackages.Folder(_dir)) || Directory.GetFiles(PendingPackages.Folder(_dir)).Length == 0);
+    }
+
     // ---- the install gate of the automatic case
 
     private static PluginInstallRequest Request(CatalogEntry entry, VerifiedStatement? statement, bool isUpdate = true, bool adds = false) => new(entry, statement, isUpdate, adds);

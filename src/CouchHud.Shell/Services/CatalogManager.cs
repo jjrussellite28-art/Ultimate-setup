@@ -290,7 +290,7 @@ public sealed class CatalogManager
         var row = Describe(result).Entries.First(r => r.Id.Equals(entry.Id, StringComparison.OrdinalIgnoreCase) && r.Kind == (entry.Kind == CatalogKind.Skin ? "skin" : "plugin"));
         var changelog = verified?.Statement.Changelog ?? entry.Changelog;
         var changelogUrl = changelog is not null && CatalogParser.IsAllowedUrl(changelog, false) ? changelog : null;
-        return new CatalogDetail(row, verified?.Statement.Description ?? entry.LongDescription, shots, changelogUrl is null ? changelog : null, changelogUrl,
+        return new CatalogDetail(row, CatalogRules.ShownLongDescription(entry, verified?.Statement.Description), shots, changelogUrl is null ? changelog : null, changelogUrl,
             verified?.Origin == PluginOrigin.ThirdParty ? Strings.Get("plugin.thirdParty") : null);
     }
 
@@ -326,7 +326,7 @@ public sealed class CatalogManager
             // The signed statement needs a newer SDK than this CouchHUD has: shown as "needs a newer CouchHUD", never offered.
             var sdkTooNew = e.Kind == CatalogKind.Plugin && CatalogRules.NeedsNewerSdk(verified?.Statement.Sdk) && originProblem is null;
             if (sdkTooNew) word = installed ? "installed" : "unavailable";
-            return new CatalogRow(e.Id, verified?.Statement.Name ?? e.Name, verified?.Statement.Summary ?? e.Description, verified?.Statement.Author ?? e.Author,
+            return new CatalogRow(e.Id, verified?.Statement.Name ?? e.Name, CatalogRules.ShownSummary(e, verified?.Statement.Summary), verified?.Statement.Author ?? e.Author,
                 e.Kind == CatalogKind.Skin ? "skin" : "plugin", e.Version, version, word, pending,
                 originProblem ?? (sdkTooNew ? Strings.Get("catalog.needsSdk", verified!.Statement.Sdk) : installed && word == "installed" ? null : CatalogRules.Reason(e, app)), e.Homepage, IconOf(e), e.MinCouchHud, e.Unsigned)
             {
@@ -408,8 +408,16 @@ public sealed class CatalogManager
         try
         {
             var infos = await _plugins.LoadNowAsync(folder);
-            if (infos.Any(i => i.Loaded)) return (Strings.Get("catalog.pluginStarted", entry.Name, entry.Version), false);
-            if (infos.FirstOrDefault(i => i.Error is not null) is { } failed && !failed.NeedsApproval) return (Strings.Get("catalog.pluginStartFailed", entry.Name, entry.Version, PluginSettingRules.LogLine(failed.Error)), false);
+            switch (InstalledStartRules.Judge(infos))
+            {
+                case InstalledStart.Started:
+                    return (Strings.Get("catalog.pluginStarted", entry.Name, entry.Version), false);
+                case InstalledStart.SwitchedOff:
+                    // Not a restart matter: the owner's earlier "off" stays after an uninstall. Switching it on starts it at once.
+                    return (Strings.Get("catalog.pluginInstalledOff", entry.Name, entry.Version), false);
+                case InstalledStart.Failed:
+                    return (Strings.Get("catalog.pluginStartFailed", entry.Name, entry.Version, PluginSettingRules.LogLine(infos.First(i => i.Error is not null).Error)), false);
+            }
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -429,10 +437,11 @@ public sealed class CatalogManager
         var stop = await _plugins.StopAsync(folder);
         if (!gone)
         {
-            // Stopped cleanly, the files may be free now.
-            CatalogService.FinishRemovals(_dataDir);
-            gone = !Directory.Exists(Path.Combine(_dataDir, "plugins", folder));
+            // Stopped cleanly, the files may be free now; if the runtime still holds them, a few short tries (with a collection between)
+            // follow. Else the folder stays marked and goes at the next start.
+            gone = await CatalogService.RemoveAfterStopAsync(_dataDir, folder, stop.FullyStopped ? CatalogService.RemovalRetries : 0, CatalogService.RemovalRetryPause, Task.Delay);
         }
+        Console.WriteLine($"[catalog] uninstall {folder}: stop {stop.Stop}, collected {stop.Collected}, folder {(gone ? "gone" : "stays until the next start")}");
         // The files are gone: nothing to list. Else the list keeps the entry as "uninstalled, removed at the next start" (PluginInfo.RemovedAtRestart).
         if (gone) _plugins.DropListing(folder);
         if (_last is { } last) PublishUpdates(Describe(last), announce: false);

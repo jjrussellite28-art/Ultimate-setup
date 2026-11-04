@@ -12,7 +12,7 @@ import { ensureParentGrant, parental } from './parental.js';
 import { ensureUnlocked } from './passcode.js';
 import { t } from '../core/i18n.js';
 import {
-  MAX_GAMES, MODE_ALL, MODE_GAMES, changeOf, draftOf, flagKeys, gameRows, problemKey, summary, toggleGame, wandOffer
+  MAX_GAMES, MODE_ALL, MODE_GAMES, changeOf, confirmable, draftOf, flagKeys, gameRows, pinLines, problemKey, summary, toggleGame, wandOffer
 } from '../core/companion-rules.js';
 
 /** One list page: rows of { icon, label, detail, run, hint? }. */
@@ -168,6 +168,9 @@ function companionRulePage(rule, data, done) {
       { check: draft.whenLocked, label: t('companion.locked'), detail: t('companion.lockedDetail'), hint: t('companion.hint.toggle'), run: () => flip('whenLocked') },
       { icon: '✓', label: t('companion.save'), detail: dirty() ? t('companion.saveDetail') : t('companion.saved'), hint: t('companion.hint.save'), run: save }
     );
+    if (rule.saved !== false && confirmable(rule.problem)) {
+      rows.unshift({ icon: '✓', label: t('companion.confirm'), detail: t(problemKey(rule.problem)), hint: t('companion.hint.confirm'), run: confirm });
+    }
     if (rule.saved !== false) rows.push({ icon: '✕', label: t('companion.remove'), detail: t('companion.removeDetail'), hint: t('companion.hint.remove'), run: remove });
     return rows;
   });
@@ -184,6 +187,29 @@ function companionRulePage(rule, data, done) {
     const next = await attempt(() => api.setCompanion(rule.appId, change), t('companion.saveFailed'));
     if (!next) return;
     toast(t('companion.savedToast', { name: rule.name }));
+    done(next);
+    pop();
+  }
+  async function confirm() {
+    // The parent first sees exactly which file is meant; the confirmation (and its second factor) is bound to what was shown.
+    const preview = await attempt(() => api.previewCompanion(rule.appId), t('companion.saveFailed'));
+    if (!preview) return;
+    if (!(await confirmDialog(t('companion.confirmTitle', { name: rule.name }), t('companion.confirm'), { message: pinLines(preview, t).join('\n') }))) return;
+    if (parental.status?.enabled && !(await ensureParentGrant(t('companion.guardChange'), { action: 'companions', item: rule.appId }))) return;
+    // A writable folder blocks the start on the locked couch unless the parent allows it here; off by default, and the choice is part of what
+    // the second factor is bound to (the digest with the choice).
+    let allow = false;
+    if (preview.folderWritable) {
+      const choice = await chooseDialog(t('companion.allowTitle'), [
+        { label: t('companion.allowNo'), detail: t('companion.allowNoDetail'), icon: '✕', value: 'no' },
+        { label: t('companion.allowYes'), detail: t('companion.allowYesDetail'), icon: '▶', value: 'yes' }
+      ], 'no');
+      if (!choice) return;
+      allow = choice === 'yes';
+    }
+    const next = await attempt(() => api.confirmCompanion(rule.appId, allow ? preview.digestAllow : preview.digest, preview.hash, allow), t('companion.saveFailed'));
+    if (!next) return;
+    toast(t('companion.confirmedToast', { name: rule.name }));
     done(next);
     pop();
   }

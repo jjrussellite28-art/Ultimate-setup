@@ -120,6 +120,8 @@ export default {
   'phone.paired': 'Paired: {names}',
   'phone.noneYet': 'No phone paired yet.',
   'phone.hint.newCode': 'New code',
+  'phone.codeHidden': 'Press X for a new code (parents\' code needed)',
+  'phone.parentReason': 'Only the parents pair a new phone',
   'phone.hint.back': 'Back',
 
 };

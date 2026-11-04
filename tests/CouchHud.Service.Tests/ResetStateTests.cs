@@ -101,7 +101,7 @@ public class ResetStateTests
     [Fact]
     public async Task A_release_of_every_account_goes_on_after_the_request_timed_out_and_Status_tells_when_it_is_done()
     {
-        using var ops = new OpsHarness();
+        using var ops = new OpsHarness(handlerTimeout: TimeSpan.FromSeconds(3));
         await ops.Call(Callers.User(Callers.OtherSid), Operation.ApplyLockPolicies, new ApplyLockPoliciesArgs(["taskmgr"]));
         ops.Hives.OnDisk[Callers.OtherSid] = ops.Hives.Loaded[Callers.OtherSid];
         ops.Hives.Loaded.Remove(Callers.OtherSid);
@@ -109,11 +109,12 @@ public class ResetStateTests
         ops.Hives.LoadGate = slow;
         Assert.Equal("none", (await ops.Call<StatusData>(Callers.User(), Operation.Status)).Data!.Release);
 
-        // The harness gives a handler 2 s.
+        // This harness gives a handler 3 s; the load waits for the gate, so it always runs out.
         Assert.Equal(ErrorCodes.Timeout, (await ops.Call(Callers.ElevatedAdmin(), Operation.ReleaseAllAccounts)).Code);
         Assert.Equal("running", (await ops.Call<StatusData>(Callers.User(), Operation.Status)).Data!.Release);
         slow.Set();
-        for (var i = 0; i < 100 && ops.Operations.ReleaseStatus == "running"; i++) await Task.Delay(50);
+        var until = DateTime.UtcNow.AddSeconds(60);
+        while (ops.Operations.ReleaseStatus == "running" && DateTime.UtcNow < until) await Task.Delay(20);
         Assert.Equal("done", (await ops.Call<StatusData>(Callers.User(), Operation.Status)).Data!.Release);
         Assert.Empty(ops.State.Accounts.GetValueOrDefault(Callers.OtherSid)?.Groups ?? []);
     }

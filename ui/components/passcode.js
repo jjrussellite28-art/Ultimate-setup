@@ -339,7 +339,7 @@ export function resetDamagedCodes(message) {
 }
 
 // Before Windows' UAC prompt for an administrator's approval: what exactly is approved (the prompt itself only names sc.exe).
-// i18n-used: passcode.approve.autoLogon passcode.approve.lockMode passcode.approve.removeCode passcode.approve.changeCode passcode.approve.release passcode.approve.firewall passcode.approve.update passcode.approve.resetCodes passcode.approve.resetServiceState
+// i18n-used: passcode.approve.autoLogon passcode.approve.lockMode passcode.approve.removeCode passcode.approve.changeCode passcode.approve.changeCodeBoth passcode.approve.changeCodeCouch passcode.approve.release passcode.approve.firewall passcode.approve.update passcode.approve.resetCodes passcode.approve.resetServiceState
 const LEGACY_TEXT = {
   unlockNoCode: () => t('passcode.approve.unlockNoCode'),
   legacyCode: () => t('passcode.approve.legacyCode'),
@@ -383,7 +383,9 @@ api.onAdminApproval?.((payload) => {
     toast(legacy(), 20000, { long: true });
     return;
   }
-  const what = [...new Set((payload?.what ?? []).map((op) => APPROVAL_TEXT[op]).filter(Boolean))].map((key) => t(key));
+  // A code change names the code it replaces (an administrator's approval needs no old code), when the host knows it.
+  const codeKey = payload?.codes === 'both' ? 'passcode.approve.changeCodeBoth' : payload?.codes === 'couch' ? 'passcode.approve.changeCodeCouch' : null;
+  const what = [...new Set((payload?.what ?? []).map((op) => (codeKey && APPROVAL_TEXT[op] === 'passcode.approve.changeCode' ? codeKey : APPROVAL_TEXT[op])).filter(Boolean))].map((key) => t(key));
   toast(t('passcode.approve.notice', { what: what.length ? what.join(', ') : t('passcode.approve.confirmOnly') }), 12000, { long: true });
 });
 

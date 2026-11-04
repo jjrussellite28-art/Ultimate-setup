@@ -47,6 +47,17 @@ public class RobustnessTests
         Assert.Contains("steam:1", saved.Favorites);
     }
 
+    /// <summary>Polls a condition (no deadline of its own to tune; the two minutes only end a test that is truly stuck).</summary>
+    private static async Task WaitFor(Func<bool> condition)
+    {
+        var until = DateTime.UtcNow.AddMinutes(2);
+        while (!condition())
+        {
+            if (DateTime.UtcNow > until) throw new Xunit.Sdk.XunitException("The condition never became true.");
+            await Task.Delay(5);
+        }
+    }
+
     [Fact]
     public async Task Hanging_or_cancelled_providers_are_skipped()
     {
@@ -54,14 +65,35 @@ public class RobustnessTests
         var config = new ConfigStore(dir);
         config.Update(c => c.Apps = []);
         var artwork = new ArtworkResolver(new HttpClient(new Offline()), Path.Combine(dir, "art.json"), null);
-        var library = new LibraryService(config, artwork, [new Hanging(), new TimesOut(), new Works()])
+        // The timeout runs on a clock the test moves by hand, so a slow machine cannot time out the providers that work.
+        var clock = new ManualTimeProvider();
+        var hanging = new Hanging();
+        var works = new Works();
+        var timesOut = new TimesOut();
+        var library = new LibraryService(config, artwork, [hanging, timesOut, works])
         {
-            ProviderTimeout = TimeSpan.FromMilliseconds(300)
+            ProviderTimeout = TimeSpan.FromMilliseconds(300),
+            Time = clock
         };
 
-        var items = await library.ScanAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        try
+        {
+            var scan = library.ScanAsync();
+            // The working providers have answered and the hanging one is stuck: only now does time pass.
+            await WaitFor(() => hanging.Entered.IsSet && works.Ran && timesOut.Ran);
+            await WaitFor(() =>
+            {
+                clock.Advance(TimeSpan.FromMinutes(1));
+                return scan.IsCompleted;
+            });
+            var items = await scan;
 
-        Assert.Equal("ok:1", Assert.Single(items).Id);
+            Assert.Equal("ok:1", Assert.Single(items).Id);
+        }
+        finally
+        {
+            hanging.Gate.Set();
+        }
     }
 
     [Fact]
@@ -154,10 +186,14 @@ public class RobustnessTests
     {
         public string Name => "hanging";
 
-        // Blocks the calling thread before even returning a task (longer than the timeout).
+        public readonly ManualResetEventSlim Entered = new();
+        public readonly ManualResetEventSlim Gate = new();
+
+        // Blocks the calling thread before even returning a task, until the test lets it go (after the timeout).
         public Task<IReadOnlyList<LibraryItem>> GetItemsAsync(CancellationToken ct)
         {
-            Thread.Sleep(5000);
+            Entered.Set();
+            Gate.Wait(TimeSpan.FromMinutes(2));
             return Task.FromResult<IReadOnlyList<LibraryItem>>([]);
         }
     }
@@ -166,16 +202,26 @@ public class RobustnessTests
     {
         public string Name => "timeout";
 
-        public Task<IReadOnlyList<LibraryItem>> GetItemsAsync(CancellationToken ct) =>
+        public volatile bool Ran;
+
+        public Task<IReadOnlyList<LibraryItem>> GetItemsAsync(CancellationToken ct)
+        {
+            Ran = true;
             throw new TaskCanceledException("HttpClient timeout");
+        }
     }
 
     private sealed class Works : ILibraryProvider
     {
         public string Name => "works";
 
-        public Task<IReadOnlyList<LibraryItem>> GetItemsAsync(CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<LibraryItem>>([Item("ok:1")]);
+        public volatile bool Ran;
+
+        public Task<IReadOnlyList<LibraryItem>> GetItemsAsync(CancellationToken ct)
+        {
+            Ran = true;
+            return Task.FromResult<IReadOnlyList<LibraryItem>>([Item("ok:1")]);
+        }
     }
 
     private sealed class Offline : HttpMessageHandler

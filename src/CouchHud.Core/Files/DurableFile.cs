@@ -229,11 +229,15 @@ public static class DurableFile
         return null;
     }
 
+    /// <summary>The most <see cref="ReadValid"/> reads from a file or its .bak; a larger one counts as damaged.</summary>
+    public const int MaxReadBytes = 4 * 1024 * 1024;
+
     private static string? TryRead(string path)
     {
         try
         {
-            return File.Exists(path) ? File.ReadAllText(path) : null;
+            // Larger than the cap counts as unusable (null), like a missing or damaged file.
+            return File.Exists(path) ? CouchHud.Core.Platform.BoundedFile.ReadAllText(path, MaxReadBytes) : null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

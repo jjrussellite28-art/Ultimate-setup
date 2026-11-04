@@ -27,6 +27,8 @@ export default {
   'consoleSetup.summary.nothing': 'Nothing to do',
   'consoleSetup.cancelledNote': 'Cancelled. “Try again” picks up where it stopped',
   'consoleSetup.needsFirst': 'Needs this first: {step}',
+  'consoleSetup.refused.title': 'This is not possible right now',
+  'consoleSetup.refused.locked': 'The couch is locked. Enter the code to go on.',
   'consoleSetup.notUnlocked': 'Not unlocked. “Try again” picks up where it stopped',
   'consoleSetup.action.undo': 'Cancel and undo everything',
   'consoleSetup.leadFailedUndo': 'The switch did not finish. “Try again” goes on; “Cancel and undo everything” (or B) puts back the state from before.',

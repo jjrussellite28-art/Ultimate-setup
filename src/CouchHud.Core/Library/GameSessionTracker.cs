@@ -20,8 +20,9 @@ public interface IProcessProbe
 }
 
 /// <param name="External">Found running without a start through CouchHud (Steam's own client, a launcher, a start before CouchHud): the launch checks did not see it.</param>
+/// <param name="Launch">The serial of the CouchHud launch this session came from (0: not started through CouchHud).</param>
 /// <param name="Stamps">Image and start time of the processes when they were seen: what ending the game checks against (a pid alone may belong to something else by then).</param>
-public sealed record GameSession(LibraryItem Item, DateTimeOffset Started, IReadOnlyList<int> Pids, bool External = false, IReadOnlyDictionary<int, ProcessStamp>? Stamps = null)
+public sealed record GameSession(LibraryItem Item, DateTimeOffset Started, IReadOnlyList<int> Pids, bool External = false, IReadOnlyDictionary<int, ProcessStamp>? Stamps = null, long Launch = 0)
 {
     public IReadOnlyDictionary<int, ProcessStamp> StampsOrEmpty => Stamps ?? new Dictionary<int, ProcessStamp>();
 
@@ -43,6 +44,8 @@ public sealed class GameSessionTracker(IProcessProbe probe)
     private readonly object _gate = new();
     private LibraryItem? _pending;
     private DateTimeOffset _pendingSince;
+    private long _pendingLaunch;
+    private long _launchSerial;
     private GameSession? _current;
     private IReadOnlyList<GameSession> _others = [];
     // Processes of the current session with their image path: a pid that comes back with another path is a reused one.
@@ -84,12 +87,14 @@ public sealed class GameSessionTracker(IProcessProbe probe)
     /// <summary>Raised when such another game is gone (not when it became the current session).</summary>
     public event Action<GameSession>? OtherEnded;
 
-    public void Launched(LibraryItem item, DateTimeOffset now)
+    /// <summary>Notes a launch and returns its serial: the session that comes out of it carries the same one (<see cref="GameSession.Launch"/>).</summary>
+    public long Launched(LibraryItem item, DateTimeOffset now)
     {
         lock (_gate)
         {
             _pending = item;
             _pendingSince = now;
+            return _pendingLaunch = ++_launchSerial;
         }
     }
 
@@ -191,7 +196,7 @@ public sealed class GameSessionTracker(IProcessProbe probe)
         var (found, foundKnown) = FindPids(pending, snapshot, parents, starts, steam, null);
         if (found.Count > 0)
         {
-            var started = new GameSession(pending, now, found, Stamps: foundKnown);
+            var started = new GameSession(pending, now, found, Stamps: foundKnown, Launch: _pendingLaunch);
             _current = started;
             _known = foundKnown;
             _pending = null;

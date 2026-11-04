@@ -22,3 +22,30 @@ public static class CatalogInstallFlow
         });
     }
 }
+
+/// <summary>What became of a plugin that was installed from the catalog and started right away.</summary>
+public enum InstalledStart
+{
+    /// <summary>It runs now.</summary>
+    Started,
+    /// <summary>It was installed, but its start failed (the error is in the list).</summary>
+    Failed,
+    /// <summary>It was installed but stays off: the owner switched this folder off earlier and that choice outlives an uninstall (a reinstall must not lift it). It needs no restart, only switching on.</summary>
+    SwitchedOff,
+    /// <summary>It starts with the next start (an earlier run could not be stopped for sure, Offline mode, or nothing could be said).</summary>
+    AtRestart
+}
+
+/// <summary>Reads the list lines of a folder after the host tried to start it now; the one place that decides whether the answer says "restart".</summary>
+public static class InstalledStartRules
+{
+    public static InstalledStart Judge(IReadOnlyList<PluginInfo> infos)
+    {
+        if (infos.Any(i => i.Loaded)) return InstalledStart.Started;
+        // Waiting for a restart wins over everything: that start is owed, whatever else the line says.
+        if (infos.Any(i => i.NeedsRestartToStart || i.SkippedForOffline)) return InstalledStart.AtRestart;
+        if (infos.Any(i => !i.Enabled && i.Error is null && !i.NeedsApproval && !i.RemovedAtRestart)) return InstalledStart.SwitchedOff;
+        if (infos.FirstOrDefault(i => i.Error is not null) is { NeedsApproval: false }) return InstalledStart.Failed;
+        return InstalledStart.AtRestart;
+    }
+}

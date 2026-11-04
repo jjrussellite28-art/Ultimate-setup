@@ -309,18 +309,18 @@ public class PluginHardeningTests : IDisposable
     // ---- M10: SDK 2 lock state ----
 
     [Fact]
-    public void The_sdk_has_the_lock_state_and_stays_compatible()
+    public async Task The_sdk_has_the_lock_state_and_stays_compatible()
     {
         Assert.Equal(5, SdkVersion.Current);
         // A host (or a test double) that knows nothing of SDK 2 answers "not locked" through the default implementation.
         IPluginContext old = new OldContext();
         Assert.False(old.Locked);
         var events = new PluginEvents();
-        bool? seen = null;
-        events.LockChanged += locked => seen = locked;
+        // The handler runs on the pool, off the caller's thread; the test waits for the event itself, not for a time.
+        var seen = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        events.LockChanged += locked => seen.TrySetResult(locked);
         events.RaiseLockChanged(true);
-        SpinWait.SpinUntil(() => seen is not null, TimeSpan.FromSeconds(2));
-        Assert.True(seen);
+        Assert.True(await seen.Task.WaitAsync(TimeSpan.FromMinutes(2)));
         // A manifest for SDK 1 is still read as before.
         Assert.Equal(1, JsonSerializer.Deserialize<PluginManifest>("""{"name":"X"}""")!.Sdk);
     }

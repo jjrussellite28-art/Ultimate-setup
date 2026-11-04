@@ -414,14 +414,17 @@ public sealed partial class PluginManager(IReadOnlyList<(string Dir, bool UserIn
         return PluginFunctionRules.Effective(declared, stored, PluginPolicy.IsOwn(OriginOf(pluginId)));
     }
 
-    private static readonly CouchHud.Core.Guard.LogThrottle UndeclaredLog = new(TimeSpan.FromMinutes(10));
+    /// <summary>Where the manager's own warnings go (the error stream; a test collects them without touching the process-wide console).</summary>
+    internal Action<string> LogLine { get; set; } = Console.Error.WriteLine;
+
+    private readonly CouchHud.Core.Guard.LogThrottle UndeclaredLog = new(TimeSpan.FromMinutes(10));
 
     /// <summary>An item names a function the plugin never declared: it counts as admin only; said once in a while, with the text cleaned (it comes from the plugin).</summary>
-    private static void LogUndeclared(string pluginId, string functionId)
+    private void LogUndeclared(string pluginId, string functionId)
     {
         var clean = new string(functionId.Where(c => !char.IsControl(c)).Take(40).ToArray());
         var line = $"[plugins] {pluginId}: an item names the function '{clean}' that the plugin never declared (treated as admin only)";
-        if (UndeclaredLog.Allow(line, DateTime.UtcNow, out _)) Console.Error.WriteLine(line);
+        if (UndeclaredLog.Allow(line, DateTime.UtcNow, out _)) LogLine(line);
     }
 
     /// <summary>The ids as the plugin declared them (the stored levels are kept under these); false when the plugin does not declare the function.</summary>

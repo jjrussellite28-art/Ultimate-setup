@@ -99,6 +99,51 @@ public static partial class NameMatch
         return Plain(a).Length > 0 && Plain(a) == Plain(b);
     }
 
+    /// <summary>
+    /// Shorter searches to try when the store finds nothing for <paramref name="query"/>: the store only returns entries that contain every word
+    /// ("Mortal Kombat 1 Premium Edition" finds nothing although "Mortal Kombat 1" is there). Trademark signs and punctuation go first, then
+    /// edition words at the end, then one trailing word at a time (never below two words), at most <paramref name="max"/> searches. A single word
+    /// is searched only when edition words were peeled off ("Doom Deluxe Edition" gives "Doom"), and never a bare number or roman numeral
+    /// ("2 Deluxe Edition" gives nothing): that would find unrelated games.
+    /// </summary>
+    public static IReadOnlyList<string> SearchFallbacks(string query, int max = 3)
+    {
+        var words = query.Replace("™", " ").Replace("®", " ").Replace("©", " ").Replace("℠", " ")
+            .Split([' ', '	', ':', ';', ',', '(', ')', '[', ']', '-', '–', '—', '/', '|'], StringSplitOptions.RemoveEmptyEntries).ToList();
+        var result = new List<string>();
+        var peeled = false;
+        void Add(List<string> w)
+        {
+            var text = string.Join(' ', w);
+            if (w.Count == 1 && (!peeled || w[0].All(char.IsAsciiDigit) || w[0].All(c => "ivxlcdm".Contains(char.ToLowerInvariant(c))))) return;
+            if (w.Count > 0 && result.Count < max && !text.Equals(query, StringComparison.OrdinalIgnoreCase)
+                && !result.Contains(text, StringComparer.OrdinalIgnoreCase)) result.Add(text);
+        }
+        Add(words);
+        for (var changed = true; changed;)
+        {
+            changed = false;
+            foreach (var suffix in EditionSuffixes)
+            {
+                var parts = suffix.Split(' ');
+                if (words.Count > parts.Length && words.Skip(words.Count - parts.Length).Select(x => x.Replace("'", "").Replace("’", "").ToLowerInvariant()).SequenceEqual(parts))
+                {
+                    words.RemoveRange(words.Count - parts.Length, parts.Length);
+                    changed = true;
+                    peeled = true;
+                    break;
+                }
+            }
+        }
+        Add(words);
+        while (words.Count > 2 && result.Count < max)
+        {
+            words.RemoveAt(words.Count - 1);
+            Add(words);
+        }
+        return result;
+    }
+
     /// <summary>Below this <see cref="Confidence"/> a search hit is not taken automatically: no artwork is better than a wrong one.</summary>
     public const double Threshold = 0.8;
 

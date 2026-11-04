@@ -169,7 +169,7 @@ public sealed partial class ArtworkResolver
         string? note = null;
         try
         {
-            foreach (var c in await SteamStore.SearchAsync(_http, query, ct))
+            foreach (var c in await SteamStore.SearchWithFallbackAsync(_http, query, ct))
             {
                 var thumb = c.Thumb is { } t && ArtworkSources.IsAllowed(t) ? t : null;
                 hits.Add(new ArtworkHit($"steam:{c.AppId}", c.Name, "Steam", null, ["Steam"], thumb));
