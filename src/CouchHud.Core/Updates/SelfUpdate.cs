@@ -37,7 +37,7 @@ public sealed record SelfUpdateCheck(ReleaseInfo? Release, bool UpdateAvailable,
 /// <summary>Where a setup may come from, and which release counts as an update.</summary>
 public static class SelfUpdateRules
 {
-    public const string Repository = "kewe87/CouchHUD";
+    public const string Repository = "jjrussellite28-art/Ultimate-setup";
 
     /// <summary>Shown when GitHub has no release at all (404), which is not the same as "up to date".</summary>
     public static string NoReleaseYet => Strings.Get("selfupdate.noRelease");

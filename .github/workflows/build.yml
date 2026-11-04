@@ -88,8 +88,24 @@ jobs:
         timeout-minutes: 40
         run: node scripts/tabs-check.mjs
 
+      - name: Corresponding source archive
+        shell: pwsh
+        run: |
+          git archive --format=zip --prefix=Ultimate-setup/ --output="Ultimate-setup-source-$env:GITHUB_SHA.zip" HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Source archive failed' }
+
       - name: Publish
         run: dotnet publish src/CouchHud.Shell/CouchHud.Shell.csproj -c Release -r win-x64 --self-contained true -o publish
+
+      - name: Record source commit
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllText('publish/BUILD-COMMIT.txt', "$env:GITHUB_SHA`n", [Text.UTF8Encoding]::new($false))
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Ultimate-setup-source
+          path: Ultimate-setup-source-*.zip
 
       # CouchHud.Service (LocalSystem): self-contained single file in its own folder (two self-contained apps in one folder collide).
       # Single file without any self-extraction is set in CouchHud.Service.csproj (extraction would unpack DLLs into a temp folder at
@@ -190,13 +206,17 @@ jobs:
       - name: Release notes
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
-        run: ./scripts/release-notes.ps1 -Tag $env:GITHUB_REF_NAME -Out release-notes.md
+        run: |
+          $header = "# Ultimate Setup — development draft`n`nIndependent fork of CouchHUD by kewe87 and contributors. GPL-3.0-only.`n`nNot approved for public or commercial distribution. See docs/RELEASE-CHECKLIST.md.`n`nSource commit: $env:GITHUB_SHA`n`nExact source is attached as Ultimate-setup-source-$env:GITHUB_SHA.zip. Retain LICENSE and notices.`n`n"
+          [IO.File]::WriteAllText('release-notes.md', $header + (Get-Content FORK-CHANGES.md -Raw), [Text.UTF8Encoding]::new($false))
 
-      - name: Release
+      - name: Prepare draft release (never publish automatically)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
+          draft: true
           files: |
+            Ultimate-setup-source-*.zip
             installer/output/*.exe
             installer/output/*.sha256
           body_path: release-notes.md

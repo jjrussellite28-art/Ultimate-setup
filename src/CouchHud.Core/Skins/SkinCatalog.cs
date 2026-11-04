@@ -96,6 +96,8 @@ public static class SkinCatalog
     {
         var wanted = text?.Trim();
         if (string.IsNullOrEmpty(wanted)) return null;
+        // Keep the inherited default-skin alias reserved after the visible product rename.
+        if (string.Equals(wanted, "CouchHUD", StringComparison.OrdinalIgnoreCase)) return "default";
         var users = userSkins.ToList();
         var id = MigrateSkinId(wanted)!;
         if (BuiltinIds.Contains(id) || users.Any(s => s.Id == id)) return id;

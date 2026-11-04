@@ -31,7 +31,7 @@ export default {
   'companion.flag.minimized': 'Minimized',
   'companion.flag.locked': 'Also on a locked couch',
   'companion.close': 'End with the game',
-  'companion.closeDetail': 'Only if CouchHUD started the app itself and it is still the same process',
+  'companion.closeDetail': 'Only if Ultimate Setup started the app itself and it is still the same process',
   'companion.minimized': 'Start minimized in the background',
   'companion.minimizedDetail': 'The game stays in front. If a window takes the focus anyway, it is minimized again',
   'companion.locked': 'Also start on a locked couch',

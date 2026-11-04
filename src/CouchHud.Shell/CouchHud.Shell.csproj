@@ -11,7 +11,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>couchhud.ico</ApplicationIcon>
     <!-- Shown in Task Manager and the file properties. -->
-    <AssemblyTitle>CouchHUD</AssemblyTitle>
+    <AssemblyTitle>Ultimate Setup</AssemblyTitle>
     <!-- Elevated helpers inherit the user's environment: no DOTNET_STARTUP_HOOKS code may run in them. -->
     <StartupHookSupport>false</StartupHookSupport>
   </PropertyGroup>
@@ -45,5 +45,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\ui\**\*" LinkBase="ui" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\LICENSE;..\..\CREDITS.md;..\..\SOURCE.md;..\..\THIRD-PARTY-NOTICES.md;..\..\FORK-CHANGES.md" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -13,10 +13,10 @@
       number as the release once hid the update). The updater ignores the part after "+".
     -->
     <InformationalVersion Condition="'$(CouchHudRelease)' != 'true'">$(Version)-dev</InformationalVersion>
-    <Authors>kewe87</Authors>
+    <Authors>kewe87; jjrussellite28-art</Authors>
     <Copyright>Copyright © 2026 kewe87</Copyright>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
-    <Product>CouchHUD</Product>
+    <Product>Ultimate Setup</Product>
   </PropertyGroup>
 
   <!-- The SDK appends the full commit to the informational version; eight characters are enough to name a build. -->
