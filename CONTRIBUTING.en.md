@@ -1,8 +1,8 @@
-# Contributing to CouchHUD
+# Contributing to Mega Hub
 
 [Deutsch](CONTRIBUTING.md) | **English**
 
-Great to have you here! CouchHUD aims to be a free, really good living-room frontend for Windows, and that works best together.
+Great to have you here! Mega Hub aims to be a free, really good living-room frontend for Windows, and that works best together.
 
 ## Ways to contribute
 
@@ -22,7 +22,7 @@ dotnet test CouchHud.slnx
 dotnet run --project src/CouchHud.Shell -- --dev   # window mode with DevTools
 ```
 
-`--dev` only works in a Debug build (as above with `dotnet run`). A Release build ignores the switch unless an administrator sets `HKLM\SOFTWARE\CouchHud` `DeveloperMode=1` (DWORD; the key must only be writable by Administrators, SYSTEM and TrustedInstaller). Otherwise a standard account could start CouchHUD with `--dev` from a shortcut and get DevTools.
+`--dev` only works in a Debug build (as above with `dotnet run`). A Release build ignores the switch unless an administrator sets `HKLM\SOFTWARE\CouchHud` `DeveloperMode=1` (DWORD; the key must only be writable by Administrators, SYSTEM and TrustedInstaller). Otherwise a standard account could start Mega Hub with `--dev` from a shortcut and get DevTools.
 
 The interface (`ui/`) is vanilla JS as ES modules without a build step. Platform-neutral logic belongs in `CouchHud.Core` (with tests in `tests/`), Windows-specific code in `CouchHud.Shell`.
 
@@ -71,8 +71,8 @@ Get-Credential | Export-Clixml "$env:USERPROFILE\couchhud-vm.cred"
 
 | Script | Purpose |
 |---|---|
-| `scripts\deploy-vm.ps1` | Publishes CouchHUD (self-contained), copies it to `C:\Program Files\CouchHud` in the VM and starts it in the signed-in session. `-NoBuild` copies the last publish again, `-NoStart` does not start it, `-Arguments --dev` passes switches through (a Release build only honors `--dev` with `DeveloperMode=1` in `HKLM\SOFTWARE\CouchHud`, see `vm-cdp.ps1 -Enable`). |
-| `scripts\vm-cdp.ps1` | Talks to the UI in the VM over the Chrome DevTools Protocol: `-Eval 'document.title'`, `-Screenshot shot.png`, `-Keys ArrowRight,Enter`, `-Console` (errors since the last call), `-Reload`. Run `-Enable` once first (sets `HKLM\SOFTWARE\CouchHud` `DeveloperMode=1` and `RemoteDebuggingPort=9222`, DWORD, as an administrator of the VM; then restart CouchHUD), and `-Disable` after the tests. The port only listens on 127.0.0.1; the couch browser gets port + 1. `WEBVIEW2_*` environment variables have no effect since 0.4.2 (CouchHUD removes them at start). |
+| `scripts\deploy-vm.ps1` | Publishes Mega Hub (self-contained), copies it to `C:\Program Files\CouchHud` in the VM and starts it in the signed-in session. `-NoBuild` copies the last publish again, `-NoStart` does not start it, `-Arguments --dev` passes switches through (a Release build only honors `--dev` with `DeveloperMode=1` in `HKLM\SOFTWARE\CouchHud`, see `vm-cdp.ps1 -Enable`). |
+| `scripts\vm-cdp.ps1` | Talks to the UI in the VM over the Chrome DevTools Protocol: `-Eval 'document.title'`, `-Screenshot shot.png`, `-Keys ArrowRight,Enter`, `-Console` (errors since the last call), `-Reload`. Run `-Enable` once first (sets `HKLM\SOFTWARE\CouchHud` `DeveloperMode=1` and `RemoteDebuggingPort=9222`, DWORD, as an administrator of the VM; then restart Mega Hub), and `-Disable` after the tests. The port only listens on 127.0.0.1; the couch browser gets port + 1. `WEBVIEW2_*` environment variables have no effect since 0.4.2 (Mega Hub removes them at start). |
 | `scripts\vm-screenshot.ps1` | Saves the VM's console screen as a PNG (`-Path shot.png`), also at the sign-in screen, where the UI cannot be reached. |
 | `scripts\vm-uac.ps1` | Confirms (or with `-Decline` declines) a UAC prompt in the VM through the virtual keyboard, which also reaches the secure desktop. |
 
@@ -94,7 +94,7 @@ The interface exists in German and English. Rules (details and the terminology t
 The principles: everything through the GUI, controller first, seamless full screen, third-party software in plugins, a broken plugin must never kill the shell.
 
 - Every setting in only one place, no jargon in Simple mode.
-- Every change to Windows can be undone and is listed on the transparency page ("What CouchHUD changes in Windows").
+- Every change to Windows can be undone and is listed on the transparency page ("What Mega Hub changes in Windows").
 
 ## Release
 
@@ -109,8 +109,8 @@ Signing scripts (PowerShell 7):
 
 | Script | Purpose |
 |---|---|
-| `scripts\sign-file.ps1` | Signs a file with ECDSA P-256 (SHA-256) and writes `<file>.sig`. `-GenerateKey` creates the key pair the first time and shows the public key (which is in the code as `CatalogSignature.PublicKeyPem`). `-Context catalog` (default) or `release` keeps the purposes apart. `-BumpSerial` (catalog index only, used by `catalog-sign.ps1`) raises the root `serial` of the index by 1 before signing; the file and the `.sig` are replaced only once the signature exists. Signing never creates a key and refuses a key that is not the one compiled into CouchHUD. |
-| `scripts\catalog-sign.ps1` | Signs the plugin catalog: `-Index .\catalog\index.json` raises `serial` by 1 (every change needs a higher number, or clients refuse the index as older) and writes `index.json.sig`. It never creates a key and refuses a key that is not the one compiled into CouchHUD. Do not change the file after signing (not even line endings). |
+| `scripts\sign-file.ps1` | Signs a file with ECDSA P-256 (SHA-256) and writes `<file>.sig`. `-GenerateKey` creates the key pair the first time and shows the public key (which is in the code as `CatalogSignature.PublicKeyPem`). `-Context catalog` (default) or `release` keeps the purposes apart. `-BumpSerial` (catalog index only, used by `catalog-sign.ps1`) raises the root `serial` of the index by 1 before signing; the file and the `.sig` are replaced only once the signature exists. Signing never creates a key and refuses a key that is not the one compiled into Mega Hub. |
+| `scripts\catalog-sign.ps1` | Signs the plugin catalog: `-Index .\catalog\index.json` raises `serial` by 1 (every change needs a higher number, or clients refuse the index as older) and writes `index.json.sig`. It never creates a key and refuses a key that is not the one compiled into Mega Hub. Do not change the file after signing (not even line endings). |
 | `scripts\sign-release.ps1` | The release step above. |
 | `scripts\catalog-entry.ps1` | Packs a plugin or skin folder as `<Name>-<Version>.zip` and prints the SHA-256 for the catalog entry. |
 

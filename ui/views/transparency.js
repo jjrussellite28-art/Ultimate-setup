@@ -1,4 +1,4 @@
-// "What CouchHUD changes in Windows": every intervention in one list, with where it
+// "What Mega Hub changes in Windows": every intervention in one list, with where it
 // happens, whether it needs administrator rights, its current state and how to undo it.
 
 import { api } from '../core/api.js';

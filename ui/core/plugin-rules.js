@@ -5,7 +5,7 @@
 /** Where a confirm dialog starts. A risky question starts on "Cancel": a double press on A must never confirm it. */
 export const confirmStartIndex = ({ danger = false, focusCancel = false } = {}) => (danger || focusCancel ? 1 : 0);
 
-/** A plugin or catalog row of a developer who is not CouchHUD: a signed third-party package, or anything from a catalog the user added. */
+/** A plugin or catalog row of a developer who is not Mega Hub: a signed third-party package, or anything from a catalog the user added. */
 export const isThirdParty = (x) => !!x && (x.origin === 'thirdParty' || x.extra === true || x.thirdParty === true);
 
 /** The mark in the list: 'thirdParty' (Fremdentwickler), 'local' (a plugin nobody signed), 'unsigned' (a source without signature) or null. */
@@ -35,7 +35,7 @@ const KNOWN_CAPABILITIES = new Set([
 /** Capability keys to show; an id this version does not know is shown as unknown (never as its raw id inside a sentence). */
 export const capabilityKeys = (caps) => (caps ?? []).map((c) => (KNOWN_CAPABILITIES.has(c) ? capabilityKey(c) : 'plugin.capability.unknown'));
 
-/** Capabilities that deserve a red mark: they reach beyond CouchHUD (programs, the registry, the internet, native code, loading code). */
+/** Capabilities that deserve a red mark: they reach beyond Mega Hub (programs, the registry, the internet, native code, loading code). */
 export const RISKY_CAPABILITIES = new Set(['process', 'native', 'registry', 'network:internet', 'dynamicCode', 'setup.run']);
 export const isRisky = (cap) => RISKY_CAPABILITIES.has(cap);
 
@@ -114,9 +114,9 @@ export const usesInstallGate = (entry, update) => !update || !!entry.addsCapabil
 
 /**
  * Does this change need the parents' code (or, without parental controls, the couch code again)? A mirror of PluginPolicy.Decide (Core): a plugin
- * from a third party or a local one for install/approve/accept/confirm and for everything under parental controls; CouchHUD's own plugins only for
+ * from a third party or a local one for install/approve/accept/confirm and for everything under parental controls; Mega Hub's own plugins only for
  * accepting a withdrawn one, confirming a program, and (under parental controls) an install or update that reaches the assistant, a setup or a program.
- * An update that adds capabilities counts as an install. Origin 'skin' is a skin of CouchHUD's own catalog: the unlock is enough, no code.
+ * An update that adds capabilities counts as an install. Origin 'skin' is a skin of Mega Hub's own catalog: the unlock is enough, no code.
  * The table in scripts/ui-logic-check.mjs and the one in PluginPolicyGateTableTests (Core) are the same; change both together.
  */
 export function needsCode(change, origin, capabilities, parentalOn, addsCapabilities = false) {
@@ -128,7 +128,7 @@ export function needsCode(change, origin, capabilities, parentalOn, addsCapabili
   return effective === 'acceptRevoked' || effective === 'confirmExe' || (!!parentalOn && ['install', 'update'].includes(effective) && reaches);
 }
 
-/** The origin the host gates a catalog row by: anything from an added catalog is third-party; a skin of CouchHUD's own catalog is 'skin'. */
+/** The origin the host gates a catalog row by: anything from an added catalog is third-party; a skin of Mega Hub's own catalog is 'skin'. */
 export const gateOrigin = (entry) => (isThirdParty(entry) ? 'thirdParty' : entry.kind === 'skin' ? 'skin' : entry.origin ?? 'local');
 
 /** The change name for the parents' grant of a catalog install or update (a skin of an added catalog always asks as an install). */
@@ -139,7 +139,7 @@ export const grantAction = (change) => `plugin${change[0].toUpperCase()}${change
 
 /**
  * The questions before a catalog install or update, in order: a third-party package gets the Fremdentwickler warning first (install) or a
- * plain question (update: the key is pinned already); CouchHUD's own and skins get the plain question. Then always the code step (the parents'
+ * plain question (update: the key is pinned already); Mega Hub's own and skins get the plain question. Then always the code step (the parents'
  * code where needsCode says so, the plain unlock otherwise). Only after all of them the call goes out. { blocked } when the page must not ask at all.
  */
 export function installPlan(entry, { expert = false, update = false } = {}) {
@@ -190,7 +190,7 @@ export function hostOf(url) {
   }
 }
 
-/** The list the page shows: CouchHUD's own first and marked official, then the added ones in the order they were added. */
+/** The list the page shows: Mega Hub's own first and marked official, then the added ones in the order they were added. */
 export function sourceRows(sources) {
   if (!sources) return [];
   const official = sources.official ? [{ official: true, url: sources.official.url, name: null, host: hostOf(sources.official.url), removable: false }] : [];

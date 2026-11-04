@@ -16,7 +16,7 @@ import { ageBadge, badgeText, descriptionState, loadTickets, storeRetryDelay } f
 
 let rescanOnReturn = false;
 
-// The uninstaller runs outside CouchHUD; look again once we're back in front.
+// The uninstaller runs outside Mega Hub; look again once we're back in front.
 window.addEventListener('focus', async () => {
   if (!rescanOnReturn) return;
   rescanOnReturn = false;

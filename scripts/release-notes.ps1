@@ -8,7 +8,7 @@ param(
     [Parameter(Mandatory)] [string] $Tag,
     [Parameter(Mandatory)] [string] $Out,
     [string] $Changelog = (Join-Path $PSScriptRoot '..' 'CHANGELOG.md'),
-    [string] $Repo = 'jjrussellite28-art/Ultimate-setup'
+    [string] $Repo = 'jjrussellite28-art/mega-hub'
 )
 $ErrorActionPreference = 'Stop'
 

@@ -1,4 +1,4 @@
-// HDR for the HUD: with Windows HDR on (or CouchHUD turning it on), artwork and
+// HDR for the HUD: with Windows HDR on (or Mega Hub turning it on), artwork and
 // trailers use the full brightness range and the skins switch to wide-gamut colors,
 // glows and light sweeps (see the "HDR" section in styles.css and the skins).
 

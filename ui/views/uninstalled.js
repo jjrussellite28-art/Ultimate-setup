@@ -177,7 +177,7 @@ export function uninstalledPage() {
 
 /**
  * Asks the store's client to install the game. On a locked couch first the unlock; with parental controls on the parents' code for
- * exactly this game (the host checks both again). The client then shows its own dialog (folder, space), which CouchHUD lets to the front.
+ * exactly this game (the host checks both again). The client then shows its own dialog (folder, space), which Mega Hub lets to the front.
  */
 export async function installGame(game) {
   const client = SOURCE_LABEL[game.source] ?? game.source;

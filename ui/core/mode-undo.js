@@ -23,7 +23,7 @@ export function createUndoTables({ api, state, wait = (ms) => new Promise((resol
     }
   });
 
-  // "CouchHUD stays in front" with the mark of the shell setup (b: the setup switched it on, see AppConfig.SuppressBySetup). The host
+  // "Mega Hub stays in front" with the mark of the shell setup (b: the setup switched it on, see AppConfig.SuppressBySetup). The host
   // clears the mark with every change of the setting, so the mark goes back after it. A record of 0.6.3 has no b: only the setting.
   const suppressBack = {
     snapshot: (env) => ({ v: !!env.settings.suppressCompetitors, b: !!env.settings.suppressBySetup }),

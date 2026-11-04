@@ -1,4 +1,4 @@
-// The toast for a screenshot taken with Guide + Y or from the guide menu while CouchHUD is in front: the picture, where it went,
+// The toast for a screenshot taken with Guide + Y or from the guide menu while Mega Hub is in front: the picture, where it went,
 // and the camera sound of the sound set (if sounds are on). Over a game the host shows its own small toast instead.
 
 import { $, el } from '../core/dom.js';

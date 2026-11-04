@@ -1,4 +1,4 @@
-# Skins for CouchHUD
+# Skins for Mega Hub
 
 [Deutsch](SKINS.md) | **English**
 
@@ -25,11 +25,11 @@ A skin is a stylesheet plus optional button glyphs of its own. It changes colors
 }
 ```
 
-`name` and `description` are either plain text or an object with `de` and `en`; CouchHUD shows the one for the current language (the other one if it is missing). Names have at most 40 characters, descriptions 300; control characters, invisible format characters (such as text-direction overrides or zero-width characters) and `<` `>` are removed, so a name is always plain text. A skin without a name carries its folder name. `soundSet` is optional: one of the sound sets of the app (`default`, `deepsea`, `greenlight`, `neoncity`, `nova`) that plays while the skin is active; anything else is ignored.
+`name` and `description` are either plain text or an object with `de` and `en`; Mega Hub shows the one for the current language (the other one if it is missing). Names have at most 40 characters, descriptions 300; control characters, invisible format characters (such as text-direction overrides or zero-width characters) and `<` `>` are removed, so a name is always plain text. A skin without a name carries its folder name. `soundSet` is optional: one of the sound sets of the app (`default`, `deepsea`, `greenlight`, `neoncity`, `nova`) that plays while the skin is active; anything else is ignored.
 
-`glyphs` is optional (at most 32 entries, each label at most 12 characters) and only styling. The key `≡` is the label of the menu button (for example `☰` or `MENU`): which symbols appear is decided by the controller (or *Settings › Controller › Button symbols*). An entry such as `✕`, `○`, `□`, `△`, `L1`, `R1`, `L2`, `R2`, `L3`, `R3`, `OPTIONS`, `CREATE`, `SHARE` or `PS` only applies with PlayStation symbols, any other only with Xbox symbols; otherwise CouchHUD shows the default symbol of that kind of controller. The button colors with PlayStation symbols hang on `:root[data-pad="playstation"]`. For own labels for both kinds use the optional lists `glyphsXbox` and `glyphsPlayStation` (same limits, text only); an entry there applies to exactly that kind of controller and wins over the entry in `glyphs`, which stays the fallback. Order: the list of the controller kind, then `glyphs` (filtered by kind), then the default symbol of the kind. A PlayStation pad that Steam Input or DS4Windows passes on as a virtual XInput pad counts as PlayStation as long as its native connection reports the presses first; otherwise CouchHUD shows the Xbox symbols.
+`glyphs` is optional (at most 32 entries, each label at most 12 characters) and only styling. The key `≡` is the label of the menu button (for example `☰` or `MENU`): which symbols appear is decided by the controller (or *Settings › Controller › Button symbols*). An entry such as `✕`, `○`, `□`, `△`, `L1`, `R1`, `L2`, `R2`, `L3`, `R3`, `OPTIONS`, `CREATE`, `SHARE` or `PS` only applies with PlayStation symbols, any other only with Xbox symbols; otherwise Mega Hub shows the default symbol of that kind of controller. The button colors with PlayStation symbols hang on `:root[data-pad="playstation"]`. For own labels for both kinds use the optional lists `glyphsXbox` and `glyphsPlayStation` (same limits, text only); an entry there applies to exactly that kind of controller and wins over the entry in `glyphs`, which stays the fallback. Order: the list of the controller kind, then `glyphs` (filtered by kind), then the default symbol of the kind. A PlayStation pad that Steam Input or DS4Windows passes on as a virtual XInput pad counts as PlayStation as long as its native connection reports the presses first; otherwise Mega Hub shows the Xbox symbols.
 
-`sounds` is optional. Possible events: `move`, `tab`, `select`, `back`, `bump`, `open`, `close`, `notify`, `toggle`, `boot` and `music`. `music` is a background track that loops when the user has chosen "Menu sounds and music"; without it, the skin's built-in music plays. Allowed are `.wav`, `.ogg` and `.mp3` from the skin folder. For missing events CouchHUD plays the built-in sound set.
+`sounds` is optional. Possible events: `move`, `tab`, `select`, `back`, `bump`, `open`, `close`, `notify`, `toggle`, `boot` and `music`. `music` is a background track that loops when the user has chosen "Menu sounds and music"; without it, the skin's built-in music plays. Allowed are `.wav`, `.ogg` and `.mp3` from the skin folder. For missing events Mega Hub plays the built-in sound set.
 
 **HDR**: when HDR mode is active, the root element carries `data-hdr="on"`. There you can set stronger colors, ideally in Display P3:
 
@@ -64,7 +64,7 @@ A skin is a stylesheet plus optional button glyphs of its own. It changes colors
 
 Put your own fonts and images in the skin folder and reference them relatively (`url("orbitron.woff2")`).
 
-**Local files only:** CouchHUD replaces internet addresses (`http://`, `https://`, `//host/…`) in `skin.css` with `about:blank` before it serves the stylesheet. A skin should not be able to contact a foreign server for every image and so tell it when someone is sitting on the couch. Images, fonts and sounds therefore belong in the skin folder (or in the CSS as a `data:` address). The skin folder may only point to local drives, never to network drives or shares (`\\server\…`). When installing from a `.zip`, CouchHUD points out that a skin can load content.
+**Local files only:** Mega Hub replaces internet addresses (`http://`, `https://`, `//host/…`) in `skin.css` with `about:blank` before it serves the stylesheet. A skin should not be able to contact a foreign server for every image and so tell it when someone is sitting on the couch. Images, fonts and sounds therefore belong in the skin folder (or in the CSS as a `data:` address). The skin folder may only point to local drives, never to network drives or shares (`\\server\…`). When installing from a `.zip`, Mega Hub points out that a skin can load content.
 
 ## Important variables
 
@@ -76,7 +76,7 @@ Put your own fonts and images in the skin folder and reference them relatively (
 | `--font` | Font family |
 | `--tile-radius`, `--shelf-tile`, `--focus-scale` | Corners, tile size on Home, zoom of the focus |
 
-For everything else you can override the selectors from `ui/styles.css`. The skins in the catalog (Deep Sea, Greenlight, Neon City, Nova, Stardust) show how far that goes: Deep Sea, for example, turns the whole Home layout around. Only the CouchHUD skin is part of the app (`ui/skins/`); all others are skins like yours, installed into the skins folder, and their rules begin with `:root[data-skin="user:<folder>"]`.
+For everything else you can override the selectors from `ui/styles.css`. The skins in the catalog (Deep Sea, Greenlight, Neon City, Nova, Stardust) show how far that goes: Deep Sea, for example, turns the whole Home layout around. Only the Mega Hub skin is part of the app (`ui/skins/`); all others are skins like yours, installed into the skins folder, and their rules begin with `:root[data-skin="user:<folder>"]`.
 
 ## The tab bar
 
@@ -172,7 +172,7 @@ A skin says which picture a tile shows with the CSS variable `--tile-art`, set *
 
 Any other or missing value means the tile's default; the default skin does not change. The app tiles (16:9) and the "Continue playing" card set their own value, so a `square` on `:root` does not reach them; a skin that makes the card square sets `--tile-art: square` on `.shelf .hero-art`.
 
-When a picture does not suit the tile's shape (a cover standing in on a square tile, a store header on a cover tile), CouchHUD shows it **whole and centred over a blurred copy** of itself (class `art-fit`, plus `art-wide` when the picture is wider than the tile), never stretched and never with its title cut off. A square or hero picture on a tile that asks for it fills the tile. CouchHUD reads the tile's shape from its `aspect-ratio`. Every tile carries `data-tile-art` with the picture it shows, and the class `art-square` for `square`.
+When a picture does not suit the tile's shape (a cover standing in on a square tile, a store header on a cover tile), Mega Hub shows it **whole and centred over a blurred copy** of itself (class `art-fit`, plus `art-wide` when the picture is wider than the tile), never stretched and never with its title cut off. A square or hero picture on a tile that asks for it fills the tile. Mega Hub reads the tile's shape from its `aspect-ratio`. Every tile carries `data-tile-art` with the picture it shows, and the class `art-square` for `square`.
 
 Switching skins switches the pictures **at once**, both ways, without a restart and without a new scan: as soon as the new skin's stylesheet has loaded, every tile asks again. Only pictures the library already knows are loaded; missing square pictures come only from the normal artwork lookup (with a SteamGridDB key, and only while the privacy switches allow it). Users choose the square picture under *Change artwork* in the "Square" tab.
 
@@ -186,7 +186,7 @@ Switching skins switches the pictures **at once**, both ways, without a restart 
 
 ## Mouse pointer
 
-When the user moves a mouse, CouchHUD draws its own pointer. It comes from the skin: every skin may set it, and a skin without a pointer of its own automatically shows CouchHUD's default arrow. With the setting "Real mouse pointer" (*Settings › Look*) the user sees the normal Windows pointer instead, and your pointer does not apply.
+When the user moves a mouse, Mega Hub draws its own pointer. It comes from the skin: every skin may set it, and a skin without a pointer of its own automatically shows Mega Hub's default arrow. With the setting "Real mouse pointer" (*Settings › Look*) the user sees the normal Windows pointer instead, and your pointer does not apply.
 
 | Variable | Effect |
 |---|---|
@@ -202,16 +202,16 @@ When the user moves a mouse, CouchHUD draws its own pointer. It comes from the s
 }
 ```
 
-Tips: a pointer has to stand out on the TV from the armchair. A dark outline (here `#12141c`) keeps it visible on a light background, a light fill on a dark one. The pointer rests while the mouse is still. Since 0.7 the pointer is a closed shadow root in the top layer: no selector reaches `#cursor` or `#cursor .cp` any more, and the skin steers it only through `--pointer`, `--pointer-size` (1 to 8 rem) and `--pointer-hx`/`--pointer-hy` (0 to 1); the squish on click and the walking animation are the program's (off with "Reduce animations"). This is only the pointer inside CouchHUD. In other windows it stays the Windows pointer.
+Tips: a pointer has to stand out on the TV from the armchair. A dark outline (here `#12141c`) keeps it visible on a light background, a light fill on a dark one. The pointer rests while the mouse is still. Since 0.7 the pointer is a closed shadow root in the top layer: no selector reaches `#cursor` or `#cursor .cp` any more, and the skin steers it only through `--pointer`, `--pointer-size` (1 to 8 rem) and `--pointer-hx`/`--pointer-hy` (0 to 1); the squish on click and the walking animation are the program's (off with "Reduce animations"). This is only the pointer inside Mega Hub. In other windows it stays the Windows pointer.
 
 ## Trying it out
 
-Start CouchHUD with `--dev` and pick your skin under *Settings › Look › Skin*. You see changes to the CSS after selecting it again.
+Start Mega Hub with `--dev` and pick your skin under *Settings › Look › Skin*. You see changes to the CSS after selecting it again.
 
 It also works without Windows: `node scripts/preview-server.js` starts the interface with sample data in the browser. There, serve your skin folders with `CATALOG_SKINS=<folder with your skin folders> node scripts/preview-server.js` and look at a skin with `node scripts/ui-shot.mjs --catalog <folder> skin:user:<folder name> shot:home`. The stylesheet is cleaned of web addresses there just as the app does it.
 
 ## Sharing
 
-Pack the folder as a `.zip` (with or without the parent folder) and publish it on GitHub with the topic `couchhud-skin`. Others install it in CouchHUD under *Settings › Look › Install new skins*.
+Pack the folder as a `.zip` (with or without the parent folder) and publish it on GitHub with the topic `couchhud-skin`. Others install it in Mega Hub under *Settings › Look › Install new skins*.
 
 For the catalog: give the skin a name of its own, not someone else's brand (no console, manufacturer or game name), and use no third-party logos. A style may remind you of something, but must not be named after it.

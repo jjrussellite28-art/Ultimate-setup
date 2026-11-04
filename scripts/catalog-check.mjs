@@ -22,7 +22,7 @@ for (const m of text.matchAll(/"(https?:\/\/[^"]+)"/g)) {
   if (canonical && canonical !== spelled) bad.push(`${url}: write '${canonical}', not '${spelled}'`);
 }
 // Plugin SDK: an entry (and a statement) may only ask for a version this build implements; a newer one is not installable here (the host
-// hides it as "needs a newer CouchHUD"), so a typo such as "sdk": 40 must not reach the index.
+// hides it as "needs a newer Mega Hub"), so a typo such as "sdk": 40 must not reach the index.
 const current = Number(/public const int Current = (\d+);/.exec(readFileSync(new URL('../src/CouchHud.Sdk/Plugins.cs', import.meta.url), 'utf8'))?.[1]);
 if (!Number.isInteger(current)) bad.push('SdkVersion.Current not found in src/CouchHud.Sdk/Plugins.cs');
 const checkSdk = (where, sdk) => {

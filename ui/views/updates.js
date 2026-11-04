@@ -1,4 +1,4 @@
-// What the host knows about updates (Windows Update, winget, CouchHUD itself, plugins and skins): the state, its events and the
+// What the host knows about updates (Windows Update, winget, Mega Hub itself, plugins and skins): the state, its events and the
 // ways to start them. The Downloads tab shows and starts all of it; the host checks quietly in the background.
 
 import { api } from '../core/api.js';
@@ -13,7 +13,7 @@ import { t } from '../core/i18n.js';
 state.updates = null;
 /** Plugins and skins with a newer version in the catalog (the host checks in the background). */
 state.catalogUpdates = [];
-/** CouchHUD itself: newer release on GitHub (the host checks in the background). */
+/** Mega Hub itself: newer release on GitHub (the host checks in the background). */
 state.selfUpdate = null;
 /** When the page last heard of each kind (ms): a download that finished later hides its update until the next news (Downloads tab). */
 state.updatesSeen = { updates: 0, selfUpdate: 0, catalogUpdates: 0 };
@@ -60,7 +60,7 @@ export async function startUpdate(kind, id, question, label) {
   await attempt(() => withUnlock(() => api.startUpdate(kind, id), () => ensureUnlocked(t('downloads.unlockReason'))), t('updates.notStarted'));
 }
 
-/** Installs CouchHUD's own update after asking: the Downloads tab's way. */
+/** Installs Mega Hub's own update after asking: the Downloads tab's way. */
 export async function installSelfUpdate() {
   const s = state.selfUpdate;
   if (!s?.available || s.busy) return toast(t('updates.alreadyBusy'));

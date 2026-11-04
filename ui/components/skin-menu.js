@@ -7,7 +7,7 @@ import { t } from '../core/i18n.js';
 import { BUILTIN_SKINS } from '../skins/index.js';
 
 /**
- * The skins as the host knows them now: a skin copied into %APPDATA%\CouchHud\skins while CouchHUD runs shows up without a restart
+ * The skins as the host knows them now: a skin copied into %APPDATA%\CouchHud\skins while Mega Hub runs shows up without a restart
  * (the host reads the folder on every call). A failed read keeps the list from before.
  */
 export async function reloadSkins() {

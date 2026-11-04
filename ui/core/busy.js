@@ -53,7 +53,7 @@ export const isBusy = (key) => busy.isBusy(key);
 export const busyTarget = (key) => busy.target(key);
 export const runBusy = (key, fn, options) => busy.run(key, fn, options);
 
-/** Reduced motion: the system setting or CouchHUD's own switch (motion.js writes data-motion="off" for both). */
+/** Reduced motion: the system setting or Mega Hub's own switch (motion.js writes data-motion="off" for both). */
 export function prefersReducedMotion(doc = globalThis.document, win = globalThis) {
   if (doc?.documentElement?.dataset?.motion === 'off') return true;
   return !!win?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;

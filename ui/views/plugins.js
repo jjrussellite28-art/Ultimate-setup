@@ -261,7 +261,7 @@ export function tellChange(list, plugin, enabled) {
   else toast(t('plugins.page.stoppedNow', { name: plugin.name }), 4000);
 }
 
-/** Enable or disable: the code step (the plain unlock for CouchHUD's own plugins), then the call. */
+/** Enable or disable: the code step (the plain unlock for Mega Hub's own plugins), then the call. */
 async function setEnabled(plugin, enabled) {
   if (!(await gateOpen(enabled ? 'enable' : 'disable', gateOrigin(plugin)))) return undefined;
   if (!(await runGates(['code'], { code: () => codeStep(enabled ? 'enable' : 'disable', plugin, plugin.folder) }))) return undefined;

@@ -204,7 +204,7 @@ async function pairWith(address, allowPlain = false, provider = null) {
   if (page && currentView() === page) render();
 }
 
-/** The plugins page on the catalog, at the plugin's entry when one is named (CouchHUD's own TV plugins). */
+/** The plugins page on the catalog, at the plugin's entry when one is named (Mega Hub's own TV plugins). */
 function openCatalog(pluginId = null) {
   push(pluginsPage(1, { expert: !!page?.expert, openId: pluginId }));
 }

@@ -1,4 +1,4 @@
-// A page a plugin describes as data (rows, sections, kinds): CouchHUD draws it in the active skin, with controller, mouse and keyboard.
+// A page a plugin describes as data (rows, sections, kinds): Mega Hub draws it in the active skin, with controller, mouse and keyboard.
 // A plugin never ships HTML or script: every text goes in as text, every picture is a PNG data URI the host already checked. The host
 // decides again on every press (lock, parents' code, the values a row offers); this page only draws and sends what the user did.
 

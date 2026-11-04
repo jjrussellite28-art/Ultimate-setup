@@ -5,7 +5,7 @@ export const isFinished = (entry) => entry?.state === 'done' || entry?.state ===
 
 /**
  * The sections of the list, in this order and only when they hold something: what runs now (every source), the updates that can be
- * started, each kind in its own section (CouchHUD, apps through winget, Windows, plugins and skins), then the finished lines. A start
+ * started, each kind in its own section (Mega Hub, apps through winget, Windows, plugins and skins), then the finished lines. A start
  * row names its section in `group`; the restart that is due (`first`) stands with the Windows updates, it finishes them. A start row
  * of a kind this page does not know goes with the plugins (the rest that can be updated), never lost.
  */

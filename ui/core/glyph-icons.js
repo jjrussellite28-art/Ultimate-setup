@@ -30,7 +30,7 @@ const PATHS = {
   download: 'M12 3v12M7 11l5 5 5-5M4 20h16',
   upload: 'M12 17V5M7 9l5-5 5 5M4 20h16',
   refresh: 'M20 11a8 8 0 1 0-2 6M20 5v6h-6',
-  // Restarting CouchHUD (the app), not the PC: the turning arrow inside a screen frame, a different outline than the PC's arrow.
+  // Restarting Mega Hub (the app), not the PC: the turning arrow inside a screen frame, a different outline than the PC's arrow.
   appRestart: 'M3 4h18v16H3zM16.4 12.5a4.4 4.4 0 1 0-1.1 3.3M16.4 9.2v3.3h-3.3',
   swap: 'M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4',
   star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z',

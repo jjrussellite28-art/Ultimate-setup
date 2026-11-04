@@ -13,7 +13,7 @@ import { sound } from '../sound.js';
 /** Raise when the texts change in a way users should confirm again. */
 export const TERMS_VERSION = 2;
 
-const REPO = 'github.com/jjrussellite28-art/Ultimate-setup';
+const REPO = 'github.com/jjrussellite28-art/mega-hub';
 
 export const DISCLAIMER = () => [
   [t('legal.disclaimer.warrantyTitle'), t('legal.disclaimer.warrantyText')],
@@ -82,7 +82,7 @@ function textPage({ id, title, sections, firstRun, onBack }) {
           return render();
         case 'start':
           if (!firstRun) return;
-          // Declined: CouchHUD steps aside. As the shell it hands over to the normal desktop for good.
+          // Declined: Mega Hub steps aside. As the shell it hands over to the normal desktop for good.
           if (state.info.isShell) {
             await attempt(() => api.setShell(false));
             toast(t('legal.declinedShell'));
@@ -106,7 +106,7 @@ export const termsAccepted = () => (state.info.acceptedTerms ?? 0) >= TERMS_VERS
 /** The first-start notice as a page of its own; the setup assistant opens it as its terms step (same text, same accept and decline). */
 export const termsPage = ({ onBack } = {}) => textPage({ id: 'terms', title: t('legal.termsTitle'), firstRun: true, onBack });
 
-/** First start (or changed texts): the user confirms before using CouchHUD. */
+/** First start (or changed texts): the user confirms before using Mega Hub. */
 export function showTermsIfNeeded() {
   if (termsAccepted()) return;
   state.stack.push(termsPage());

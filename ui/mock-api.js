@@ -246,7 +246,7 @@ const png = (hue, glyph = '', w = 96, h = 96) => {
   return c.toDataURL('image/png');
 };
 // Plugin functions (who may use what): the levels the owner chose, plugin id -> function id -> 'admin' | 'restricted' | 'off'. A suggestion
-// of CouchHUD's own plugin applies until then; ?fnnolock mocks "couch lock and parental controls off" (the settings then say so).
+// of Mega Hub's own plugin applies until then; ?fnnolock mocks "couch lock and parental controls off" (the settings then say so).
 const fnLevels = {};
 // i18n-used: mock.plug.fnLighting mock.plug.fnSettings mock.plug.fnControl
 const fnDefs = {
@@ -303,7 +303,7 @@ const plugins = [
     origin: 'thirdParty', publisher: '3c4d-5e6f-7a8b-9c0d', revoked: false, revokedReason: null, capabilities: ['pages'], pages: [], settings: [], tools: []
   }, { description: () => t('mock.plug.retroDesc'), functions: () => fnList('retrobar'), restrictionsPossible })
 ];
-// Preview catalog: every state the page has (update, installed, new, third-party, withdrawn, needs a newer CouchHUD, the official catalog first,
+// Preview catalog: every state the page has (update, installed, new, third-party, withdrawn, needs a newer Mega Hub, the official catalog first,
 // unlisted, no hash).
 const shots = (hue) => [png(hue, '1', 320, 180), png(hue + 40, '2', 320, 180), png(hue + 80, '3', 320, 180)];
 // i18n-used: mock.category.smartHome mock.category.streaming mock.category.hardware mock.category.media mock.category.ai mock.category.information mock.category.hud mock.category.skins mock.category.other

@@ -118,7 +118,7 @@ export function nightModeItems(settings, change) {
 }
 
 // ---------------------------------------------------------------------------
-// Capture from the guide menu: the screenshot through CouchHUD itself (the host reports it with its own toast and picture),
+// Capture from the guide menu: the screenshot through Mega Hub itself (the host reports it with its own toast and picture),
 // clips and recordings through the Game Bar.
 
 export async function capture(kind) {

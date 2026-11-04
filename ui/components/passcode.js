@@ -69,7 +69,7 @@ export function enterPasscode({ title = t('passcode.enter'), hint = '', error = 
         this.dots = Array.from({ length: PASSCODE_LENGTH }, () => el('span', { className: 'passcode-dot' }));
         this.errorEl = el('p', { className: 'passcode-error', textContent: error });
         // Without a controller (Bluetooth off, battery empty) the code still has to be possible: the same buttons by mouse or touch,
-        // and the keyboard keys spelled out. Same code, same check in the CouchHUD service, same lockout after wrong tries.
+        // and the keyboard keys spelled out. Same code, same check in the Mega Hub service, same lockout after wrong tries.
         this.keys = el('div', { className: 'passcode-keys', role: 'group', ariaLabel: t('passcode.onScreen') },
           // data-glyph: the key follows the controller in use (✕ ○ □ △ with a PlayStation pad), see refreshGlyphs.
           CODE_KEYS.map((code) => el('span', { className: `passcode-key key-${code}`, dataset: LABEL[code] ? { code } : { code, glyph: code.toUpperCase() }, textContent: LABEL[code] ?? glyph(code.toUpperCase()) })),
@@ -249,7 +249,7 @@ export async function ensureUnlocked(reason = '') {
 let codeEntry = null;
 
 /**
- * Windows lock mode, also while the couch is open: the Windows sign-in once more (and its confirmation), so the CouchHUD service sees it
+ * Windows lock mode, also while the couch is open: the Windows sign-in once more (and its confirmation), so the Mega Hub service sees it
  * and gives its proof for a new couch code. True when that proof is there afterwards. A host without the service answers at once.
  */
 export async function ensureWindowsSignIn(reason = '') {
@@ -315,7 +315,7 @@ async function askForCode(reason) {
       }
       if (viaAdmin?.blocked) toast(viaAdmin.blocked, 6000);
     }
-    // The host refuses to open while the CouchHUD service is missing or blocked (fail-closed): its reason, not "wrong code".
+    // The host refuses to open while the Mega Hub service is missing or blocked (fail-closed): its reason, not "wrong code".
     // After a reset that did not open the couch the "store damaged" text is stale: the store is reset, the entry says so.
     error = resetDone ? t('passcode.resetCodesDone') : result?.blocked ? result.blocked : result?.waitSeconds ? t('passcode.wrongWait', { count: result.waitSeconds }) : t('passcode.wrong');
   }
@@ -437,7 +437,7 @@ export async function ensureParentCode(reason = '', scope = {}) {
         resetDone = true;
       }
     }
-    // Locked out, or no parents' code in the CouchHUD service yet: an administrator of this PC can approve instead (Windows' own UAC
+    // Locked out, or no parents' code in the Mega Hub service yet: an administrator of this PC can approve instead (Windows' own UAC
     // prompt), so a forgotten, missing or planted parents' code never shuts the parents out.
     // After the reset just done (its own Windows question was the first) the text says that a second one follows for this action.
     // i18n-used: passcode.adminFallback passcode.adminFallbackNoCode passcode.adminFallbackDamaged passcode.adminFallbackAfterReset
@@ -451,7 +451,7 @@ export async function ensureParentCode(reason = '', scope = {}) {
       }
       if (viaAdmin?.blocked) toast(viaAdmin.blocked, 6000);
     }
-    // The CouchHUD service checks the parents' code too: when it cannot, its reason, not "wrong code".
+    // The Mega Hub service checks the parents' code too: when it cannot, its reason, not "wrong code".
     error = result?.blocked ? result.blocked : result?.waitSeconds ? t('passcode.wrongWait', { count: result.waitSeconds }) : t('passcode.wrong');
   }
 }

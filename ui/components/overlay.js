@@ -103,7 +103,7 @@ export function renderOverlay() {
   if (!menu) queueMicrotask(releaseNextWaiter);
   overlay.hidden = !menu;
   overlay.classList.toggle('preview', !!menu?.preview);
-  // A web page's question: marked as the web's (globe, own frame), never in the look of CouchHUD's own questions.
+  // A web page's question: marked as the web's (globe, own frame), never in the look of Mega Hub's own questions.
   overlay.classList.toggle('web', !!menu?.web);
   document.body.classList.toggle('overlay-open', !!menu);
   renderHints();

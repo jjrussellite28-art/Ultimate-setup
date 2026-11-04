@@ -1,5 +1,5 @@
 // Guide menu: the console-style side panel for what you need mid-game.
-// Opens with the Guide button (tap in CouchHUD, hold over a game).
+// Opens with the Guide button (tap in Mega Hub, hold over a game).
 
 import { iconEl } from '../core/glyph-icons.js';
 import { api } from '../core/api.js';

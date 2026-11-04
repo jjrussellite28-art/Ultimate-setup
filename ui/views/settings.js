@@ -81,7 +81,7 @@ const lockModes = () => [
 ];
 
 /**
- * With the parental controls on, changing the lock or the code needs the parents' code each time. The action names what the CouchHUD
+ * With the parental controls on, changing the lock or the code needs the parents' code each time. The action names what the Mega Hub
  * service then does with the parents' approval ("lockMode", "passcode"): its grant counts for exactly that.
  */
 const lockGrant = (reason, action) => (parental.status?.enabled ? ensureParentGrant(reason, { action }) : ensureUnlocked(reason));
@@ -108,7 +108,7 @@ async function chooseLock(preset) {
     toast(t('settings.lock.noPassword'), 8000);
     return 'failed';
   }
-  // With the CouchHUD service the switch to the Windows sign-in deletes the couch code (the service keeps one lock's key, not two). Said
+  // With the Mega Hub service the switch to the Windows sign-in deletes the couch code (the service keeps one lock's key, not two). Said
   // before, with the way back: a new code then needs this Windows sign-in once more (finding H1 of the 0.4.1 acceptance test).
   if (mode === 'windows' && security?.couchLock === 'code' && security?.serviceCodes
     && !(await confirmDialog(t('settings.lock.windowsDropsCodeTitle'), t('settings.common.continue'), { message: t('settings.lock.windowsDropsCode') }))) return 'cancelled';
@@ -120,7 +120,7 @@ async function chooseLock(preset) {
     const message = strong ? t('settings.lock.offWarn2fa') : t('settings.lock.offWarn');
     if (!(await confirmDialog(title, t('settings.lock.offConfirm'), { danger: true, focusCancel: true, message }))) return 'cancelled';
   }
-  // The code lock needs a code the CouchHUD service holds: a new one goes along with the switch, in one step (a code set on its own at an
+  // The code lock needs a code the Mega Hub service holds: a new one goes along with the switch, in one step (a code set on its own at an
   // open couch would not survive the lock being switched on). Entered before the approval, which then names it ("lockModeCode").
   const plan = mode === 'code' ? codeLockPlan(security) : 'default';
   let code = null;
@@ -213,7 +213,7 @@ let lastAutoLogonError = null;
 async function setupAutoLogon() {
   lastAutoLogonError = null;
   if (!(await ensureUnlocked(t('settings.autoLogon.title')))) return false;
-  // A machine-wide setting: the CouchHUD service wants the parents' approval; without a parents' code Windows asks an administrator later.
+  // A machine-wide setting: the Mega Hub service wants the parents' approval; without a parents' code Windows asks an administrator later.
   if (parental.status?.hasParentCode && !(await ensureParentCode(t('settings.autoLogon.title'), { action: 'autologon' }))) return false;
   security = (await attempt(() => api.getSecurity())) ?? security;
   if (security?.accountPassword === false) {
@@ -222,7 +222,7 @@ async function setupAutoLogon() {
   }
   if (!(await confirmDialog(autoLogonInfo(), t('settings.common.continue')))) return false;
   if (security?.passwordlessOnly) {
-    // Windows ignores a stored password while "Windows Hello only" is on; CouchHUD restores it when switched off.
+    // Windows ignores a stored password while "Windows Hello only" is on; Mega Hub restores it when switched off.
     if (!(await confirmDialog(t('settings.autoLogon.helloOnly'), t('settings.autoLogon.relax')))) return false;
   }
   let acceptNoLock = false;
@@ -274,7 +274,7 @@ function autoLogonLabel() {
 async function disableAutoLogon() {
   if (!(await confirmDialog(t('settings.autoLogon.disableConfirm'), t('settings.autoLogon.turnOff')))) return;
   toast(t('settings.common.confirmWindowsPrompt'), 4000);
-  // Off already with nothing of CouchHUD's left (state "off", a page older than the switch): the host takes a refusal as done, said as
+  // Off already with nothing of Mega Hub's left (state "off", a page older than the switch): the host takes a refusal as done, said as
   // such. In the "lost" state the stored password is still deleted, so that is a real switch-off.
   const wasOn = security?.autoLogonState !== 'off';
   const updated = await attempt(() => api.setAutoLogon('off'), t('settings.autoLogon.notTurnedOff'));
@@ -501,7 +501,7 @@ async function setParentalValue(key, value, message) {
     code = await choosePasscode();
     if (!code) return false;
   }
-  // Switching off also removes the parents' code from the CouchHUD service: the approval is asked for that.
+  // Switching off also removes the parents' code from the Mega Hub service: the approval is asked for that.
   const action = key !== 'enabled' ? 'profile' : value === false ? 'parentalOff' : 'parentalOn';
   const granted = needsParentCode
     ? !!(await attempt(() => api.parentalAuth(null, action, null)))?.ok
@@ -1035,7 +1035,7 @@ async function chooseXboxButton() {
   const set = (key, value) => saveSetting(key, value);
   if (mode === 'couchhud') {
     await set('guideTapInGame', true);
-    // Light mode takes the button too while CouchHUD runs (original restored on quit); choosing this explicitly also turns it off.
+    // Light mode takes the button too while Mega Hub runs (original restored on quit); choosing this explicitly also turns it off.
     if (isLight(settings)) await set('gameBarButton', false);
   } else if (mode === 'gamebar') await set('gameBarButton', true);
   else {
@@ -1103,7 +1103,7 @@ export const consoleDeps = {
 
 /**
  * Settings › Console, the first page: what one looks at first, each in its only place. The setup assistant, the mode (light or the
- * console, with the guided setup and its way back), the couch lock and its code, a link to the parental controls, what CouchHUD
+ * console, with the guided setup and its way back), the couch lock and its code, a link to the parental controls, what Mega Hub
  * changes in Windows, and one status line. The fine switches (shell, task manager, automatic sign-in …) and the service's details
  * are in the expert category Windows integration.
  */
@@ -1156,7 +1156,7 @@ function consoleItems(s) {
   return [
     { ...action(t('settings.console.wizard'), t('settings.console.wizardDesc'), openSetupWizard, '✦'), primary: true },
     { kind: 'choice', key: 'mode', label: t('settings.mode.title'), desc: modeDesc(s), value: () => modeLabel(s), run: chooseMode },
-    // Which parts of CouchHUD are there at all (games, apps, browser, news): one place for both modes.
+    // Which parts of Mega Hub are there at all (games, apps, browser, news): one place for both modes.
     { kind: 'choice', key: 'areas', label: t('settings.areas.title'), desc: t('settings.areas.desc'), value: areasLabel, run: chooseAreas },
     // The couch lock needs the full integration (the host refuses it otherwise); the mode row above leads there.
     ...(full ? [{
@@ -1198,7 +1198,7 @@ function consoleItems(s) {
     }))] : []),
     // The HUD runs on a WebView2 runtime the account's programs can change: the lock is weaker than it looks.
     ...runtimeWarningItems(),
-    // Honest about the Windows policies of the locked couch: without the CouchHUD service they are not active.
+    // Honest about the Windows policies of the locked couch: without the Mega Hub service they are not active.
     ...(security && lock !== 'off' && (security.policies ?? 'none') === 'none' ? [info(t('settings.windows.warning'), t('settings.console.policiesOff'))] : []),
     // A parents' code in the service that this HUD did not set (no parental controls here).
     ...(security?.parentCodeUnknown ? [info(t('settings.console.parentUnknown'), t('settings.console.parentUnknownDetail'))] : []),
@@ -1207,7 +1207,7 @@ function consoleItems(s) {
   ];
 }
 
-/** The CouchHUD service and the lock's Windows policies in detail (expert category Windows integration, in both levels). */
+/** The Mega Hub service and the lock's Windows policies in detail (expert category Windows integration, in both levels). */
 function serviceFacts() {
   return [
     info(t('settings.console.policies'), security ? ({ service: t('settings.console.policiesService'), direct: t('settings.console.policiesDirect'), none: t('settings.console.policiesNone') })[security.policies ?? 'none'] : '–'),
@@ -1244,7 +1244,7 @@ function runtimeWarningItems() {
   return [info(t('settings.windows.warning'), text)];
 }
 
-/** "Repair the service": shown in both modes whenever the CouchHUD service should be there and is not healthy. */
+/** "Repair the service": shown in both modes whenever the Mega Hub service should be there and is not healthy. */
 function repairServiceItem() {
   const svc = security.service;
   return action(t('settings.console.repairService'), svc.alarm ? t('settings.console.repairAlarm', { state: svc.label }) : t('settings.console.repairDesc', { state: svc.label }), repairService, '⚠');
@@ -1496,7 +1496,7 @@ const powerItems = (ids) => Object.fromEntries(powerEntries(ids).map((e) => [e.i
 
 function categories() {
   const s = settings ?? {};
-  // The mode decides: shell mode has the PC mode and a restart into it, app mode "Quit CouchHUD" in its place (power.js forMode).
+  // The mode decides: shell mode has the PC mode and a restart into it, app mode "Quit Mega Hub" in its place (power.js forMode).
   const power = powerItems(['pc-mode', 'standby', 'restart', 'shutdown', 'restart-pc']);
   const holdOptions = [500, 1000, 1500, 2000].map((ms) => ({ label: holdLabel(ms), value: ms }));
   const glyphLabels = { auto: t('settings.controller.glyphs.auto'), xbox: t('settings.controller.glyphs.xbox'), playstation: t('settings.controller.glyphs.playstation') };
@@ -1667,7 +1667,7 @@ function categories() {
         }
       ]
     }] : []),
-    // TV control (LG webOS first): pairing and everything else on its own page; the Guide menu option and "TV follows CouchHUD" here.
+    // TV control (LG webOS first): pairing and everything else on its own page; the Guide menu option and "TV follows Mega Hub" here.
     ...(api.tvStatus ? [{
       id: 'tv',
       icon: 'tv',
@@ -1710,7 +1710,7 @@ function categories() {
         ...expert(info(t('settings.parental.status'), ({ allowed: t('settings.notifications.allowed'), denied: t('settings.notifications.denied'), unavailable: t('settings.notifications.unavailable'), unspecified: t('settings.notifications.unspecified'), off: t('settings.common.off') })[s.notificationStatus] ?? t('settings.common.off')))
       ]
     },
-    // Privacy: every connection CouchHUD makes to the internet, one switch each, and Offline above all of them (core/net-rules.js).
+    // Privacy: every connection Mega Hub makes to the internet, one switch each, and Offline above all of them (core/net-rules.js).
     { id: 'privacy', icon: 'privacy', name: t('settings.cat.privacy'), items: privacyItems() },
     {
       id: 'power',
@@ -1755,7 +1755,7 @@ function categories() {
         info(t('settings.info.guide'), t('settings.info.guideDesc')),
         info(t('settings.info.version'), state.info.version || '–'),
         info(t('settings.info.license'), 'GPL-3.0 · © 2026 kewe87 · fork: jjrussellite28-art'),
-        // How CouchHUD starts is the status line in Console.
+        // How Mega Hub starts is the status line in Console.
         ...expert(
           info(t('settings.info.config'), s.configPath || '–'),
           info(t('settings.info.logs'), s.logPath || '–')

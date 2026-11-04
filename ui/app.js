@@ -1,4 +1,4 @@
-// CouchHUD UI entry point: wires input, tabs, pages and the host bridge together.
+// Mega Hub UI entry point: wires input, tabs, pages and the host bridge together.
 
 // First: the boot screen's input shield has to listen before any other code of the page does.
 import { endBoot, inputOpen } from './core/boot-gate.js';

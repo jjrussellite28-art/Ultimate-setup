@@ -1,11 +1,11 @@
 // Screenshots on the controller (Guide + Y, or the guide menu): pure rules, tested by scripts/ui-logic-check.mjs.
 
-/** Only pictures CouchHUD serves itself from the PC: never an address from anywhere else. */
+/** Only pictures Mega Hub serves itself from the PC: never an address from anywhere else. */
 const LOCAL_PREFIX = 'https://local.couchhud/';
 
 /**
  * What the toast shows for the host's "screenshot" event: { ok, text, url }. The picture only for a saved screenshot and only from
- * CouchHUD's own file host; a refusal or an error is text alone.
+ * Mega Hub's own file host; a refusal or an error is text alone.
  */
 export function shotToast(payload) {
   const ok = payload?.ok === true;

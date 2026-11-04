@@ -33,7 +33,7 @@ function bell() {
   showChipFocus();
 }
 
-/** Where a notification of CouchHUD itself leads: a fixed whitelist of screens (the host sets it for its own notices only). Anything else is ignored. */
+/** Where a notification of Mega Hub itself leads: a fixed whitelist of screens (the host sets it for its own notices only). Anything else is ignored. */
 const GO = { downloads: () => activateChip('downloads') };
 
 /** Opens the notification's target; false when it has none or an unknown one. Showing the screen installs nothing. */

@@ -4,7 +4,7 @@
 // i18n-used: updates.allCurrent updates.alreadyRunning updates.searchFailed updates.searching updates.found updates.lastChecked updates.notChecked updates.self.err.noRelease updates.self.err.rateLimit updates.self.err.noAnswer updates.self.err.unreachable
 const SELF_CODES = ['noRelease', 'rateLimit', 'noAnswer', 'unreachable'];
 
-/** The reasons a search did not get an answer: CouchHUD's own check, then Windows Update. Each text once, empty ones dropped; an unknown code never shows as a key. */
+/** The reasons a search did not get an answer: Mega Hub's own check, then Windows Update. Each text once, empty ones dropped; an unknown code never shows as a key. */
 export function searchProblems(updates, selfUpdate, tr) {
   const list = [];
   const code = selfUpdate?.errorCode;
@@ -15,7 +15,7 @@ export function searchProblems(updates, selfUpdate, tr) {
   return list;
 }
 
-/** Both calls of a search came back with an answer (a call that failed gives none; a missing CouchHUD check does not count against it). */
+/** Both calls of a search came back with an answer (a call that failed gives none; a missing Mega Hub check does not count against it). */
 export const searchSucceeded = (updatesResult, selfResult, hasSelfCheck = true) => updatesResult != null && (!hasSelfCheck || selfResult != null);
 
 /**

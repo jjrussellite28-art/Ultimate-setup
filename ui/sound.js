@@ -277,7 +277,7 @@ export const sound = {
 
 // ---------------------------------------------------------------------------
 // Background music: a slow generative piece per skin, like the dashboard music on
-// consoles. It only plays while CouchHUD is in front and no game runs.
+// consoles. It only plays while Mega Hub is in front and no game runs.
 
 const MUSIC = {
   // Warm major sevenths, soft and slow.
@@ -315,7 +315,7 @@ export function setMusicVolume(v) {
   updateMusic();
 }
 
-/** CouchHUD in front or not (a game or another full-screen app on top). */
+/** Mega Hub in front or not (a game or another full-screen app on top). */
 export function setFocusActive(active) {
   focused = active;
   updateMusic();

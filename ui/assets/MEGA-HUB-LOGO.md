@@ -13,5 +13,5 @@ or that Microsoft endorses Mega Hub. It does not certify third-party rights clea
 The application's inherited GPL v3 license and original code credits remain in LICENSE and CREDITS.md.
 
 For a rights concern, contact the repository maintainer through
-[the project](https://github.com/jjrussellite28-art/Ultimate-setup).
+[the project](https://github.com/jjrussellite28-art/mega-hub).
 The maintainer intends to review concerns and remove or replace the artwork where appropriate.

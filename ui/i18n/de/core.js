@@ -39,7 +39,7 @@ export default {
   'power.pcMode.label': 'PC-Modus',
   'power.pcMode.detail': 'Windows-Desktop nutzen, Mega Hub wartet',
   'power.pcMode.confirmTitle': 'Zum Windows-Desktop wechseln?',
-  'power.pcMode.confirmMessage': 'Mega Hub macht Platz für den Windows-Desktop. Zurück zu Mega Hub geht es mit der Xbox-Taste oder über das CouchHUD-Symbol in der Taskleiste.',
+  'power.pcMode.confirmMessage': 'Mega Hub macht Platz für den Windows-Desktop. Zurück zu Mega Hub geht es mit der Xbox-Taste oder über das Mega-Hub-Symbol in der Taskleiste.',
   'power.pcMode.unlock': 'Zum Windows-Desktop',
   'power.rowDetailApp': 'Standby, Neustart, Herunterfahren, Mega Hub beenden',
   'power.quit.label': 'Mega Hub beenden',

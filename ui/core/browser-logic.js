@@ -125,7 +125,7 @@ export function reconcileFocus(view, { requested, granted }) {
   return view;
 }
 
-/** What the HUD shows for a page's question (alert, confirm, prompt, download): always with the site's name, so a page cannot pass it off as CouchHUD's own. */
+/** What the HUD shows for a page's question (alert, confirm, prompt, download): always with the site's name, so a page cannot pass it off as Mega Hub's own. */
 export function dialogKind(d) {
   if (!d || typeof d !== 'object') return null;
   if (d.closed) return 'closed';

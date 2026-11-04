@@ -4,7 +4,7 @@
 // (so running it again repairs instead of doubling up), does exactly one thing and
 // reports "done", "skipped" or "failed" with a reason. Cancelling stops after the
 // current step. Every step is complete in itself, and the two that must go together
-// are chained: the host enforces the couch lock only while CouchHUD runs as the shell,
+// are chained: the host enforces the couch lock only while Mega Hub runs as the shell,
 // so the shell comes before the automatic sign-in and the sign-in is only set up when
 // lock and shell are both in place. A stop therefore never leaves a PC that signs in
 // by itself without a working lock.
@@ -559,7 +559,7 @@ const failed = (note) => ({ status: 'failed', note });
 
 /**
  * The lock step (rules in core/lock-rules.js): the code goes along with the switch in one step, never "code set, then the lock on" (the
- * CouchHUD service drops a code set at the open couch when a lock is switched on, and the code lock would have no code; finding of the
+ * Mega Hub service drops a code set at the open couch when a lock is switched on, and the code lock would have no code; finding of the
  * 0.4.2 acceptance test). The flows are the settings page's own (deps), with every check of the couch, the parents and the host.
  */
 async function setupLock(env, deps) {

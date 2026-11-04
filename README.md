@@ -15,7 +15,7 @@ under the GNU GPL v3. It is not an official CouchHUD product and is not endorsed
 The inherited application brings game launchers and a game library into a controller-driven TV interface.
 It includes an optional Windows shell mode, a background service, parental controls, and plugin support.
 See the [English guide](docs/GUIDE.en.md) for inherited functionality. Older guide pages and screenshots
-still use CouchHUD terminology; they are being reviewed for this fork.
+still use Mega Hub terminology; they are being reviewed for this fork.
 
 ## Changes in this fork
 
@@ -28,9 +28,9 @@ These changes do not claim authorship of the inherited application or new game-l
 
 There is currently **no approved Mega Hub installer**. Do not treat upstream CouchHUD installers
 as builds of this fork. Future reviewed builds will appear only on
-[this repository's releases page](https://github.com/jjrussellite28-art/Ultimate-setup/releases).
-For development feedback, use [pull requests](https://github.com/jjrussellite28-art/Ultimate-setup/pulls).
-Issues are currently disabled. Do not send fork support requests to CouchHUD's maintainer.
+[this repository's releases page](https://github.com/jjrussellite28-art/mega-hub/releases).
+For development feedback, use [pull requests](https://github.com/jjrussellite28-art/mega-hub/pulls).
+Issues are currently disabled. Do not send fork support requests to Mega Hub's maintainer.
 Do not post passwords, API keys, personal configuration or exploit details publicly.
 
 ## Build a development version
@@ -47,7 +47,7 @@ dotnet run --project src/CouchHud.Shell -- --dev
 Browser preview with mock data: `node scripts/preview-server.js`.
 Installer build instructions are in `.github/workflows/build.yml` (Inno Setup 6).
 Internal `CouchHud` assembly, service, data and protocol names are inherited compatibility identifiers.
-**Do not install this development fork alongside or over CouchHUD**: those identifiers are not isolated yet.
+**Do not install this development fork alongside or over Mega Hub**: those identifiers are not isolated yet.
 Use a disposable Windows test environment for installer and shell-mode testing.
 
 ## License, source and commercial distribution

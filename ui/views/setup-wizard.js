@@ -99,7 +99,7 @@ const resultLine = (r) => {
   const mark = r.outcome === 'ok' ? '✓' : r.outcome === 'skipped' ? '–' : '✕';
   return `${mark} ${r.label ?? sumText(r.id)} – ${t(key)}${r.outcome === 'ok' ? '' : `. ${t('wizard.result.retry', { where: r.where })}`}`;
 };
-/** A TV is paired: the assistant may offer "TV follows CouchHUD". */
+/** A TV is paired: the assistant may offer "TV follows Mega Hub". */
 const tvPaired = () => !!(api.tvStatus && state.tv?.paired);
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ function steps(page) {
         { id: 'continue', row: AREAS.length, line: 1, button: true, title: t('wizard.next'), run: () => page.saveAreas() }
       ]
     },
-    // What CouchHUD may look for on its own (Settings > Privacy has the rest). Both are independent and can be switched off.
+    // What Mega Hub may look for on its own (Settings > Privacy has the rest). Both are independent and can be switched off.
     updates: {
       icon: 'update',
       title: () => t('wizard.updates.title'),
@@ -258,7 +258,7 @@ function steps(page) {
     }),
     // The lock: needed for the shell (then the code is asked for during the setup) or optional for a shell that has none yet.
     lock: explainStep('lock', {
-      // The CouchHUD service holds codes the settings file does not know (an earlier installation, or someone set one): say so.
+      // The Mega Hub service holds codes the settings file does not know (an earlier installation, or someone set one): say so.
       note: () => {
         const held = page.env?.security?.serviceCodes;
         const conflict = page.env?.security?.codeConflict;

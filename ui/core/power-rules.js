@@ -3,7 +3,7 @@
 
 /**
  * The action an id stands for in the current mode. Shell mode: the PC mode (back with the Guide button) and a restart into it; no
- * quit. App mode: "pc-mode" is closing CouchHUD, and a restart into the PC mode means nothing (Windows starts its desktop anyway).
+ * quit. App mode: "pc-mode" is closing Mega Hub, and a restart into the PC mode means nothing (Windows starts its desktop anyway).
  */
 export function forMode(id, isShell) {
   if (isShell) return id === 'quit' ? null : id;
@@ -25,7 +25,7 @@ export const MORE = 'more';
 export const POWER_PRIMARY = ['standby', 'shutdown', 'restart'];
 export const POWER_SECONDARY = ['pc-mode', 'restart-pc', 'restart-app', 'quit'];
 
-/** Entries that end something or lose unsaved work are tinted as dangerous; the CouchHUD entries and standby come back by themselves. */
+/** Entries that end something or lose unsaved work are tinted as dangerous; the Mega Hub entries and standby come back by themselves. */
 export const isDangerous = (id) => id === 'restart' || id === 'restart-pc' || id === 'shutdown';
 
 const offered = (ids, isShell) => [...new Set(ids.map((id) => forMode(id, isShell)).filter(Boolean))];

@@ -401,7 +401,7 @@ assert.equal(pairOutcome({ paired: true, error: null }, false), 'paired');
 assert.equal(pairOutcome({ paired: true, error: 'denied' }, false), 'failed');
 assert.equal(pairOutcome(null, true), 'failed');
 
-// Console setup, lock step: the code goes along with the switch in one step; a code from the open couch is not "kept" (the CouchHUD
+// Console setup, lock step: the code goes along with the switch in one step; a code from the open couch is not "kept" (the Mega Hub
 // service drops it when a lock is switched on, finding of the 0.4.2 acceptance test). The fake host below behaves like Hud.SetCouchLockAsync.
 {
   const host = (security) => {
@@ -587,7 +587,7 @@ assert.equal(shouldShowCodeKeys(3), false);
   assert.deepEqual(pendingDownloads({ updates, seen: undefined }, done).map((p) => p.id), ['update:windows']);
   assert.deepEqual(pendingDownloads({ updates }, [{ id: 'update:apps', state: 'done', updatedAt: '9999' }]).map((p) => p.id), ['update:windows', 'update:apps']);
 
-  // CouchHUD's own download while it can be cancelled: cancel; after the hand-over (cancellable false) nothing.
+  // Mega Hub's own download while it can be cancelled: cancel; after the hand-over (cancellable false) nothing.
   assert.deepEqual(downloadActions({ id: 'couchhud:self', kind: 'couchHud', source: 'couchhud', state: 'downloading', cancellable: true }), ['cancel']);
   assert.deepEqual(downloadActions({ id: 'couchhud:self', kind: 'couchHud', source: 'couchhud', state: 'downloading', cancellable: false }), []);
   // Windows Update and winget while they run: nothing (no pause, no cancel from here).
@@ -757,7 +757,7 @@ assert.equal(shouldShowCodeKeys(3), false);
   assert.deepEqual(batteryEntries([{ index: 1, battery: 'full' }, { index: 4, battery: 'full' }], []).map((e) => e.label), ['2', '3']);
 }
 
-// Screenshot toast: a picture only from CouchHUD's own file host and only for a saved shot; refusals and errors are text.
+// Screenshot toast: a picture only from Mega Hub's own file host and only for a saved shot; refusals and errors are text.
 {
   const saved = shotToast({ ok: true, text: 'Saved', url: 'https://local.couchhud/file?p=x.png' });
   assert.deepEqual(saved, { ok: true, text: 'Saved', image: 'https://local.couchhud/file?p=x.png', ms: 3500 });
@@ -1256,7 +1256,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   const third = { id: 'kodi', kind: 'plugin', origin: 'thirdParty', status: 'notInstalled', publisher: 'a1b2-c3d4', author: 'dev' };
   const foreign = { id: 'x', kind: 'skin', origin: 'local', extra: true, status: 'notInstalled' };
 
-  // Badge logic: third-party (a signed developer key, or anything from an added catalog) is marked; CouchHUD's own is not; unsigned ones say so.
+  // Badge logic: third-party (a signed developer key, or anything from an added catalog) is marked; Mega Hub's own is not; unsigned ones say so.
   assert.equal(pr.badgeOf(firstParty), null);
   assert.equal(pr.badgeOf(third), 'thirdParty');
   assert.equal(pr.badgeOf(foreign), 'thirdParty');
@@ -1536,7 +1536,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
     ['enable', 'firstParty', ['process'], true, false, false]
   ];
   for (const [change, origin, caps, parental, adds, expected] of TABLE) assert.equal(pr.needsCode(change, origin, caps, parental, adds), expected, `${change} ${origin} ${caps} parental=${parental} adds=${adds}`);
-  // Skins: CouchHUD's own catalog needs only the unlock; a skin of an added catalog always asks like a third-party install, updates included.
+  // Skins: Mega Hub's own catalog needs only the unlock; a skin of an added catalog always asks like a third-party install, updates included.
   assert.equal(pr.needsCode('install', 'skin', [], true), false);
   assert.equal(pr.needsCode('update', 'skin', [], true), false);
   const ownSkin = { id: 's', kind: 'skin', origin: 'local', status: 'update' };
@@ -1870,13 +1870,13 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   assert.equal(ptabs.look('H0me'), 'home');
   assert.equal(ptabs.look('Smart Home'), 'smarthome');
 
-  // The area: "always" only for CouchHUD's own plugins.
+  // The area: "always" only for Mega Hub's own plugins.
   assert.equal(ptabs.cleanPluginTabs([tab({ area: 'always' })])[0].area, 'apps');
   assert.equal(ptabs.cleanPluginTabs([tab({ area: 'always', origin: 'firstParty' })])[0].area, 'always');
   assert.equal(ptabs.cleanPluginTabs([tab({ area: 'bogus' })])[0].area, 'apps');
   assert.equal(ptabs.cleanPluginTabs([tab({ area: 'games' })])[0].area, 'games');
 
-  // Glyphs: one symbol; built-in icons are for CouchHUD only (a third party gets the plain dot).
+  // Glyphs: one symbol; built-in icons are for Mega Hub only (a third party gets the plain dot).
   for (const g of ['💡', '🌡️', '◆', '→', '🏠', '👍🏽']) assert.equal(ptabs.cleanGlyph(g), g, g);
   for (const g of ['12345', 'A', '7', 'ab', '💡💡', '💡x', '', '‮', '‍', '💡‍🔒', 'á', 'א', ' ', '', null]) assert.equal(ptabs.cleanGlyph(g), null, String(g));
   for (const g of ['🔒', '⚙', '🔔', '🌡️', '★', '🗑']) {
@@ -1897,7 +1897,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   reg2.sync([cleaned[0]]);
   assert.equal(gone.length, 1);
 
-  // The UI and the host keep the same lists: the reserved titles, the names of CouchHUD's plugins, the first-party titles and the glyphs
+  // The UI and the host keep the same lists: the reserved titles, the names of Mega Hub's plugins, the first-party titles and the glyphs
   // that are built-in icons are read from the C# file and compared.
   const cs = readFileSync(new URL('../src/CouchHud.Core/Plugins/PluginTabs.cs', import.meta.url), 'utf8');
   const strings = (name) => {
@@ -2825,7 +2825,7 @@ console.log('ui logic: ok');
     for (const id of Object.keys(SETUP_UNDO)) await assert.rejects(() => SETUP_UNDO[id].undo(null), /no record/, id);
   }
   {
-    // 0.6.4: "CouchHUD stays in front" carries the setup's mark (b). Switched on by the setup: its undo switches it off, mark gone.
+    // 0.6.4: "Mega Hub stays in front" carries the setup's mark (b). Switched on by the setup: its undo switches it off, mark gone.
     const h = host({});
     const { SETUP_UNDO, REVERT_UNDO } = createUndoTables(h);
     const env = () => ({ settings: h.db.settings, security: h.db.security });
@@ -3145,7 +3145,7 @@ assert.equal(chipsBlocked(null), false);
   assert.equal(searchSucceeded({}, {}, true), true);
   assert.equal(searchSucceeded(undefined, {}, true), false);
   assert.equal(searchSucceeded({}, undefined, true), false);
-  assert.equal(searchSucceeded({}, undefined, false), true); // no CouchHUD check in this build
+  assert.equal(searchSucceeded({}, undefined, false), true); // no Mega Hub check in this build
   assert.equal(searchMessage({}, {}, 0, tr, false), null);
   assert.equal(searchMessage({}, { available: false }, 0, tr, true), '<updates.allCurrent>');
   assert.equal(searchMessage({ busy: 'Suche läuft' }, {}, 0, tr, true), '<updates.alreadyRunning>');
@@ -3958,7 +3958,7 @@ console.log('undo progress: ok');
   const powerSrc = readFileSync(new URL('../ui/core/power.js', import.meta.url), 'utf8');
   assert.match(powerSrc, /export const POWER_MENU_LAYOUT = 'tiles';/);
   assert.doesNotMatch(powerSrc, /power\.cancel/);
-  // Restarting CouchHUD and restarting the PC have different icons (not two arrows of the same shape), and both are drawn.
+  // Restarting Mega Hub and restarting the PC have different icons (not two arrows of the same shape), and both are drawn.
   const { glyphName } = await import('../ui/core/glyph-icons.js');
   const iconOf = (id) => new RegExp(`id: '${id}',\\s*icon: '([^']+)'`).exec(powerSrc)?.[1];
   const icons = ['restart-app', 'restart', 'restart-pc', 'shutdown', 'standby', 'pc-mode'].map((id) => glyphName(iconOf(id)));
@@ -4152,7 +4152,7 @@ console.log('menu grid: ok');
   assert.equal(button.attrs['aria-disabled'], undefined);
   assert.equal(button.children.length, 0);
   assert.equal(markBusy(null, true, { doc }), null);
-  // Reduced motion: CouchHUD's own switch (data-motion="off") or the system's setting.
+  // Reduced motion: Mega Hub's own switch (data-motion="off") or the system's setting.
   assert.equal(prefersReducedMotion({ documentElement: { dataset: { motion: 'off' } } }, {}), true);
   assert.equal(prefersReducedMotion({ documentElement: { dataset: { motion: 'on' } } }, { matchMedia: () => ({ matches: true }) }), true);
   assert.equal(prefersReducedMotion({ documentElement: { dataset: { motion: 'on' } } }, { matchMedia: () => ({ matches: false }) }), false);
@@ -4174,7 +4174,7 @@ console.log('busy state: ok');
     { kind: 'pending', group: 'apps', label: 'All apps' }, { kind: 'pending', group: 'apps', label: 'Discord' },
     { kind: 'pending', group: 'couchhud', label: 'CouchHUD' }
   ];
-  // Sections in a fixed order (running, CouchHUD, apps, Windows, plugins, finished); the restart stands first with the Windows updates.
+  // Sections in a fixed order (running, Mega Hub, apps, Windows, plugins, finished); the restart stands first with the Windows updates.
   const sections = downloadSections({ entries, first: [reboot], pending });
   assert.deepEqual(sections.map((s) => [s.id, s.rows.map((r) => r.entry?.id ?? r.label)]), [
     ['running', ['b', 'd']], ['couchhud', ['CouchHUD']], ['apps', ['All apps', 'Discord']], ['windows', ['restart', 'Windows']],
@@ -4293,7 +4293,7 @@ console.log('busy instead of toasts: ok');
   f = fake({ locked: true, opens: false });
   assert.equal(await pressPending(row(), f.deps), undefined);
   assert.deepEqual(f.log, ['select', 'locked?', 'code-prompt']);
-  // Every kind of pending row the page builds (Windows, all apps, one app, CouchHUD, a plugin or skin) asks the same way.
+  // Every kind of pending row the page builds (Windows, all apps, one app, Mega Hub, a plugin or skin) asks the same way.
   for (const busyKey of ['update:windows', 'update:apps', 'update:app:Mozilla.Firefox', 'update:self', 'catalog:demo']) {
     f = fake({ locked: true });
     assert.equal(await pressPending(row({ busyKey }), f.deps), 'started');

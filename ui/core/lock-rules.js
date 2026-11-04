@@ -1,8 +1,8 @@
 // Pure rules of the couch lock in the console setup, without DOM (tested by scripts/ui-logic-check.mjs). The host checks it again
-// (Hud.SetCouchLockAsync refuses the code lock without a code the CouchHUD service keeps through the switch).
+// (Hud.SetCouchLockAsync refuses the code lock without a code the Mega Hub service keeps through the switch).
 
 /**
- * The code lock is in place: the mode is "code" and a code is there. When the codes go through the CouchHUD service (codesInService)
+ * The code lock is in place: the mode is "code" and a code is there. When the codes go through the Mega Hub service (codesInService)
  * its own answer counts: a code it does not hold (serviceCodes.couch false) opens nothing, whatever the settings file says. Without the
  * service (a development copy) the settings file's hash is the code.
  */
@@ -12,7 +12,7 @@ export function codeLockHeld(security) {
 }
 
 /**
- * How the code lock is switched on, from what the CouchHUD service holds (the host decides again with the same rule, CodeFlow.PlanCodeLock):
+ * How the code lock is switched on, from what the Mega Hub service holds (the host decides again with the same rule, CodeFlow.PlanCodeLock):
  *  - 'keep': a couch code from before is held under a lock mode that is on (the account went back to the app mode, the service kept its
  *    code). No new code is asked: the code applies again, raising the lock is free. A new one only through "Change code".
  *  - 'store': a new code cannot come along with the switch (a lock mode is on without a couch code, or a parents' code is held and may be
@@ -96,7 +96,7 @@ export const admitProfileChange = ({ reason, id = null, action, ensureUnlocked, 
 /**
  * The console setup's lock step. A lock that is on stays as it is (the Windows sign-in, the code lock with its code). Everything else
  * takes the code in the same step as the switch (enroll: Settings › Console › Couch lock with "code" picked): a code set at the open
- * couch does not survive the lock being switched on in the CouchHUD service, so "keep the code" is not offered there; the person
+ * couch does not survive the lock being switched on in the Mega Hub service, so "keep the code" is not offered there; the person
  * enters the code (the old one again, or a new one) and it goes along. The code lock without a code (only an administrator could
  * have opened the couch) takes a new code for the lock that is on (restore).
  *

@@ -44,7 +44,7 @@ public sealed class PoliteHandler : DelegatingHandler
         _policy = policy ?? DefaultPolicy;
         _now = now ?? (() => DateTimeOffset.UtcNow);
         _delay = delay ?? Task.Delay;
-        _userAgent = $"MegaHub/{version} (+https://github.com/jjrussellite28-art/Ultimate-setup)";
+        _userAgent = $"MegaHub/{version} (+https://github.com/jjrussellite28-art/mega-hub)";
     }
 
     /// <summary>Store and API hosts get one request at a time and a generous gap; CDNs may take two.</summary>

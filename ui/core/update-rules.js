@@ -29,7 +29,7 @@ const RUNNING = new Set(['waiting', 'downloading', 'installing', 'inClient', 'pa
 
 /**
  * What the Downloads tab offers to start, from what the Updates page knows: Windows updates (all at once, as the Updates page does),
- * app updates (all), CouchHUD itself and each plugin or skin with a newer version. Something that already runs as a line of its own
+ * app updates (all), Mega Hub itself and each plugin or skin with a newer version. Something that already runs as a line of its own
  * (the same id the host uses) is not offered again, nor something whose line finished (done) after the page last heard of that kind of
  * update (`seen`: ms of the last news per kind): the list it came from is old until the host sends the next one.
  */
@@ -53,7 +53,7 @@ export function pendingDownloads({ updates = null, selfUpdate = null, catalogUpd
 }
 
 /**
- * The actions of one line of the Downloads tab, the first one on A: only what really works for its source. CouchHUD's own download
+ * The actions of one line of the Downloads tab, the first one on A: only what really works for its source. Mega Hub's own download
  * while it can be stopped: cancel (no pause: a cancelled setup is downloaded and verified again in full). Steam: its own download
  * page, where pausing and resuming work (Steam has no documented way to do it from outside). Windows Update and winget: nothing while
  * they run (no cancel through the service yet; stopping an installer midway can break the app). Finished lines and requests: remove.

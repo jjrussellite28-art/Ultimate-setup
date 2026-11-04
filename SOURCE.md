@@ -1,10 +1,10 @@
 # Corresponding source
 
-Project: https://github.com/jjrussellite28-art/Ultimate-setup
+Project: https://github.com/jjrussellite28-art/mega-hub
 License: GNU GPL v3 (LICENSE).
 
 For a binary distribution, supply its exact source archive alongside that binary with equally convenient access,
-at no additional charge. The preparation workflow creates Ultimate-setup-source-<commit>.zip using git archive
+at no additional charge. The preparation workflow creates mega-hub-source-<commit>.zip using git archive
 of the checked-out commit. It contains the tracked source, installer scripts, workflow and notices.
 Do not substitute a changing default-branch link for the source of a specific installer.
 

@@ -2,26 +2,26 @@
 
 [Deutsch](PRIVACY.md) | **English**
 
-*As of October 2026, applies to CouchHUD from version 0.3*
+*As of October 2026, applies to Mega Hub from version 0.3*
 
 > This is a translation. In case of doubt, the German version ([PRIVACY.md](PRIVACY.md)) prevails.
 
-CouchHUD is a local application. There is **no account, no telemetry, no usage statistics and no advertising**. The developers of CouchHUD receive no data from you.
+Mega Hub is a local application. There is **no account, no telemetry, no usage statistics and no advertising**. The developers of Mega Hub receive no data from you.
 
 ## What is stored locally
 
 | Location | Content |
 |---|---|
-| `%APPDATA%\CouchHud` | Settings (`config.json`: favorites, collections, play times, your own entries, bookmarks, parental control rules), the parental controls' daily counter (`playtime.json`), save game backups and the downloaded save game manifest, caches for artwork, store info and the catalog, the backup of the Windows values CouchHUD changed (`guard.json`) and of the changed Steam settings (`guard-steam.json`; the settings themselves are in Steam's file `userdata\<account>\config\localconfig.vdf` and in the registry value `HKCU\Software\Valve\Steam\StartupMode`; none of it leaves the PC and nothing on the Steam account is changed), installed plugins and skins |
+| `%APPDATA%\CouchHud` | Settings (`config.json`: favorites, collections, play times, your own entries, bookmarks, parental control rules), the parental controls' daily counter (`playtime.json`), save game backups and the downloaded save game manifest, caches for artwork, store info and the catalog, the backup of the Windows values Mega Hub changed (`guard.json`) and of the changed Steam settings (`guard-steam.json`; the settings themselves are in Steam's file `userdata\<account>\config\localconfig.vdf` and in the registry value `HKCU\Software\Valve\Steam\StartupMode`; none of it leaves the PC and nothing on the Steam account is changed), installed plugins and skins |
 | `%LOCALAPPDATA%\CouchHud` | Logs (`logs`), image cache for artwork (`artwork`, about 750 MB at most; the images of current entries are always kept), the interface profile (WebView2), the browser profile (history, cookies, logins of the websites you visit) |
 
-API keys and tokens (SteamGridDB, MCP and the access of plugins, since 0.7 also the keys for Anthropic and OpenAI; uninstalling a plugin deletes its keys) are stored encrypted with Windows DPAPI for your user account. The couch lock's controller code is only stored as a salted hash. CouchHUD never stores your Windows password, neither in the configuration nor in the log. Only if you set up automatic sign-in do you enter it once in CouchHUD: it is checked with Windows and stored by Windows in encrypted form as an LSA secret (as with Sysinternals Autologon); CouchHUD does not keep it.
+API keys and tokens (SteamGridDB, MCP and the access of plugins, since 0.7 also the keys for Anthropic and OpenAI; uninstalling a plugin deletes its keys) are stored encrypted with Windows DPAPI for your user account. The couch lock's controller code is only stored as a salted hash. Mega Hub never stores your Windows password, neither in the configuration nor in the log. Only if you set up automatic sign-in do you enter it once in Mega Hub: it is checked with Windows and stored by Windows in encrypted form as an LSA secret (as with Sysinternals Autologon); Mega Hub does not keep it.
 
 You can delete everything by removing both folders.
 
-## Which connections CouchHUD makes
+## Which connections Mega Hub makes
 
-CouchHUD only connects to these services, and only for the purpose given. As with any website visit, the providers see your IP address.
+Mega Hub only connects to these services, and only for the purpose given. As with any website visit, the providers see your IP address.
 
 | Service | When | What is sent |
 |---|---|---|
@@ -38,23 +38,23 @@ CouchHUD only connects to these services, and only for the purpose given. As wit
 | TV (LG webOS) in your home network | Only when a TV is paired or searched for: search (SSDP multicast in the local network, 5 seconds at most), pairing, control, switching on (a Wake-on-LAN packet to the TV's MAC address, only into the local network) | Control commands (volume, input, on/off) and status queries straight to the TV, only to private or link-local addresses. Stored on the PC: address, name, model, MAC address, certificate fingerprint and the pairing key (encrypted with DPAPI for your Windows account). No LG cloud, no account. *Remove TV* deletes this again; only the list of addresses and MAC addresses that were already paired with encryption (32 at most, protection against unencrypted pairing) stays in `config.json` (key `tv.secureSeen`) |
 | CaseHUD (local API, 127.0.0.1), through the CaseHUD plugin | Only if the plugin is installed and CaseHUD is installed and running; while the plugin's page is open or a game is running | Control commands and status queries to the local CaseHUD (port and token are in its `api.json`), plus the name and process ID of the running game so the displays can switch to the game scene (can be switched off in Expert mode). Does not leave the PC |
 | GitHub: CaseHUD release (api.github.com, github.com, `kewe87/CaseHUD`), through the CaseHUD plugin | Only while CaseHUD is not installed yet and you press *Install* in the plugin (no background lookup, none for updating: CaseHUD does that itself) | Query for the latest version; then the download of the setup, `SHA256SUMS.txt` and `SHA256SUMS.txt.sig`. The signature is checked with the built-in CaseHUD release key (SHA-256 fingerprint `cfb6863f23c892a53c93786dd1ee78478618aed680c5603fbc3955c1dde4abaf`); without a valid signature and checksums nothing is installed. No data about you is sent |
-| Anthropic (api.anthropic.com) or OpenAI (api.openai.com), through their plugins | Only if the plugin is installed, with your own API key (encrypted in the plugin's settings) and only when you use the assistant; can be switched off under Settings › Privacy | Your questions and the information the assistant reads from CouchHUD to answer them (e.g. names and play times of your games, settings). The provider's own privacy policy applies. |
+| Anthropic (api.anthropic.com) or OpenAI (api.openai.com), through their plugins | Only if the plugin is installed, with your own API key (encrypted in the plugin's settings) and only when you use the assistant; can be switched off under Settings › Privacy | Your questions and the information the assistant reads from Mega Hub to answer them (e.g. names and play times of your games, settings). The provider's own privacy policy applies. |
 | Microsoft (Windows Update), winget sources | Checking for and installing updates | As usual for Windows Update or winget |
-| Microsoft (www.microsoft.com) | Only with parental controls on, when CouchHUD notices a jump of the system clock | One HTTPS request (HEAD), used only for the date in the response, to check the clock. No data is sent |
+| Microsoft (www.microsoft.com) | Only with parental controls on, when Mega Hub notices a jump of the system clock | One HTTPS request (HEAD), used only for the date in the response, to check the clock. No data is sent |
 | Microsoft (WebView2 runtime) | Only during installation, if the runtime is missing | The setup includes the WebView2 bootstrapper, which downloads the runtime from Microsoft. Later, Windows updates the runtime itself |
 | Websites in the browser | Only what you open (also links from news and plugins: they open in the built-in browser, not in the Windows default browser) | As in any browser, in its own profile (history, cookies); searches go to DuckDuckGo. Website entries for streaming with copy protection open in Edge if you choose so; that data stays with Edge |
-| Game clients (Steam, Epic, …) | CouchHUD only starts them, the clients connect by themselves | Up to the respective providers |
-| VPN app (NordVPN), through the VPN plugin | Only when the plugin is installed and you connect or disconnect on the VPN page or in the Guide menu | Neither CouchHUD nor the plugin makes a connection: the plugin calls the command line of the installed app, and the app connects to its provider. The plugin reads the state from the PC's network adapter, without asking third parties (no lookup of the public IP); it has no network right and no credentials. Only the last chosen country and the switch "VPN in the Guide menu" are stored (in the plugin's settings; before the plugin `vpnLastCountry` and `vpnInGuide` in the program, which carry over once) |
+| Game clients (Steam, Epic, …) | Mega Hub only starts them, the clients connect by themselves | Up to the respective providers |
+| VPN app (NordVPN), through the VPN plugin | Only when the plugin is installed and you connect or disconnect on the VPN page or in the Guide menu | Neither Mega Hub nor the plugin makes a connection: the plugin calls the command line of the installed app, and the app connects to its provider. The plugin reads the state from the PC's network adapter, without asking third parties (no lookup of the public IP); it has no network right and no credentials. Only the last chosen country and the switch "VPN in the Guide menu" are stored (in the plugin's settings; before the plugin `vpnLastCountry` and `vpnInGuide` in the program, which carry over once) |
 
 ## Artwork: stored locally, only in the background, only with consideration
 
 - Each image is downloaded **once** and then kept in `%LOCALAPPDATA%\CouchHud\artwork`. The interface never loads artwork from the internet itself, only from there. Addresses found and failures (7 days) are stored as well.
-- Images are only loaded in the background after the library has been read, **never while a game is running**. There is a rate limit per host; on "too many requests" (HTTP 429/503) the server's wait time (Retry-After) is respected, followed by exponential back-off. If a host keeps answering with errors, CouchHUD pauses it for several minutes up to an hour.
+- Images are only loaded in the background after the library has been read, **never while a game is running**. There is a rate limit per host; on "too many requests" (HTTP 429/503) the server's wait time (Retry-After) is respected, followed by exponential back-off. If a host keeps answering with errors, Mega Hub pauses it for several minutes up to an hour.
 - Requests carry the name `CouchHUD/<version>` as the user agent.
 - Only complete png, jpeg, webp and gif files up to 12 MB are accepted; the content is checked, not what the server claims.
-- Local sources come before any request: Steam's `librarycache`, the Epic Launcher's catalog cache, package logos of Microsoft Store games, icons of the program files. If there is no artwork at all, CouchHUD draws a banner itself (name, color), without the network.
+- Local sources come before any request: Steam's `librarycache`, the Epic Launcher's catalog cache, package logos of Microsoft Store games, icons of the program files. If there is no artwork at all, Mega Hub draws a banner itself (name, color), without the network.
 - Under Settings › Library (Expert mode) you can switch off "Look up artwork online" (then only existing images are used) and clear the artwork cache. The switch only applies to images: descriptions and age ratings from the Steam store (needed for parental controls) are still loaded and stored when focused, and trailers can be switched off separately under Look.
-- Downloads only come from the hosts named above (Steam, Epic, SteamGridDB and their CDNs); every redirect is checked, at most 3. Connections to addresses in your own network or on this PC are refused, even if a name points there. For this reason CouchHUD does not use the Windows proxy for artwork and store queries.
+- Downloads only come from the hosts named above (Steam, Epic, SteamGridDB and their CDNs); every redirect is checked, at most 3. Connections to addresses in your own network or on this PC are refused, even if a name points there. For this reason Mega Hub does not use the Windows proxy for artwork and store queries.
 
 ## Services in your home network
 
@@ -63,7 +63,7 @@ CouchHUD only connects to these services, and only for the purpose given. As wit
 
 ## Notifications
 
-If you switch on "Mirror notifications" and Windows grants access, CouchHUD reads the Windows notifications (e.g. WhatsApp, Discord) to show them on the TV. They stay on the PC and are not stored.
+If you switch on "Mirror notifications" and Windows grants access, Mega Hub reads the Windows notifications (e.g. WhatsApp, Discord) to show them on the TV. They stay on the PC and are not stored.
 
 ## Plugins
 

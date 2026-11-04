@@ -88,7 +88,7 @@ export function tvMock() {
       if (!tv.paired) throw new Error('No TV paired yet (Settings › TV)');
       if (on) {
         if (tv.power === 'on') return describe();
-        if (!tv.mac) throw new Error('Can’t switch on: CouchHUD doesn’t know the TV’s MAC address or finds no matching network');
+        if (!tv.mac) throw new Error('Can’t switch on: Mega Hub doesn’t know the TV’s MAC address or finds no matching network');
         tv.power = 'waking';
         later(2500, () => { tv.power = 'on'; });
       } else {

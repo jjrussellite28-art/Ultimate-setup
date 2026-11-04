@@ -1,4 +1,4 @@
-// The one way the UI shows a web address: in CouchHUD's own browser, never in the system's.
+// The one way the UI shows a web address: in Mega Hub's own browser, never in the system's.
 // Only http(s) goes that way; the host checks again and refuses everything else.
 
 import { api } from './api.js';

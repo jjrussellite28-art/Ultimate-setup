@@ -1,4 +1,4 @@
-# Skins für CouchHUD
+# Skins für Mega Hub
 
 **Deutsch** | [English](SKINS.en.md)
 
@@ -25,11 +25,11 @@ Ein Skin ist ein Stylesheet plus optional eigene Button-Symbole. Er ändert Farb
 }
 ```
 
-`name` und `description` sind entweder einfacher Text oder ein Objekt mit `de` und `en`; CouchHUD zeigt den Text der aktuellen Sprache (fehlt er, den anderen). Namen haben höchstens 40 Zeichen, Beschreibungen 300; Steuerzeichen, unsichtbare Formatzeichen (etwa Umkehr der Schreibrichtung oder Zeichen ohne Breite) und `<` `>` werden entfernt, ein Name ist also immer einfacher Text. Ein Skin ohne Namen trägt seinen Ordnernamen. `soundSet` ist optional: eines der Klangsets der App (`default`, `deepsea`, `greenlight`, `neoncity`, `nova`), das spielt, solange der Skin aktiv ist; alles andere wird ignoriert.
+`name` und `description` sind entweder einfacher Text oder ein Objekt mit `de` und `en`; Mega Hub zeigt den Text der aktuellen Sprache (fehlt er, den anderen). Namen haben höchstens 40 Zeichen, Beschreibungen 300; Steuerzeichen, unsichtbare Formatzeichen (etwa Umkehr der Schreibrichtung oder Zeichen ohne Breite) und `<` `>` werden entfernt, ein Name ist also immer einfacher Text. Ein Skin ohne Namen trägt seinen Ordnernamen. `soundSet` ist optional: eines der Klangsets der App (`default`, `deepsea`, `greenlight`, `neoncity`, `nova`), das spielt, solange der Skin aktiv ist; alles andere wird ignoriert.
 
-`glyphs` ist optional (höchstens 32 Einträge, jede Beschriftung höchstens 12 Zeichen) und nur Gestaltung. Der Schlüssel `≡` ist die Beschriftung der Menütaste (zum Beispiel `☰` oder `MENU`): Welche Symbole erscheinen, bestimmt der Controller (bzw. *Einstellungen › Controller › Tastensymbole*). Ein Eintrag wie `✕`, `○`, `□`, `△`, `L1`, `R1`, `L2`, `R2`, `L3`, `R3`, `OPTIONS`, `CREATE`, `SHARE` oder `PS` gilt nur mit PlayStation-Symbolen, jeder andere nur mit Xbox-Symbolen; sonst zeigt CouchHUD das Standardsymbol der Controller-Art. Die Farben der Tasten bei PlayStation-Symbolen hängen an `:root[data-pad="playstation"]`. Wer für beide Arten eigene Beschriftungen will, nimmt die optionalen Listen `glyphsXbox` und `glyphsPlayStation` (gleiche Grenzen, nur Text); ein Eintrag dort gilt genau für diese Art von Controller und geht dem Eintrag in `glyphs` vor, `glyphs` bleibt die Rückfallebene. Rangfolge: Liste der Controller-Art, dann `glyphs` (nach Art gefiltert), dann das Standardsymbol der Art. Ein PlayStation-Controller, den Steam Input oder DS4Windows als virtuellen XInput-Controller weiterreicht, zählt als PlayStation, solange sein nativer Anschluss die Tasten zuerst meldet; sonst zeigt CouchHUD die Xbox-Symbole.
+`glyphs` ist optional (höchstens 32 Einträge, jede Beschriftung höchstens 12 Zeichen) und nur Gestaltung. Der Schlüssel `≡` ist die Beschriftung der Menütaste (zum Beispiel `☰` oder `MENU`): Welche Symbole erscheinen, bestimmt der Controller (bzw. *Einstellungen › Controller › Tastensymbole*). Ein Eintrag wie `✕`, `○`, `□`, `△`, `L1`, `R1`, `L2`, `R2`, `L3`, `R3`, `OPTIONS`, `CREATE`, `SHARE` oder `PS` gilt nur mit PlayStation-Symbolen, jeder andere nur mit Xbox-Symbolen; sonst zeigt Mega Hub das Standardsymbol der Controller-Art. Die Farben der Tasten bei PlayStation-Symbolen hängen an `:root[data-pad="playstation"]`. Wer für beide Arten eigene Beschriftungen will, nimmt die optionalen Listen `glyphsXbox` und `glyphsPlayStation` (gleiche Grenzen, nur Text); ein Eintrag dort gilt genau für diese Art von Controller und geht dem Eintrag in `glyphs` vor, `glyphs` bleibt die Rückfallebene. Rangfolge: Liste der Controller-Art, dann `glyphs` (nach Art gefiltert), dann das Standardsymbol der Art. Ein PlayStation-Controller, den Steam Input oder DS4Windows als virtuellen XInput-Controller weiterreicht, zählt als PlayStation, solange sein nativer Anschluss die Tasten zuerst meldet; sonst zeigt Mega Hub die Xbox-Symbole.
 
-`sounds` ist optional. Mögliche Ereignisse: `move`, `tab`, `select`, `back`, `bump`, `open`, `close`, `notify`, `toggle`, `boot` und `music`. `music` ist ein Hintergrund-Track, der in Schleife läuft, wenn der Nutzer „UI-Sounds und Musik“ gewählt hat; ohne ihn spielt die eingebaute Musik des Skins. Erlaubt sind `.wav`, `.ogg` und `.mp3` aus dem Skin-Ordner. Für fehlende Ereignisse spielt CouchHUD das eingebaute Klangset.
+`sounds` ist optional. Mögliche Ereignisse: `move`, `tab`, `select`, `back`, `bump`, `open`, `close`, `notify`, `toggle`, `boot` und `music`. `music` ist ein Hintergrund-Track, der in Schleife läuft, wenn der Nutzer „UI-Sounds und Musik“ gewählt hat; ohne ihn spielt die eingebaute Musik des Skins. Erlaubt sind `.wav`, `.ogg` und `.mp3` aus dem Skin-Ordner. Für fehlende Ereignisse spielt Mega Hub das eingebaute Klangset.
 
 **HDR**: Ist der HDR-Modus aktiv, steht `data-hdr="on"` am Root-Element. Dort kannst du kräftigere Farben setzen, am besten in Display-P3:
 
@@ -64,7 +64,7 @@ Ein Skin ist ein Stylesheet plus optional eigene Button-Symbole. Er ändert Farb
 
 Eigene Schriften und Bilder legst du in den Skin-Ordner und bindest sie relativ ein (`url("orbitron.woff2")`).
 
-**Nur lokale Dateien:** CouchHUD ersetzt Internet-Adressen (`http://`, `https://`, `//host/…`) in `skin.css` durch `about:blank`, bevor es das Stylesheet ausliefert. Ein Skin soll nicht bei jedem Bild bei einem fremden Server anfragen können und ihm so verraten, wann jemand auf der Couch sitzt. Bilder, Schriften und Klänge gehören deshalb in den Skin-Ordner (oder als `data:`-Adresse ins CSS). Der Skin-Ordner darf nur auf lokale Laufwerke zeigen, nie auf Netzlaufwerke oder Freigaben (`\\server\…`). Beim Installieren per `.zip` weist CouchHUD darauf hin, dass ein Skin Inhalte laden kann.
+**Nur lokale Dateien:** Mega Hub ersetzt Internet-Adressen (`http://`, `https://`, `//host/…`) in `skin.css` durch `about:blank`, bevor es das Stylesheet ausliefert. Ein Skin soll nicht bei jedem Bild bei einem fremden Server anfragen können und ihm so verraten, wann jemand auf der Couch sitzt. Bilder, Schriften und Klänge gehören deshalb in den Skin-Ordner (oder als `data:`-Adresse ins CSS). Der Skin-Ordner darf nur auf lokale Laufwerke zeigen, nie auf Netzlaufwerke oder Freigaben (`\\server\…`). Beim Installieren per `.zip` weist Mega Hub darauf hin, dass ein Skin Inhalte laden kann.
 
 ## Wichtige Variablen
 
@@ -76,7 +76,7 @@ Eigene Schriften und Bilder legst du in den Skin-Ordner und bindest sie relativ 
 | `--font` | Schriftfamilie |
 | `--tile-radius`, `--shelf-tile`, `--focus-scale` | Ecken, Kachelgröße auf Home, Zoom des Fokus |
 
-Für alles andere kannst du die Selektoren aus `ui/styles.css` überschreiben. Die Skins im Katalog (Tiefsee, Grünlicht, Neonstadt, Nova, Sternenstaub) zeigen, wie weit das geht: Tiefsee dreht z.B. das ganze Home-Layout um. Nur der CouchHUD-Skin gehört zum Programm (`ui/skins/`); alle anderen sind Skins wie deiner, im Skin-Ordner installiert, und ihre Regeln beginnen mit `:root[data-skin="user:<Ordner>"]`.
+Für alles andere kannst du die Selektoren aus `ui/styles.css` überschreiben. Die Skins im Katalog (Tiefsee, Grünlicht, Neonstadt, Nova, Sternenstaub) zeigen, wie weit das geht: Tiefsee dreht z.B. das ganze Home-Layout um. Nur der Mega-Hub-Skin gehört zum Programm (`ui/skins/`); alle anderen sind Skins wie deiner, im Skin-Ordner installiert, und ihre Regeln beginnen mit `:root[data-skin="user:<Ordner>"]`.
 
 ## Die Tab-Leiste
 
@@ -172,7 +172,7 @@ Welches Bild eine Kachel zeigt, sagt der Skin mit der CSS-Variable `--tile-art`,
 
 Jeder andere oder fehlende Wert gilt als Standard der Kachel; der Standard-Skin ändert sich nicht. Die App-Kacheln (16:9) und die „Weiterspielen“-Karte setzen ihren Wert selbst, ein `square` auf `:root` erreicht sie nicht; ein Skin, der die Karte quadratisch macht, setzt `--tile-art: square` an `.shelf .hero-art`.
 
-Passt ein Bild nicht zur Form der Kachel (ein Cover als Ersatz in einer quadratischen Kachel, ein Store-Header auf einer Cover-Kachel), zeigt CouchHUD es **ganz und mittig über einer unscharfen Kopie** von sich (Klasse `art-fit`, dazu `art-wide`, wenn das Bild breiter ist als die Kachel), nie gestreckt und nie mit abgeschnittenem Titel. Ein Quadrat- oder Hero-Bild in einer Kachel, die danach fragt, füllt sie. Die Form der Kachel liest CouchHUD aus ihrem `aspect-ratio`. Jede Kachel trägt `data-tile-art` mit dem Bild, das sie zeigt, und bei `square` die Klasse `art-square`.
+Passt ein Bild nicht zur Form der Kachel (ein Cover als Ersatz in einer quadratischen Kachel, ein Store-Header auf einer Cover-Kachel), zeigt Mega Hub es **ganz und mittig über einer unscharfen Kopie** von sich (Klasse `art-fit`, dazu `art-wide`, wenn das Bild breiter ist als die Kachel), nie gestreckt und nie mit abgeschnittenem Titel. Ein Quadrat- oder Hero-Bild in einer Kachel, die danach fragt, füllt sie. Die Form der Kachel liest Mega Hub aus ihrem `aspect-ratio`. Jede Kachel trägt `data-tile-art` mit dem Bild, das sie zeigt, und bei `square` die Klasse `art-square`.
 
 Ein Skin-Wechsel schaltet die Bilder **sofort** um, in beide Richtungen, ohne Neustart und ohne neuen Scan: Sobald das Stylesheet des neuen Skins geladen ist, fragt jede Kachel neu. Es werden dabei nur Bilder geladen, die die Bibliothek schon kennt; fehlende Quadrat-Bilder holt nur die normale Artwork-Suche (mit SteamGridDB-Schlüssel und nur, solange die Datenschutz-Schalter sie erlauben). Das Quadrat-Bild wählt der Nutzer unter *Artwork ändern* im Reiter „Quadrat“.
 
@@ -186,7 +186,7 @@ Ein Skin-Wechsel schaltet die Bilder **sofort** um, in beide Richtungen, ohne Ne
 
 ## Mauszeiger
 
-Bewegt der Nutzer eine Maus, zeichnet CouchHUD einen eigenen Zeiger. Er kommt aus dem Skin: Jeder Skin darf ihn setzen, ein Skin ohne eigenen Zeiger zeigt automatisch den Standard-Pfeil von CouchHUD. Mit der Einstellung „Echter Mauszeiger“ (Einstellungen › Darstellung) zeigt der Nutzer stattdessen den normalen Windows-Zeiger, dann greift dein Zeiger nicht.
+Bewegt der Nutzer eine Maus, zeichnet Mega Hub einen eigenen Zeiger. Er kommt aus dem Skin: Jeder Skin darf ihn setzen, ein Skin ohne eigenen Zeiger zeigt automatisch den Standard-Pfeil von Mega Hub. Mit der Einstellung „Echter Mauszeiger“ (Einstellungen › Darstellung) zeigt der Nutzer stattdessen den normalen Windows-Zeiger, dann greift dein Zeiger nicht.
 
 | Variable | Wirkung |
 |---|---|
@@ -202,16 +202,16 @@ Bewegt der Nutzer eine Maus, zeichnet CouchHUD einen eigenen Zeiger. Er kommt au
 }
 ```
 
-Tipps: Ein Zeiger muss auf dem Fernseher aus dem Sessel auffallen. Eine dunkle Kontur (hier `#12141c`) hält ihn auf hellem Hintergrund sichtbar, eine helle Füllung auf dunklem. Der Zeiger ruht, solange die Maus still steht. Seit 0.7 ist der Zeiger ein geschlossener Shadow-Root in der obersten Ebene: `#cursor` und `#cursor .cp` erreicht kein Selektor mehr, der Skin steuert ihn nur über `--pointer`, `--pointer-size` (1 bis 8 rem) und `--pointer-hx`/`--pointer-hy` (0 bis 1); Klick-Quetschen und Lauf-Animation macht das Programm selbst (aus bei „Animationen reduzieren“). Das ist nur der Zeiger innerhalb von CouchHUD. In anderen Fenstern bleibt es der Windows-Zeiger.
+Tipps: Ein Zeiger muss auf dem Fernseher aus dem Sessel auffallen. Eine dunkle Kontur (hier `#12141c`) hält ihn auf hellem Hintergrund sichtbar, eine helle Füllung auf dunklem. Der Zeiger ruht, solange die Maus still steht. Seit 0.7 ist der Zeiger ein geschlossener Shadow-Root in der obersten Ebene: `#cursor` und `#cursor .cp` erreicht kein Selektor mehr, der Skin steuert ihn nur über `--pointer`, `--pointer-size` (1 bis 8 rem) und `--pointer-hx`/`--pointer-hy` (0 bis 1); Klick-Quetschen und Lauf-Animation macht das Programm selbst (aus bei „Animationen reduzieren“). Das ist nur der Zeiger innerhalb von Mega Hub. In anderen Fenstern bleibt es der Windows-Zeiger.
 
 ## Ausprobieren
 
-CouchHUD mit `--dev` starten, unter *Einstellungen › Darstellung › Skin* deinen Skin wählen. Änderungen an der CSS siehst du nach erneutem Auswählen.
+Mega Hub mit `--dev` starten, unter *Einstellungen › Darstellung › Skin* deinen Skin wählen. Änderungen an der CSS siehst du nach erneutem Auswählen.
 
 Ohne Windows geht es auch: `node scripts/preview-server.js` startet die Oberfläche mit Beispieldaten im Browser. Eigene Skin-Ordner dort mit `CATALOG_SKINS=<Ordner mit deinen Skin-Ordnern> node scripts/preview-server.js` ausliefern und einen Skin mit `node scripts/ui-shot.mjs --catalog <Ordner> skin:user:<Ordnername> shot:home` ansehen. Das Stylesheet wird dort von Internet-Adressen befreit, genau wie in der App.
 
 ## Teilen
 
-Ordner als `.zip` packen (mit oder ohne übergeordneten Ordner), auf GitHub mit dem Topic `couchhud-skin` veröffentlichen. Andere installieren ihn in CouchHUD unter *Einstellungen › Darstellung › Neue Skins installieren*.
+Ordner als `.zip` packen (mit oder ohne übergeordneten Ordner), auf GitHub mit dem Topic `couchhud-skin` veröffentlichen. Andere installieren ihn in Mega Hub unter *Einstellungen › Darstellung › Neue Skins installieren*.
 
 Für den Katalog: Gib dem Skin einen eigenen Namen, keine fremde Marke (kein Konsolen-, Hersteller- oder Spielename), und verwende keine fremden Logos. Ein Stil darf an etwas erinnern, aber nicht danach heißen.

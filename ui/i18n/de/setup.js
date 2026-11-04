@@ -99,7 +99,7 @@ export default {
   'consoleSetup.lock.reenterCode': 'Der Code, der ohne Sperre festgelegt wurde, gilt beim Einschalten der Sperre nicht weiter. Bitte den Code jetzt eingeben, gern denselben noch einmal',
   'consoleSetup.lock.notSaved': 'Die Sperre wurde nicht eingeschaltet. Der Grund steht in der Meldung, „Noch einmal versuchen“ fragt erneut',
   'consoleSetup.lock.legacyConfirmFirst': 'Die Sperre aus Mega Hub 0.4.0 wartet noch auf die Bestätigung eines Administrators. Erst die Couch mit dem Code entsperren und „Als Administrator bestätigen“ wählen, dann die Einrichtung noch einmal starten',
-  'consoleSetup.lock.codesDamaged': 'Der Code-Speicher des CouchHUD-Dienstes ist beschädigt. Ein Administrator kann ihn in den Einstellungen zurücksetzen, dann die Einrichtung noch einmal starten',
+  'consoleSetup.lock.codesDamaged': 'Der Code-Speicher des Mega-Hub-Dienstes ist beschädigt. Ein Administrator kann ihn in den Einstellungen zurücksetzen, dann die Einrichtung noch einmal starten',
   'consoleSetup.lock.codesReset': 'Der Code-Speicher wurde zurückgesetzt. „Noch einmal versuchen“ richtet die Sperre mit einem neuen Code ein',
   'consoleSetup.step.integration.title': 'Shell-Funktionen freischalten',
   'consoleSetup.step.integration.detail': 'Erlaubt Mega Hub, statt des Desktops zu starten, den PC zu sperren und beim Einschalten alles vorzubereiten. Steam & Co. starten dann leise mit; ein von Mega Hub gestartetes Steam wird beim Beenden geschlossen',

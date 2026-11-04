@@ -481,7 +481,7 @@ async function onPageDialog(d) {
   if (endedDialogs.delete(d.id)) return;
   // The user is no longer at the page (the guide button went home meanwhile): its question is not shown over the HUD.
   if (currentView() !== browserView || !browserView.isOpen) return answer(d.id, false);
-  // Always the site's name, and always marked as the web's (globe, own frame): never in the look of CouchHUD's own questions.
+  // Always the site's name, and always marked as the web's (globe, own frame): never in the look of Mega Hub's own questions.
   const site = webSite(d);
   switch (kind) {
     case 'alert':

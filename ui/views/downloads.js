@@ -1,5 +1,5 @@
 // Downloads tab: everything that loads or installs, in one place (like a console's download list). The host gathers the lines
-// (Steam's manifests, Windows Update, winget, CouchHUD's own update, plugins and skins, CaseHUD, installs asked for in a store);
+// (Steam's manifests, Windows Update, winget, Mega Hub's own update, plugins and skins, CaseHUD, installs asked for in a store);
 // see src/CouchHud.Core/Library/DownloadCenter.cs. A bar only where the source really tells its progress.
 
 import { api } from '../core/api.js';
@@ -210,11 +210,11 @@ const rowBusy = (row) => row.kind === 'pending' && (!!row.hostBusy || (!!row.bus
 /** The heading's text key of a section (core/downloads-rules.js SECTIONS). */
 const sectionKey = (id) => `downloads.section.${id}`;
 
-/** What is waiting to be installed: Windows and app updates, CouchHUD itself, plugins and skins. */
+/** What is waiting to be installed: Windows and app updates, Mega Hub itself, plugins and skins. */
 const pendingCount = (u, s) => (u?.windows?.length ?? 0) + (u?.apps?.length ?? 0) + (s?.available ? 1 : 0) + (state.catalogUpdates?.length ?? 0);
 
 /**
- * Looks for Windows, app and CouchHUD updates now (X, or a click on its footer hint). While it runs the hint is busy and the status line
+ * Looks for Windows, app and Mega Hub updates now (X, or a click on its footer hint). While it runs the hint is busy and the status line
  * says so; a second press does nothing. A search that Privacy forbids (Offline, a switch off) or that failed says so; a finished one
  * tells what it found ("All up to date", "3 updates found"), in a toast and next to the heading.
  */
@@ -331,7 +331,7 @@ export const downloadsView = {
     // finished lines. The search for updates is the page's footer action (X), not a row; new games are installed from the Games tab (View).
     const pending = pendingDownloads({ updates: state.updates, selfUpdate: state.selfUpdate, catalogUpdates: state.catalogUpdates, seen: state.updatesSeen }, entries)
       .flatMap((p) => (p.kind === 'apps' ? [pendingRow(p), ...(state.updates?.apps ?? []).map(appRow)] : [pendingRow(p)]));
-    // In sections, each under its heading: what runs now, the updates that can be started by kind (CouchHUD, apps, Windows, plugins and
+    // In sections, each under its heading: what runs now, the updates that can be started by kind (Mega Hub, apps, Windows, plugins and
     // skins), what has finished. The headings are no stops: up and down go from row to row across them.
     const sections = downloadSections({ entries, first: updateNotes().first, pending });
     this.rows = sections.flatMap((s) => s.rows);

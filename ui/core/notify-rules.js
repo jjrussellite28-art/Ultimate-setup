@@ -1,4 +1,4 @@
-// Where a notification of CouchHUD itself leads: a fixed whitelist of screens, nothing else (pure, tested by scripts/ui-logic-check.mjs).
+// Where a notification of Mega Hub itself leads: a fixed whitelist of screens, nothing else (pure, tested by scripts/ui-logic-check.mjs).
 
 const TARGETS = Object.freeze({ downloads: 'downloads' });
 

@@ -43,7 +43,7 @@ export const POWER_ACTIONS = [
     run: () => api.enterPcMode()
   },
   {
-    // CouchHUD itself starts again (plugin changes take effect, the couch lock and the profile come back as they were): behind the same
+    // Mega Hub itself starts again (plugin changes take effect, the couch lock and the profile come back as they were): behind the same
     // couch lock as quitting; the host refuses while a game runs.
     id: 'restart-app',
     icon: '⟲',
@@ -71,7 +71,7 @@ export const POWER_ACTIONS = [
     run: () => api.power('restart-pc')
   },
   {
-    // App mode: CouchHUD is a program on the desktop, so "PC mode" simply means closing it (the host asks for the couch lock too).
+    // App mode: Mega Hub is a program on the desktop, so "PC mode" simply means closing it (the host asks for the couch lock too).
     id: 'quit',
     icon: '✕',
     get label() { return t('power.quit.label'); },
@@ -125,7 +125,7 @@ export function powerEntries(ids = POWER_ACTIONS.map((a) => a.id), { onCancel } 
 
 /**
  * The Start menu: three large tiles (standby, shut down, restart), a collapsed "Mehr" row with the rare entries (PC mode, restart into
- * it, restart CouchHUD, quit) and one row for the sleep timer (power-rules.js). Focus starts on standby. A expands "Mehr" in place and
+ * it, restart Mega Hub, quit) and one row for the sleep timer (power-rules.js). Focus starts on standby. A expands "Mehr" in place and
  * moves to its first entry; B folds it back before the menu closes; X opens the timer picker from anywhere. After a cancelled question
  * the menu comes back on the entry the question was about (focus), expanded if that entry lives behind "Mehr". No "Abbrechen" entry:
  * B, a click next to the menu or the B hint close it. Whether "Mehr" is open is remembered for the open menu only.
@@ -269,7 +269,7 @@ function reportSleepTimer() {
 }
 
 let phoneTimerListening = false;
-// True while CouchHUD is in PC mode (the host says so): no sleep timer starts or fires then, whoever set it.
+// True while Mega Hub is in PC mode (the host says so): no sleep timer starts or fires then, whoever set it.
 let pcModeActive = false;
 
 /**

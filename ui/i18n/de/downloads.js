@@ -6,7 +6,7 @@ export default {
   // The sections of the list (the updates by kind, each under its own heading); the heading carries how many lines it holds.
   'downloads.section.count': '{name} · {count}',
   'downloads.section.running': 'Läuft gerade',
-  'downloads.section.couchhud': 'CouchHUD-Update',
+  'downloads.section.couchhud': 'Mega-Hub-Update',
   'downloads.section.apps': 'App-Updates (winget)',
   'downloads.section.windows': 'Windows-Updates',
   'downloads.section.plugins': 'Plugins und Skins',

@@ -106,7 +106,7 @@ export function ageBadge(value, label) {
   return { age, label: typeof label === 'string' && AGE_LABEL.test(label) && value <= 21 ? label : null };
 }
 
-// Systems that are no choice in CouchHUD and only count when the store gives nothing nearer (AgeRatings.Effective): named with their
+// Systems that are no choice in Mega Hub and only count when the store gives nothing nearer (AgeRatings.Effective): named with their
 // country, so "ClassInd 14" does not read like an unknown code (VM test 0.5, 3DMark).
 const FOREIGN_SYSTEMS = { ClassInd: 'br', CERO: 'jp' };
 

@@ -133,7 +133,7 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
         this.board = el('div', { className: 'osk-board' }, this.keys.map((row) => el('div', { className: 'osk-row' }, row)));
 
         root.append(el('div', { className: 'osk-wrap' },
-          // A web page's prompt: the web's frame, never the look of CouchHUD's own questions.
+          // A web page's prompt: the web's frame, never the look of Mega Hub's own questions.
           el('div', { className: web ? 'osk web' : 'osk' },
             el('h2', { className: 'osk-title', textContent: title }),
             this.field,

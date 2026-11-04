@@ -32,8 +32,8 @@
 ; names (src/CouchHud.Privileged/ServiceRemoval.cs, ServiceInstall). InstallerTests compares them with the C# constants: change
 ; them there and here together.
 #define ServiceName "CouchHud"
-#define ServiceDisplayName "CouchHUD Service"
-#define ServiceDescription "Carries out the administrator tasks of CouchHUD (lock policies, updates, automatic sign-in) for signed-in users. Without it these functions are unavailable."
+#define ServiceDisplayName "Mega Hub Service"
+#define ServiceDescription "Carries out the administrator tasks of Mega Hub (lock policies, updates, automatic sign-in) for signed-in users. Without it these functions are unavailable."
 #define ServiceFolder "service"
 #define ServiceExe "CouchHud.Service.exe"
 ; {app}\service\data: the service's state, staging, jobs and logs (ServiceInstall.DataFolder). Created by the setup after the folder's
@@ -69,9 +69,9 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher=jjrussellite28-art (independent CouchHUD fork)
-AppPublisherURL=https://github.com/jjrussellite28-art/Ultimate-setup
-AppSupportURL=https://github.com/jjrussellite28-art/Ultimate-setup/pulls
-AppUpdatesURL=https://github.com/jjrussellite28-art/Ultimate-setup/releases
+AppPublisherURL=https://github.com/jjrussellite28-art/mega-hub
+AppSupportURL=https://github.com/jjrussellite28-art/mega-hub/pulls
+AppUpdatesURL=https://github.com/jjrussellite28-art/mega-hub/releases
 AppCopyright=Copyright © 2026 kewe87
 VersionInfoVersion={#NumericVersion}
 ; Program Files, always: the service runs as SYSTEM from {app}\service, so {app} must be a folder only administrators can
@@ -113,30 +113,30 @@ Name: "de"; MessagesFile: "compiler:Languages\German.isl"; InfoBeforeFile: "info
 [CustomMessages]
 de.DesktopIcon=Desktop-Symbol anlegen
 en.DesktopIcon=Create a desktop icon
-de.Autostart=CouchHUD bei der Windows-Anmeldung starten (App-Modus, ändert nicht die Shell)
-en.Autostart=Start CouchHUD when signing in to Windows (app mode, doesn't replace the shell)
+de.Autostart=Mega Hub bei der Windows-Anmeldung starten (App-Modus, ändert nicht die Shell)
+en.Autostart=Start Mega Hub when signing in to Windows (app mode, doesn't replace the shell)
 de.WebView2=Microsoft WebView2 Runtime wird installiert …
 en.WebView2=Installing the Microsoft WebView2 Runtime …
-de.Launch=CouchHUD jetzt starten
-en.Launch=Start CouchHUD now
-de.Cleanup=Windows-Einstellungen von CouchHUD werden zurückgesetzt …
-en.Cleanup=Restoring Windows settings changed by CouchHUD …
-de.DeleteData=Sollen auch deine CouchHUD-Einstellungen, Spielzeiten, Lesezeichen und Caches gelöscht werden?%n%nNein behält sie für eine spätere Neuinstallation.
-en.DeleteData=Also delete your CouchHUD settings, playtime, bookmarks and caches?%n%nNo keeps them for a later reinstall.
-de.StillRunning=CouchHUD läuft noch. Bitte erst beenden (Menü Beenden oder PC-Modus), dann erneut starten.
-en.StillRunning=CouchHUD is still running. Please quit it first (Quit or PC mode), then run this again.
-de.AutoLogonNote=Hinweis: Falls du die automatische Windows-Anmeldung selbst (z.B. mit netplwiz) eingeschaltet hast, bleibt sie an. Von CouchHUD eingerichtete wurde entfernt. Ausschalten: Windows-Taste + R, „netplwiz“, Haken bei „Benutzer müssen Benutzernamen und Kennwort eingeben“ setzen.
-en.AutoLogonNote=Note: automatic Windows sign-in that you turned on yourself (e.g. with netplwiz) stays on; the one CouchHUD set up was removed. To turn it off: Windows key + R, "netplwiz", tick "Users must enter a user name and password".
-de.SignOutNote=CouchHUD war deine Windows-Oberfläche. Bitte abmelden und neu anmelden, dann startet wieder der normale Windows-Desktop. Fehlt die Taskleiste: Strg+Alt+Entf, dann „Abmelden“.
-en.SignOutNote=CouchHUD was your Windows shell. Please sign out and sign in again to get the normal Windows desktop back. If the taskbar is missing: Ctrl+Alt+Del, then "Sign out".
-de.NotProgramFiles=CouchHUD muss unter „%1“ installiert sein: Der CouchHUD-Dienst läuft mit Systemrechten und darf nur in einem Ordner liegen, den allein Administratoren ändern können. Diese Installation liegt in „%2“. Bitte CouchHUD deinstallieren und neu installieren.
-en.NotProgramFiles=CouchHUD must be installed under "%1": the CouchHUD service runs with system rights and may only live in a folder that only administrators can change. This installation is in "%2". Please uninstall CouchHUD and install it again.
-de.ServiceStuck=Der CouchHUD-Dienst lässt sich nicht beenden. Bitte den PC neu starten und das Setup erneut ausführen.
-en.ServiceStuck=The CouchHUD service cannot be stopped. Please restart the PC and run the setup again.
-de.ServiceFailed=Der CouchHUD-Dienst konnte nicht eingerichtet oder gestartet werden. Bis er läuft, gehen Sperre, Updates und automatische Anmeldung nicht. Bitte das Setup erneut ausführen oder in CouchHUD „Dienst reparieren“ wählen.
-en.ServiceFailed=The CouchHUD service could not be set up or started. Until it runs, the lock, updates and automatic sign-in do not work. Please run the setup again or choose "Repair service" in CouchHUD.
-de.ServicePipeSquatted=Der CouchHUD-Dienst wurde nicht gestartet: Ein anderes Programm belegt bereits seinen Anschluss (die Named Pipe des Dienstes). Aus Sicherheit läuft der Dienst dann nicht; bis er läuft, gehen Sperre, Updates und automatische Anmeldung nicht. Bitte den PC neu starten und das Setup danach erneut ausführen. Tritt es wieder auf, das Programm suchen, das sich als CouchHUD-Dienst ausgibt (Ereignisanzeige, Anwendung, Quelle CouchHud.Service).
-en.ServicePipeSquatted=The CouchHUD service was not started: another program already holds its connection (the service's named pipe). For safety the service does not run then; until it runs, the lock, updates and automatic sign-in do not work. Please restart the PC and then run the setup again. If it happens again, look for the program that poses as the CouchHUD service (Event Viewer, Application, source CouchHud.Service).
+de.Launch=Mega Hub jetzt starten
+en.Launch=Start Mega Hub now
+de.Cleanup=Windows-Einstellungen von Mega Hub werden zurückgesetzt …
+en.Cleanup=Restoring Windows settings changed by Mega Hub …
+de.DeleteData=Sollen auch deine Mega-Hub-Einstellungen, Spielzeiten, Lesezeichen und Caches gelöscht werden?%n%nNein behält sie für eine spätere Neuinstallation.
+en.DeleteData=Also delete your Mega Hub settings, playtime, bookmarks and caches?%n%nNo keeps them for a later reinstall.
+de.StillRunning=Mega Hub läuft noch. Bitte erst beenden (Menü Beenden oder PC-Modus), dann erneut starten.
+en.StillRunning=Mega Hub is still running. Please quit it first (Quit or PC mode), then run this again.
+de.AutoLogonNote=Hinweis: Falls du die automatische Windows-Anmeldung selbst (z.B. mit netplwiz) eingeschaltet hast, bleibt sie an. Von Mega Hub eingerichtete wurde entfernt. Ausschalten: Windows-Taste + R, „netplwiz“, Haken bei „Benutzer müssen Benutzernamen und Kennwort eingeben“ setzen.
+en.AutoLogonNote=Note: automatic Windows sign-in that you turned on yourself (e.g. with netplwiz) stays on; the one Mega Hub set up was removed. To turn it off: Windows key + R, "netplwiz", tick "Users must enter a user name and password".
+de.SignOutNote=Mega Hub war deine Windows-Oberfläche. Bitte abmelden und neu anmelden, dann startet wieder der normale Windows-Desktop. Fehlt die Taskleiste: Strg+Alt+Entf, dann „Abmelden“.
+en.SignOutNote=Mega Hub was your Windows shell. Please sign out and sign in again to get the normal Windows desktop back. If the taskbar is missing: Ctrl+Alt+Del, then "Sign out".
+de.NotProgramFiles=Mega Hub muss unter „%1“ installiert sein: Der Mega-Hub-Dienst läuft mit Systemrechten und darf nur in einem Ordner liegen, den allein Administratoren ändern können. Diese Installation liegt in „%2“. Bitte Mega Hub deinstallieren und neu installieren.
+en.NotProgramFiles=Mega Hub must be installed under "%1": the Mega Hub service runs with system rights and may only live in a folder that only administrators can change. This installation is in "%2". Please uninstall Mega Hub and install it again.
+de.ServiceStuck=Der Mega-Hub-Dienst lässt sich nicht beenden. Bitte den PC neu starten und das Setup erneut ausführen.
+en.ServiceStuck=The Mega Hub service cannot be stopped. Please restart the PC and run the setup again.
+de.ServiceFailed=Der Mega-Hub-Dienst konnte nicht eingerichtet oder gestartet werden. Bis er läuft, gehen Sperre, Updates und automatische Anmeldung nicht. Bitte das Setup erneut ausführen oder in Mega Hub „Dienst reparieren“ wählen.
+en.ServiceFailed=The Mega Hub service could not be set up or started. Until it runs, the lock, updates and automatic sign-in do not work. Please run the setup again or choose "Repair service" in Mega Hub.
+de.ServicePipeSquatted=Der Mega-Hub-Dienst wurde nicht gestartet: Ein anderes Programm belegt bereits seinen Anschluss (die Named Pipe des Dienstes). Aus Sicherheit läuft der Dienst dann nicht; bis er läuft, gehen Sperre, Updates und automatische Anmeldung nicht. Bitte den PC neu starten und das Setup danach erneut ausführen. Tritt es wieder auf, das Programm suchen, das sich als Mega-Hub-Dienst ausgibt (Ereignisanzeige, Anwendung, Quelle CouchHud.Service).
+en.ServicePipeSquatted=The Mega Hub service was not started: another program already holds its connection (the service's named pipe). For safety the service does not run then; until it runs, the lock, updates and automatic sign-in do not work. Please restart the PC and then run the setup again. If it happens again, look for the program that poses as the Mega Hub service (Event Viewer, Application, source CouchHud.Service).
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:DesktopIcon}"; Flags: unchecked
