@@ -1,0 +1,6 @@
+{
+  "ACH_WIN_ONE_GAME": { "earned": true, "earned_time": 1762300000 },
+  "ACH_WIN_100_GAMES": { "earned": false, "earned_time": 0 },
+  "ACH_TRAVEL_FAR_ACCUM": { "earned": true, "earned_time": 1762100000 },
+  "ACH_TRAVEL_FAR_SINGLE": { "earned": false, "earned_time": 0 }
+}

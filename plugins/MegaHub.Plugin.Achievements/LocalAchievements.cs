@@ -2,8 +2,11 @@ using System.Text.Json;
 
 namespace MegaHub.Plugin.Achievements;
 
+/// <summary>One achievement of a game: its name (as the file spells it) and, when earned, the time.</summary>
+internal sealed record AchievementItem(string Name, bool Earned, DateTimeOffset? When);
+
 /// <summary>One game with achievement progress read from a local file.</summary>
-internal sealed record AchievementGame(string Id, string Name, int Total, int Earned, DateTimeOffset? LastUnlock, string? LastName, string Folder)
+internal sealed record AchievementGame(string Id, string Name, int Total, int Earned, DateTimeOffset? LastUnlock, string? LastName, string Folder, IReadOnlyList<AchievementItem> Items)
 {
     public int Percent => Total == 0 ? 0 : (int)Math.Round(100.0 * Earned / Total);
 }
@@ -69,7 +72,7 @@ internal static class LocalAchievements
                 {
                     var id = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                     var name = names.TryGetValue(id, out var n) && n.Length > 0 ? n : id;
-                    games.Add(new AchievementGame(id, name, p.Total, p.Earned, p.Last, p.LastName, dir));
+                    games.Add(new AchievementGame(id, name, p.Total, p.Earned, p.Last, p.LastName, dir, p.Items));
                 }
             }
             if (depth >= MaxDepth) return;
@@ -91,7 +94,7 @@ internal static class LocalAchievements
     }
 
     /// <summary>The format: { "ACH_NAME": { "earned": true, "earned_time": 1700000000 }, ... }. A list is a definition file, not progress.</summary>
-    internal static (int Total, int Earned, DateTimeOffset? Last, string? LastName)? Parse(string json)
+    internal static (int Total, int Earned, DateTimeOffset? Last, string? LastName, IReadOnlyList<AchievementItem> Items)? Parse(string json)
     {
         try
         {
@@ -100,22 +103,33 @@ internal static class LocalAchievements
             int total = 0, earned = 0;
             long lastTime = 0;
             string? lastName = null;
+            var items = new List<AchievementItem>();
             foreach (var prop in doc.RootElement.EnumerateObject())
             {
                 if (prop.Value.ValueKind != JsonValueKind.Object) continue;
                 total++;
                 var done = prop.Value.TryGetProperty("earned", out var e) && e.ValueKind == JsonValueKind.True;
-                if (!done) continue;
-                earned++;
-                if (prop.Value.TryGetProperty("earned_time", out var t) && t.ValueKind == JsonValueKind.Number && t.TryGetInt64(out var secs) && secs > lastTime)
+                if (!done)
                 {
-                    lastTime = secs;
-                    lastName = prop.Name;
+                    items.Add(new AchievementItem(prop.Name, false, null));
+                    continue;
                 }
+                earned++;
+                DateTimeOffset? when = null;
+                if (prop.Value.TryGetProperty("earned_time", out var t) && t.ValueKind == JsonValueKind.Number && t.TryGetInt64(out var secs) && secs > 0 && secs < 4102444800)
+                {
+                    when = DateTimeOffset.FromUnixTimeSeconds(secs);
+                    if (secs > lastTime)
+                    {
+                        lastTime = secs;
+                        lastName = prop.Name;
+                    }
+                }
+                items.Add(new AchievementItem(prop.Name, true, when));
             }
             if (total == 0) return null;
             DateTimeOffset? last = lastTime > 0 && lastTime < 4102444800 ? DateTimeOffset.FromUnixTimeSeconds(lastTime) : null;
-            return (total, earned, last, lastName);
+            return (total, earned, last, lastName, items);
         }
         catch (JsonException)
         {
