@@ -1509,10 +1509,20 @@ body[data-view="passcode"] #toast {
   font-size: 1.15rem;
 }
 
+.file-row,
+.check-row {
+  transition: transform 0.15s var(--ease), background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+/* The highlighter: a bright frame, a glow in the skin's color, a tinted row and a small step to the right, so the selected row is easy
+   to see from the couch on every skin (it was a thin border only). */
 .file-row.focused,
 .check-row.focused {
   border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, var(--accent) 28%, var(--panel));
+  box-shadow: inset 0 0 0 0.14rem var(--accent), 0 0 1.4rem var(--accent-glow);
+  transform: translateX(0.5rem);
 }
 
 .file-icon,
