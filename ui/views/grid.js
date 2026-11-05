@@ -41,12 +41,25 @@ function filtered(list, { query, favorites, sort }) {
 import { detailPage } from './detail.js';
 import { scheduleTrailer } from '../core/media.js';
 import { addEntryFlow } from '../components/library-tools.js';
+import { requestPower } from '../core/power.js';
 
 /** The last tile of the game and app pages: starts the add flow for the kind of the page. */
 const addTile = (kind) => ({
   id: '__add', name: t('grid.add.name'), type: kind, source: '', builtin: true, add: true,
   art: { cover: ['assets/add-tile.svg'], hero: [], logo: [] }, open: () => addEntryFlow({ kind })
 });
+
+/**
+ * The way out of Mega Hub as the last tile of the Games and Apps pages: "Quit Mega Hub" in app mode, "PC mode" in shell mode (where
+ * quitting is not offered). The same question and couch lock as the power menu (requestPower).
+ */
+const quitTile = () => {
+  const id = state.info?.isShell ? 'pc-mode' : 'quit';
+  return {
+    id: '__quit', name: t(id === 'quit' ? 'power.quit.label' : 'power.pcMode.label'), type: 'app', source: '', builtin: true, add: true,
+    art: { cover: ['assets/quit-tile.svg'], hero: [], logo: [] }, open: () => requestPower(id)
+  };
+};
 
 /** Opens the mixed games-and-apps page of a collection (app.js pushes it). */
 const openCollection = (id) => window.dispatchEvent(new CustomEvent('couchhud:show-collection', { detail: { id } }));
@@ -75,7 +88,7 @@ export function gridView(name, getItems, { columns, kind, className, empty, coll
       const found = filtered(all, this.filter);
       // The way to add an entry is always the last tile (not on the page of a collection).
       const adder = addKind && !collectionId ? [addTile(addKind)] : [];
-      this.list = [...found, ...adder];
+      this.list = [...found, ...adder, ...(addKind && !collectionId ? [quitTile()] : [])];
       this.tiles = [];
       if (all.length === 0 && !adder.length) {
         plainBackground();
@@ -122,7 +135,7 @@ export function gridView(name, getItems, { columns, kind, className, empty, coll
       const collectionName = collectionId ? collectionById(collectionId)?.name ?? '' : '';
       this.title.textContent = collectionId ? collectionName : focused.name;
       const filter = this.filterLabel();
-      this.meta.textContent = `${collectionId ? `${focused.name} · ` : ''}${focused.add ? '' : `${SOURCE_LABEL[focused.source] || focused.source || ''} · `}${this.index + 1} / ${this.list.length}${filter ? ` · ${filter}` : ''}`;
+      this.meta.textContent = `${collectionId ? `${focused.name} · ` : ''}${focused.builtin ? '' : `${SOURCE_LABEL[focused.source] || focused.source || ''} · `}${this.index + 1} / ${this.list.length}${filter ? ` · ${filter}` : ''}`;
       setBackground(focused);
       scheduleTrailer(focused, 2200);
       // Keep the focused row vertically centered.
@@ -224,7 +237,7 @@ export function gridView(name, getItems, { columns, kind, className, empty, coll
       }
       const item = this.list[this.index];
       return [
-        ['A', item?.add ? t('grid.hint.add') : t('grid.hint.open')],
+        ['A', item?.id === '__quit' ? t('grid.hint.quit') : item?.add ? t('grid.hint.add') : t('grid.hint.open')],
         ['X', t('grid.hint.filter')],
         ...(item?.builtin ? [] : [itemMenuHint()]),
         ...install,

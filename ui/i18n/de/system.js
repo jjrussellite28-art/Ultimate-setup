@@ -295,6 +295,7 @@ export default {
   'display.screen.main': 'Hauptbildschirm',
   'display.screen.auto': 'Automatisch',
   'display.screen.autoDetail': 'Mega Hub nimmt den Hauptbildschirm',
+  'display.screen.oneFound': 'Automatisch (1 Bildschirm gefunden)',
   'display.screen.single': 'Nur ein Bildschirm gefunden. Schließe den anderen an oder schalte ihn ein',
   'display.screen.failed': 'Der Bildschirm ließ sich nicht wechseln',
   'display.screen.moved': 'Mega Hub ist auf den Bildschirm umgezogen',

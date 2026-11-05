@@ -19,6 +19,7 @@ export default {
   'grid.menu.sort': 'Sort: {sort}',
   'grid.menu.showAll': 'Show all',
   'grid.menu.onlyFavorites': 'Favorites only',
+  'grid.hint.quit': 'Quit',
   'grid.add.name': '+ Add',
   'grid.menu.add': 'Add',
   'grid.menu.addHint': 'A program, game or web page for the library',

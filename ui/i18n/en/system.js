@@ -295,6 +295,7 @@ export default {
   'display.screen.main': 'main',
   'display.screen.auto': 'Automatic',
   'display.screen.autoDetail': 'Mega Hub picks the main screen',
+  'display.screen.oneFound': 'Automatic (1 screen found)',
   'display.screen.single': 'Only one screen found. Connect or switch on the other one first',
   'display.screen.failed': 'Could not change the screen',
   'display.screen.moved': 'Mega Hub moved to that screen',

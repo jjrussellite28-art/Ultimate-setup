@@ -155,20 +155,19 @@ export function displayItems(refresh) {
       }
     }
   ];
-  // Which screen Mega Hub is on (two or more screens) and how the screens work together. The layout row stays also with one screen
-  // seen: with a mirrored picture Windows reports only one, and this is the way back to "use both".
-  if (screens.length > 1) {
-    const chosen = screens.find((s) => s.chosen);
-    items.push({
-      kind: 'choice',
-      label: t('display.screen.label'),
-      desc: t('display.screen.desc'),
-      value: () => (chosen ? screenName(chosen) : t('display.screen.auto')),
-      run: async () => {
-        if (await chooseScreen()) refresh();
-      }
-    });
-  }
+  // Which screen Mega Hub is on: the row is always there (with one screen it says so when opened), so it can be found and tried.
+  const chosen = screens.find((s) => s.chosen);
+  items.push({
+    kind: 'choice',
+    label: t('display.screen.label'),
+    desc: t('display.screen.desc'),
+    value: () => (chosen ? screenName(chosen) : screens.length > 1 ? t('display.screen.auto') : t('display.screen.oneFound')),
+    run: async () => {
+      if (await chooseScreen()) refresh();
+    }
+  });
+  // How the screens work together. The row stays also with one screen seen: with a mirrored picture Windows reports only one, and
+  // this is the way back to "use both".
   if (api.setScreenLayout) {
     items.push({
       kind: 'choice',

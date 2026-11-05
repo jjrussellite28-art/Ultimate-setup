@@ -19,6 +19,7 @@ export default {
   'grid.menu.sort': 'Sortierung: {sort}',
   'grid.menu.showAll': 'Alle anzeigen',
   'grid.menu.onlyFavorites': 'Nur Favoriten',
+  'grid.hint.quit': 'Beenden',
   'grid.add.name': '+ Hinzufügen',
   'grid.menu.add': 'Hinzufügen',
   'grid.menu.addHint': 'Programm, Spiel oder Webseite zur Bibliothek',
