@@ -1543,6 +1543,12 @@ body[data-view="passcode"] #toast {
   cursor: auto;
 }
 
+/* Skin pointer (and the comic mouse): the big pointer is the only one. Without this, buttons that set `cursor: pointer` (the bell,
+   the downloads badge, the browser bar) showed the real Windows hand on top of it. */
+:root:not([data-pointer="system"]) * {
+  cursor: none !important;
+}
+
 body.mouse-active .hover:not(.focused) {
   outline: 0.14rem solid rgba(255, 255, 255, 0.45);
   outline-offset: 0.1rem;
