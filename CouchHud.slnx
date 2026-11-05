@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/plugins/">
     <Project Path="plugins/CouchHud.Plugin.Wand/CouchHud.Plugin.Wand.csproj" />
+    <Project Path="plugins/MegaHub.Plugin.Achievements/MegaHub.Plugin.Achievements.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/CouchHud.Core.Tests/CouchHud.Core.Tests.csproj" />

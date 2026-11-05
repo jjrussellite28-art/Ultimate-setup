@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>Mega Hub plugin: one Achievements page that reads local achievement files.</Description>
+    <Authors>russellite06</Authors>
+    <!-- Plugins load from plugins/<folder>/<folder>.dll; keep the names equal. -->
+    <AssemblyName>MegaHub.Plugin.Achievements</AssemblyName>
+    <RootNamespace>MegaHub.Plugin.Achievements</RootNamespace>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The SDK comes from the app itself; don't ship a copy. -->
+    <ProjectReference Include="..\..\src\CouchHud.Sdk\CouchHud.Sdk.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

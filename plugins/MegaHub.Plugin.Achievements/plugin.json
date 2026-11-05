@@ -1,0 +1,17 @@
+{
+  "id": "achievements",
+  "name": "Achievements",
+  "version": "0.1.0",
+  "author": "russellite06",
+  "description": {
+    "de": "Eine Erfolge-Seite für Mega Hub: liest lokale Erfolgsdateien (z. B. vom Goldberg-Emulator) und zeigt Fortschritt je Spiel",
+    "en": "One Achievements page for Mega Hub: reads local achievement files (for example from the Goldberg emulator) and shows progress per game"
+  },
+  "homepage": "https://github.com/jjrussellite28-art/mega-hub",
+  "license": "GPL-3.0-or-later",
+  "sdk": 3,
+  "capabilities": [
+    "pages",
+    "tabs"
+  ]
+}

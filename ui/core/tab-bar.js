@@ -39,7 +39,7 @@ const CSS = `
   background: linear-gradient(to bottom, var(--s-scrim) 0, var(--s-scrim) calc(100% - var(--u) * 2.5), transparent 100%); }
 .wrap.dim { filter: brightness(0.55) blur(calc(var(--u) * 0.15)); transition: filter 0.3s; }
 .tabs { all: initial; display: flex; align-items: center; flex: 1 1 0; position: relative; min-width: 0; gap: calc(var(--u) * 1.2);
-  font-family: var(--s-font); font-size: calc(var(--u) * 1.35); line-height: normal; color: var(--s-glyph-color); direction: ltr; cursor: none; user-select: none; box-sizing: border-box; }
+  font-family: var(--s-font); font-size: calc(var(--u) * 1.35); line-height: normal; color: var(--s-glyph-color); direction: ltr; cursor: default; user-select: none; box-sizing: border-box; }
 .tabs[data-hidden] { visibility: hidden; }
 .tabs[data-noshoulder] .shoulder { visibility: hidden; }
 .glyph { display: inline-grid; place-items: center; min-width: calc(var(--u) * 1.7); height: calc(var(--u) * 1.7); padding: 0 calc(var(--u) * 0.4);
@@ -55,7 +55,9 @@ li { position: relative; isolation: isolate; flex: none; display: block; max-wid
 li::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--s-bg); border-radius: var(--s-radius);
   clip-path: polygon(0 0, calc(100% - var(--s-cut)) 0, 100% var(--s-cut), 100% 100%, 0 100%); }
 li.pinned { position: sticky; }
-li.hover:not(.active) { color: var(--s-color-active); }
+li { cursor: pointer; }
+li.hover:not(.active) { color: var(--s-color-active); border-bottom-color: var(--s-accent); }
+li.hover:not(.active)::before { background: var(--s-bg-active); outline: calc(var(--u) * 0.12) solid var(--s-accent); outline-offset: calc(var(--u) * -0.12); }
 li.active { color: var(--s-color-active); border-bottom-color: var(--s-accent); font-weight: var(--s-weight-active); }
 li.active::before { background: var(--s-bg-active); }
 li.active .tab-label, li.active .run { text-shadow: var(--s-glow); }

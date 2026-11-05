@@ -51,7 +51,7 @@ export default {
   'grid.hint.installGames': 'Install games',
 
   // home.js
-  'home.name': 'Favorites',
+  'home.name': 'Home',
   'home.badge.paused': '❚❚ Paused',
   'home.badge.running': '▶ Playing',
   'home.meta.collection': 'Collection · {entries}',
