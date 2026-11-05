@@ -95,7 +95,7 @@ export const open = async (text) => (await ensureUnlocked(t('browser.openLock'))
 
 async function openAddress() {
   if (!(await ensureUnlocked(t('browser.openLock')))) return;
-  const text = await openKeyboard({ title: t('browser.addressTitle'), hint: t('browser.addressHint') });
+  const text = await openKeyboard({ title: t('browser.addressTitle'), hint: t('browser.addressHint'), placeholder: t('browser.enterAddress'), address: true });
   if (!text) return;
   await open(text);
 }

@@ -1371,6 +1371,39 @@ body[data-view="passcode"] #toast {
   color: var(--muted);
 }
 
+/* The browser's address: the field is the bar at the top, the keys sit right under it. */
+.osk.osk-address {
+  justify-content: flex-start;
+  padding-top: 1rem;
+  gap: 1rem;
+}
+.osk-address .osk-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.osk-address .osk-field {
+  width: min(72rem, 100%);
+  min-height: 3.4rem;
+  padding: 0.4rem 1.2rem;
+  border-radius: calc(var(--tile-radius) + 0.3rem);
+  background: var(--panel);
+  font-size: 1.3rem;
+}
+.osk-address .osk-field::before {
+  content: "\2315";
+  margin-right: 0.8rem;
+  color: var(--muted);
+  font-size: 1.5rem;
+}
+
+/* Typing on a real keyboard: the keys go away, the field stays. */
+.osk.osk-typing .osk-board {
+  display: none;
+}
+
 .osk-board {
   display: flex;
   flex-direction: column;

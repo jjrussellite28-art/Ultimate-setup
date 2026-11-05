@@ -84,11 +84,12 @@ function phonePanel() {
 
 /**
  * Opens the keyboard as a page. Resolves to the entered text, or undefined if cancelled.
- * options: { title, value, placeholder, secret, hint, maxLength, paste }
+ * options: { title, value, placeholder, secret, hint, maxLength, paste, address }
+ * address: the field looks like the browser's address bar at the top with the keys right below it (no separate big page).
  * paste: a "Paste from PC" key (and Ctrl+V) for tokens, keys and long addresses: the host reads the clipboard (text only, trimmed, at
  * most 4096 characters, never logged; refused while the couch is locked).
  */
-export function openKeyboard({ title = t('keyboard.title'), value = '', placeholder = '', secret = false, hint = '', maxLength = 0, paste = false, web = false } = {}) {
+export function openKeyboard({ title = t('keyboard.title'), value = '', placeholder = '', secret = false, hint = '', maxLength = 0, paste = false, web = false, address = false } = {}) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (result) => {
@@ -136,11 +137,11 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
 
         root.append(el('div', { className: 'osk-wrap' },
           // A web page's prompt: the web's frame, never the look of Mega Hub's own questions.
-          el('div', { className: web ? 'osk web' : 'osk' },
+          (this.frame = el('div', { className: `${web ? 'osk web' : 'osk'}${address ? ' osk-address' : ''}` },
             el('h2', { className: 'osk-title', textContent: title }),
             this.field,
             hint ? el('p', { className: 'osk-hint', textContent: hint }) : null,
-            this.board),
+            this.board)),
           secret ? el('aside', { className: 'osk-phone' }, el('span', { className: 'osk-phone-icon', textContent: '🔒' }), el('p', { className: 'osk-phone-hint', textContent: t('keyboard.secretNote') })) : phonePanel()));
         this.update();
       },
@@ -166,6 +167,13 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
       },
       relabel() {
         for (const btn of this.keys.flat()) btn.textContent = this.label(btn.dataset.key);
+      },
+      /**
+       * Typing on a real keyboard hides the keys (the field stays); the next controller, remote or mouse input brings them back.
+       */
+      setTyping(on) {
+        this.typing = !!on;
+        this.frame?.classList.toggle('osk-typing', this.typing);
       },
       /** Shows or hides the typed password; showing ends by itself after 8 seconds (someone may be looking over your shoulder). */
       setReveal(on) {
@@ -260,6 +268,7 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
         this.update();
       },
       handle(action) {
+        this.setTyping(false);
         const row = this.keys[this.row];
         switch (action) {
           case 'left':
@@ -281,6 +290,7 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
         }
       },
       pointer(node, index) {
+        this.setTyping(false);
         this.row = [...this.board.children].indexOf(node.parentElement);
         this.col = index;
         this.press(node.dataset.key);
@@ -297,6 +307,7 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
     function onKey(e) {
       if (state.stack.at(-1) !== page || state.overlay) return;
       if (e.key.startsWith('Arrow')) {
+        page.setTyping(false);
         // Remotes and controllers in keyboard mode send arrows + Enter: from now on Enter presses the marked key.
         if (!page.arrowNav) {
           page.arrowNav = true;
@@ -319,6 +330,7 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
         e.stopImmediatePropagation();
         page.text = page.text.slice(0, -1);
         page.pasted = false;
+        page.setTyping(true);
         return page.update();
       }
       if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
@@ -331,6 +343,7 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
         }
         page.text += e.key;
         page.pasted = false;
+        page.setTyping(true);
         page.update();
       }
     }
