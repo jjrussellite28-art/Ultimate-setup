@@ -711,8 +711,10 @@ function setupSteps({ pauseServices = true } = {}) {
 /**
  * skip: step ids the setup leaves out because the user declined them in the setup assistant (automatic sign-in, the Steam and
  * startup changes, the services). The steps that must go together stay: lock, shell and integration are never skipped.
+ * Without a `skip` list (the one-button setup in Settings) the automatic sign-in is left out: it is optional and has its own switch
+ * (Settings › Windows, expert mode), so the setup never lists it as something still to do.
  */
-export function consoleSetupPage(deps, { skip = [], pauseServices = true, carried = [], autoStart = false, onDone = null, carriedEntries = [] } = {}) {
+export function consoleSetupPage(deps, { skip = ['autologon'], pauseServices = true, carried = [], autoStart = false, onDone = null, carriedEntries = [] } = {}) {
   return stepsPage({
     id: 'console-setup',
     title: t('consoleSetup.setup.title'),
