@@ -56,6 +56,9 @@ li::before { content: ""; position: absolute; inset: 0; z-index: -1; background:
   clip-path: polygon(0 0, calc(100% - var(--s-cut)) 0, 100% var(--s-cut), 100% 100%, 0 100%); }
 li.pinned { position: sticky; }
 li { cursor: pointer; }
+/* The page's own rule (styles.css) cannot reach into this closed shadow root: with the themed pointer (or the comic mouse) the real
+   Windows pointer stays hidden here too; it shows only in the "system" pointer mode (data-pointer on <html>, components/mouse.js). */
+:host-context(html:not([data-pointer="system"])) .tabs, :host-context(html:not([data-pointer="system"])) li, :host-context(html:not([data-pointer="system"])) .slot { cursor: none !important; }
 li.hover:not(.active) { color: var(--s-color-active); border-bottom-color: var(--s-accent); }
 li.hover:not(.active)::before { background: var(--s-bg-active); outline: calc(var(--u) * 0.12) solid var(--s-accent); outline-offset: calc(var(--u) * -0.12); }
 li.active { color: var(--s-color-active); border-bottom-color: var(--s-accent); font-weight: var(--s-weight-active); }
