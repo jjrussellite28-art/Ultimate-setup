@@ -19,6 +19,7 @@
 // because the couch locked again in the meantime asks for the code before it is tried again.
 
 import { api } from '../core/api.js';
+import { askModeAtStart, setAskModeAtStart } from '../core/mode-ask.js';
 import { lang, t } from '../core/i18n.js';
 import { el, setFocused } from '../core/dom.js';
 import { attempt, toast } from '../core/feedback.js';
@@ -342,6 +343,22 @@ function steps(page) {
           env.settings.audioMode = o.id;
           state.info.audioMode = o.id;
           setAudioMode(o.id);
+          return 'next';
+        }
+      }))
+    },
+    startask: {
+      icon: 'console',
+      title: () => t('wizard.startask.title'),
+      lead: () => t('wizard.startask.lead'),
+      later: () => where('settings.cat.display'),
+      options: () => [
+        { id: 'ask', icon: '🛋️', title: t('wizard.startask.ask'), bullets: [t('wizard.startask.ask1'), t('wizard.startask.ask2')] },
+        { id: 'skip', icon: '▶', title: t('wizard.startask.skip'), bullets: [t('wizard.startask.skip1'), t('wizard.startask.skip2')] }
+      ].map((o) => ({
+        ...o, current: askModeAtStart() === (o.id === 'ask'),
+        run: () => {
+          setAskModeAtStart(o.id === 'ask');
           return 'next';
         }
       }))
@@ -793,6 +810,7 @@ function wizardPage({ firstRun = false, startAt = null } = {}) {
         [full ? '📺' : '▭', full ? t('wizard.mode.full') : t('wizard.mode.light')],
         ['🎨', this.savedSkin.name],
         ['🔊', t(soundKey(audioMode(env.settings)))],
+        ['🛋️', t(askModeAtStart() ? 'wizard.startask.ask' : 'wizard.startask.skip')],
         ['▦', this.areas.map((a) => t(AREA_NAME_KEYS[a])).join(', ')],
         ...(full && env.launchers.length ? [['🎮', t('wizard.done.clients', { count: clients })]] : []),
         ...(full ? [lock] : [])

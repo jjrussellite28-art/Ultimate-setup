@@ -1629,11 +1629,11 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   const ctx = (extra = {}) => ({ ...base, choices: W.freshChoices(), ...extra });
 
   // App mode: no system page at all, straight from the questions to the summary.
-  assert.deepEqual(W.order(ctx()), ['welcome', 'areas', 'updates', 'mode', 'look', 'sound', 'summary']);
+  assert.deepEqual(W.order(ctx()), ['welcome', 'areas', 'updates', 'mode', 'look', 'sound', 'startask', 'summary']);
   // Shell mode chosen: the explanations come right after the question, in a fixed order, then look and sound, then the summary.
-  assert.deepEqual(W.order(ctx({ intent: 'full' })), ['welcome', 'areas', 'updates', 'mode', 'shell', 'lock', 'autologon', 'launchers', 'services', 'look', 'sound', 'clientsInfo', 'summary']);
+  assert.deepEqual(W.order(ctx({ intent: 'full' })), ['welcome', 'areas', 'updates', 'mode', 'shell', 'lock', 'autologon', 'launchers', 'services', 'look', 'sound', 'startask', 'clientsInfo', 'summary']);
   // The way back is explained too.
-  assert.deepEqual(W.order(ctx({ intent: 'light', full: true })), ['welcome', 'areas', 'updates', 'mode', 'revert', 'look', 'sound', 'summary']);
+  assert.deepEqual(W.order(ctx({ intent: 'light', full: true })), ['welcome', 'areas', 'updates', 'mode', 'revert', 'look', 'sound', 'startask', 'summary']);
   // No password on the account (it signs in by itself), a sign-in set up already, a lock set already: those pages fall away.
   assert.ok(!W.order(ctx({ intent: 'full', accountPassword: false })).includes('autologon'));
   assert.ok(!W.order(ctx({ intent: 'full', autoLogonDone: true })).includes('autologon'));
@@ -1659,8 +1659,9 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   assert.equal(W.prevOf('look', full), 'services');
   assert.equal(W.prevOf('shell', full), 'mode');
   assert.equal(W.nextOf('shell', ctx({ intent: null })), 'look');
-  assert.equal(W.nextOf('sound', ctx()), 'summary');
-  assert.equal(W.prevOf('summary', ctx()), 'sound');
+  assert.equal(W.nextOf('sound', ctx()), 'startask');
+  assert.equal(W.nextOf('startask', ctx()), 'summary');
+  assert.equal(W.prevOf('summary', ctx()), 'startask');
   assert.equal(W.prevOf('welcome', ctx()), null);
   // Walking the whole way and back lands where it started.
   for (const c of [ctx(), full, ctx({ intent: 'light', full: true }), ctx({ full: true, caseHudWantsApi: true, tvPaired: true, choices: { ...W.freshChoices(), clients: 'adjust' } })]) {

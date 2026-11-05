@@ -10,7 +10,7 @@ import { lockStepStatus } from './lock-rules.js';
 export const SEQUENCE = [
   'welcome', 'terms', 'areas', 'updates', 'mode',
   'revert', 'shell', 'lock', 'autologon', 'launchers', 'services',
-  'look', 'sound', 'clientsInfo', 'clients', 'tv',
+  'look', 'sound', 'startask', 'clientsInfo', 'clients', 'tv',
   'summary', 'result'
 ];
 
@@ -153,7 +153,7 @@ export function summaryPlan(ctx) {
   }
   if (choices.clients === 'adjust' && Object.keys(choices.clientModes ?? {}).length) changes.push('clients');
   if (applies('tv', ctx) && choices.tv !== 'off') changes.push(choices.tv === 'both' ? 'tvBoth' : 'tvOn');
-  const kept = ['language', 'mode', 'look', 'sound', 'areas'];
+  const kept = ['language', 'mode', 'look', 'sound', 'startask', 'areas'];
   if (!changes.length) kept.push('nothing');
   return { changes, kept };
 }
