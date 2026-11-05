@@ -2168,6 +2168,13 @@ export const settingsView = {
       }
     }
   },
+  /** The mouse wheel: the pane under the pointer is the one that scrolls (the controller keeps working in whichever pane it is in). */
+  wheelAt(node) {
+    const over = node?.closest?.('.settings-cats') ? 'cats' : node?.closest?.('.settings-items') ? 'items' : null;
+    if (!over || over === this.pane || (over === 'items' && !this.items.length)) return;
+    this.pane = over;
+    this.update({ instant: true });
+  },
   pointer(node, index, dispatch) {
     if (node.closest('.settings-cats')) {
       const i = this.catRows.indexOf(node);

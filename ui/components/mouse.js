@@ -182,7 +182,10 @@ function onWheel(e, dispatch) {
   if (Math.abs(wheelAccumulator) < WHEEL_STEP) return;
   const forward = wheelAccumulator > 0;
   wheelAccumulator = 0;
-  const horizontal = currentView().wheelAxis === 'x';
+  const view = currentView();
+  // A two-pane page (settings) scrolls the pane the mouse is over, not the one the controller was last in.
+  view.wheelAt?.(target(e));
+  const horizontal = view.wheelAxis === 'x';
   dispatch(horizontal ? (forward ? 'right' : 'left') : (forward ? 'down' : 'up'));
 }
 
