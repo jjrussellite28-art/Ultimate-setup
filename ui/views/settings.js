@@ -85,6 +85,28 @@ const lockModes = () => [
  * With the parental controls on, changing the lock or the code needs the parents' code each time. The action names what the Mega Hub
  * service then does with the parents' approval ("lockMode", "passcode"): its grant counts for exactly that.
  */
+/** Reset and uninstall (Settings > Power): a red warning line, two questions, the couch lock, then the host does it after quitting. */
+// i18n-used: settings.power.reset settings.power.resetDesc settings.power.resetHint settings.power.resetTitle settings.power.resetMessage
+// i18n-used: settings.power.uninstall settings.power.uninstallDesc settings.power.uninstallHint settings.power.uninstallTitle settings.power.uninstallMessage
+const wipeRow = (id, run) => {
+  const key = (field) => `settings.power.${id}${field}`;
+  const text = (field) => t(key(field));
+  return {
+    kind: 'action',
+    danger: true,
+    icon: '⚠',
+    label: text(''),
+    desc: text('Desc'),
+    hint: text('Hint'),
+    run: async () => {
+      if (!(await confirmDialog(text('Title'), text(''), { danger: true, message: text('Message'), focusCancel: true }))) return;
+      if (!(await confirmDialog(t('settings.power.sure'), t('settings.power.sureYes'), { danger: true, message: t('settings.power.sureMessage'), focusCancel: true }))) return;
+      if (!(await ensureUnlocked(text('')))) return;
+      await attempt(run, text(''));
+    }
+  };
+};
+
 const lockGrant = (reason, action) => (parental.status?.enabled ? ensureParentGrant(reason, { action }) : ensureUnlocked(reason));
 
 /**
@@ -1734,7 +1756,9 @@ function categories() {
         power.restart,
         power['pc-mode'] ?? power.quit,
         ...(power['restart-pc'] ? expert(power['restart-pc']) : []),
-        { kind: 'choice', label: t('settings.power.timer'), desc: t('settings.power.timerDesc'), value: () => sleepTimerDetail(), run: chooseSleepTimer }
+        { kind: 'choice', label: t('settings.power.timer'), desc: t('settings.power.timerDesc'), value: () => sleepTimerDetail(), run: chooseSleepTimer },
+        wipeRow('reset', () => api.resetMegaHub()),
+        wipeRow('uninstall', () => api.uninstallMegaHub())
       ]
     },
     {
@@ -2027,7 +2051,7 @@ export const settingsView = {
         expertShown = true;
         nodes.push(divider(t('settings.expertDivider')));
       }
-      const row = el('li', { className: `setting setting-${item.kind}${item.primary ? ' setting-primary' : ''}${item.disabled?.() ? ' setting-disabled' : ''}` },
+      const row = el('li', { className: `setting setting-${item.kind}${item.primary ? ' setting-primary' : ''}${item.danger ? ' setting-danger' : ''}${item.disabled?.() ? ' setting-disabled' : ''}` },
         el('div', { className: 'setting-text' },
           el('strong', { textContent: item.label }),
           el('p', { textContent: item.desc })),

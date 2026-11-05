@@ -1122,6 +1122,8 @@ window.couchhud = {
     log('restartCouchHud');
     emit('toast', t('mock.previewRestart'));
   },
+  resetMegaHub: async () => log('resetMegaHub'),
+  uninstallMegaHub: async () => log('uninstallMegaHub'),
   quit: async () => log('quit'),
   onInput: noop,
   onNav: noop,

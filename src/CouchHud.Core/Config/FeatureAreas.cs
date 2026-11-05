@@ -117,7 +117,7 @@ public static class FeatureAreas
         "getCollections", "createCollection", "renameCollection", "deleteCollection", "setCollectionMember", "setCollectionOnHome",
         "removeEntry", "hideEntry", "showEntry", "getIgnoredOrphans", "removeIgnoredOrphan", "getSession", "resumeGame", "quitGame",
         // Console, settings (per key), lock, codes, parental controls and profiles.
-        "systemInfo", "setShell", "enterPcMode", "power", "sleepTimerWarning", "sleepTimerArm", "quit", "restartCouchHud", "getSettings", "setFeatureAreas", "setSetting", "setIntegrationMode",
+        "systemInfo", "setShell", "enterPcMode", "power", "sleepTimerWarning", "sleepTimerArm", "quit", "restartCouchHud", "resetMegaHub", "uninstallMegaHub", "getSettings", "setFeatureAreas", "setSetting", "setIntegrationMode",
         "displayOn", "displayOff", "getSecurity", "getServiceStatus", "repairService", "resetCodeStore", "resetServiceState", "getParental", "setParental",
         "setParentalItemLock", "resetParentalAllChildrenLocks", "parentalCheck", "parentalExtend", "parentalAuth", "confirmWindowsUnlock", "parentalReset",
         "parentalAcceptClock", "parentalAdoptZone", "parentalCloseGame", "getProfiles", "switchProfile", "profileScreen", "profileIdle",

@@ -5173,3 +5173,14 @@ body[data-view="terms"] #notify-stack .notify-card:not(.security) {
 @media (prefers-reduced-motion: reduce) {
   .menu li.menu-reveal { animation: none; }
 }
+
+/* Reset and uninstall rows (Settings > Power): a light, bright red so nobody taps them by accident. */
+.settings li.setting-danger strong,
+.settings li.setting-danger .setting-value {
+  color: #ff8f8f;
+}
+
+.settings li.setting-danger p {
+  color: #ff7a7a;
+  font-weight: 600;
+}

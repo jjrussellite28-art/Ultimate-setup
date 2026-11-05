@@ -8169,6 +8169,44 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     }
 
     /// <summary>
+    /// "Reset Mega Hub" and "Uninstall Mega Hub" in the UI (Settings › Power): behind the couch lock (the UI asks for the parents' code first),
+    /// not while a game runs. Mega Hub writes a small script, starts it, and quits; the script waits for the exit and then deletes the
+    /// settings (reset: and starts Mega Hub again; uninstall: runs the uninstaller or the elevated cleanup first). Only the settings folder
+    /// "...\CouchHud" in the user's AppData is ever deleted.
+    /// </summary>
+    [SecondFactorExempt("behind RequireUnlocked and the parents' code in the UI; the script only deletes this user's own settings folder")]
+    public void CleanupFromUi(bool uninstall)
+    {
+        RequireUnlocked();
+        if (_sessions.Current is not null || GamePause.IsPaused || _sessions.IsPending(DateTimeOffset.UtcNow))
+            throw new InvalidOperationException(Strings.Get("restart.gameRunning"));
+        if (_quitting) return;
+        var exe = Environment.ProcessPath;
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var settings = Path.Combine(appData, "CouchHud");
+        var link = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Mega Hub.lnk");
+        if (!CouchHud.Shell.Services.CleanupScript.IsSafePath(exe) || !CouchHud.Shell.Services.CleanupScript.IsSettingsFolder(settings, appData) || !CouchHud.Shell.Services.CleanupScript.IsSafePath(link))
+            throw new InvalidOperationException(Strings.Get("restart.unavailable"));
+        var scriptPath = Path.Combine(Path.GetTempPath(), "megahub-cleanup-" + Guid.NewGuid().ToString("N") + ".cmd");
+        try
+        {
+            File.WriteAllText(scriptPath, CouchHud.Shell.Services.CleanupScript.Build(uninstall, Environment.ProcessId, exe!, settings, link));
+            var info = new System.Diagnostics.ProcessStartInfo("cmd.exe") { UseShellExecute = false, WorkingDirectory = Path.GetTempPath() };
+            info.ArgumentList.Add("/c");
+            info.ArgumentList.Add(scriptPath);
+            using var started = System.Diagnostics.Process.Start(info);
+            if (started is null) throw new InvalidOperationException("no process");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"[hud] cleanup failed to start: {ex.Message}");
+            throw new InvalidOperationException(Strings.Get("restart.failed"));
+        }
+        Console.WriteLine(uninstall ? "[hud] uninstall" : "[hud] reset");
+        Quit();
+    }
+
+    /// <summary>
     /// "Restart CouchHUD" in the UI: behind the same couch lock as quitting (the lock and the child profile are not touched; they come
     /// back from the saved settings exactly as they were), not while a game or a launcher session runs. A fixed operation: the same program
     /// file as the running process with the same arguments, no elevation, no service. The new process starts first and is checked; only then

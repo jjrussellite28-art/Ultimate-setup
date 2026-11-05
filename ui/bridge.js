@@ -121,6 +121,8 @@ window.couchhud = {
   setSkin: (id) => call('setSkin', id),
   quit: () => call('quit'),
   restartCouchHud: () => call('restartCouchHud'),
+  resetMegaHub: () => call('resetMegaHub'),
+  uninstallMegaHub: () => call('uninstallMegaHub'),
   onInput: on('input'),
   onNav: on('nav'),
   onLibrary: on('library'),
