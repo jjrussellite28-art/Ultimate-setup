@@ -7,6 +7,7 @@ import { attempt, toast } from '../core/feedback.js';
 import { state } from '../core/state.js';
 import { chooseDialog, closeOverlay, openOverlay } from '../components/overlay.js';
 import { t } from '../core/i18n.js';
+import { ensureUnlocked } from '../components/passcode.js';
 
 let display = null;
 
@@ -51,6 +52,8 @@ function keepDialog() {
 }
 
 async function switchTo(mode) {
+  // A locked couch refuses the change; ask for the code (or the Windows sign-in) first instead of failing with "unlock first".
+  if (!(await ensureUnlocked(t('display.guard')))) return;
   const before = display.current;
   const next = await attempt(() => api.setDisplayMode(mode.width, mode.height, mode.hz), t('display.switchFailed'));
   if (!next) return;
@@ -106,6 +109,7 @@ export function displayItems(refresh) {
       desc: t('display.hdr.desc'),
       value: () => d.hdrOn,
       run: async () => {
+        if (!(await ensureUnlocked(t('display.guard')))) return;
         const next = await attempt(() => api.setHdr(!d.hdrOn), t('display.hdr.failed'));
         if (next) display = next;
         refresh();

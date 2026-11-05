@@ -106,6 +106,8 @@ export default {
   'keyboard.key.space': 'Leerzeichen',
   'keyboard.key.done': 'Fertig',
   'keyboard.key.paste': 'Vom PC einfügen',
+  'keyboard.key.show': '👁 Passwort anzeigen',
+  'keyboard.key.hide': '👁 Passwort verbergen',
   'keyboard.pasteFailed': 'Aus der Zwischenablage ließ sich nichts einfügen',
   'keyboard.key.delete': '⌫ Löschen',
   'keyboard.noField': 'Am TV ist gerade kein Eingabefeld offen',

@@ -95,6 +95,7 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
       if (settled) return;
       settled = true;
       window.removeEventListener('keydown', onKey, true);
+      clearTimeout(page.revealTimer);
       if (active === page) active = null;
       // The phone panel is gone: a pairing code made under the parents' grant is not shown any more. Not when the pairing page is open
       // underneath: its code belongs to that page, which discards it itself when it closes.
@@ -118,14 +119,15 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
       captures: (action) => action === 'lb' || action === 'rb' || action === 'start',
       onClose: () => finish(undefined),
       build(root) {
-        const rows = paste ? [...layouts()[this.layout], ['paste']] : layouts()[this.layout];
+        // A password field gets a "Show" key under the letters (the field is dots otherwise); a paste key comes after it.
+        const rows = [...layouts()[this.layout], ...(secret ? [['eye']] : []), ...(paste ? [['paste']] : [])];
         this.row = Math.min(this.row, rows.length - 1);
         this.col = Math.min(this.col, rows[this.row].length - 1);
 
         this.field = el('div', { className: 'osk-field' });
         this.keys = rows.map((row) =>
           row.map((key) => el('button', {
-            className: `osk-key${key.length > 1 || labels()[key] ? ' osk-wide' : ''}${key === 'space' || key === 'paste' ? ' osk-space' : ''}${key === 'done' ? ' osk-done' : ''}`,
+            className: `osk-key${key.length > 1 || labels()[key] ? ' osk-wide' : ''}${key === 'space' || key === 'paste' || key === 'eye' ? ' osk-space' : ''}${key === 'done' ? ' osk-done' : ''}`,
             tabIndex: -1,
             textContent: this.label(key),
             dataset: { key }
@@ -143,13 +145,15 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
         this.update();
       },
       label(key) {
+        if (key === 'eye') return this.reveal ? t('keyboard.key.hide') : t('keyboard.key.show');
         const special = labels()[key];
         if (special) return special;
         return this.shift && key.length === 1 ? key.toUpperCase() : key;
       },
       update() {
         if (maxLength && this.text.length > maxLength) this.text = this.text.slice(0, maxLength);
-        const shown = secret ? '•'.repeat(this.text.length) : this.text;
+        // Dots for a password, unless "Show" is on (it switches itself off again after a few seconds).
+        const shown = secret && !this.reveal ? '•'.repeat(this.text.length) : this.text;
         // The caret sits where typing starts: before the placeholder, after the text.
         this.field.replaceChildren(...(this.text
           ? [el('span', { textContent: shown }), el('span', { className: 'osk-caret' })]
@@ -163,6 +167,14 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
       relabel() {
         for (const btn of this.keys.flat()) btn.textContent = this.label(btn.dataset.key);
       },
+      /** Shows or hides the typed password; showing ends by itself after 8 seconds (someone may be looking over your shoulder). */
+      setReveal(on) {
+        clearTimeout(this.revealTimer);
+        this.reveal = !!on && secret;
+        if (this.reveal) this.revealTimer = setTimeout(() => { if (this.reveal) this.setReveal(false); }, 8000);
+        this.relabel();
+        this.update();
+      },
       press(key) {
         if (key !== 'paste' && key !== 'done') this.pasted = false;
         switch (key) {
@@ -174,6 +186,10 @@ export function openKeyboard({ title = t('keyboard.title'), value = '', placehol
           case 'ABC':
             this.layout = this.layout === 'letters' ? 'symbols' : 'letters';
             render();
+            return;
+          case 'eye':
+            this.setReveal(!this.reveal);
+            sound.move();
             return;
           case 'space':
             this.text += ' ';

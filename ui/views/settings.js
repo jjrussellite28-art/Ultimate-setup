@@ -1811,7 +1811,12 @@ function categories() {
         toggle('expertMode', t('settings.cat.expert'), t('settings.expert.desc')),
         s.expertMode
           ? info(t('settings.expert.visible'), t('settings.expert.visibleAll'))
-          : info(t('settings.expert.visible'), t('settings.expert.visibleSimple'))
+          : info(t('settings.expert.visible'), t('settings.expert.visibleSimple')),
+        // Plain-words help under the switch: what it is, who it is for, why on, why off, and that it can be undone.
+        info(t('settings.expert.what'), t('settings.expert.whatText')),
+        info(t('settings.expert.whyOn'), t('settings.expert.whyOnText')),
+        info(t('settings.expert.whyOff'), t('settings.expert.whyOffText')),
+        info(t('settings.expert.undo'), t('settings.expert.undoText'))
       ]
     },
     { id: 'windows', icon: 'shield', name: t('settings.cat.windows'), expertOnly: true, items: windowsItems(s) },

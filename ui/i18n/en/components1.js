@@ -106,6 +106,8 @@ export default {
   'keyboard.key.space': 'Space',
   'keyboard.key.done': 'Done',
   'keyboard.key.paste': 'Paste from PC',
+  'keyboard.key.show': '👁 Show password',
+  'keyboard.key.hide': '👁 Hide password',
   'keyboard.pasteFailed': 'Nothing could be pasted from the clipboard',
   'keyboard.key.delete': '⌫ Delete',
   'keyboard.noField': 'No input field is open on the TV right now',

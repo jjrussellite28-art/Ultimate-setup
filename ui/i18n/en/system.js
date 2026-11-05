@@ -288,6 +288,7 @@ export default {
   'display.keep': 'Keep',
   'display.revert': 'Revert',
   'display.switchFailed': 'Could not switch',
+  'display.guard': 'Enter your code to change the display',
   'display.saved': 'Display saved',
   'display.revertFailed': 'Could not switch back',
   'display.restored': 'Previous setting restored',

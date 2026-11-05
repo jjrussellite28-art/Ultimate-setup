@@ -368,7 +368,7 @@ public static partial class Strings
         ["library.ignoreFull"] = "{0} entries are hidden already. Show some again first in Settings › Library › Hidden entries.",
 
         // lock
-        ["lock.unlockFirst"] = "Locked: unlock first",
+        ["lock.unlockFirst"] = "This is locked. Enter your code to change it",
         ["launch.scriptWaited"] = "Start script of {0} was waiting for input – ended",
         ["launch.scriptAfterGame"] = "Start script of {0} kept running after the game – ended",
         ["lock.appReleased"] = "{0} is released until you return to the HUD",

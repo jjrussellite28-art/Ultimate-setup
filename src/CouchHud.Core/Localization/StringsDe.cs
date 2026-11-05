@@ -368,7 +368,7 @@ public static partial class Strings
         ["library.ignoreFull"] = "Schon {0} Einträge ausgeblendet. Zeig unter Einstellungen › Bibliothek › Ausgeblendete Einträge erst welche wieder an.",
 
         // lock
-        ["lock.unlockFirst"] = "Gesperrt: erst entsperren",
+        ["lock.unlockFirst"] = "Das ist gesperrt. Gib deinen Code ein, um es zu ändern",
         ["launch.scriptWaited"] = "Startskript von {0} wartete auf eine Eingabe – beendet",
         ["launch.scriptAfterGame"] = "Startskript von {0} lief nach dem Spiel weiter – beendet",
         ["lock.appReleased"] = "{0} ist freigegeben, bis du ins HUD zurückkehrst",
