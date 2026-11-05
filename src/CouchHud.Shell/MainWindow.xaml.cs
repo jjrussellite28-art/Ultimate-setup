@@ -416,13 +416,28 @@ public partial class MainWindow : Window
     /// Covers the real monitor, taskbar area included (pixels, no DPI conversion): the one the window
     /// is on, or the primary one after the monitors changed (the old one may be gone or switched off).
     /// </summary>
+    private static IntPtr? ChosenMonitor()
+    {
+        if (!int.TryParse(Environment.GetEnvironmentVariable("MEGAHUB_SCREEN"), out var number) || number < 1) return null;
+        var found = new List<(IntPtr Monitor, int Left)>();
+        NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (monitor, _, _, _) =>
+        {
+            var info = new NativeMethods.MonitorInfo { Size = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MonitorInfo>() };
+            if (NativeMethods.GetMonitorInfo(monitor, ref info)) found.Add((monitor, info.Monitor.Left));
+            return true;
+        }, IntPtr.Zero);
+        found.Sort((x, y) => x.Left.CompareTo(y.Left));
+        return number <= found.Count ? found[number - 1].Monitor : null;
+    }
+
     private void FitToMonitor(bool primary = false)
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == IntPtr.Zero) return;
-        var monitor = primary
+        // MEGAHUB_SCREEN (1 = leftmost screen, 2 = the next one ...) picks the screen; without it, or when that screen is gone, it is automatic.
+        var monitor = ChosenMonitor() ?? (primary
             ? NativeMethods.MonitorFromPoint(new NativeMethods.NativePoint(), NativeMethods.MonitorDefaultToPrimary)
-            : NativeMethods.MonitorFromWindow(hwnd, NativeMethods.MonitorDefaultToNearest);
+            : NativeMethods.MonitorFromWindow(hwnd, NativeMethods.MonitorDefaultToNearest));
         var info = new NativeMethods.MonitorInfo { Size = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MonitorInfo>() };
         if (!NativeMethods.GetMonitorInfo(monitor, ref info)) return;
         var r = info.Monitor;
