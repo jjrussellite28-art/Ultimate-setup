@@ -184,6 +184,8 @@ export const browserView = {
     if (!browserState) this.load();
     this.slot = null;
     if (this.isOpen) return this.buildPage(root);
+    // Back on the start list after a page: forget the bar of that page, or update() keeps working on the bar and the list gets no highlight.
+    this.buttons = null;
     this.list = this.rows();
     this.index = Math.min(this.index, this.list.length - 1);
     this.items = this.list.map((r) => {

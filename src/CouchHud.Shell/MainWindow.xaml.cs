@@ -418,8 +418,10 @@ public partial class MainWindow : Window
     /// </summary>
     private static IntPtr? ChosenMonitor(int configured)
     {
-        // MEGAHUB_SCREEN (for testing) wins over the setting; 0 or less = automatic.
-        var number = int.TryParse(Environment.GetEnvironmentVariable("MEGAHUB_SCREEN"), out var fromEnvironment) && fromEnvironment >= 1 ? fromEnvironment : configured;
+        // The setting (Settings > Display) wins. Without one, MEGAHUB_SCREEN (the question of Start Mega Hub.bat) decides; without that: automatic.
+        var number = configured >= 1
+            ? configured
+            : int.TryParse(Environment.GetEnvironmentVariable("MEGAHUB_SCREEN"), out var fromEnvironment) && fromEnvironment >= 1 ? fromEnvironment : 0;
         if (number < 1) return null;
         var found = new List<(IntPtr Monitor, int Left)>();
         NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (monitor, _, _, _) =>
@@ -435,7 +437,19 @@ public partial class MainWindow : Window
     /// <summary>The screen setting changed: cover the chosen screen now (not in the developer window).</summary>
     public void MoveToScreen()
     {
-        if (!_dev) FitToMonitor();
+        if (!_dev)
+        {
+            FitToMonitor();
+            return;
+        }
+        // The small test window keeps its size and moves to the chosen screen.
+        var hwnd = new WindowInteropHelper(this).Handle;
+        var monitor = ChosenMonitor(_hud.ScreenNumber);
+        if (hwnd == IntPtr.Zero || monitor is null) return;
+        var info = new NativeMethods.MonitorInfo { Size = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MonitorInfo>() };
+        if (!NativeMethods.GetMonitorInfo(monitor.Value, ref info)) return;
+        NativeMethods.SetWindowPos(hwnd, IntPtr.Zero, info.Monitor.Left + 60, info.Monitor.Top + 60, 0, 0,
+            NativeMethods.SwpNoSize | NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate);
     }
 
     private void FitToMonitor(bool primary = false)

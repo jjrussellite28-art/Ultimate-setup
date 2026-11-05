@@ -128,7 +128,7 @@ function target(e) {
   return e.target instanceof Element ? e.target : null;
 }
 
-const CLICKABLE = '.passcode-key, .timeup-option, .quick-row, .ha-card, .news-card, .tile, .action, .settings li, .settings-cats li, .file-row, .check-row, .chip, .wizard-option, .osk-key, .menu li:not(.menu-group), .hint';
+const CLICKABLE = '.passcode-key, .timeup-option, .quick-row, .ha-card, .news-card, .tile, .action, .settings li, .settings-cats li, .file-row, .check-row, .chip, .wizard-option, .osk-key, .bbar-btn, .bbar-address, .menu li:not(.menu-group), .hint';
 
 // The code prompt without a menu over it: only clicks on its buttons count there.
 const codeEntry = () => !state.overlay && !quick.open && isCodeEntry(currentView());
