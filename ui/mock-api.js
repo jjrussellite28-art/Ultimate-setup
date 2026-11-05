@@ -216,6 +216,11 @@ const uninstalled = Array.from({ length: 140 }, (_, i) => {
   const name = `${UNINSTALLED_NAMES[i % UNINSTALLED_NAMES.length]}${i >= UNINSTALLED_NAMES.length ? ` ${Math.floor(i / UNINSTALLED_NAMES.length) + 1}` : ''}`;
   return { id: epic ? `epic:Demo${i}` : `steam:${900000 + i}`, source: epic ? 'epic' : 'steam', name, art: { cover: [], hero: [], logo: [], icon: [] } };
 }).sort((a, b) => a.name.localeCompare(b.name));
+// Two screens, like a PC with a monitor and a TV; none chosen = automatic.
+const screens = [
+  { number: 1, width: 1920, height: 1080, primary: true, chosen: false },
+  { number: 2, width: 3840, height: 2160, primary: false, chosen: false }
+];
 const display = {
   current: { width: 3840, height: 2160, hz: 60 },
   modes: [[3840, 2160, 120], [3840, 2160, 60], [2560, 1440, 120], [2560, 1440, 60], [1920, 1080, 120], [1920, 1080, 60]].map(([width, height, hz]) => ({ width, height, hz })),
@@ -1215,6 +1220,13 @@ window.couchhud = {
   },
   setDisplayMode: async (width, height, hz) => ((display.current = { width, height, hz }), structuredClone(display)),
   setHdr: async (on) => ((display.hdrOn = on), structuredClone(display)),
+  getScreens: async () => structuredClone(screens),
+  setScreen: async (number) => {
+    screens.forEach((s) => { s.chosen = s.number === number; });
+    log('setScreen', number);
+    return structuredClone(screens);
+  },
+  setScreenLayout: async (mode) => log('setScreenLayout', mode),
   getPerformance: async () => ({ cpu: 20 + Math.round(Math.random() * 25), gpu: 70 + Math.round(Math.random() * 25), ramUsedGb: 14.2, ramTotalGb: 31.9 }),
   getCaptures: async () => [
     { url: fakeShot('Elden Ring', 290), name: 'Elden Ring 2026-10-17 21-14-03', source: 'Game Bar', video: false, time: Date.now() - 3_600_000, size: 4_200_000 },

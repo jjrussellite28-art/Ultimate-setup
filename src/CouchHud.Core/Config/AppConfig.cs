@@ -319,6 +319,9 @@ public sealed class AppConfig
     /// <summary>Switch the display off after this many minutes of screensaver (0 = never).</summary>
     public int DisplayOffMinutes { get; set; }
 
+    /// <summary>The screen Mega Hub covers, numbered from the left (1 = leftmost): 0 = automatic. Gone screens fall back to automatic.</summary>
+    public int ScreenNumber { get; set; }
+
     /// <summary>Moves the whole HUD by a few pixels now and then so static parts don't burn in.</summary>
     public bool PixelShift { get; set; } = true;
 

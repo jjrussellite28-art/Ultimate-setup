@@ -8,6 +8,7 @@ import { move, push, removePage, render } from '../core/nav.js';
 import { state } from '../core/state.js';
 import { sound } from '../sound.js';
 import { t } from '../core/i18n.js';
+import { chooseScreen } from '../views/display.js';
 
 // i18n-used: modeask.couch modeask.couchHint modeask.pc modeask.pcHint
 const CHOICES = [
@@ -43,6 +44,10 @@ export function showModeChooser() {
         case 'right': return move(this, 1, CHOICES.length, true);
         case 'b':
           return sound.bump();
+        case 'y':
+          // Which screen Mega Hub is on (two or more screens), before choosing.
+          sound.select();
+          return chooseScreen();
         case 'a': {
           sound.select();
           if (CHOICES[this.index].id === 'couch') {
@@ -63,7 +68,7 @@ export function showModeChooser() {
       }
     },
     hints() {
-      return [['A', t('modeask.hintChoose')]];
+      return [['A', t('modeask.hintChoose')], ['Y', t('modeask.hintScreen')]];
     }
   };
   push(page);

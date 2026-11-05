@@ -36,7 +36,7 @@ public static class LockPolicy
         "resetCodeStore",
         "getSession", "resumeGame", "quitGame", "getAudio", "setVolume", "setMute", "setAudioOutput", "getAppVolumes", "setAppVolume", "setAppMute", "getPads", "getBattery", "rumble",
         "getNews", "getFeeds", "assistantInfo", "askAssistant", "confirmAssistant", "resetAssistant",
-        "getBrowser", "browserLayout", "browserFocus", "browserCommand", "displayOff", "displayOn", "getLaunchers", "getProfile", "capture", "getDownloads", "getDisplay",
+        "getBrowser", "browserLayout", "browserFocus", "browserCommand", "displayOff", "displayOn", "getLaunchers", "getProfile", "capture", "getDownloads", "getDisplay", "getScreens",
         // The downloads page and the list of not installed games may be looked at; installing ("installGame"), starting an update, cancelling
         // ("cancelDownload") and opening a client's download page ("openClientDownloads") need the unlock.
         "getDownloadCenter", "dismissDownload", "getUninstalled", "getPerformance", "getCaptures",

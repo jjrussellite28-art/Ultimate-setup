@@ -4110,6 +4110,23 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         return DisplayService.Get();
     }
 
+    /// <summary>The screen Mega Hub covers: 0 = automatic, 1 = the leftmost screen ...</summary>
+    public int ScreenNumber => config.Current.ScreenNumber;
+
+    public IReadOnlyList<ScreenInfo> GetScreens() => DisplayService.Screens(config.Current.ScreenNumber);
+
+    /// <summary>Picks the screen Mega Hub covers (0 = automatic) and moves the window there right away.</summary>
+    public IReadOnlyList<ScreenInfo> SetScreen(int number)
+    {
+        var chosen = Math.Clamp(number, 0, ConfigLimits.ScreenNumberMax);
+        config.UpdateOrThrow(c => c.ScreenNumber = chosen);
+        Ui(() => _window?.MoveToScreen());
+        return GetScreens();
+    }
+
+    /// <summary>PC screen only, mirror, extend or second screen only (Windows' own switch).</summary>
+    public void SetScreenLayout(string mode) => DisplayService.SetLayout(mode);
+
     public Task<PerformanceSample> GetPerformanceAsync() => _performance.SampleAsync();
 
     public Task<object> GetCapturesAsync() => Task.Run<object>(() =>

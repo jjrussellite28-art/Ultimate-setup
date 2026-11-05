@@ -126,7 +126,7 @@ public static class FeatureAreas
         "holdUnlockForSetup", "setBlockTaskManager", "openAutoLogonDialog", "enableAutoLogon", "setAutoLogon",
         // Sound, controllers, batteries, display, performance, captures and screenshots.
         "getAudio", "setVolume", "setMute", "setAudioOutput", "getAppVolumes", "setAppVolume", "setAppMute", "getBattery", "getPads",
-        "rumble", "getDisplay", "setDisplayMode", "setHdr", "getPerformance", "capture", "getCaptures",
+        "rumble", "getDisplay", "setDisplayMode", "setHdr", "getScreens", "setScreen", "setScreenLayout", "getPerformance", "capture", "getCaptures",
         // Assistant (its tools check the areas themselves).
         "assistantInfo", "askAssistant", "confirmAssistant", "resetAssistant",
         // Downloads tab (CouchHUD's and Windows' own downloads; game lines go with Gaming inside the center).

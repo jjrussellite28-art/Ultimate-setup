@@ -11,6 +11,7 @@ public static class ConfigLimits
     public const int ReturnHoldMsMin = 200, ReturnHoldMsMax = 5000;
     public const int ScreensaverMinutesMax = 240;
     public const int DisplayOffMinutesMax = 480;
+    public const int ScreenNumberMax = 8;
     public const int SetupWizardDoneMax = 1000;
     public const int VolumeMax = 100;
     public const int NightModeStrengthMax = 100;
@@ -179,6 +180,7 @@ internal static class ConfigSanitizer
         Clamp("return hold time", c.ReturnHoldMs, ConfigLimits.ReturnHoldMsMin, ConfigLimits.ReturnHoldMsMax, v => c.ReturnHoldMs = v);
         Clamp("screensaver minutes", c.ScreensaverMinutes, 0, ConfigLimits.ScreensaverMinutesMax, v => c.ScreensaverMinutes = v);
         Clamp("display off minutes", c.DisplayOffMinutes, 0, ConfigLimits.DisplayOffMinutesMax, v => c.DisplayOffMinutes = v);
+        Clamp("screen number", c.ScreenNumber, 0, ConfigLimits.ScreenNumberMax, v => c.ScreenNumber = v);
         Clamp("setup assistant marker", c.SetupWizardDone, 0, ConfigLimits.SetupWizardDoneMax, v => c.SetupWizardDone = v);
         Clamp("sound volume", c.SoundVolume, 0, ConfigLimits.VolumeMax, v => c.SoundVolume = v);
         Clamp("music volume", c.MusicVolume, 0, ConfigLimits.VolumeMax, v => c.MusicVolume = v);

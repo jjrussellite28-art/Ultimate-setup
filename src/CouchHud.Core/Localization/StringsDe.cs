@@ -262,6 +262,7 @@ public static partial class Strings
         ["display.hdrFailed"] = "HDR lässt sich auf diesem Bildschirm nicht schalten",
         ["display.modeUnsupported"] = "{0}×{1} mit {2} Hz wird nicht unterstützt",
         ["display.notFound"] = "Anzeige nicht gefunden",
+        ["display.layoutFailed"] = "Die Bildschirmanordnung ließ sich nicht ändern. Mit Windows-Taste + P kannst du sie von Hand wählen",
         ["display.switchFailed"] = "Umschalten fehlgeschlagen (Code {0})",
 
         // external

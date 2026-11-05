@@ -652,6 +652,13 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                 return hud.SetDisplayMode(Arg(0).GetInt32(), Arg(1).GetInt32(), Arg(2).GetInt32());
             case "setHdr":
                 return hud.SetHdr(Arg(0).ValueKind == JsonValueKind.True);
+            case "getScreens":
+                return hud.GetScreens();
+            case "setScreen":
+                return hud.SetScreen(Arg(0).GetInt32());
+            case "setScreenLayout":
+                hud.SetScreenLayout(StringArg(0));
+                return null;
             case "getPerformance":
                 return await hud.GetPerformanceAsync();
             case "getCaptures":

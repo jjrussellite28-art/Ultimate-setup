@@ -416,9 +416,11 @@ public partial class MainWindow : Window
     /// Covers the real monitor, taskbar area included (pixels, no DPI conversion): the one the window
     /// is on, or the primary one after the monitors changed (the old one may be gone or switched off).
     /// </summary>
-    private static IntPtr? ChosenMonitor()
+    private static IntPtr? ChosenMonitor(int configured)
     {
-        if (!int.TryParse(Environment.GetEnvironmentVariable("MEGAHUB_SCREEN"), out var number) || number < 1) return null;
+        // MEGAHUB_SCREEN (for testing) wins over the setting; 0 or less = automatic.
+        var number = int.TryParse(Environment.GetEnvironmentVariable("MEGAHUB_SCREEN"), out var fromEnvironment) && fromEnvironment >= 1 ? fromEnvironment : configured;
+        if (number < 1) return null;
         var found = new List<(IntPtr Monitor, int Left)>();
         NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (monitor, _, _, _) =>
         {
@@ -430,12 +432,18 @@ public partial class MainWindow : Window
         return number <= found.Count ? found[number - 1].Monitor : null;
     }
 
+    /// <summary>The screen setting changed: cover the chosen screen now (not in the developer window).</summary>
+    public void MoveToScreen()
+    {
+        if (!_dev) FitToMonitor();
+    }
+
     private void FitToMonitor(bool primary = false)
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == IntPtr.Zero) return;
         // MEGAHUB_SCREEN (1 = leftmost screen, 2 = the next one ...) picks the screen; without it, or when that screen is gone, it is automatic.
-        var monitor = ChosenMonitor() ?? (primary
+        var monitor = ChosenMonitor(_hud.ScreenNumber) ?? (primary
             ? NativeMethods.MonitorFromPoint(new NativeMethods.NativePoint(), NativeMethods.MonitorDefaultToPrimary)
             : NativeMethods.MonitorFromWindow(hwnd, NativeMethods.MonitorDefaultToNearest));
         var info = new NativeMethods.MonitorInfo { Size = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MonitorInfo>() };

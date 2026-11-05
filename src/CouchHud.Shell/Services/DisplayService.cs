@@ -1,11 +1,15 @@
 using System.Runtime.InteropServices;
 using CouchHud.Core.Localization;
+using CouchHud.Shell.Native;
 
 namespace CouchHud.Shell.Services;
 
 public sealed record DisplayMode(int Width, int Height, int Hz);
 
 public sealed record DisplayState(DisplayMode Current, IReadOnlyList<DisplayMode> Modes, bool HdrSupported, bool HdrOn);
+
+/// <summary>One connected screen. Number counts from the left (1 = leftmost), the same numbering as MEGAHUB_SCREEN and the ScreenNumber setting.</summary>
+public sealed record ScreenInfo(int Number, int Width, int Height, bool Primary, bool Chosen);
 
 /// <summary>
 /// Resolution, refresh rate and HDR of the main display, like the video settings of a
@@ -49,6 +53,43 @@ public static class DisplayService
         if (test != DispChangeSuccessful) throw new InvalidOperationException(Strings.Get("display.modeUnsupported", mode.Width, mode.Height, mode.Hz));
         var result = ChangeDisplaySettingsExW(null, ref dm, IntPtr.Zero, CdsUpdateRegistry, IntPtr.Zero);
         if (result != DispChangeSuccessful) throw new InvalidOperationException(Strings.Get("display.switchFailed", result));
+    }
+
+    /// <summary>The connected screens from left to right. `chosen` is the ScreenNumber setting (0 = automatic).</summary>
+    public static IReadOnlyList<ScreenInfo> Screens(int chosen)
+    {
+        var found = new List<(int Left, int Width, int Height, bool Primary)>();
+        NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (monitor, _, _, _) =>
+        {
+            var info = new NativeMethods.MonitorInfo { Size = Marshal.SizeOf<NativeMethods.MonitorInfo>() };
+            if (NativeMethods.GetMonitorInfo(monitor, ref info))
+            {
+                found.Add((info.Monitor.Left, info.Monitor.Right - info.Monitor.Left, info.Monitor.Bottom - info.Monitor.Top, (info.Flags & 1) != 0));
+            }
+            return true;
+        }, IntPtr.Zero);
+        found.Sort((x, y) => x.Left.CompareTo(y.Left));
+        return found.Select((s, i) => new ScreenInfo(i + 1, s.Width, s.Height, s.Primary, chosen == i + 1)).ToList();
+    }
+
+    /// <summary>
+    /// How several screens work together, through Windows' own switch (the same as Windows key + P): "internal" (the PC screen only), "clone"
+    /// (the same picture on both), "extend" (use both), "external" (the second screen only). Nothing else is ever started.
+    /// </summary>
+    public static void SetLayout(string mode)
+    {
+        var argument = mode switch
+        {
+            "internal" => "/internal",
+            "clone" => "/clone",
+            "extend" => "/extend",
+            "external" => "/external",
+            _ => throw new InvalidOperationException(Strings.Get("display.layoutFailed"))
+        };
+        var program = Path.Combine(Environment.SystemDirectory, "DisplaySwitch.exe");
+        if (!File.Exists(program)) throw new InvalidOperationException(Strings.Get("display.layoutFailed"));
+        using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(program, argument) { UseShellExecute = false, CreateNoWindow = true });
+        if (process is null) throw new InvalidOperationException(Strings.Get("display.layoutFailed"));
     }
 
     public static void SetHdr(bool on)

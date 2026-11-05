@@ -245,6 +245,7 @@ export default {
   'modeask.pc': 'PC',
   'modeask.pcHint': 'Windows desktop',
   'modeask.hintChoose': 'Choose',
+  'modeask.hintScreen': 'Screen',
   'modeask.setting': 'Ask at start: Couch or PC',
   'modeask.settingDesc': 'When Mega Hub starts, ask whether to stay on the couch or go to the PC desktop.',
   'settings.screensaver.title': 'Screensaver',
