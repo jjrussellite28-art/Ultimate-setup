@@ -3,11 +3,11 @@
 
 /**
  * The action an id stands for in the current mode. Shell mode: the PC mode (back with the Guide button) and a restart into it; no
- * quit. App mode: "pc-mode" is closing Mega Hub, and a restart into the PC mode means nothing (Windows starts its desktop anyway).
+ * quit. App mode: the PC mode (Mega Hub hides and keeps running, the tray icon brings it back) and quit are both offered; a restart
+ * into the PC mode means nothing (Windows starts its desktop anyway).
  */
 export function forMode(id, isShell) {
   if (isShell) return id === 'quit' ? null : id;
-  if (id === 'pc-mode') return 'quit';
   return id === 'restart-pc' ? null : id;
 }
 
@@ -19,8 +19,7 @@ export const MORE = 'more';
 
 /**
  * The menu in three parts: the everyday computer actions as large tiles, the rare ones behind a collapsed "Mehr" row, the sleep
- * timer as one row at the bottom. Ids before forMode. The secondary list is in the order of the menu; app mode turns "pc-mode"
- * into "quit" (forMode), so quit is listed once.
+ * timer as one row at the bottom. Ids before forMode. The secondary list is in the order of the menu; quit is only there in app mode.
  */
 export const POWER_PRIMARY = ['standby', 'shutdown', 'restart'];
 export const POWER_SECONDARY = ['pc-mode', 'restart-pc', 'restart-app', 'quit'];

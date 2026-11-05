@@ -71,7 +71,7 @@ export const POWER_ACTIONS = [
     run: () => api.power('restart-pc')
   },
   {
-    // App mode: Mega Hub is a program on the desktop, so "PC mode" simply means closing it (the host asks for the couch lock too).
+    // App mode only (in shell mode there is no desktop to go back to): closes Mega Hub (the host asks for the couch lock too).
     id: 'quit',
     icon: '✕',
     get label() { return t('power.quit.label'); },

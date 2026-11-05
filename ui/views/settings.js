@@ -1530,7 +1530,7 @@ const powerItems = (ids) => Object.fromEntries(powerEntries(ids).map((e) => [e.i
 function categories() {
   const s = settings ?? {};
   // The mode decides: shell mode has the PC mode and a restart into it, app mode "Quit Mega Hub" in its place (power.js forMode).
-  const power = powerItems(['pc-mode', 'standby', 'restart', 'shutdown', 'restart-pc']);
+  const power = powerItems(['pc-mode', 'standby', 'restart', 'shutdown', 'restart-pc', 'quit']);
   const holdOptions = [500, 1000, 1500, 2000].map((ms) => ({ label: holdLabel(ms), value: ms }));
   const glyphLabels = { auto: t('settings.controller.glyphs.auto'), xbox: t('settings.controller.glyphs.xbox'), playstation: t('settings.controller.glyphs.playstation') };
   const padGlyphOptions = () => PAD_GLYPH_SETTINGS.map((value) => ({ label: glyphLabels[value], value }));
@@ -1754,7 +1754,8 @@ function categories() {
         power.standby,
         power.shutdown,
         power.restart,
-        power['pc-mode'] ?? power.quit,
+        power['pc-mode'],
+        ...(power.quit ? [power.quit] : []),
         ...(power['restart-pc'] ? expert(power['restart-pc']) : []),
         { kind: 'choice', label: t('settings.power.timer'), desc: t('settings.power.timerDesc'), value: () => sleepTimerDetail(), run: chooseSleepTimer },
         wipeRow('reset', () => api.resetMegaHub()),
@@ -1786,7 +1787,6 @@ function categories() {
         },
         action(t('settings.info.disclaimer'), t('settings.info.disclaimerDesc'), () => openPage(disclaimerPage(), t('settings.cat.info'))),
         action(t('settings.info.privacy'), t('settings.info.privacyDesc'), () => openPage(privacyPage(), t('settings.cat.info'))),
-        ...(state.info.isShell ? [] : [action(t('settings.info.quit'), t('settings.info.quitDesc'), guarded(t('settings.info.quit'), () => attempt(() => api.quit())), '✕', t('settings.hint.quit'))]),
         info(t('settings.info.guide'), t('settings.info.guideDesc')),
         info(t('settings.info.version'), state.info.version || '–'),
         info(t('settings.info.license'), 'GPL-3.0 · © 2026 kewe87 · fork: jjrussellite28-art'),

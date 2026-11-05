@@ -3917,7 +3917,7 @@ console.log('undo progress: ok');
 {
   const lay = (shell, opts) => powerLayout(shell, opts);
   assert.deepEqual(lay(true), { primary: ['standby', 'shutdown', 'restart'], more: ['pc-mode', 'restart-pc', 'restart-app'], timer: true });
-  assert.deepEqual(lay(false), { primary: ['standby', 'shutdown', 'restart'], more: ['quit', 'restart-app'], timer: true });
+  assert.deepEqual(lay(false), { primary: ['standby', 'shutdown', 'restart'], more: ['pc-mode', 'restart-app', 'quit'], timer: true });
   // The Guide menu opens it without the timer (it has its own row).
   assert.equal(lay(false, { sleepTimer: false }).timer, false);
   // Nothing offered is something the mode does not allow; nothing behind "Mehr" hides the row.
@@ -3932,10 +3932,11 @@ console.log('undo progress: ok');
   assert.deepEqual(powerEntryIds(shell, false), ['standby', 'shutdown', 'restart', MORE, SLEEP_TIMER]);
   assert.deepEqual(powerEntryIds(shell, true), ['standby', 'shutdown', 'restart', MORE, 'pc-mode', 'restart-pc', 'restart-app', SLEEP_TIMER]);
   assert.ok(isSecondary(shell, 'restart-pc') && !isSecondary(shell, 'restart') && !isSecondary(shell, SLEEP_TIMER));
-  // forMode: shell has no quit, app mode has no restart into PC mode and "pc-mode" is quitting.
+  // forMode: shell has no quit, app mode has no restart into PC mode but offers PC mode and quit.
   assert.equal(powerForMode('quit', true), null);
   assert.equal(powerForMode('pc-mode', true), 'pc-mode');
-  assert.equal(powerForMode('pc-mode', false), 'quit');
+  assert.equal(powerForMode('pc-mode', false), 'pc-mode');
+  assert.equal(powerForMode('quit', false), 'quit');
   assert.equal(powerForMode('restart-pc', false), null);
   assert.equal(powerForMode('shutdown', false), 'shutdown');
   // The phone's actions (RemotePower.EntryId: sleep → standby, restart, shutdown) are the same entries in both modes: the phone never
