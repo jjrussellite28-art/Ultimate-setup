@@ -20,6 +20,7 @@ import { PAD_GLYPH_SETTINGS } from '../core/pad-glyphs.js';
 import { SOUND_SETS, setAudioMode, setMusicVolume, setSoundSet, setSoundVolume, sound } from '../sound.js';
 import { setHdrMode } from '../core/hdr.js';
 import { setPointer } from '../components/mouse.js';
+import { askModeAtStart, setAskModeAtStart } from '../core/mode-ask.js';
 import { SCREENSAVER_STYLES, configureScreensaver, startScreensaver } from '../core/screensaver.js';
 import { chooseDialog, confirmDialog, openOverlay } from '../components/overlay.js';
 import { openKeyboard } from '../components/keyboard.js';
@@ -1309,6 +1310,16 @@ function displayCategoryItems(s) {
   const nightRows = nightModeItems(s, change);
   out.push(...nightRows.map((item) => (item === nightRows[0] ? item : { ...item, expert: true })));
   out.push(
+    {
+      kind: 'toggle',
+      label: t('modeask.setting'),
+      desc: t('modeask.settingDesc'),
+      value: () => askModeAtStart(),
+      run: () => {
+        setAskModeAtStart(!askModeAtStart());
+        render();
+      }
+    },
     {
       kind: 'choice',
       label: t('settings.screensaver.title'),

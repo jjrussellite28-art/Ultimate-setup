@@ -41,6 +41,8 @@ import { startTv } from './views/tv.js';
 import { detailPage } from './views/detail.js';
 import { startParental } from './components/parental.js';
 import { startProfiles } from './components/profiles.js';
+import { showModeChooser } from './components/mode-chooser.js';
+import { askModeAtStart } from './core/mode-ask.js';
 import { startNotifications } from './views/notifications.js';
 import { startBluetoothRecovery } from './components/bluetooth-recovery.js';
 import { isCodeEntry, screenHeld } from './core/input-help.js';
@@ -471,6 +473,8 @@ async function init() {
   await startProfiles().catch(console.error);
   // Show the HUD immediately; a slow store or plugin must not keep the screen empty.
   render();
+  // Optional (Settings > Display > Ask at start): Couch or PC.
+  if (askModeAtStart()) showModeChooser();
   const bootStarted = performance.now();
   const hideBoot = () => {
     if (endBoot(document.querySelector('#boot'))) sound.boot();
