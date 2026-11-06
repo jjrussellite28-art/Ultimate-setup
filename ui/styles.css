@@ -880,6 +880,18 @@ body[data-view="detail"] #bg-hero.has-image ~ .bg-shade {
   gap: 0.6rem;
 }
 
+/* Which build this is, small at the bottom left (app.js showBuildTag). */
+#build-tag {
+  position: fixed;
+  left: 4rem;
+  bottom: 0.7rem;
+  z-index: 11;
+  font-size: 0.85rem;
+  opacity: 0.55;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 /* ------------------------------------------------------------------ overlay */
 
 #overlay {

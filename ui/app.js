@@ -4,7 +4,7 @@
 import { endBoot, inputOpen } from './core/boot-gate.js';
 import { api } from './core/api.js';
 import { fmtTime, t } from './core/i18n.js';
-import { $ } from './core/dom.js';
+import { $, el } from './core/dom.js';
 import { state } from './core/state.js';
 import { attempt, toast } from './core/feedback.js';
 import { applySkin, onGlyphsChanged, setPadGlyphs } from './core/skins.js';
@@ -252,8 +252,26 @@ function reloadForLanguage() {
 }
 setInterval(reloadForLanguage, 1000);
 
+/**
+ * A small line at the bottom left: which Mega Hub this is (version, and for an updated test build the GitHub commit and when it was
+ * updated, from ui/build.json that the update writes). It never takes a click.
+ */
+async function showBuildTag() {
+  let extra = '';
+  try {
+    const res = await fetch('build.json', { cache: 'no-store' });
+    if (res.ok) {
+      const b = await res.json();
+      extra = [b.commit, b.updated].filter(Boolean).join(' · ');
+    }
+  } catch { /* no build.json: the version alone */ }
+  const text = [`Mega Hub ${state.info.version || ''}`.trim(), extra].filter(Boolean).join(' · ');
+  document.body.append(el('div', { id: 'build-tag', textContent: text, ariaHidden: 'true' }));
+}
+
 async function init() {
   state.info = (await attempt(() => api.systemInfo(), t('app.systemInfoFailed'))) || {};
+  showBuildTag();
   state.info.areas = setAreas(state.info.areas);
   setAudioMode(state.info.audioMode ?? (state.info.sounds === false ? 'off' : 'ui'));
   setSoundVolume((state.info.soundVolume ?? 70) / 100);

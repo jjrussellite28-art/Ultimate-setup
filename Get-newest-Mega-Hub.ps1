@@ -45,6 +45,12 @@ try {
   robocopy $new $here /E /NFL /NDL /NJH /NJS /NP /XF '.installed-stamp' | Out-Null
   if ($LASTEXITCODE -ge 8) { throw 'Copying failed.' }
 
+  # Which version this is (shown small at the bottom of Mega Hub): the newest commit on GitHub and the time of this update.
+  $sha = ''
+  try { $sha = (Invoke-RestMethod -Uri 'https://api.github.com/repos/jjrussellite28-art/mega-hub/commits/mega-hub-rename' -Headers @{ 'User-Agent' = 'MegaHubUpdate' } -UseBasicParsing).sha.Substring(0, 7) } catch { }
+  $stampJson = '{"commit":"' + $sha + '","updated":"' + (Get-Date -Format 'MMM d, h:mm tt') + '"}'
+  [IO.File]::WriteAllText((Join-Path $here 'ui\build.json'), $stampJson)
+
   if ($install) {
     Write-Host '[4/5] Program code changed (or first install): building the installer. 5-10 minutes, do not close this window...'
     $iscc = Find-Iscc
