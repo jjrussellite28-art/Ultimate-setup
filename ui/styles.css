@@ -4820,6 +4820,7 @@ body[data-view="terms"] #notify-stack .notify-card:not(.security) {
   border: 0.15rem solid transparent;
 }
 
+.profile-tile.hover,
 .profile-tile.focused {
   border-color: var(--accent);
   background: rgba(255, 255, 255, 0.08);
