@@ -82,7 +82,8 @@ try {
   } else {
     Write-Host '[4/5] No program code changed: no rebuild needed.'
     Write-Host '[5/5] Copying the newest screens into Program Files. Windows asks once: say Yes...'
-    $copy = "robocopy '$here\ui' '$installDir\ui' /MIR /NFL /NDL /NJH /NJS /NP; if (`$LASTEXITCODE -ge 8) { exit 1 }"
+    # robocopy answers 1 when it copied files (fine); only 8 and up is an error. An explicit exit, else PowerShell reports its 1 as a failure.
+    $copy = "robocopy '$here\ui' '$installDir\ui' /MIR /NFL /NDL /NJH /NJS /NP; if (`$LASTEXITCODE -ge 8) { exit 1 } else { exit 0 }"
     $p = Start-Process powershell -Verb RunAs -Wait -PassThru -WindowStyle Hidden -ArgumentList '-NoProfile', '-Command', $copy
     if ($p.ExitCode -ne 0) { throw 'Copying into Program Files failed.' }
   }
