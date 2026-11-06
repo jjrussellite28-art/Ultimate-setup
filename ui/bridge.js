@@ -175,6 +175,7 @@ window.couchhud = {
   getScreens: () => call('getScreens'),
   setScreen: (number) => call('setScreen', number),
   setScreenLayout: (mode) => call('setScreenLayout', mode),
+  updateMegaHub: () => call('updateMegaHub'),
   getPerformance: () => call('getPerformance'),
   getCaptures: () => call('getCaptures'),
   getPlugins: () => call('getPlugins'),

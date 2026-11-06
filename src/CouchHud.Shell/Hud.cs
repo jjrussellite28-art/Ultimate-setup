@@ -4127,6 +4127,24 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// <summary>PC screen only, mirror, extend or second screen only (Windows' own switch).</summary>
     public void SetScreenLayout(string mode) => DisplayService.SetLayout(mode);
 
+    /// <summary>
+    /// Test builds: starts "Get newest Mega Hub.bat" (it sits next to the app folder, not in Program Files) which closes Mega Hub, fetches the
+    /// newest version from GitHub, rebuilds when the program code changed and starts Mega Hub again. False when that file is not there.
+    /// </summary>
+    public bool UpdateMegaHub()
+    {
+        RequireUnlocked();
+        var folder = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, ".."));
+        var script = Path.Combine(folder, "Get newest Mega Hub.bat");
+        if (!File.Exists(script)) return false;
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c \"\"" + script + "\" auto\"")
+        {
+            UseShellExecute = true,
+            WorkingDirectory = folder
+        })?.Dispose();
+        return true;
+    }
+
     public Task<PerformanceSample> GetPerformanceAsync() => _performance.SampleAsync();
 
     public Task<object> GetCapturesAsync() => Task.Run<object>(() =>

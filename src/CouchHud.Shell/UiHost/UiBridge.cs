@@ -659,6 +659,8 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "setScreenLayout":
                 hud.SetScreenLayout(StringArg(0));
                 return null;
+            case "updateMegaHub":
+                return hud.UpdateMegaHub();
             case "getPerformance":
                 return await hud.GetPerformanceAsync();
             case "getCaptures":
