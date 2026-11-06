@@ -3916,7 +3916,7 @@ console.log('undo progress: ok');
 // Power menu: three everyday tiles, the rare entries behind "Mehr", the timer as a row; the mode decides what is offered.
 {
   const lay = (shell, opts) => powerLayout(shell, opts);
-  assert.deepEqual(lay(true), { primary: ['standby', 'shutdown', 'restart'], more: ['pc-mode', 'restart-pc', 'restart-app'], timer: true });
+  assert.deepEqual(lay(true), { primary: ['standby', 'shutdown', 'restart'], more: ['pc-mode', 'restart-pc', 'restart-app', 'quit'], timer: true });
   assert.deepEqual(lay(false), { primary: ['standby', 'shutdown', 'restart'], more: ['pc-mode', 'restart-app', 'quit'], timer: true });
   // The Guide menu opens it without the timer (it has its own row).
   assert.equal(lay(false, { sleepTimer: false }).timer, false);
@@ -3930,10 +3930,10 @@ console.log('undo progress: ok');
   // Collapsed: tiles, Mehr, timer. Expanded: the secondary entries between Mehr and the timer.
   const shell = lay(true);
   assert.deepEqual(powerEntryIds(shell, false), ['standby', 'shutdown', 'restart', MORE, SLEEP_TIMER]);
-  assert.deepEqual(powerEntryIds(shell, true), ['standby', 'shutdown', 'restart', MORE, 'pc-mode', 'restart-pc', 'restart-app', SLEEP_TIMER]);
+  assert.deepEqual(powerEntryIds(shell, true), ['standby', 'shutdown', 'restart', MORE, 'pc-mode', 'restart-pc', 'restart-app', 'quit', SLEEP_TIMER]);
   assert.ok(isSecondary(shell, 'restart-pc') && !isSecondary(shell, 'restart') && !isSecondary(shell, SLEEP_TIMER));
   // forMode: shell has no quit, app mode has no restart into PC mode but offers PC mode and quit.
-  assert.equal(powerForMode('quit', true), null);
+  assert.equal(powerForMode('quit', true), 'quit');
   assert.equal(powerForMode('pc-mode', true), 'pc-mode');
   assert.equal(powerForMode('pc-mode', false), 'pc-mode');
   assert.equal(powerForMode('quit', false), 'quit');
@@ -3952,7 +3952,7 @@ console.log('undo progress: ok');
   for (const id of collapsed) assert.equal(collapsed[powerIndex(collapsed, id)], id);
   assert.equal(collapsed[powerIndex(collapsed, 'quit')], 'standby');
   const open = powerEntryIds(shell, true);
-  for (const id of ['pc-mode', 'restart-pc', 'restart-app']) assert.equal(open[powerIndex(open, id)], id);
+  for (const id of ['pc-mode', 'restart-pc', 'restart-app', 'quit']) assert.equal(open[powerIndex(open, id)], id);
   assert.equal(powerIndex([], 'standby'), 0);
   const app = powerEntryIds(lay(false), true);
   assert.equal(app[powerIndex(app, 'quit')], 'quit');

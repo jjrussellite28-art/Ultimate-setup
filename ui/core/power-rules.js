@@ -2,13 +2,12 @@
 // menu groups them and where the focus starts or comes back to.
 
 /**
- * The action an id stands for in the current mode. Shell mode: the PC mode (back with the Guide button) and a restart into it; no
- * quit. App mode: the PC mode (Mega Hub hides and keeps running, the tray icon brings it back) and quit are both offered; a restart
- * into the PC mode means nothing (Windows starts its desktop anyway).
+ * The action an id stands for in the current mode. PC mode (Mega Hub waits, the Guide button or tray icon brings it back) and quit
+ * (Mega Hub ends completely; as the shell the host starts the desktop first) are offered in both modes; only a restart into the PC mode
+ * means nothing in app mode (Windows starts its desktop anyway).
  */
 export function forMode(id, isShell) {
-  if (isShell) return id === 'quit' ? null : id;
-  return id === 'restart-pc' ? null : id;
+  return !isShell && id === 'restart-pc' ? null : id;
 }
 
 /** The sleep timer sits in the menu like an action, but it is no power action (it only picks a time). */
@@ -19,7 +18,7 @@ export const MORE = 'more';
 
 /**
  * The menu in three parts: the everyday computer actions as large tiles, the rare ones behind a collapsed "Mehr" row, the sleep
- * timer as one row at the bottom. Ids before forMode. The secondary list is in the order of the menu; quit is only there in app mode.
+ * timer as one row at the bottom. Ids before forMode. The secondary list is in the order of the menu.
  */
 export const POWER_PRIMARY = ['standby', 'shutdown', 'restart'];
 export const POWER_SECONDARY = ['pc-mode', 'restart-pc', 'restart-app', 'quit'];

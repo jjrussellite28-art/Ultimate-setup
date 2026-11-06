@@ -1529,7 +1529,7 @@ const powerItems = (ids) => Object.fromEntries(powerEntries(ids).map((e) => [e.i
 
 function categories() {
   const s = settings ?? {};
-  // The mode decides: shell mode has the PC mode and a restart into it, app mode "Quit Mega Hub" in its place (power.js forMode).
+  // The mode decides: a restart into the PC mode is only offered as the shell (power.js forMode).
   const power = powerItems(['pc-mode', 'standby', 'restart', 'shutdown', 'restart-pc', 'quit']);
   const holdOptions = [500, 1000, 1500, 2000].map((ms) => ({ label: holdLabel(ms), value: ms }));
   const glyphLabels = { auto: t('settings.controller.glyphs.auto'), xbox: t('settings.controller.glyphs.xbox'), playstation: t('settings.controller.glyphs.playstation') };
@@ -1755,7 +1755,8 @@ function categories() {
         power.shutdown,
         power.restart,
         power['pc-mode'],
-        ...(power.quit ? [power.quit] : []),
+        // Red, right under the PC mode: not waiting in the background, really gone until it is started again.
+        ...(power.quit ? [{ ...power.quit, danger: true }] : []),
         // Test builds: fetches the newest Mega Hub from GitHub, rebuilds if needed and starts it again (the file next to the app folder; not in an installed copy).
         action(t('settings.info.update'), t('settings.info.updateDesc'), async () => {
           if (!(await ensureUnlocked(t('settings.info.update')))) return;

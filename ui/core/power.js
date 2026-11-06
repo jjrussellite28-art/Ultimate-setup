@@ -71,7 +71,7 @@ export const POWER_ACTIONS = [
     run: () => api.power('restart-pc')
   },
   {
-    // App mode only (in shell mode there is no desktop to go back to): closes Mega Hub (the host asks for the couch lock too).
+    // Closes Mega Hub completely (as the shell the host starts the desktop first); the host asks for the couch lock too.
     id: 'quit',
     icon: '✕',
     get label() { return t('power.quit.label'); },
