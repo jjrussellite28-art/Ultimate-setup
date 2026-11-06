@@ -1756,6 +1756,12 @@ function categories() {
         power.restart,
         power['pc-mode'],
         ...(power.quit ? [power.quit] : []),
+        // Test builds: fetches the newest Mega Hub from GitHub, rebuilds if needed and starts it again (the file next to the app folder; not in an installed copy).
+        action(t('settings.info.update'), t('settings.info.updateDesc'), async () => {
+          if (!(await ensureUnlocked(t('settings.info.update')))) return;
+          const started = await attempt(() => api.updateMegaHub(), t('settings.info.update'));
+          if (started === false) toast(t('settings.info.updateMissing'), 6000);
+        }),
         ...(power['restart-pc'] ? expert(power['restart-pc']) : []),
         { kind: 'choice', label: t('settings.power.timer'), desc: t('settings.power.timerDesc'), value: () => sleepTimerDetail(), run: chooseSleepTimer },
         wipeRow('reset', () => api.resetMegaHub()),
@@ -1787,12 +1793,6 @@ function categories() {
         },
         action(t('settings.info.disclaimer'), t('settings.info.disclaimerDesc'), () => openPage(disclaimerPage(), t('settings.cat.info'))),
         action(t('settings.info.privacy'), t('settings.info.privacyDesc'), () => openPage(privacyPage(), t('settings.cat.info'))),
-        // Test builds: fetches the newest Mega Hub from GitHub, rebuilds if needed and starts it again (the file next to the app folder; not in an installed copy).
-        action(t('settings.info.update'), t('settings.info.updateDesc'), async () => {
-          if (!(await ensureUnlocked(t('settings.info.update')))) return;
-          const started = await attempt(() => api.updateMegaHub(), t('settings.info.update'));
-          if (started === false) toast(t('settings.info.updateMissing'), 6000);
-        }),
         info(t('settings.info.guide'), t('settings.info.guideDesc')),
         info(t('settings.info.version'), state.info.version || '–'),
         info(t('settings.info.license'), 'GPL-3.0 · © 2026 kewe87 · fork: jjrussellite28-art'),
