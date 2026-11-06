@@ -4128,13 +4128,24 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     public void SetScreenLayout(string mode) => DisplayService.SetLayout(mode);
 
     /// <summary>
-    /// Test builds: starts "Get newest Mega Hub.bat" (it sits next to the app folder, not in Program Files) which closes Mega Hub, fetches the
-    /// newest version from GitHub, rebuilds when the program code changed and starts Mega Hub again. False when that file is not there.
+    /// Test builds: starts "Get newest Mega Hub.bat" (in the project folder) which closes Mega Hub, fetches the newest version from GitHub,
+    /// installs it into Program Files (the whole installer when the program code changed, else only the screens) and starts Mega Hub again.
+    /// False when that file is not there.
     /// </summary>
     public bool UpdateMegaHub()
     {
         RequireUnlocked();
+        // The project folder: remembered by the update file itself (the installed copy lives in Program Files), else the folder above the app.
         var folder = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, ".."));
+        try
+        {
+            var remembered = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CouchHud", "update-folder.txt");
+            if (File.Exists(remembered)) folder = File.ReadAllText(remembered).Trim();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Not readable: the folder above the app stays.
+        }
         var script = Path.Combine(folder, "Get newest Mega Hub.bat");
         if (!File.Exists(script)) return false;
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c \"\"" + script + "\" auto\"")
