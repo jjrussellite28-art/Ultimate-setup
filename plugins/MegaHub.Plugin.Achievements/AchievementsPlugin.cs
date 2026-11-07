@@ -70,7 +70,7 @@ public sealed class AchievementsPlugin : IPlugin
             {
                 Key = "steam",
                 Label = T("Steam-Erfolge lesen", "Read Steam achievements"),
-                Description = T("Holt deine Erfolge über Steams Webdienst. Dein Steam-Profil muss öffentlich sein (Spieldetails).", "Gets your achievements through Steam's web service. Your Steam profile must be public (Game details)."),
+                Description = T("Holt deine Erfolge über Steams Webdienst. Wichtig: Spieldetails müssen in Steam auf Öffentlich stehen.", "Gets your achievements through Steam's web service. Important: Game details must be set to Public in Steam."),
                 Kind = SettingKind.Toggle,
                 Default = "true"
             },
@@ -78,7 +78,7 @@ public sealed class AchievementsPlugin : IPlugin
             {
                 Key = "steamkey",
                 Label = T("Steam-Schlüssel", "Steam key"),
-                Description = T("Dein kostenloser Steam-Webschlüssel (einmal eintragen). Auf der Erfolge-Seite unter Quellen gibt es eine Zeile, die die Seite dafür öffnet. Er wird verschlüsselt gespeichert und nie angezeigt.", "Your free Steam web key (enter it once). The Achievements page has a row under Sources that opens the page to make one. It is stored encrypted and never shown."),
+                Description = T("Wichtig: In Steam muss Profil › Datenschutz › Spieldetails auf Öffentlich stehen, sonst sieht Mega Hub keine Erfolge. Dein kostenloser Steam-Webschlüssel (einmal eintragen). Auf der Erfolge-Seite unter Quellen gibt es eine Zeile, die die Seite dafür öffnet. Er wird verschlüsselt gespeichert und nie angezeigt.", "Important: in Steam, Profile › Privacy settings › Game details must be set to Public, or Mega Hub sees no achievements. Your free Steam web key (enter it once). The Achievements page has a row under Sources that opens the page to make one. It is stored encrypted and never shown."),
                 Kind = SettingKind.Secret
             },
             new PluginSetting
@@ -298,7 +298,7 @@ public sealed class AchievementsPlugin : IPlugin
             {
                 Section = "sources",
                 Kind = PluginRowKind.Action,
-                Detail = T("Öffnet die Steam-Seite im Browser von Mega Hub", "Opens the Steam page in the Mega Hub browser"),
+                Detail = T("Öffnet die Steam-Seite im Browser von Mega Hub. Wichtig: Spieldetails in Steam auf Öffentlich stellen", "Opens the Steam page in the Mega Hub browser. Important: set Game details to Public in Steam"),
                 RequiresUnlock = false
             });
         }
