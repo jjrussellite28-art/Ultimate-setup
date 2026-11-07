@@ -56,7 +56,25 @@ jobs:
 
       - name: Test
         # One test assembly at a time: the runner has few cores, and the time-bound tests (a hung handler, a slow source) must not starve each other.
-        run: dotnet test CouchHud.slnx --no-build -c Release --logger "console;verbosity=normal" -- RunConfiguration.MaxCpuCount=1
+        run: dotnet test CouchHud.slnx --no-build -c Release --logger "console;verbosity=normal" --logger "trx" --results-directory TestResults -- RunConfiguration.MaxCpuCount=1
+
+      # Mega Hub: every failed test shows up as a readable error on the run page (name and first lines of the message).
+      - name: Failed tests (summary)
+        if: always()
+        shell: pwsh
+        run: |
+          $n = 0
+          foreach ($f in Get-ChildItem TestResults -Filter *.trx -Recurse -ErrorAction SilentlyContinue) {
+            [xml]$x = Get-Content $f.FullName
+            $ns = New-Object Xml.XmlNamespaceManager($x.NameTable); $ns.AddNamespace('t', 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
+            foreach ($r in $x.SelectNodes("//t:UnitTestResult[@outcome='Failed']", $ns)) {
+              $n++
+              $msg = ($r.Output.ErrorInfo.Message -replace '[\r\n]+', ' | ')
+              if ($msg.Length -gt 500) { $msg = $msg.Substring(0, 500) }
+              Write-Host "::error title=Test failed::$($r.testName) :: $msg"
+            }
+          }
+          Write-Host "failed tests: $n"
 
       # Same UI checks as scripts/check.sh: every file parsed as an ES module, ESLint (eslint.config.mjs), de/en kept in step.
       # The C# analyzer rules (.editorconfig) are part of the Build step: a new finding fails it.
