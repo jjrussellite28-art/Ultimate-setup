@@ -281,11 +281,11 @@ async function signInIfPossible(reason) {
       resolve(false);
     }, 3 * 60_000);
   });
-  const asked = await attempt(() => api.windowsSignIn?.());
+  const asked = await attempt(() => api.windowsSignIn?.(true));
   if (asked?.pending !== true) {
     pendingWindowsUnlocks = pendingWindowsUnlocks.filter((e) => e !== entry);
     // Not asked (no service, or a preview): the code alone then; a refused sign-in stops.
-    return asked?.ok !== false;
+    return asked?.ok !== false || asked?.pending === false;
   }
   toast(t('passcode.signInWindows'), 4000);
   return signedIn;

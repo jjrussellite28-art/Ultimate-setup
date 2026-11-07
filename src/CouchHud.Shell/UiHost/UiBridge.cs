@@ -592,7 +592,7 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                 // Third argument: an administrator's approval instead of the code; Hud allows it only while the service holds no couch code.
                 return await hud.UnlockAsync(Buttons(0), Arg(1).ValueKind == JsonValueKind.True, Arg(2).ValueKind == JsonValueKind.True);
             case "windowsSignIn":
-                return hud.WindowsSignIn();
+                return hud.WindowsSignIn(Arg(0).ValueKind == JsonValueKind.True);
             case "setPasscode":
                 return await hud.SetPasscodeAsync(Buttons(0) ?? throw new ArgumentException(Strings.Get("bridge.sequenceMissing")));
             case "setCouchLock":

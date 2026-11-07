@@ -341,7 +341,7 @@ window.couchhud = {
   // asNewCode: a lock of 0.4.0 whose stored code did not match (legacyMismatch), confirmed as the new code after the person chose so.
   unlock: (code, asNewCode = false, byAdmin = false) => call('unlock', code, asNewCode, byAdmin),
   // Windows lock mode: the Windows sign-in once more, for the service's proof (a new couch code); "unlocked" follows like after unlock.
-  windowsSignIn: () => call('windowsSignIn'),
+  windowsSignIn: (fresh = false) => call('windowsSignIn', fresh),
   setPasscode: (code) => call('setPasscode', code),
   setCouchLock: (mode, code = null) => call('setCouchLock', mode, code),
   setParentCode: (code) => call('setParentCode', code),

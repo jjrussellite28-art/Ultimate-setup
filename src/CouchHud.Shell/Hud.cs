@@ -7928,10 +7928,11 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// code lock, finding H1 of the 0.4.1 acceptance test); without it only a parent's or an administrator's approval would do. The
     /// "unlocked" event and its confirmation follow as after <see cref="UnlockAsync"/>.
     /// </summary>
-    public object WindowsSignIn()
+    public object WindowsSignIn(bool fresh = false)
     {
-        if (config.Current.CouchLock != "windows" || !ServiceCodes.Expected || AdminService.DevMayRelax(dev)) return new { ok = false, pending = false };
-        if (AdminService.Ops.Cache.Has(GrantKind.WindowsUnlock)) return new { ok = true };
+        // Mega Hub: also with the code lock ("fresh": the full unlock always asks for the Windows PIN or password, whatever grant is cached).
+        if (!ServiceCodes.Expected || AdminService.DevMayRelax(dev)) return new { ok = false, pending = false };
+        if (!fresh && AdminService.Ops.Cache.Has(GrantKind.WindowsUnlock)) return new { ok = true };
         _windowsUnlock.Ask();
         if (!WindowsLock.Lock())
         {
