@@ -774,12 +774,14 @@
       const pk = S.pairKey(secret);
       try {
         const res = await post('/api/pair', {}, S.seal(pk, S.DIR.request, 0, 'pair', JSON.stringify({ name: deviceName() })));
-        const opened = res.ok ? S.open(pk, S.DIR.response, 'pair', await res.text()) : null;
-        const answer = opened && JSON.parse(opened.text);
+        const raw = res.ok ? await res.text() : '';
+        const opened = res.ok ? S.open(pk, S.DIR.response, 'pair', raw) : null;
+        let answer = null;
+        try { answer = opened && JSON.parse(opened.text); } catch { /* shown below */ }
         const key = S.fromB64url(answer?.key);
         if (!answer?.id || key?.length !== 32) {
           pairWhy(res.ok // i18n-ignore
-            ? 'Pairing failed: the answer of the PC could not be opened.'
+            ? `Pairing failed: the answer of the PC could not be opened. [${opened ? 'opened, but id/key missing: ' + String(opened.text).replace(/"key":"[^"]*"/, '"key":"..."').slice(0, 120) : 'not opened, ' + raw.length + ' chars: ' + raw.slice(0, 40)}]`
             : `Pairing failed: the PC answered ${res.status} (${res.status === 403 ? 'pairing is not open right now' : res.status === 400 ? 'the QR code ran out or was already used' : 'refused'}). Show a new QR code on the TV and scan it again.`);
           return toast(tr('pairFailed'));
         }
