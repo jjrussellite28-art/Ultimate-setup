@@ -30,6 +30,7 @@ import { addEntryFlow, gameFoldersPage, hiddenItemsPage, scanFolderFlow } from '
 import { openCompanionApps } from '../components/companions.js';
 import { refreshWeather } from '../core/weather.js';
 import { cleanupStuckPoliciesDialog, launchersPage, servicesPage, startupPage } from './system-tools.js';
+import { showUpdateProgress } from '../components/update-progress.js';
 import { transparencyPage } from './transparency.js';
 import { disclaimerPage, privacyPage } from './legal.js';
 import { openSetupWizard } from './setup-wizard.js';
@@ -1799,6 +1800,7 @@ function categories() {
           if (!(await ensureUnlocked(t('settings.info.update')))) return;
           const started = await attempt(() => api.updateMegaHub(), t('settings.info.update'));
           if (started === false) toast(t('settings.info.updateMissing'), 6000);
+          else if (started) showUpdateProgress();
         }),
         // Mega Hub: expert mode + developer switch in one go, so an unsigned plugin of your own can be installed and approved.
         toggle('developerMode', t('settings.power.dev'), t('settings.power.devDesc')),

@@ -11,6 +11,48 @@ $stamp = Join-Path $here '.installed-stamp'
 $installDir = Join-Path $env:ProgramFiles 'CouchHud'
 $installedExe = Join-Path $installDir 'CouchHud.exe'
 
+# Progress for the screen inside Mega Hub (the update runs without a window of its own): %APPDATA%\CouchHud\update-status.json.
+$statusFile = Join-Path $env:APPDATA 'CouchHud\update-status.json'
+function Say([string]$text, [string]$err = '') {
+  Write-Host $text
+  try {
+    New-Item -ItemType Directory -Force -Path (Split-Path $statusFile) | Out-Null
+    $json = '{"text":' + (ConvertTo-Json $text) + ',"error":' + (ConvertTo-Json $err) + '}'
+    [IO.File]::WriteAllText($statusFile, $json)
+  } catch { }
+}
+
+function Stop-MegaHub {
+  Get-Process CouchHud -ErrorAction SilentlyContinue | Stop-Process -Force
+  Start-Sleep -Milliseconds 800
+}
+
+# Own plugins of the project (plugins\MegaHub.Plugin.*): rebuilt when their source changed and put into the plugin folder of Mega Hub.
+function Update-Plugins {
+  $src = Join-Path $here 'plugins'
+  if (-not (Test-Path $src)) { return }
+  $dest = Join-Path $env:APPDATA 'CouchHud\plugins'
+  foreach ($d in @(Get-ChildItem $src -Directory | Where-Object { $_.Name -like 'MegaHub.Plugin.*' })) {
+    $name = $d.Name
+    $target = Join-Path $dest $name
+    $h = (Get-ChildItem $d.FullName -Recurse -File | Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' } | Sort-Object FullName | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA1).Hash }) -join ''
+    $stampFile = Join-Path $here ".plugin-$name-stamp"
+    if ((Test-Path (Join-Path $target "$name.dll")) -and (Test-Path $stampFile) -and ((Get-Content $stampFile -Raw).Trim() -eq $h)) { continue }
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { Say "Plugin $name skipped: .NET is missing."; continue }
+    Say "[plugins] Updating $name..."
+    $out = Join-Path $env:TEMP "mega-hub-plugin-$name"
+    if (Test-Path $out) { Remove-Item $out -Recurse -Force }
+    dotnet publish (Join-Path $d.FullName "$name.csproj") -c Release -o $out | Out-Null
+    if ($LASTEXITCODE -ne 0) { Say "Plugin $name could not be built; the old one stays."; continue }
+    New-Item -ItemType Directory -Force -Path $target | Out-Null
+    Copy-Item (Join-Path $out "$name.dll") $target -Force
+    Copy-Item (Join-Path $d.FullName 'plugin.json') $target -Force
+    if ((Test-Path (Join-Path $d.FullName 'sample-data')) -and -not (Test-Path (Join-Path $target 'sample-data'))) { Copy-Item (Join-Path $d.FullName 'sample-data') $target -Recurse -Force }
+    Set-Content -Path $stampFile -Value $h
+    Remove-Item $out -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
 function Find-Iscc {
   foreach ($p in @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe", "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe")) { if (Test-Path $p) { return $p } }
   return $null
@@ -22,15 +64,13 @@ try {
   New-Item -ItemType Directory -Force -Path $remember | Out-Null
   Set-Content -Path (Join-Path $remember 'update-folder.txt') -Value $here -Encoding UTF8
 
-  Write-Host '[1/5] Downloading the newest Mega Hub from GitHub...'
+  Say '[1/5] Downloading the newest Mega Hub from GitHub...'
   Invoke-WebRequest -Uri 'https://github.com/jjrussellite28-art/mega-hub/archive/refs/heads/mega-hub-rename.zip' -OutFile $zip -UseBasicParsing
   if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
   Expand-Archive -Path $zip -DestinationPath $tmp -Force
   $new = (Get-ChildItem $tmp -Directory | Select-Object -First 1).FullName
 
-  Write-Host '[2/5] Closing Mega Hub if it is open...'
-  Get-Process CouchHud -ErrorAction SilentlyContinue | Stop-Process -Force
-  Start-Sleep -Milliseconds 800
+  Say '[2/5] Looking at what changed...'
 
   # Did the program code change? (a fingerprint of src, plugins and the version file)
   $files = @(Get-ChildItem (Join-Path $new 'src'), (Join-Path $new 'plugins') -Recurse -File) + (Get-Item (Join-Path $new 'Directory.Build.props'))
@@ -40,7 +80,7 @@ try {
   $old = if (Test-Path $stamp) { (Get-Content $stamp -Raw).Trim() } else { '' }
   $install = ($code -ne $old) -or -not (Test-Path $installedExe)
 
-  Write-Host '[3/5] Copying the newest files into the project folder...'
+  Say '[3/5] Copying the newest files into the project folder...'
   # Everything from GitHub is copied over the project folder; your own files (ideas, test list, old builds) stay.
   robocopy $new $here /E /NFL /NDL /NJH /NJS /NP /XF '.installed-stamp' | Out-Null
   if ($LASTEXITCODE -ge 8) { throw 'Copying failed.' }
@@ -52,10 +92,10 @@ try {
   [IO.File]::WriteAllText((Join-Path $here 'ui\build.json'), $stampJson)
 
   if ($install) {
-    Write-Host '[4/5] Program code changed (or first install): building the installer. 5-10 minutes, do not close this window...'
+    Say '[4/5] Program code changed (or first install): building the installer. about 10 minutes, Mega Hub stays open until it is ready.'
     $iscc = Find-Iscc
     if (-not $iscc) {
-      Write-Host 'Inno Setup is missing. Installing it...'
+      Say 'Inno Setup is missing. Installing it...'
       winget install --id JRSoftware.InnoSetup -e --accept-package-agreements --accept-source-agreements
       $iscc = Find-Iscc
     }
@@ -75,24 +115,28 @@ try {
     if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'Building Setup.exe failed.' }
     $setup = Get-ChildItem installer\output\CouchHud-Setup-*.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     Pop-Location
-    Write-Host '[5/5] Installing into Program Files. Windows asks once: say Yes...'
+    Say '[5/5] Installing into Program Files. Windows asks once: say Yes...'
+    Stop-MegaHub
     $p = Start-Process -FilePath $setup.FullName -ArgumentList '/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS' -Wait -PassThru
     if ($p.ExitCode -ne 0) { throw "The installer stopped (code $($p.ExitCode))." }
     Set-Content -Path $stamp -Value $code
   } else {
-    Write-Host '[4/5] No program code changed: no rebuild needed.'
-    Write-Host '[5/5] Copying the newest screens into Program Files. Windows asks once: say Yes...'
+    Say '[4/5] No program code changed: no rebuild needed.'
+    Say '[5/5] Copying the newest screens into Program Files. Windows asks once: say Yes...'
     # robocopy answers 1 when it copied files (fine); only 8 and up is an error. An explicit exit, else PowerShell reports its 1 as a failure.
+    Stop-MegaHub
     $copy = "robocopy '$here\ui' '$installDir\ui' /MIR /NFL /NDL /NJH /NJS /NP; if (`$LASTEXITCODE -ge 8) { exit 1 } else { exit 0 }"
     $p = Start-Process powershell -Verb RunAs -Wait -PassThru -WindowStyle Hidden -ArgumentList '-NoProfile', '-Command', $copy
     if ($p.ExitCode -ne 0) { throw 'Copying into Program Files failed.' }
   }
   Remove-Item $zip -Force -ErrorAction SilentlyContinue
   Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
-  Write-Host 'Done. Starting Mega Hub...'
+  Stop-MegaHub
+  Update-Plugins
+  Say 'Done. Starting Mega Hub...'
   Start-Process $installedExe -WorkingDirectory $installDir
 } catch {
   Write-Host ''
-  Write-Host ('ERROR: ' + $_.Exception.Message) -ForegroundColor Red
+  Say 'The update stopped.' $_.Exception.Message
   exit 1
 }

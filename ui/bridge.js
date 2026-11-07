@@ -176,6 +176,7 @@ window.couchhud = {
   setScreen: (number) => call('setScreen', number),
   setScreenLayout: (mode) => call('setScreenLayout', mode),
   updateMegaHub: () => call('updateMegaHub'),
+  getUpdateStatus: () => call('getUpdateStatus'),
   getOpenApps: () => call('getOpenApps'),
   setCloseApps: (names) => call('setCloseApps', names),
   unlockFully: () => call('unlockFully'),

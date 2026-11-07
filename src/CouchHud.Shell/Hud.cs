@@ -4166,6 +4166,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         return clean;
     }
 
+    private System.Diagnostics.Process? _updateProc;
+
+    /// <summary>
+    /// Starts the update (Get-newest-Mega-Hub.ps1 in the project folder) without a window of its own: Mega Hub stays on screen and shows
+    /// the progress (GetUpdateStatus); the script closes Mega Hub only when it is ready to install. False when the file is not there.
+    /// </summary>
     public bool UpdateMegaHub()
     {
         RequireUnlocked();
@@ -4180,14 +4186,36 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         {
             // Not readable: the folder above the app stays.
         }
-        var script = Path.Combine(folder, "Get newest Mega Hub.bat");
+        var script = Path.Combine(folder, "Get-newest-Mega-Hub.ps1");
         if (!File.Exists(script)) return false;
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c \"\"" + script + "\" auto\"")
+        try { File.Delete(UpdateStatusFile); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        var info = new System.Diagnostics.ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = folder };
+        foreach (var a in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script, "auto" }) info.ArgumentList.Add(a);
+        _updateProc = System.Diagnostics.Process.Start(info);
+        return _updateProc is not null;
+    }
+
+    private static string UpdateStatusFile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CouchHud", "update-status.json");
+
+    /// <summary>What the running update says it is doing (text), an error text when it stopped, and whether it still runs.</summary>
+    public object GetUpdateStatus()
+    {
+        string text = "", error = "";
+        try
         {
-            UseShellExecute = true,
-            WorkingDirectory = folder
-        })?.Dispose();
-        return true;
+            if (File.Exists(UpdateStatusFile))
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(UpdateStatusFile));
+                text = doc.RootElement.TryGetProperty("text", out var t) ? t.GetString() ?? "" : "";
+                error = doc.RootElement.TryGetProperty("error", out var e) ? e.GetString() ?? "" : "";
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            // Being written right now: the next poll reads it.
+        }
+        var running = _updateProc is { } p && !p.HasExited;
+        return new { running, text, error };
     }
 
     public Task<PerformanceSample> GetPerformanceAsync() => _performance.SampleAsync();

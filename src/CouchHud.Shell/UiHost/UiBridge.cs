@@ -672,6 +672,8 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
                     : throw new ArgumentException("setCloseApps: argument 0 must be a list"));
             case "updateMegaHub":
                 return hud.UpdateMegaHub();
+            case "getUpdateStatus":
+                return hud.GetUpdateStatus();
             case "getPerformance":
                 return await hud.GetPerformanceAsync();
             case "getCaptures":

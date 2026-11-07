@@ -1228,6 +1228,7 @@ window.couchhud = {
   },
   setScreenLayout: async (mode) => log('setScreenLayout', mode),
   updateMegaHub: async () => (log('updateMegaHub'), true),
+  getUpdateStatus: async () => ({ running: true, text: '[3/5] Copying the newest files...', error: '' }),
   getOpenApps: async () => ['chrome', 'discord', 'firefox'],
   setCloseApps: async (names) => (log('setCloseApps', names), names),
   unlockFully: async () => (log('unlockFully'), (security.unlocked = true), true),
