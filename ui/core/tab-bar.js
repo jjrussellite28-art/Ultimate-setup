@@ -58,7 +58,7 @@ li.pinned { position: sticky; }
 li { cursor: pointer; }
 /* The page's own rule (styles.css) cannot reach into this closed shadow root: with the themed pointer (or the comic mouse) the real
    Windows pointer stays hidden here too; it shows only in the "system" pointer mode (data-pointer on <html>, components/mouse.js). */
-:host-context(html:not([data-pointer="system"])) .tabs, :host-context(html:not([data-pointer="system"])) li, :host-context(html:not([data-pointer="system"])) .slot { cursor: none !important; }
+:host(:not([data-real-pointer])), :host(:not([data-real-pointer])) * { cursor: none !important; }
 li.hover:not(.active) { color: var(--s-color-active); border-bottom-color: var(--s-accent); }
 li.hover:not(.active)::before { background: var(--s-bg-active); outline: calc(var(--u) * 0.12) solid var(--s-accent); outline-offset: calc(var(--u) * -0.12); }
 li.active { color: var(--s-color-active); border-bottom-color: var(--s-accent); font-weight: var(--s-weight-active); }
@@ -97,6 +97,8 @@ function mountBar() {
   const wrap = el('div', { className: 'wrap' }, nav, slot);
   root.append(style, wrap);
   refs = { host, root, wrap, nav, list, more, lb, rb };
+  // The Windows pointer shows over the bar only in the "system" pointer mode (the attribute is kept by components/mouse.js setPointer).
+  host.toggleAttribute('data-real-pointer', html.dataset.pointer === 'system');
   refreshBarGlyphs();
   onGlyphsChanged(refreshBarGlyphs);
   holdAncestors();

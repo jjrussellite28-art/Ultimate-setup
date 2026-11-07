@@ -70,6 +70,8 @@ svg { width: 100%; height: 100%; overflow: visible; transform-origin: 10% 10%; }
 export function setPointer(mode, mouseUnlocked) {
   const next = mode === 'system' ? 'system' : mode === 'mouse' && mouseUnlocked ? 'mouse' : 'skin';
   document.documentElement.dataset.pointer = next;
+  // The tab bar is a closed shadow root that the page's CSS cannot reach: the host carries the answer for it.
+  document.getElementById('top')?.toggleAttribute('data-real-pointer', next === 'system');
   pointerMode = next;
   if (cursor) {
     // The real Windows pointer shows: no overlay (core/layers.js keeps the pointer out of the top layer then).
