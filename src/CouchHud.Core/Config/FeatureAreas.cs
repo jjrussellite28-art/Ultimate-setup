@@ -53,7 +53,7 @@ public static class FeatureAreas
         ["pointer"] = Always, ["mouseUnlocked"] = Always, ["closeExplorerInLight"] = Always, ["acceptedTerms"] = Always,
         ["setupWizardDone"] = Always, ["modeSwitchJournal"] = Always, ["autoLogonDeclined"] = Always, ["guideTapInGame"] = Always, ["suppressCompetitors"] = Always, ["suppressBySetup"] = Always, ["gameBarButton"] = Always,
         ["musicVolume"] = Always, ["soundVolume"] = Always, ["soundSet"] = Always, ["uiHdr"] = Always, ["sounds"] = Always,
-        ["expertMode"] = Always, ["language"] = Always, ["rumble"] = Always, ["padGlyphs"] = Always, ["runStartupApps"] = Always,
+        ["expertMode"] = Always, ["developerMode"] = Always, ["language"] = Always, ["rumble"] = Always, ["padGlyphs"] = Always, ["runStartupApps"] = Always,
         ["killExplorerOnReturn"] = Always, ["nightMode"] = Always, ["nightModeStrength"] = Always,
         ["closePcAppsOnReturn"] = Always, ["closeAllAppsOnReturn"] = Always, ["onlineArtwork"] = Always, ["clearArtworkCache"] = Always,
         ["autoSwitchHeadphones"] = Always, ["returnHoldMs"] = Always, ["weatherLocation"] = Always,

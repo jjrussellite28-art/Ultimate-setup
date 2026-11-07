@@ -570,6 +570,8 @@ export default {
   'settings.info.disclaimerDesc': 'Nutzung auf eigenes Risiko, was Mega Hub an Windows ändern kann',
   'settings.info.privacy': 'Datenschutz',
   'settings.info.privacyDesc': 'Keine Telemetrie. Was lokal liegt und welche Dienste Mega Hub wann kontaktiert',
+  'settings.power.dev': 'Entwicklermodus',
+  'settings.power.devDesc': 'Erlaubt eigene, unsignierte Plugins (schaltet auch den Expertenmodus ein)',
   'settings.info.update': 'Mega Hub aktualisieren',
   'settings.info.updateDesc': 'Testversionen: holt die neueste Version von GitHub, installiert sie in Program Files und startet Mega Hub neu',
   'settings.info.updateMissing': 'Die Update-Datei wurde nicht gefunden. Starte zuerst einmal "Get newest Mega Hub.bat" im Mega-Hub-Ordner',

@@ -1800,6 +1800,8 @@ function categories() {
           const started = await attempt(() => api.updateMegaHub(), t('settings.info.update'));
           if (started === false) toast(t('settings.info.updateMissing'), 6000);
         }),
+        // Mega Hub: expert mode + developer switch in one go, so an unsigned plugin of your own can be installed and approved.
+        toggle('developerMode', t('settings.power.dev'), t('settings.power.devDesc')),
         { kind: 'choice', label: t('settings.power.timer'), desc: t('settings.power.timerDesc'), value: () => sleepTimerDetail(), run: chooseSleepTimer },
         wipeRow('reset', () => api.resetMegaHub()),
         wipeRow('uninstall', () => api.uninstallMegaHub())

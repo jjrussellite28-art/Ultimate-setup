@@ -2766,6 +2766,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             suppressBySetup = c.SuppressBySetup,
             integrationMode = c.IntegrationMode,
             expertMode = c.ExpertMode,
+            developerMode = c.ExpertMode && c.CatalogAllowLocal,
             modeSwitchJournal = c.ModeSwitchJournal,
             areas = FeatureAreas.From(c).Enabled,
             bluetoothAutoOn = c.BluetoothAutoOn,
@@ -3091,6 +3092,11 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 break;
             case "expertMode":
                 config.UpdateOrThrow(c => c.ExpertMode = Bool());
+                break;
+            case "developerMode":
+                // Mega Hub: one switch for expert mode plus the developer switch (unsigned local plugins, local catalogs).
+                var devOn = Bool();
+                config.UpdateOrThrow(c => { c.CatalogAllowLocal = devOn; if (devOn) c.ExpertMode = true; });
                 break;
             case "language":
                 var language = value.GetString();
