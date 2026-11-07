@@ -1097,6 +1097,25 @@ body[data-view="passcode"] #toast {
   display: none;
 }
 
+/* "Unlock now" and the like: a button on the right of the text. */
+#toast.has-action {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+#toast .toast-action {
+  flex: none;
+  padding: 0.4rem 1.2rem;
+  border-radius: 1.2rem;
+  border: 0.1rem solid rgba(255, 255, 255, 0.4);
+  background: var(--accent, #1ea7fd);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 /* A screenshot was taken (Guide + Y, guide menu): the picture and where it went, bottom right above the button hints, out of the way
    of the page's title, the text toast and notification banners (top right). */
 #shot-toast {

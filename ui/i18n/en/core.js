@@ -30,6 +30,7 @@ export default {
   'nav.back': 'Back',
 
   'feedback.failed': 'Failed',
+  'feedback.unlockNow': 'Unlock now',
 
   'power.dataLoss': 'Unsaved work in open programs will be lost.',
   'power.standby.label': 'Sleep',

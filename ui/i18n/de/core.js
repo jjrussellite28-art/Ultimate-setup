@@ -30,6 +30,7 @@ export default {
   'nav.back': 'Zurück',
 
   'feedback.failed': 'Fehlgeschlagen',
+  'feedback.unlockNow': 'Jetzt entsperren',
 
   'power.dataLoss': 'Nicht gespeicherte Arbeit in offenen Programmen geht verloren.',
   'power.standby.label': 'Standby',

@@ -7,9 +7,23 @@ export { isBusy, markBusy, runBusy } from './busy.js';
 let toastTimer;
 
 /** `long`: a text of several lines; it sits low on the screen so it never covers the title of the page behind it. */
-export function toast(text, ms = 2500, { long = false } = {}) {
+export function toast(text, ms = 2500, { long = false, action = null } = {}) {
   const t = $('#toast');
   t.textContent = text;
+  // A button on the right of the text (mouse or touch), e.g. "Unlock now" on a locked-message.
+  if (action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'toast-action';
+    button.textContent = action.label;
+    button.addEventListener('click', () => {
+      t.hidden = true;
+      clearTimeout(toastTimer);
+      action.run();
+    });
+    t.append(button);
+  }
+  t.classList.toggle('has-action', !!action);
   t.classList.toggle('long', long);
   t.hidden = false;
   clearTimeout(toastTimer);
@@ -36,6 +50,21 @@ export async function attempt(action, label, { quietLocked = false, lockedValue 
       return undefined;
     }
     console.error(err);
+    // A locked couch: the message gets an "Unlock now" button; after the unlock the page is built again.
+    if (err?.locked) {
+      toast(`${label ?? t('feedback.failed')}: ${err?.message || err}`, 7000, {
+        action: {
+          label: t('feedback.unlockNow'),
+          run: async () => {
+            const { ensureUnlocked } = await import('../components/passcode.js');
+            if (!(await ensureUnlocked(label ?? ''))) return;
+            const { render } = await import('./nav.js');
+            render();
+          }
+        }
+      });
+      return undefined;
+    }
     toast(`${label ?? t('feedback.failed')}: ${err?.message || err}`, 5000);
     return undefined;
   }
