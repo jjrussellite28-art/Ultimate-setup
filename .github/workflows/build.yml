@@ -131,9 +131,11 @@ jobs:
         if: always()
         shell: bash
         run: |
+          set +e
+          ls -la *.txt
           for f in browser-output.txt tabs-output.txt; do
             [ -f "$f" ] || continue
-            lines=$(grep -E 'FAIL|^ {5}|fail|Error' "$f" | head -25 | tr '\n' '|' | cut -c1-1500)
+            lines=$(grep -E 'FAIL|^ {5}|fail|Error' "$f" | head -25 | tr '\n' '|' | cut -c1-1500; true)
             [ -n "$lines" ] && echo "::error title=$f::$lines"
           done
           exit 0
