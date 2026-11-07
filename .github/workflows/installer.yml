@@ -1,0 +1,77 @@
+name: installer
+
+# Mega Hub: builds the full installer (app + service) on every push to mega-hub-rename and puts it on the
+# "Latest installer" release page, so it can be downloaded and run once (this is what installs the Mega Hub service).
+# The unit tests are in build.yml; this one only builds.
+
+on:
+  push:
+    branches: [mega-hub-rename]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish app
+        run: dotnet publish src/CouchHud.Shell/CouchHud.Shell.csproj -c Release -r win-x64 --self-contained true -o publish
+
+      - name: Record source commit
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllText('publish/BUILD-COMMIT.txt', "$env:GITHUB_SHA`n", [Text.UTF8Encoding]::new($false))
+
+      - name: Publish service
+        shell: pwsh
+        run: |
+          dotnet publish src/CouchHud.Service/CouchHud.Service.csproj -c Release -r win-x64 --self-contained true -p:DebugType=embedded -o publish/service
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Setup version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content Directory.Build.props
+          "version=$($props.Project.PropertyGroup.Version)" >> $env:GITHUB_OUTPUT
+
+      - name: Download WebView2 bootstrapper
+        shell: pwsh
+        run: Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile installer/MicrosoftEdgeWebview2Setup.exe
+
+      - name: Build setup
+        shell: pwsh
+        run: |
+          $isUrl = 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe'
+          $isSha = '9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732'
+          $isExe = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          Invoke-WebRequest -Uri $isUrl -OutFile $isExe
+          if ((Get-FileHash $isExe -Algorithm SHA256).Hash.ToLowerInvariant() -ne $isSha) { throw "Inno Setup installer hash mismatch" }
+          $isDir = Join-Path $env:RUNNER_TEMP 'InnoSetup'
+          Start-Process -FilePath $isExe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=`"$isDir`"" -Wait
+          $iscc = Join-Path $isDir 'ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found after installing Inno Setup" }
+          & $iscc "/DAppVersion=${{ steps.version.outputs.version }}" "/DPublishDir=..\publish" "/DWebView2Setup=MicrosoftEdgeWebview2Setup.exe" installer\CouchHud.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Mega-Hub-Setup
+          path: installer/output/*.exe
+
+      - name: Latest installer release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          tag_name: latest-installer
+          name: Latest installer
+          prerelease: true
+          body: "Mega Hub installer (app and service), built from the newest push. Download the .exe, run it once, press Yes. Mega Hub is based on CouchHUD by kewe87 (GPL-3.0); source: https://github.com/jjrussellite28-art/mega-hub"
+          files: installer/output/*.exe
