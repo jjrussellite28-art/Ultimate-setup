@@ -1530,6 +1530,33 @@ function windowsItems(s) {
   ];
 }
 
+/** Which programs close on the way back to the couch: the open ones plus the saved ones, each On or Off; saved when the list is left. */
+async function chooseCloseApps() {
+  if (!(await ensureUnlocked(t('settings.startup.closePick')))) return;
+  const open = (await attempt(() => api.getOpenApps(), t('settings.startup.closePickFailed'))) ?? [];
+  const saved = settings?.closeAppsList ?? [];
+  let chosen = [...saved];
+  const names = [...new Set([...open, ...saved])].sort();
+  if (!names.length) return toast(t('settings.startup.closePickNone'), 5000);
+  let last;
+  for (;;) {
+    const picked = await chooseDialog(t('settings.startup.closePick'), names.map((n) => ({
+      label: `${n}: ${chosen.includes(n) ? t('settings.common.on') : t('settings.common.off')}`,
+      detail: open.includes(n) ? t('settings.startup.closePickOpen') : t('settings.startup.closePickSaved'),
+      value: n
+    })), last ?? names[0]);
+    if (picked === undefined) break;
+    chosen = chosen.includes(picked) ? chosen.filter((n) => n !== picked) : [...chosen, picked];
+    last = picked;
+  }
+  if (chosen.slice().sort().join() === saved.slice().sort().join()) return;
+  const result = await attempt(() => api.setCloseApps(chosen), t('settings.startup.closePickFailed'));
+  if (!result) return;
+  settings.closeAppsList = result;
+  toast(t('settings.startup.closePickSaved2'));
+  render();
+}
+
 function startupItems(s) {
   const full = (s.integrationMode ?? 'light') === 'full';
   return [
@@ -1537,6 +1564,15 @@ function startupItems(s) {
       toggle('runStartupApps', t('settings.startup.apps'), t('settings.startup.appsDesc')),
       action(t('settings.startup.choose'), t('settings.startup.chooseDesc'), () => openPage(startupPage(), t('settings.cat.startup'))),
       toggle('closePcAppsOnReturn', t('settings.startup.closePc'), t('settings.startup.closePcDesc')),
+      // Other programs (browsers, chat …) close like a click on the X when you return to the couch: all of them, or only the chosen ones.
+      toggle('closeAllAppsOnReturn', t('settings.startup.closeAll'), t('settings.startup.closeAllDesc')),
+      {
+        kind: 'choice',
+        label: t('settings.startup.closePick'),
+        desc: t('settings.startup.closePickDesc'),
+        value: () => (settings?.closeAllAppsOnReturn ? t('settings.startup.closePickAll') : t('settings.startup.closePickCount', { count: (settings?.closeAppsList ?? []).length })),
+        run: chooseCloseApps
+      },
       action(t('settings.startup.services'), t('settings.startup.servicesDesc'), () => openPage(servicesPage(), t('settings.cat.startup')))
     ] : [info(t('settings.startup.fullOnly'), t('settings.startup.fullOnlyDesc'))])
   ];

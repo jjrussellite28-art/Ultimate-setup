@@ -370,12 +370,18 @@ function steps(page) {
       later: () => where('settings.cat.startup'),
       options: () => [
         { id: 'off', icon: '🧹', title: t('wizard.startup.off'), bullets: [t('wizard.startup.off1'), t('wizard.startup.off2')] },
+        { id: 'clean', icon: '✨', title: t('wizard.startup.clean'), bullets: [t('wizard.startup.clean1'), t('wizard.startup.clean2')] },
         { id: 'on', icon: '▶', title: t('wizard.startup.on'), bullets: [t('wizard.startup.on1'), t('wizard.startup.on2')] }
       ].map((o) => ({
-        ...o, current: !!env.settings.runStartupApps === (o.id === 'on'),
+        ...o,
+        current: !env.settings.runStartupApps === (o.id !== 'on') && !!env.settings.closeAllAppsOnReturn === (o.id === 'clean'),
         run: async () => {
           if (!(await save('runStartupApps', o.id === 'on'))) return;
           env.settings.runStartupApps = o.id === 'on';
+          // "clean": also close the other programs (browsers …) like a click on the X when returning to the couch.
+          const closeAll = o.id === 'clean';
+          if (!(await save('closeAllAppsOnReturn', closeAll))) return;
+          env.settings.closeAllAppsOnReturn = closeAll;
           return 'next';
         }
       }))

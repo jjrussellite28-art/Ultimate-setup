@@ -2798,6 +2798,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             runStartupApps = c.RunStartupApps,
             killExplorerOnReturn = KillExplorerOnReturn,
             closePcAppsOnReturn = c.ClosePcAppsOnReturn,
+            closeAllAppsOnReturn = c.CloseAllAppsOnReturn,
+            closeAppsList = c.CloseAppsList,
             maximizeBrowser = c.MaximizeBrowser,
             browserHistory = c.BrowserHistory,
             favoritesMode = FavoritesShelf.NormalizeMode(c.FavoritesMode),
@@ -3165,6 +3167,9 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                 break;
             case "closePcAppsOnReturn":
                 config.UpdateOrThrow(c => c.ClosePcAppsOnReturn = Bool());
+                break;
+            case "closeAllAppsOnReturn":
+                config.UpdateOrThrow(c => c.CloseAllAppsOnReturn = Bool());
                 break;
             case "onlineArtwork":
                 var online = Bool();
@@ -4133,6 +4138,28 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     /// installs it into Program Files (the whole installer when the program code changed, else only the screens) and starts Mega Hub again.
     /// False when that file is not there.
     /// </summary>
+    /// <summary>The programs with a window open right now, for the list of programs to close on the way back (needs the unlock like the setting).</summary>
+    public List<string> GetOpenApps()
+    {
+        RequireUnlocked();
+        return Win32ProcessProbe.OpenAppNames();
+    }
+
+    /// <summary>The programs to close on the way back to the couch (process names); the answer is the list as saved.</summary>
+    [SecondFactorExempt("only chooses which of the person's own programs close; no protection is loosened")]
+    public List<string> SetCloseApps(IReadOnlyList<string> names)
+    {
+        RequireUnlocked();
+        var clean = names
+            .Select(n => (n ?? "").Trim().ToLowerInvariant())
+            .Where(n => n.Length is > 0 and <= 64 && n.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.' or ' '))
+            .Distinct()
+            .Take(100)
+            .ToList();
+        config.UpdateOrThrow(c => c.CloseAppsList = clean);
+        return clean;
+    }
+
     public bool UpdateMegaHub()
     {
         RequireUnlocked();
@@ -6678,6 +6705,13 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             {
                 var modes = new Dictionary<string, string>(config.Current.StartupModes);
                 _ = Task.Run(() => _startup.ClosePc(modes));
+            }
+            // Mega Hub: the windows of the other programs close the way a click on the X does (all, or only the chosen ones); not while a game runs.
+            if (!GameBusy && (config.Current.CloseAllAppsOnReturn || config.Current.CloseAppsList.Count > 0))
+            {
+                var closeAll = config.Current.CloseAllAppsOnReturn;
+                var closeNames = config.Current.CloseAppsList.ToArray();
+                _ = Task.Run(() => Win32ProcessProbe.CloseAppWindows(closeAll, closeNames));
             }
             if (Full) _services.Apply(StartupMode.Couch, config.Current.CouchServicesInstalled);
             else if (config.Current.CloseExplorerInLight) HideTaskbar();

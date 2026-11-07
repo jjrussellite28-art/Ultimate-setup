@@ -160,6 +160,57 @@ public sealed class Win32ProcessProbe : IProcessProbe
         return set;
     }
 
+    // Never closed by "close my programs": the desktop itself, Mega Hub and what Windows keeps running for its own windows.
+    private static readonly HashSet<string> NeverClosed = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "explorer", "couchhud", "msedgewebview2", "applicationframehost", "textinputhost", "searchhost", "searchapp",
+        "startmenuexperiencehost", "shellexperiencehost", "dwm", "winlogon", "csrss", "lockapp", "taskmgr"
+    };
+
+    private static string? ProcessNameOf(IntPtr hWnd)
+    {
+        NativeMethods.GetWindowThreadProcessId(hWnd, out var pid);
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            return p.ProcessName.ToLowerInvariant();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The programs that have a window open right now (process names, sorted), without the ones that are never closed.</summary>
+    public static List<string> OpenAppNames()
+    {
+        var names = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var w in TopLevelWindows())
+        {
+            var name = ProcessNameOf(w);
+            if (name is not null && !NeverClosed.Contains(name)) names.Add(name);
+        }
+        return [.. names];
+    }
+
+    /// <summary>
+    /// Asks the windows of other programs to close, like a click on the X (WM_CLOSE): a browser keeps its tabs to restore, a program with
+    /// unsaved work asks first. All of them, or only the named ones.
+    /// </summary>
+    public static int CloseAppWindows(bool all, IReadOnlyCollection<string> names)
+    {
+        const uint WmClose = 0x0010;
+        var closed = 0;
+        foreach (var w in TopLevelWindows())
+        {
+            var name = ProcessNameOf(w);
+            if (name is null || NeverClosed.Contains(name)) continue;
+            if (!all && !names.Contains(name)) continue;
+            if (NativeMethods.PostMessage(w, WmClose, IntPtr.Zero, IntPtr.Zero)) closed++;
+        }
+        return closed;
+    }
+
     /// <summary>
     /// After a URL/protocol start the owning process is unknown (the browser may already run): waits for a window
     /// that was not there before and brings it to the front. False when none showed up in time.

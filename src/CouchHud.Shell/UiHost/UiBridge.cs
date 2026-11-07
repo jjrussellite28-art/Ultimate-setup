@@ -664,6 +664,12 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "keepUnlocked":
                 hud.KeepStayUnlocked();
                 return null;
+            case "getOpenApps":
+                return hud.GetOpenApps();
+            case "setCloseApps":
+                return hud.SetCloseApps(Arg(0).ValueKind == JsonValueKind.Array
+                    ? Arg(0).EnumerateArray().Select(x => x.ValueKind == JsonValueKind.String ? x.GetString()! : "").ToList()
+                    : throw new ArgumentException("setCloseApps: argument 0 must be a list"));
             case "updateMegaHub":
                 return hud.UpdateMegaHub();
             case "getPerformance":

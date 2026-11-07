@@ -812,6 +812,12 @@ public sealed class AppConfig
     /// <summary>End the PC-mode autostart programs again when returning to the couch.</summary>
     public bool ClosePcAppsOnReturn { get; set; }
 
+    /// <summary>Mega Hub: back on the couch, close the windows of all other programs (browsers, chat …) the way a click on the X does, so nothing is lost.</summary>
+    public bool CloseAllAppsOnReturn { get; set; }
+
+    /// <summary>Mega Hub: only these programs (process names, lower case, no .exe) are closed on the way back, when "all" is off.</summary>
+    public List<string> CloseAppsList { get; set; } = [];
+
     /// <summary>Services paused on the couch and started again in PC mode.</summary>
     public List<string> CouchServices { get; set; } = [];
 

@@ -1228,6 +1228,8 @@ window.couchhud = {
   },
   setScreenLayout: async (mode) => log('setScreenLayout', mode),
   updateMegaHub: async () => (log('updateMegaHub'), true),
+  getOpenApps: async () => ['chrome', 'discord', 'firefox'],
+  setCloseApps: async (names) => (log('setCloseApps', names), names),
   setStayUnlocked: async (on) => (log('setStayUnlocked', on), (security.stayUnlocked = !!on), !!on),
   keepUnlocked: async () => undefined,
   getPerformance: async () => ({ cpu: 20 + Math.round(Math.random() * 25), gpu: 70 + Math.round(Math.random() * 25), ramUsedGb: 14.2, ramTotalGb: 31.9 }),

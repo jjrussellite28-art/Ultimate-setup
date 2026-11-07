@@ -55,7 +55,7 @@ public static class FeatureAreas
         ["musicVolume"] = Always, ["soundVolume"] = Always, ["soundSet"] = Always, ["uiHdr"] = Always, ["sounds"] = Always,
         ["expertMode"] = Always, ["language"] = Always, ["rumble"] = Always, ["padGlyphs"] = Always, ["runStartupApps"] = Always,
         ["killExplorerOnReturn"] = Always, ["nightMode"] = Always, ["nightModeStrength"] = Always,
-        ["closePcAppsOnReturn"] = Always, ["onlineArtwork"] = Always, ["clearArtworkCache"] = Always,
+        ["closePcAppsOnReturn"] = Always, ["closeAllAppsOnReturn"] = Always, ["onlineArtwork"] = Always, ["clearArtworkCache"] = Always,
         ["autoSwitchHeadphones"] = Always, ["returnHoldMs"] = Always, ["weatherLocation"] = Always,
         ["aiProvider"] = Always, ["aiModel"] = Always,
         ["aiApiKey"] = Always, ["mcpEnabled"] = Always, ["mirrorNotifications"] = Always,
@@ -126,7 +126,7 @@ public static class FeatureAreas
         "holdUnlockForSetup", "setBlockTaskManager", "openAutoLogonDialog", "enableAutoLogon", "setAutoLogon",
         // Sound, controllers, batteries, display, performance, captures and screenshots.
         "getAudio", "setVolume", "setMute", "setAudioOutput", "getAppVolumes", "setAppVolume", "setAppMute", "getBattery", "getPads",
-        "rumble", "getDisplay", "setDisplayMode", "setHdr", "getScreens", "setScreen", "setScreenLayout", "updateMegaHub", "setStayUnlocked", "keepUnlocked", "getPerformance", "capture", "getCaptures",
+        "rumble", "getDisplay", "setDisplayMode", "setHdr", "getScreens", "setScreen", "setScreenLayout", "updateMegaHub", "getOpenApps", "setCloseApps", "setStayUnlocked", "keepUnlocked", "getPerformance", "capture", "getCaptures",
         // Assistant (its tools check the areas themselves).
         "assistantInfo", "askAssistant", "confirmAssistant", "resetAssistant",
         // Downloads tab (CouchHUD's and Windows' own downloads; game lines go with Gaming inside the center).
