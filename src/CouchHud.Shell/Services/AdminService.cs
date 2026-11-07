@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Diagnostics;
 using CouchHud.Core.Guard;
 using CouchHud.Core.Localization;
@@ -253,8 +254,43 @@ public static class AdminService
         var exit = await RunElevatedAsync(launch, TimeSpan.FromMinutes(5)).ConfigureAwait(false);
         Console.WriteLine($"[service] repair script ended with {exit}");
         var status = await Ops.StatusAsync(fresh: true).ConfigureAwait(false);
-        if (status.Health != ServiceHealth.Healthy) throw new InvalidOperationException(Strings.Get("service.repair.failed", Strings.Get(ServiceTexts.StateKey(status.State))));
+        if (status.Health != ServiceHealth.Healthy)
+        {
+            var why = await DiagnoseAsync().ConfigureAwait(false);
+            throw new InvalidOperationException(Strings.Get("service.repair.failed", Strings.Get(ServiceTexts.StateKey(status.State))) + (why.Length > 0 ? " " + why : ""));
+        }
         return status;
+    }
+
+    /// <summary>
+    /// Mega Hub: why the service does not run, as short text for the error: its last Windows event (Application log, source CouchHud.Service;
+    /// readable by every user, unlike the service's own log) and the service's exit code. Empty when nothing could be read.
+    /// </summary>
+    private static async Task<string> DiagnoseAsync()
+    {
+        static async Task<string> Run(string file, string args)
+        {
+            try
+            {
+                using var p = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, file), args) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true });
+                if (p is null) return "";
+                var text = await p.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
+                await p.WaitForExitAsync().ConfigureAwait(false);
+                return text;
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException) { return ""; }
+        }
+        var parts = new List<string>();
+        var query = await Run("sc.exe", "query CouchHud").ConfigureAwait(false);
+        foreach (var line in query.Split('\n'))
+        {
+            var l = line.Trim();
+            if (l.StartsWith("STATE", StringComparison.OrdinalIgnoreCase) || l.StartsWith("WIN32_EXIT_CODE", StringComparison.OrdinalIgnoreCase)) parts.Add(Regex.Replace(l, "\\s+", " "));
+        }
+        var events = await Run("wevtutil.exe", "qe Application \"/q:*[System[Provider[@Name='CouchHud.Service']]]\" /c:1 /rd:true /f:text").ConfigureAwait(false);
+        var text2 = string.Join(" ", events.Split('\n').Select(x => x.Trim()).SkipWhile(x => !x.StartsWith("Description:", StringComparison.OrdinalIgnoreCase)).Skip(1).Where(x => x.Length > 0));
+        if (text2.Length > 0) parts.Add(text2.Length > 300 ? text2[..300] : text2);
+        return string.Join(" | ", parts);
     }
 
     /// <summary>
