@@ -2,7 +2,7 @@
 // preview (never the app) exposes the root as window.__couchhudTabBar for exactly this check.
 //
 // 1. The catalog skins and the default skin with the plugin tabs (?hatab: Smart Home, Lumen) at 1280x720 and 1920x1080, in two states:
-//    "stress" (the downloads chip and every status icon shown) and "normal" (only the bell, weather and clock). Checked in every state of an
+//    "stress" (the downloads chip and every status icon shown) and "normal" (only the bell, weather and clock; the Unlock chip of Mega Hub only shows with a lock). Checked in every state of an
 //    LB/RB walk over all tabs: no tab is invisible, none is narrower than the minimum (unless its label is shorter anyway), nothing is cut
 //    while the bar scrolls (except names over the maximum), a tab that is cut shows at least 2rem or none of it, no tab part lies under an
 //    arrow, the focused tab is whole, and Smart Home and Lumen are reached with LB/RB. In the normal state Smart Home must be fully readable
@@ -48,7 +48,7 @@ process.env.EDGE = edge;
 
 // --open 0 leaves out the guide menu and the dialog readings (for runs against an older ui/ whose menu stood over the bar).
 const SHOW_STATUS = `(() => { for (const id of ['session-status', 'parental-status', 'downloads-status', 'weather']) { const n = document.getElementById(id); if (!n) continue; n.hidden = false; if (!n.textContent.trim()) n.textContent = '99 min'; } return 1; })()`;
-const NORMAL_STATUS = `(() => { const st = document.createElement('style'); st.textContent = '#session-status, #parental-status, #downloads-status { display: none !important; }'; document.head.append(st); return 1; })()`;
+const NORMAL_STATUS = `(() => { const st = document.createElement('style'); st.textContent = '#session-status, #parental-status, #downloads-status, #unlock-chip { display: none !important; }'; document.head.append(st); return 1; })()`;
 // The closed root, through the preview's test hook.
 const ROOT = `const { root, host } = window.__couchhudTabBar; const rem = innerHeight / 54;`;
 const CHECK_FN = `() => {
