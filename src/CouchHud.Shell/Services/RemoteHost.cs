@@ -101,16 +101,18 @@ public sealed class RemoteHost : IAsyncDisposable
             await ctx.Response.SendFileAsync(SealPath, ctx.RequestAborted);
         });
 
+        // These three lambdas name their return type on purpose: without it C# reads an expression-bodied async lambda as a plain RequestDelegate,
+        // throws the IResult away and every answer goes out as an empty 200 (the phone then cannot open the pairing answer).
         // Pairing: only sealed with the key from the QR code's secret (RemoteChannel/Pairing.TryPairSealed); there is no plain pairing any more.
-        app.MapPost("/api/pair", async (HttpContext ctx) =>
+        app.MapPost("/api/pair", async Task<IResult> (HttpContext ctx) =>
             Reply(channel.Pair(Trusted(ctx), ctx.Connection.RemoteIpAddress?.ToString(), await ReadTextAsync(ctx))));
 
         // A session per page visit: the device id in the header, the body sealed with the phone's channel key.
-        app.MapPost("/api/session", async (HttpContext ctx) =>
+        app.MapPost("/api/session", async Task<IResult> (HttpContext ctx) =>
             Reply(channel.OpenSession(Trusted(ctx), ctx.Request.Headers["X-CouchHud-Device"].ToString(), await ReadTextAsync(ctx), ctx.Connection.RemoteIpAddress?.ToString())));
 
         // Every call of a paired phone of the channel: sealed, numbered once, and checked against the phone's level and the couch's gates.
-        app.MapPost("/api/rpc", async (HttpContext ctx) =>
+        app.MapPost("/api/rpc", async Task<IResult> (HttpContext ctx) =>
             Reply(await channel.CallAsync(Trusted(ctx), ctx.Request.Headers["X-CouchHud-Session"].ToString(), await ReadTextAsync(ctx), ctx.Connection.RemoteIpAddress?.ToString())));
 
         // Server-sent events: signals only ("library changed"), sealed; the phone fetches the data itself over /api/rpc.
