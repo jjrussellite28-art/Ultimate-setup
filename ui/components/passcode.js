@@ -88,6 +88,15 @@ export function enterPasscode({ title = t('passcode.enter'), hint = '', error = 
         this.renderGlyphText();
         this.renderHelp();
         this.update();
+        // A message from before (e.g. "This is locked") does not stay over the code entry.
+        const old = document.getElementById('toast');
+        if (old) old.hidden = true;
+        // The explaining texts are only needed at first: after 10 seconds they go away. The on-screen buttons stay.
+        this.helpGone = false;
+        setTimeout(() => {
+          this.helpGone = true;
+          this.renderHelp();
+        }, 10_000);
       },
       /** The texts that name buttons, in the symbols of the controller in use. */
       renderGlyphText() {
@@ -98,10 +107,11 @@ export function enterPasscode({ title = t('passcode.enter'), hint = '', error = 
       },
       renderHelp() {
         if (this.keys) this.keys.hidden = !this.showKeys;
-        if (this.legendEl) this.legendEl.hidden = !this.showKeys;
+        if (this.legendEl) this.legendEl.hidden = !this.showKeys || !!this.helpGone;
+        if (this.buttonsEl) this.buttonsEl.hidden = !!this.helpGone;
         if (!this.helpEl) return;
         const { noPad, bluetooth } = this.help;
-        this.helpEl.hidden = !noPad;
+        this.helpEl.hidden = !noPad || !!this.helpGone;
         // (replaceChildren would show a null as the text "null".)
         this.helpEl.replaceChildren(...(noPad ? [
           el('strong', { textContent: t('passcode.noPad') }),
