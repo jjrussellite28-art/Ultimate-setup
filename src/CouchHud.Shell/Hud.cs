@@ -5761,9 +5761,9 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
                     Ui(() => PostNotification("Mega Hub", Strings.Ref("service.warn.title"), Strings.Ref("service.warn.body", Strings.Get(ServiceTexts.StateKey(status.State))), security: true));
                     break;
                 case LockWatchAction.LockWindows:
-                    Console.Error.WriteLine($"[service] the couch lock has no working service ({status.Name}, policies failing: {PolicyHelper.FailingSince is not null}): locking Windows (fail-closed)");
-                    WindowsLock.LockIfConfigured(dataDir);
-                    Ui(() => PostNotification("Mega Hub", Strings.Ref("service.alarm.title"), Strings.Ref(status.Health == ServiceHealth.Alarm ? "service.alarm.squatted" : "service.alarm.gone"), security: true));
+                    // Mega Hub (own PC): Windows is no longer locked behind the owner's back while he is using it. The warning above (once) stands,
+                    // and Settings > HUD > Repair service fixes the service.
+                    Console.Error.WriteLine($"[service] the couch lock has no working service ({status.Name}, policies failing: {PolicyHelper.FailingSince is not null}): not locking Windows (Mega Hub)");
                     break;
             }
         }
