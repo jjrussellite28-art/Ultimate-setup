@@ -169,6 +169,7 @@
   <section class="card message" id="unpaired" hidden>
     <h1 data-r="unpairedTitle"></h1>
     <p data-r-html="unpairedText"></p>
+    <p id="pairWhy" style="font-size:.85em;opacity:.85;word-break:break-all"></p>
   </section>
 
   <main id="app" hidden>
@@ -751,6 +752,12 @@
       return m ? m[1].trim() : tr('phone');
     }
 
+    // Mega Hub: what went wrong stays on the page (a short message was gone before anyone could read it).
+    function pairWhy(text) {
+      const n = document.getElementById('pairWhy');
+      if (n) n.textContent = text; // i18n-ignore
+    }
+
     async function pairFromLink() {
       const hash = location.hash;
       if (!hash) return;
@@ -759,22 +766,30 @@
       const m = hash.match(/^#k=([A-Za-z0-9_-]{43})$/);
       if (!m) {
         if (/pair=/.test(hash)) toast(tr('oldLink'));
+        pairWhy(`Link problem: the secret part of the QR link is missing or cut (${hash.length} characters). Scan the QR code on the TV again.`); // i18n-ignore
         return;
       }
       const secret = S.fromB64url(m[1]);
-      if (!secret || secret.length !== 32) return;
+      if (!secret || secret.length !== 32) return pairWhy('Link problem: the secret is not valid.'); // i18n-ignore
       const pk = S.pairKey(secret);
       try {
         const res = await post('/api/pair', {}, S.seal(pk, S.DIR.request, 0, 'pair', JSON.stringify({ name: deviceName() })));
         const opened = res.ok ? S.open(pk, S.DIR.response, 'pair', await res.text()) : null;
         const answer = opened && JSON.parse(opened.text);
         const key = S.fromB64url(answer?.key);
-        if (!answer?.id || key?.length !== 32) return toast(tr('pairFailed'));
+        if (!answer?.id || key?.length !== 32) {
+          pairWhy(res.ok // i18n-ignore
+            ? 'Pairing failed: the answer of the PC could not be opened.'
+            : `Pairing failed: the PC answered ${res.status} (${res.status === 403 ? 'pairing is not open right now' : res.status === 400 ? 'the QR code ran out or was already used' : 'refused'}). Show a new QR code on the TV and scan it again.`);
+          return toast(tr('pairFailed'));
+        }
         forget();
         channel = { id: answer.id, key };
         try { localStorage.setItem(CHANNEL_KEY, JSON.stringify({ id: answer.id, key: answer.key })); } catch { /* private mode */ }
+        pairWhy('');
         toast(tr('paired'));
-      } catch {
+      } catch (e) {
+        pairWhy(`No connection to the PC while pairing (${e && e.message ? e.message : e}). Is the phone on the same Wi-Fi as the PC?`); // i18n-ignore
         toast(tr('noConnection'));
       }
     }
