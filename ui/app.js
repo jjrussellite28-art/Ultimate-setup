@@ -182,7 +182,19 @@ function goHome() {
 
 const GLOBAL = new Set(['lb', 'rb', 'start', 'guide', 'b']);
 
+/** "Stay unlocked" (Settings > HUD): every input tells the host, at most once a minute, so the hour runs from the last press. */
+let lastKeepPing = 0;
+function keepUnlockedPing() {
+  if (document.documentElement.dataset.stay !== '1') return;
+  const now = Date.now();
+  if (now - lastKeepPing < 60_000) return;
+  lastKeepPing = now;
+  Promise.resolve(api.keepUnlocked?.()).catch(() => {});
+}
+for (const type of ['pointerdown', 'pointermove', 'wheel', 'keydown']) window.addEventListener(type, keepUnlockedPing, { passive: true, capture: true });
+
 function onAction(action) {
+  keepUnlockedPing();
   // The boot screen is still up (or its state is unknown): nothing reaches the UI underneath, whichever way the press came.
   if (!inputOpen()) return;
   if (screensaverInput()) return;

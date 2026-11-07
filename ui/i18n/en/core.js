@@ -43,7 +43,7 @@ export default {
   'power.pcMode.unlock': 'To the Windows desktop',
   'power.rowDetailApp': 'Standby, restart, shut down, quit Mega Hub',
   'power.quit.label': 'Quit Mega Hub',
-  'power.quit.detail': 'Closes Mega Hub completely: it no longer runs in the background and is gone from Task Manager',
+  'power.quit.detail': 'Shuts Mega Hub completely down so you can use Windows normally. It does not restart the PC and is gone from Task Manager',
   'power.quit.confirmTitle': 'Quit Mega Hub?',
   'power.quit.confirmMessage': 'Mega Hub closes completely and stops running. Start it again from the Start menu or its shortcut.',
   'power.restartApp.label': 'Restart Mega Hub',

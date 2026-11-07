@@ -43,7 +43,7 @@ export default {
   'power.pcMode.unlock': 'Zum Windows-Desktop',
   'power.rowDetailApp': 'Standby, Neustart, Herunterfahren, Mega Hub beenden',
   'power.quit.label': 'Mega Hub beenden',
-  'power.quit.detail': 'Schließt Mega Hub ganz: es läuft nicht mehr im Hintergrund und ist auch aus dem Task-Manager weg',
+  'power.quit.detail': 'Beendet Mega Hub ganz, damit du Windows normal nutzen kannst. Der PC startet nicht neu, und Mega Hub ist auch aus dem Task-Manager weg',
   'power.quit.confirmTitle': 'Mega Hub beenden?',
   'power.quit.confirmMessage': 'Mega Hub wird ganz beendet und läuft nicht mehr. Starte es wieder über das Startmenü oder die Verknüpfung.',
   'power.restartApp.label': 'Mega Hub neu starten',
