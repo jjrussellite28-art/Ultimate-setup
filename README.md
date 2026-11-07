@@ -4,6 +4,10 @@
 
 Logo generated with Bing Image Creator and supplied by jjrussellite28-art. [Source and provenance](ui/assets/MEGA-HUB-LOGO.md).
 
+[![build](https://github.com/jjrussellite28-art/mega-hub/actions/workflows/build.yml/badge.svg?branch=mega-hub-rename)](https://github.com/jjrussellite28-art/mega-hub/actions/workflows/build.yml)
+[![installer](https://github.com/jjrussellite28-art/mega-hub/actions/workflows/installer.yml/badge.svg?branch=mega-hub-rename)](https://github.com/jjrussellite28-art/mega-hub/actions/workflows/installer.yml)
+[![license](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+
 A controller-first Windows TV interface, independently maintained by **jjrussellite28-art**.
 
 **Development preview — no Mega Hub release is published yet.**
@@ -16,6 +20,19 @@ The inherited application brings game launchers and a game library into a contro
 It includes an optional Windows shell mode, a background service, parental controls, and plugin support.
 See the [English guide](docs/GUIDE.en.md) for inherited functionality. Older guide pages and screenshots
 still use Mega Hub terminology; they are being reviewed for this fork.
+
+## What is new in Mega Hub
+
+Mega Hub keeps everything the inherited application does and adds its own work on top:
+
+- **PC mode quits Mega Hub completely**, so it no longer uses memory while you use Windows normally.
+- **Unlock button** on the tab bar: the Windows PIN or password plus the Mega Hub code unlock the whole PC until the lid is closed for a few minutes, the PC powers down or restarts.
+- **Close my programs when returning** to the couch, with a choice of which programs, and **startup programs off by default**.
+- **Update Mega Hub** (Settings › Power) fetches the newest version from this repository, shows its progress inside the app and also updates your own plugins.
+- **Developer mode** (Settings › Power) for testing your own unsigned plugins.
+- Own **Achievements** plugin, a Mega Hub logo and rebranded text.
+
+Credit stays with the original project: the base application is CouchHUD by kewe87 and contributors.
 
 ## Changes in this fork
 
