@@ -659,10 +659,10 @@ public sealed class UiBridge(Hud hud, CoreWebView2 web)
             case "setScreenLayout":
                 hud.SetScreenLayout(StringArg(0));
                 return null;
-            case "setStayUnlocked":
-                return hud.SetStayUnlocked(Arg(0).GetBoolean());
-            case "keepUnlocked":
-                hud.KeepStayUnlocked();
+            case "unlockFully":
+                return hud.UnlockFully();
+            case "lockNow":
+                hud.LockNow();
                 return null;
             case "getOpenApps":
                 return hud.GetOpenApps();

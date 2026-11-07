@@ -220,14 +220,24 @@ export async function isLocked() {
 }
 
 /**
- * True once the couch lock lets the user through: the controller code, or the
- * Windows lock screen (Windows Hello, PIN) in Windows mode.
+ * True once the couch lock lets the user through. Mega Hub's rule: the Windows sign-in (PIN or password) AND the Mega Hub code, and then
+ * it stays open without a timer (the host ends it after the lid was closed about 3 minutes, a shutdown or restart; the Lock button ends it too).
+ * Everyone asking at the same time waits for the same unlock.
  */
 export async function ensureUnlocked(reason = '') {
   const security = await attempt(() => api.getSecurity());
   if (!security || security.unlocked) return true;
+  fullUnlock ??= runFullUnlock(security, reason).finally(() => { fullUnlock = null; });
+  const ok = await fullUnlock;
+  if (ok) (await import('../core/unlock-chip.js')).refreshUnlockChip();
+  return ok;
+}
 
+let fullUnlock = null;
+
+async function runFullUnlock(security, reason) {
   if (security.couchLock === 'windows') {
+    // An older Windows-mode lock: the sign-in is the whole unlock.
     toast(t('passcode.signInWindows'), 4000);
     const unlocked = new Promise((resolve) => {
       pendingWindowsUnlocks.push({ resolve, reason });
@@ -237,13 +247,38 @@ export async function ensureUnlocked(reason = '') {
     const asked = await attempt(() => api.unlock(null));
     // Windows could not be locked: nothing will come.
     if (asked?.pending === false) pendingWindowsUnlocks = pendingWindowsUnlocks.filter((e) => e.reason !== reason);
-    return asked?.pending === false ? false : unlocked;
+    if (!(asked?.pending === false ? false : await unlocked)) return false;
+  } else {
+    // 1: the Windows sign-in. A host that cannot ask for it (no service) does not block the unlock.
+    if (!(await signInIfPossible(reason))) return false;
+    // 2: the Mega Hub code (one entry at a time).
+    codeEntry ??= askForCode(reason).finally(() => { codeEntry = null; });
+    if (!(await codeEntry)) return false;
   }
+  // Both given: it stays open (the code's own two minutes would end it).
+  await attempt(() => api.unlockFully?.());
+  return true;
+}
 
-  // One code entry at a time: a second request that arrives while the first one is open (a page that loads twice, a protected
-  // entry and the page behind it) waits for that entry instead of opening a second one on top.
-  codeEntry ??= askForCode(reason).finally(() => { codeEntry = null; });
-  return codeEntry;
+/** The Windows sign-in once; true when it was given, or when the host cannot ask for it at all. */
+async function signInIfPossible(reason) {
+  const entry = { reason };
+  const signedIn = new Promise((resolve) => {
+    entry.resolve = resolve;
+    pendingWindowsUnlocks.push(entry);
+    setTimeout(() => {
+      pendingWindowsUnlocks = pendingWindowsUnlocks.filter((e) => e !== entry);
+      resolve(false);
+    }, 3 * 60_000);
+  });
+  const asked = await attempt(() => api.windowsSignIn?.());
+  if (asked?.pending !== true) {
+    pendingWindowsUnlocks = pendingWindowsUnlocks.filter((e) => e !== entry);
+    // Not asked (no service, or a preview): the code alone then; a refused sign-in stops.
+    return asked?.ok !== false;
+  }
+  toast(t('passcode.signInWindows'), 4000);
+  return signedIn;
 }
 
 let codeEntry = null;

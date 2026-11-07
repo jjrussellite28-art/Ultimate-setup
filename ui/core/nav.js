@@ -93,7 +93,7 @@ export function renderTabs() {
 
 /** The focus ring of the chip that has the focus (the same look as the active tab). */
 export function showChipFocus() {
-  for (const [id, sel] of [['bell', '#notify-bell'], ['downloads', '#downloads-status']]) $(sel)?.classList.toggle('chip-focus', bar.chip === id);
+  for (const [id, sel] of [['unlock', '#unlock-chip'], ['bell', '#notify-bell'], ['downloads', '#downloads-status']]) $(sel)?.classList.toggle('chip-focus', bar.chip === id);
 }
 
 let fitObserver = null;

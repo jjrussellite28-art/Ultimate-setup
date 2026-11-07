@@ -36,6 +36,7 @@ import { loadPluginTabs } from './views/plugin-tab.js';
 import { arrangeTabs } from './core/plugin-tabs.js';
 import { downloadsView, onDownloadsChanged, startDownloads } from './views/downloads.js';
 import { startUpdates } from './views/updates.js';
+import { startUnlockChip } from './core/unlock-chip.js';
 import { offerPluginSuggestions } from './views/plugins.js';
 import { startTv } from './views/tv.js';
 import { detailPage } from './views/detail.js';
@@ -182,19 +183,7 @@ function goHome() {
 
 const GLOBAL = new Set(['lb', 'rb', 'start', 'guide', 'b']);
 
-/** "Stay unlocked" (Settings > HUD): every input tells the host, at most once a minute, so the hour runs from the last press. */
-let lastKeepPing = 0;
-function keepUnlockedPing() {
-  if (document.documentElement.dataset.stay !== '1') return;
-  const now = Date.now();
-  if (now - lastKeepPing < 60_000) return;
-  lastKeepPing = now;
-  Promise.resolve(api.keepUnlocked?.()).catch(() => {});
-}
-for (const type of ['pointerdown', 'pointermove', 'wheel', 'keydown']) window.addEventListener(type, keepUnlockedPing, { passive: true, capture: true });
-
 function onAction(action) {
-  keepUnlockedPing();
   // The boot screen is still up (or its state is unknown): nothing reaches the UI underneath, whichever way the press came.
   if (!inputOpen()) return;
   if (screensaverInput()) return;
@@ -321,6 +310,7 @@ async function init() {
   // The guide menu's downloads line shows what loads right now; keep it current while the menu is open.
   onDownloadsChanged(() => quick.open && renderQuick());
   startDownloads();
+  startUnlockChip();
   startBluetoothRecovery();
   // Batteries: the PC's next to the clock (laptops only), low controllers as a small icon; the guide menu shows them all.
   onBatteryChanged(() => quick.open && renderQuick());

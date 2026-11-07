@@ -123,7 +123,7 @@ const heldCodeChoices = () => [
 ];
 
 async function chooseLock(preset) {
-  const mode = preset ?? await chooseDialog(t('settings.lock.title'), lockModes(), security?.couchLock ?? 'off');
+  const mode = preset ?? await chooseDialog(t('settings.lock.title'), lockModes().filter((m) => m.value !== 'windows' || security?.couchLock === 'windows'), security?.couchLock ?? 'off');
   if (mode === undefined) return 'cancelled';
   if (mode === security?.couchLock) return 'unchanged';
   // The Windows sign-in as the lock is no lock on an account without a password; the host refuses it too.
@@ -1204,23 +1204,6 @@ function consoleItems(s) {
       run: () => settingsView.jump('parental')
     }] : []),
     // The service itself: a clear warning and the repair for everyone when something is wrong (its details are in Windows integration).
-    // Stay unlocked: one unlock opens everything until the PC is used no more for an hour, Windows locks or the laptop goes to sleep.
-    ...(full && lock !== 'off' ? [{
-      kind: 'toggle',
-      key: 'stayUnlocked',
-      label: t('settings.stay.title'),
-      desc: t('settings.stay.desc'),
-      value: () => !!security?.stayUnlocked,
-      run: async () => {
-        if (!(await ensureUnlocked(t('settings.stay.title')))) return;
-        const on = !security?.stayUnlocked;
-        const result = await attempt(() => api.setStayUnlocked(on), t('settings.stay.failed'));
-        if (result === undefined) return;
-        security = (await attempt(() => api.getSecurity())) ?? security;
-        document.documentElement.dataset.stay = security?.stayUnlocked ? '1' : '0';
-        render();
-      }
-    }] : []),
     // The repair is always here (not only when Mega Hub itself notices a problem), so nobody has to hunt for it.
     ...(security?.service?.problem ? [repairServiceItem()] : (api.repairService ? [action(t('settings.console.repairService'), t('settings.console.repairAlways'), repairService, '⚠')] : [])),
     // The service's code file is damaged (it cannot be read): only then the reset, with an administrator's approval.

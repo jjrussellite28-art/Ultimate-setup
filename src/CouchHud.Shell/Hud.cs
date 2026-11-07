@@ -7610,39 +7610,49 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     public bool RuntimeStrict => config.Current.CouchLock != "off" || config.Current.ParentalEnabled;
 
     // A setup hold granted before the settings became unusable does not keep the couch open on the stand-in (security re-review).
-    private bool IsUnlocked => !LockOn || _pcMode || MonoNow() < _unlockedUntil || MonoNow() < _stayUnlockedUntil || (config.Fault is null && MonoNow() < _setupHoldUntil);
+    private bool IsUnlocked => !LockOn || _pcMode || MonoNow() < _unlockedUntil || _fullUnlock || (config.Fault is null && MonoNow() < _setupHoldUntil);
 
-    // "Stay unlocked" (Settings > HUD): once the owner unlocked and switched it on, the couch stays open for as long as it is used. It ends after an
-    // hour without input, when Windows locks, or when the laptop goes to sleep (lid closed). Never longer than that.
-    private static readonly TimeSpan StayUnlockedTime = TimeSpan.FromHours(1);
-    private DateTimeOffset _stayUnlockedUntil = DateTimeOffset.MinValue;
+    // The Unlock button (top right): the Windows sign-in and the Mega Hub code were both given, so everything stays open without a timer.
+    // It ends only when the lid has been closed for about 3 minutes (the PC slept that long), when the person presses Lock, or when
+    // Mega Hub itself is closed (the PC shut down or restarted). Not stored anywhere: nothing on disk can open the couch.
+    private static readonly TimeSpan SleepRelock = TimeSpan.FromMinutes(3);
+    private bool _fullUnlock;
+    private DateTimeOffset? _suspendedAtUtc;
 
-    /// <summary>Switches "stay unlocked" on (only from an unlocked couch) or off. Returns whether it is on afterwards.</summary>
-    [SecondFactorExempt("the owner unlocked with the code just now; the hold ends with the hour, a Windows lock or sleep")]
-    public bool SetStayUnlocked(bool on)
+    /// <summary>The UI has asked for both the Windows sign-in and the code (the code just opened the couch): from now on it stays open.</summary>
+    [SecondFactorExempt("only called after the couch code (and the Windows sign-in) opened the couch; the UI asks for both")]
+    public bool UnlockFully()
     {
-        if (on)
-        {
-            RequireUnlocked();
-            _stayUnlockedUntil = MonoNow() + StayUnlockedTime;
-        }
-        else
-        {
-            _stayUnlockedUntil = DateTimeOffset.MinValue;
-        }
-        return MonoNow() < _stayUnlockedUntil;
+        RequireUnlocked();
+        _fullUnlock = LockOn;
+        SyncLockState();
+        return _fullUnlock;
     }
 
-    /// <summary>Input in the HUD: pushes the end of "stay unlocked" an hour ahead (nothing happens when it is off).</summary>
-    [SecondFactorExempt("only moves the end of a hold the owner switched on")]
-    public void KeepStayUnlocked()
+    /// <summary>"Lock": the couch is closed again at once.</summary>
+    [SecondFactorExempt("raises protection: locks the couch")]
+    public void LockNow()
     {
-        if (MonoNow() < _stayUnlockedUntil) _stayUnlockedUntil = MonoNow() + StayUnlockedTime;
+        _fullUnlock = false;
+        _unlockedUntil = DateTimeOffset.MinValue;
+        SyncLockState();
     }
 
     private void OnPowerModeChanged(object? sender, Microsoft.Win32.PowerModeChangedEventArgs e)
     {
-        if (e.Mode == Microsoft.Win32.PowerModes.Suspend) _stayUnlockedUntil = DateTimeOffset.MinValue;
+        if (e.Mode == Microsoft.Win32.PowerModes.Suspend)
+        {
+            _suspendedAtUtc = DateTimeOffset.UtcNow;
+        }
+        else if (e.Mode == Microsoft.Win32.PowerModes.Resume)
+        {
+            if (_suspendedAtUtc is { } slept && DateTimeOffset.UtcNow - slept >= SleepRelock)
+            {
+                _fullUnlock = false;
+                _unlockedUntil = DateTimeOffset.MinValue;
+            }
+            _suspendedAtUtc = null;
+        }
     }
 
     // The console setup runs with the couch open: its lock step would otherwise lock the HUD right away and ask for the code in the
@@ -7782,7 +7792,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             hasPasscode = config.Current.PasscodeHash.Length > 0,
             blockTaskManager = config.Current.BlockTaskManager,
             unlocked = IsUnlocked,
-            stayUnlocked = MonoNow() < _stayUnlockedUntil,
+            fullyUnlocked = _fullUnlock,
             // The app the parents started while unlocked and that stays free until the HUD is in front again, or null.
             appsReleased = _appsReleased,
             asShell = _asShell,
@@ -8015,7 +8025,6 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
     private void OnSessionSwitch(object? sender, Microsoft.Win32.SessionSwitchEventArgs e)
     {
         if (e.Reason is not (Microsoft.Win32.SessionSwitchReason.SessionLock or Microsoft.Win32.SessionSwitchReason.SessionUnlock)) return;
-        if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionLock) _stayUnlockedUntil = DateTimeOffset.MinValue;
         var unlock = e.Reason == Microsoft.Win32.SessionSwitchReason.SessionUnlock;
         // On the UI thread, in the order the events came: the request knows whether the lock before this unlock was ours.
         Ui(() =>

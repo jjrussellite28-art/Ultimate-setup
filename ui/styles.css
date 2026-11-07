@@ -2610,6 +2610,32 @@ body.quick-open #view {
   cursor: pointer;
 }
 
+/* The Unlock / Lock button in front of the bell. */
+#unlock-chip {
+  padding: 0.3rem 0.8rem;
+  border-radius: 1rem;
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  font-weight: 700;
+  font-size: 0.95rem;
+  border: 0.12rem solid transparent;
+  cursor: pointer;
+}
+
+#unlock-chip.open {
+  background: transparent;
+  color: var(--muted);
+}
+
+#unlock-chip[hidden] {
+  display: none;
+}
+
+#unlock-chip.chip-focus {
+  border-color: var(--fg);
+  box-shadow: 0 0 0 0.15rem var(--accent);
+}
+
 /* No unread notification: the bell stays as a calm target for LB/RB and the mouse. */
 #notify-bell.none {
   background: transparent;

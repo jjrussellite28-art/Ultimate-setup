@@ -9,12 +9,13 @@ import { barStops, chipsBlocked, nextStop } from './tab-cycle.js';
 import { state } from './state.js';
 import { sound } from '../sound.js';
 import { notificationsPage } from '../views/notifications.js';
+import { toggleLock, unlockChipShown } from './unlock-chip.js';
 import { downloadsView } from '../views/downloads.js';
 
 /** The chips that exist now: the bell always, the downloads chip while it is shown. */
 export function chipIds() {
   const downloads = $('#downloads-status');
-  return ['bell', ...(downloads && !downloads.hidden ? ['downloads'] : [])];
+  return [...(unlockChipShown() ? ['unlock'] : []), 'bell', ...(downloads && !downloads.hidden ? ['downloads'] : [])];
 }
 
 /** LB (-1) and RB (+1): the next tab or chip, wrapping around. */
@@ -39,6 +40,10 @@ export function activateChip(id) {
   if (chipsBlocked(state) || chipAction(state, currentView(), id) === 'blocked') return false;
   bar.chip = null;
   showChipFocus();
+  if (id === 'unlock') {
+    toggleLock();
+    return true;
+  }
   if (id === 'bell') {
     push(notificationsPage());
     return true;

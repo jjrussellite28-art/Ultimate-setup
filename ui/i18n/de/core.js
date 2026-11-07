@@ -30,6 +30,12 @@ export default {
   'nav.back': 'Zurück',
 
   'feedback.failed': 'Fehlgeschlagen',
+  'unlockChip.unlock': 'Entsperren',
+  'unlockChip.lock': 'Sperren',
+  'unlockChip.unlockTitle': 'Mega Hub entsperren: Windows-Anmeldung und Mega-Hub-Code',
+  'unlockChip.lockTitle': 'Mega Hub wieder sperren',
+  'unlockChip.locked': 'Gesperrt',
+  'unlockChip.unlocked': 'Entsperrt: bleibt offen, bis der Deckel länger zu ist oder der PC heruntergefahren oder neu gestartet wird',
   'feedback.unlockNow': 'Jetzt entsperren',
 
   'power.dataLoss': 'Nicht gespeicherte Arbeit in offenen Programmen geht verloren.',

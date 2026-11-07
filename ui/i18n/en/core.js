@@ -30,6 +30,12 @@ export default {
   'nav.back': 'Back',
 
   'feedback.failed': 'Failed',
+  'unlockChip.unlock': 'Unlock',
+  'unlockChip.lock': 'Lock',
+  'unlockChip.unlockTitle': 'Unlock Mega Hub: Windows sign-in and Mega Hub code',
+  'unlockChip.lockTitle': 'Lock Mega Hub again',
+  'unlockChip.locked': 'Locked',
+  'unlockChip.unlocked': 'Unlocked: it stays open until the lid is closed for a while, or a shutdown or restart',
   'feedback.unlockNow': 'Unlock now',
 
   'power.dataLoss': 'Unsaved work in open programs will be lost.',

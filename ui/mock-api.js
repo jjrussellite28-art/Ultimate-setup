@@ -1230,8 +1230,8 @@ window.couchhud = {
   updateMegaHub: async () => (log('updateMegaHub'), true),
   getOpenApps: async () => ['chrome', 'discord', 'firefox'],
   setCloseApps: async (names) => (log('setCloseApps', names), names),
-  setStayUnlocked: async (on) => (log('setStayUnlocked', on), (security.stayUnlocked = !!on), !!on),
-  keepUnlocked: async () => undefined,
+  unlockFully: async () => (log('unlockFully'), (security.unlocked = true), true),
+  lockNow: async () => (log('lockNow'), (security.unlocked = false)),
   getPerformance: async () => ({ cpu: 20 + Math.round(Math.random() * 25), gpu: 70 + Math.round(Math.random() * 25), ramUsedGb: 14.2, ramTotalGb: 31.9 }),
   getCaptures: async () => [
     { url: fakeShot('Elden Ring', 290), name: 'Elden Ring 2026-10-17 21-14-03', source: 'Game Bar', video: false, time: Date.now() - 3_600_000, size: 4_200_000 },

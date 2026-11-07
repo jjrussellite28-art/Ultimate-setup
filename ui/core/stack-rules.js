@@ -63,7 +63,7 @@ export const navAllowed = (state) => !screenHeld(state);
 /** What a chip of the bar does now: 'blocked' (an overlay, a held screen, a page that holds the screen), 'bell' or 'downloads'. */
 export function chipAction(state, view, id) {
   if (state?.overlay || !tabClickAllowed(view, state)) return 'blocked';
-  return id === 'bell' ? 'bell' : id === 'downloads' ? 'downloads' : 'blocked';
+  return id === 'bell' ? 'bell' : id === 'downloads' ? 'downloads' : id === 'unlock' ? 'unlock' : 'blocked';
 }
 
 /**
