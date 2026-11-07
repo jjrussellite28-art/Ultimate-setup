@@ -34,6 +34,8 @@ public static class RemoteRights
         // Control: what every paired phone has had since 0.3 (the power section since 0.6.4) and the sleep timer, which ends in the same power call.
         new RemoteOp("state", RemoteLevel.Control, null),
         new RemoteOp("button", RemoteLevel.Control, null),
+        // Mega Hub: the Android companion's named commands (RemoteCommands); they end in the same buttons.
+        new RemoteOp("command", RemoteLevel.Control, null),
         new RemoteOp("text", RemoteLevel.Control, null),
         new RemoteOp("powerPrepare", RemoteLevel.Control, RemotePower.BridgeMethod),
         new RemoteOp("power", RemoteLevel.Control, RemotePower.BridgeMethod),

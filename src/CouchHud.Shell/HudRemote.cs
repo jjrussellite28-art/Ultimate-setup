@@ -157,6 +157,15 @@ public sealed partial class Hud
                 ((IRemoteTarget)this).Button(button);
                 return RemoteCallResult.Ok(null);
             }
+            case "command":
+            {
+                // Mega Hub: the Android companion's named commands, each one a button of the phone remote (RemoteCommands).
+                var name = PhoneString(args, "command");
+                if (name == RemoteCommands.Ping) return RemoteCallResult.Ok(new { pong = true, t = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
+                if (RemoteCommands.ButtonFor(name) is not { } mapped) return Bad();
+                ((IRemoteTarget)this).Button(mapped);
+                return RemoteCallResult.Ok(null);
+            }
             case "text":
             {
                 var text = PhoneString(args, "text");

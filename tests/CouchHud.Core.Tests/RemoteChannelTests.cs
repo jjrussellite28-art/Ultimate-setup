@@ -154,6 +154,23 @@ public sealed class RemoteChannelTests
     }
 
     [Fact]
+    public void The_companion_commands_are_exactly_the_seven_of_version_1_and_end_in_phone_buttons()
+    {
+        Assert.Equal(["navigate.up", "navigate.down", "navigate.left", "navigate.right", "navigate.select", "navigate.back", "session.ping"], RemoteCommands.Names);
+        Assert.Equal("up", RemoteCommands.ButtonFor("navigate.up"));
+        Assert.Equal("a", RemoteCommands.ButtonFor("navigate.select"));
+        Assert.Equal("b", RemoteCommands.ButtonFor("navigate.back"));
+        // Every mapped button is one of the phone remote's (RemoteHost.Buttons); names are exact, no case or spacing tricks.
+        foreach (var name in RemoteCommands.Names) Assert.True(RemoteCommands.ButtonFor(name) is null or "up" or "down" or "left" or "right" or "a" or "b");
+        Assert.Null(RemoteCommands.ButtonFor("session.ping"));
+        Assert.Null(RemoteCommands.ButtonFor("Navigate.Up"));
+        Assert.Null(RemoteCommands.ButtonFor("navigate.up "));
+        Assert.Null(RemoteCommands.ButtonFor("shell.run"));
+        Assert.Null(RemoteCommands.ButtonFor(null));
+        Assert.True(RemoteRights.Allows(RemoteLevel.Control, "command"));
+    }
+
+    [Fact]
     public void Levels_only_take_away_and_a_childs_phone_never_gets_more_than_the_child()
     {
         Assert.All(new[] { "state", "button", "text", "powerPrepare", "power", "sleepTimer" }, op => Assert.True(RemoteRights.Allows(RemoteLevel.Control, op)));
