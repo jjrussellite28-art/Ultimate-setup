@@ -1530,7 +1530,7 @@ const powerItems = (ids) => Object.fromEntries(powerEntries(ids).map((e) => [e.i
 function categories() {
   const s = settings ?? {};
   // The mode decides: a restart into the PC mode is only offered as the shell (power.js forMode).
-  const power = powerItems(['pc-mode', 'standby', 'restart', 'shutdown', 'restart-pc', 'quit']);
+  const power = powerItems(['pc-mode', 'standby', 'restart', 'shutdown', 'quit']);
   const holdOptions = [500, 1000, 1500, 2000].map((ms) => ({ label: holdLabel(ms), value: ms }));
   const glyphLabels = { auto: t('settings.controller.glyphs.auto'), xbox: t('settings.controller.glyphs.xbox'), playstation: t('settings.controller.glyphs.playstation') };
   const padGlyphOptions = () => PAD_GLYPH_SETTINGS.map((value) => ({ label: glyphLabels[value], value }));
@@ -1763,7 +1763,6 @@ function categories() {
           const started = await attempt(() => api.updateMegaHub(), t('settings.info.update'));
           if (started === false) toast(t('settings.info.updateMissing'), 6000);
         }),
-        ...(power['restart-pc'] ? expert(power['restart-pc']) : []),
         { kind: 'choice', label: t('settings.power.timer'), desc: t('settings.power.timerDesc'), value: () => sleepTimerDetail(), run: chooseSleepTimer },
         wipeRow('reset', () => api.resetMegaHub()),
         wipeRow('uninstall', () => api.uninstallMegaHub())

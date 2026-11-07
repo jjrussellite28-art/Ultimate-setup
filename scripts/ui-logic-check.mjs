@@ -3916,8 +3916,8 @@ console.log('undo progress: ok');
 // Power menu: three everyday tiles, the rare entries behind "Mehr", the timer as a row; the mode decides what is offered.
 {
   const lay = (shell, opts) => powerLayout(shell, opts);
-  assert.deepEqual(lay(true), { primary: ['standby', 'shutdown', 'restart'], more: ['pc-mode', 'restart-pc', 'restart-app', 'quit'], timer: true });
-  assert.deepEqual(lay(false), { primary: ['standby', 'shutdown', 'restart'], more: ['pc-mode', 'restart-app', 'quit'], timer: true });
+  assert.deepEqual(lay(true), { primary: ['standby', 'shutdown', 'restart'], more: ['pc-mode', 'quit', 'restart-app'], timer: true });
+  assert.deepEqual(lay(false), { primary: ['standby', 'shutdown', 'restart'], more: ['pc-mode', 'quit', 'restart-app'], timer: true });
   // The Guide menu opens it without the timer (it has its own row).
   assert.equal(lay(false, { sleepTimer: false }).timer, false);
   // Nothing offered is something the mode does not allow; nothing behind "Mehr" hides the row.
@@ -3930,8 +3930,8 @@ console.log('undo progress: ok');
   // Collapsed: tiles, Mehr, timer. Expanded: the secondary entries between Mehr and the timer.
   const shell = lay(true);
   assert.deepEqual(powerEntryIds(shell, false), ['standby', 'shutdown', 'restart', MORE, SLEEP_TIMER]);
-  assert.deepEqual(powerEntryIds(shell, true), ['standby', 'shutdown', 'restart', MORE, 'pc-mode', 'restart-pc', 'restart-app', 'quit', SLEEP_TIMER]);
-  assert.ok(isSecondary(shell, 'restart-pc') && !isSecondary(shell, 'restart') && !isSecondary(shell, SLEEP_TIMER));
+  assert.deepEqual(powerEntryIds(shell, true), ['standby', 'shutdown', 'restart', MORE, 'pc-mode', 'quit', 'restart-app', SLEEP_TIMER]);
+  assert.ok(isSecondary(shell, 'quit') && !isSecondary(shell, 'restart') && !isSecondary(shell, SLEEP_TIMER));
   // forMode: shell has no quit, app mode has no restart into PC mode but offers PC mode and quit.
   assert.equal(powerForMode('quit', true), 'quit');
   assert.equal(powerForMode('pc-mode', true), 'pc-mode');
@@ -3943,7 +3943,7 @@ console.log('undo progress: ok');
   // lands on a different entry (with another unlock) than the couch.
   for (const isShell of [true, false]) for (const id of ['standby', 'restart', 'shutdown']) assert.equal(powerForMode(id, isShell), id, `${id} ${isShell}`);
   // Only what ends the session for everybody is tinted as dangerous.
-  assert.deepEqual(['standby', 'pc-mode', 'quit', 'restart-app', 'restart', 'restart-pc', 'shutdown', SLEEP_TIMER, MORE].filter(isDangerous), ['restart', 'restart-pc', 'shutdown']);
+  assert.deepEqual(['standby', 'pc-mode', 'quit', 'restart-app', 'restart', 'restart-pc', 'shutdown', SLEEP_TIMER, MORE].filter(isDangerous), ['quit', 'restart', 'restart-pc', 'shutdown']);
   // Focus starts on standby (the first tile); a cancelled question brings the menu back on its own entry (expanded for a secondary
   // one); an unknown id falls back to standby.
   const collapsed = powerEntryIds(shell, false);
@@ -3952,7 +3952,7 @@ console.log('undo progress: ok');
   for (const id of collapsed) assert.equal(collapsed[powerIndex(collapsed, id)], id);
   assert.equal(collapsed[powerIndex(collapsed, 'quit')], 'standby');
   const open = powerEntryIds(shell, true);
-  for (const id of ['pc-mode', 'restart-pc', 'restart-app', 'quit']) assert.equal(open[powerIndex(open, id)], id);
+  for (const id of ['pc-mode', 'quit', 'restart-app']) assert.equal(open[powerIndex(open, id)], id);
   assert.equal(powerIndex([], 'standby'), 0);
   const app = powerEntryIds(lay(false), true);
   assert.equal(app[powerIndex(app, 'quit')], 'quit');

@@ -21,10 +21,10 @@ export const MORE = 'more';
  * timer as one row at the bottom. Ids before forMode. The secondary list is in the order of the menu.
  */
 export const POWER_PRIMARY = ['standby', 'shutdown', 'restart'];
-export const POWER_SECONDARY = ['pc-mode', 'restart-pc', 'restart-app', 'quit'];
+export const POWER_SECONDARY = ['pc-mode', 'quit', 'restart-app'];
 
 /** Entries that end something or lose unsaved work are tinted as dangerous; the Mega Hub entries and standby come back by themselves. */
-export const isDangerous = (id) => id === 'restart' || id === 'restart-pc' || id === 'shutdown';
+export const isDangerous = (id) => id === 'restart' || id === 'restart-pc' || id === 'shutdown' || id === 'quit';
 
 const offered = (ids, isShell) => [...new Set(ids.map((id) => forMode(id, isShell)).filter(Boolean))];
 
