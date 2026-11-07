@@ -9,6 +9,7 @@ import { state } from '../core/state.js';
 import { sound } from '../sound.js';
 import { t } from '../core/i18n.js';
 import { chooseScreen } from '../views/display.js';
+import { ensureUnlocked } from './passcode.js';
 
 // i18n-used: modeask.couch modeask.couchHint modeask.pc modeask.pcHint
 const CHOICES = [
@@ -54,11 +55,14 @@ export function showModeChooser() {
             removePage(this);
             return render();
           }
+          // PC at the start: Mega Hub quits completely (no RAM used, gone from Task Manager) and the normal Windows desktop is there.
+          // The Power menu's PC mode (from the couch) stays as it was.
           this.busy = true;
           try {
+            if (!(await ensureUnlocked(t('power.quit.label')))) return;
             removePage(this);
             render();
-            await attempt(() => api.enterPcMode());
+            await attempt(() => api.quit());
           } finally {
             this.busy = false;
           }

@@ -247,7 +247,7 @@ export default {
   'modeask.couch': 'Couch',
   'modeask.couchHint': 'Mega Hub',
   'modeask.pc': 'PC',
-  'modeask.pcHint': 'Windows desktop',
+  'modeask.pcHint': 'Windows desktop, Mega Hub closes',
   'modeask.hintChoose': 'Choose',
   'modeask.hintScreen': 'Screen',
   'modeask.setting': 'Ask at start: Couch or PC',
