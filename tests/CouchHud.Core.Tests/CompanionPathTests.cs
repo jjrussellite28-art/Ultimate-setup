@@ -94,7 +94,7 @@ public sealed class CompanionPathTests : IDisposable
     {
         // The name filter is a name filter (documented in SECURITY.md): a copy of a shell under a harmless name passes it.
         Assert.Equal(CompanionVerdict.Ok, CompanionPath.Judge(@"C:\Users\Anna\mytool.exe", @"C:\Users\Anna\mytool.exe", @"C:\Windows"));
-        Assert.Contains("a program under a different name is not recognised", File.ReadAllText(Path.Combine(Root(), "SECURITY.md")).Replace("\r\n", "\n"));
+        Assert.Contains("a program under a different name is not recognised", File.ReadAllText(Path.Combine(Root(), "docs", "UPSTREAM-SECURITY.md")).Replace("\r\n", "\n"));
     }
 
     // ---- on real files

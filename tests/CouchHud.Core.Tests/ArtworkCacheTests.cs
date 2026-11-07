@@ -549,7 +549,7 @@ public class ArtworkCacheTests
 
         for (var i = 0; i < 3; i++) (await client.GetAsync("https://store.example/a")).Dispose();
 
-        Assert.StartsWith("CouchHUD/9.9.9", net.Calls[0].Request.Headers.UserAgent.ToString());
+        Assert.StartsWith("MegaHub/9.9.9", net.Calls[0].Request.Headers.UserAgent.ToString());
         Assert.Equal(TimeSpan.FromSeconds(2), net.Calls[1].At - net.Calls[0].At);
         Assert.Equal(TimeSpan.FromSeconds(4), net.Calls[2].At - net.Calls[0].At);
     }
