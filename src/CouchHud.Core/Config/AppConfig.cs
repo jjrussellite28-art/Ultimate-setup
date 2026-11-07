@@ -160,7 +160,7 @@ public sealed class AppConfig
     public string ShellRemovedReason { get; set; } = "";
 
     /// <summary>Run the HKCU/HKLM Run entries on boot, which explorer normally does.</summary>
-    public bool RunStartupApps { get; set; } = true;
+    public bool RunStartupApps { get; set; } = false;
 
     public bool Sounds { get; set; } = true;
 
