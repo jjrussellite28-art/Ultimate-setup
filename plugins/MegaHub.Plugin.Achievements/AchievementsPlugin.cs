@@ -13,6 +13,7 @@ public sealed class AchievementsPlugin : IPlugin
 {
     private const int MaxGamePages = 120;
     private const string ListPage = "achievements";
+    private const string SteamPage = "steam-setup";
 
     private IPluginContext _context = null!;
     private readonly object _gate = new();
@@ -68,24 +69,32 @@ public sealed class AchievementsPlugin : IPlugin
             },
             new PluginSetting
             {
+                Key = "steamsetup",
+                Label = T("Steam einrichten (Schritt für Schritt)", "Set up Steam (step by step)"),
+                Description = T("Öffnet eine Anleitung mit Link zum Schlüssel", "Opens a guide with a link to get your key"),
+                Kind = SettingKind.Page,
+                Page = SteamPage
+            },
+            new PluginSetting
+            {
                 Key = "steam",
-                Label = T("Steam-Erfolge lesen", "Read Steam achievements"),
-                Description = T("Holt deine Erfolge über Steams Webdienst. Wichtig: Spieldetails müssen in Steam auf Öffentlich stehen.", "Gets your achievements through Steam's web service. Important: Game details must be set to Public in Steam."),
+                Label = T("Steam-Erfolge anzeigen", "Show my Steam achievements"),
+                Description = T("Schalter für Steam. Erst den Schlüssel einrichten (Zeile darüber).", "Switch for Steam. Set up the key first (the row above)."),
                 Kind = SettingKind.Toggle,
                 Default = "true"
             },
             new PluginSetting
             {
                 Key = "steamkey",
-                Label = T("Steam-Schlüssel", "Steam key"),
-                Description = T("Wichtig: In Steam muss Profil › Datenschutz › Spieldetails auf Öffentlich stehen, sonst sieht Mega Hub keine Erfolge. Dein kostenloser Steam-Webschlüssel (einmal eintragen). Auf der Erfolge-Seite unter Quellen gibt es eine Zeile, die die Seite dafür öffnet. Er wird verschlüsselt gespeichert und nie angezeigt.", "Important: in Steam, Profile › Privacy settings › Game details must be set to Public, or Mega Hub sees no achievements. Your free Steam web key (enter it once). The Achievements page has a row under Sources that opens the page to make one. It is stored encrypted and never shown."),
+                Label = T("Steam-Schlüssel einfügen", "Paste your Steam key"),
+                Description = T("Ein kostenloses Passwort von Steam, damit Mega Hub deine Erfolge lesen darf. Woher? Siehe die Anleitung oben. Wird verschlüsselt gespeichert und nie angezeigt.", "A free password from Steam that lets Mega Hub read your achievements. Where to get it? See the guide above. It is stored encrypted and never shown."),
                 Kind = SettingKind.Secret
             },
             new PluginSetting
             {
                 Key = "steamid",
-                Label = T("Steam-ID (optional)", "Steam ID (optional)"),
-                Description = T("Leer lassen: das Konto, mit dem Steam auf diesem PC angemeldet ist, wird automatisch erkannt. Sonst die 17-stellige Steam-ID.", "Leave empty: the account Steam is signed in with on this PC is found automatically. Otherwise the 17-digit Steam ID."),
+                Label = T("Steam-ID (nur falls nötig)", "Steam ID (only if needed)"),
+                Description = T("Normalerweise leer lassen: Mega Hub findet dein Konto selbst, wenn Steam auf diesem PC angemeldet ist.", "Normally leave empty: Mega Hub finds your account itself when Steam is signed in on this PC."),
                 Kind = SettingKind.Text
             },
             new PluginSetting
@@ -114,7 +123,8 @@ public sealed class AchievementsPlugin : IPlugin
                 new PluginSection("summary", T("Übersicht", "Overview")),
                 new PluginSection("games", T("Spiele", "Games")),
                 new PluginSection("months", T("Freigeschaltet nach Monat", "Unlocked by month")),
-                new PluginSection("sources", T("Quellen", "Sources"))
+                new PluginSection("steam", "Steam"),
+                new PluginSection("sources", T("Weitere Quellen", "Other sources"))
             ],
             Rows = ct => Task.Run<IReadOnlyList<PluginRow>>(() => BuildRows(ct), ct),
             Activate = (rowId, _) => Task.FromResult(ActivateRow(rowId)),
@@ -128,6 +138,20 @@ public sealed class AchievementsPlugin : IPlugin
                 _context.Invalidate(ListPage);
                 return Task.FromResult<string?>(null);
             }
+        });
+
+        _context.RegisterPage(new PluginPage
+        {
+            Id = SteamPage,
+            Title = T("Steam einrichten", "Set up Steam"),
+            Description = T("Vier Schritte, einmal. Danach zeigt Mega Hub deine Steam-Erfolge von selbst.", "Four steps, once. After that Mega Hub shows your Steam achievements by itself."),
+            Sections =
+            [
+                new PluginSection("state", T("Stand", "Status")),
+                new PluginSection("steps", T("Die Schritte", "The steps"))
+            ],
+            Rows = _ => Task.FromResult(SteamSetupRows()),
+            Activate = (rowId, _) => Task.FromResult(ActivateRow(rowId))
         });
 
         _context.RegisterTab(new PluginTab("achievements", ListPage, "Erfolge", "Achievements") { Area = "games" });
@@ -248,7 +272,7 @@ public sealed class AchievementsPlugin : IPlugin
                 Section = "games",
                 Detail = !localOn && !steamOn
                     ? T("Steam und lokale Dateien sind ausgeschaltet", "Steam and local files are switched off")
-                    : T("Steam: siehe Quellen unten. Weitere Ordner trägst du in den Plugin-Einstellungen ein", "Steam: see Sources below. Add more folders in the plugin settings"),
+                    : T("Steam: siehe den Abschnitt Steam unten. Weitere Ordner trägst du in den Plugin-Einstellungen ein", "Steam: see the Steam section below. Add more folders in the plugin settings"),
                 RequiresUnlock = false
             });
         }
@@ -292,16 +316,6 @@ public sealed class AchievementsPlugin : IPlugin
             RequiresUnlock = false
         });
         rows.Add(SteamRow(steamOn));
-        if (steamOn && !HasSteamKey())
-        {
-            rows.Add(new PluginRow("src-steamkey", T("Kostenlosen Steam-Schlüssel holen", "Get a free Steam key"))
-            {
-                Section = "sources",
-                Kind = PluginRowKind.Action,
-                Detail = T("Öffnet die Steam-Seite im Browser von Mega Hub. Wichtig: Spieldetails in Steam auf Öffentlich stellen", "Opens the Steam page in the Mega Hub browser. Important: set Game details to Public in Steam"),
-                RequiresUnlock = false
-            });
-        }
         foreach (var (id, de, en) in Planned)
             rows.Add(new PluginRow("src-" + id, T(de, en)) { Section = "sources", Value = T("Geplant", "Planned"), RequiresUnlock = false });
         return rows;
@@ -391,6 +405,58 @@ public sealed class AchievementsPlugin : IPlugin
         ("manual", "Manuell", "Manual")
     ];
 
+    private IReadOnlyList<PluginRow> SteamSetupRows()
+    {
+        var row = SteamRow(_context.Settings.GetBool("steam", true));
+        var id = SteamAccountToUse();
+        var rows = new List<PluginRow>
+        {
+            new("state", T("Steam", "Steam")) { Section = "state", Value = row.Value, Detail = row.Detail, On = row.On, RequiresUnlock = false },
+            new("account", T("Dein Steam-Konto", "Your Steam account"))
+            {
+                Section = "state",
+                Value = id is null ? T("nicht gefunden", "not found") : id.Persona,
+                Detail = id is null
+                    ? T("Melde dich in der Steam-App an. Mega Hub liest das Konto von dort, du musst keine Nummer tippen.", "Sign in in the Steam app. Mega Hub reads the account from there, you do not have to type a number.")
+                    : T("Gefunden in der Steam-App (Steam-ID " + id.SteamId + ")", "Found in the Steam app (Steam ID " + id.SteamId + ")"),
+                RequiresUnlock = false
+            },
+            new("s1", T("1. Steams Schlüssel-Seite öffnen", "1. Open Steam's key page"))
+            {
+                Section = "steps",
+                Kind = PluginRowKind.Action,
+                Detail = T("Drück hier. Melde dich dort bei Steam an. Bei „Domain Name“ tippst du: localhost", "Press here. Sign in to Steam there. For \"Domain Name\" type: localhost"),
+                RequiresUnlock = false
+            },
+            new("s2", T("2. Den Schlüssel kopieren", "2. Copy the key"))
+            {
+                Section = "steps",
+                Detail = T("Steam zeigt unter „Key“ einen langen Code aus Buchstaben und Zahlen. Markieren und kopieren (Strg+C), oder mit „Text senden“ vom Handy.", "Steam shows a long code of letters and numbers under \"Key\". Select it and copy (Ctrl+C), or use \"Send text\" from the phone."),
+                RequiresUnlock = false
+            },
+            new("s3", T("3. Den Schlüssel in Mega Hub einfügen", "3. Paste the key into Mega Hub"))
+            {
+                Section = "steps",
+                Detail = T("Einstellungen › Plugins & Skins › Erfolge › „Steam-Schlüssel einfügen“", "Settings › Plugins & skins › Achievements › \"Paste your Steam key\""),
+                RequiresUnlock = false
+            },
+            new("s4", T("4. In Steam das Profil öffentlich stellen", "4. Make your Steam profile public"))
+            {
+                Section = "steps",
+                Detail = T("Steam › Profil bearbeiten › Datenschutz › „Spieldetails“ auf Öffentlich. Sonst sieht Mega Hub keine Erfolge.", "Steam › Edit Profile › Privacy Settings › \"Game details\" = Public. Otherwise Mega Hub sees no achievements."),
+                RequiresUnlock = false
+            },
+            new("refresh", T("Jetzt neu laden", "Refresh now"))
+            {
+                Section = "steps",
+                Kind = PluginRowKind.Action,
+                Detail = T("Fragt Steam sofort noch einmal", "Asks Steam again right away"),
+                RequiresUnlock = false
+            }
+        };
+        return rows;
+    }
+
     private bool HasSteamKey() => !string.IsNullOrWhiteSpace(_context.Settings.Get("steamkey"));
 
     /// <summary>The Steam ID to ask about: the one typed in the settings, else the account Steam is signed in with on this PC.</summary>
@@ -414,7 +480,7 @@ public sealed class AchievementsPlugin : IPlugin
         var (value, detail) = status switch
         {
             SteamStatus.Off => (T("Aus", "Off"), T("Schalter in den Plugin-Einstellungen", "Switch in the plugin settings")),
-            SteamStatus.NoKey => (T("Schlüssel fehlt", "Key needed"), T("Hol dir einen kostenlosen Schlüssel (Zeile darunter) und trag ihn unter Einstellungen › Plugins & Skins › Erfolge ein", "Get a free key (the row below) and paste it in Settings › Plugins & skins › Achievements")),
+            SteamStatus.NoKey => (T("Schlüssel fehlt", "Key needed"), T("Drück hier: Schritt für Schritt zum kostenlosen Schlüssel", "Press here: step by step to your free key")),
             SteamStatus.NoAccount => (T("Kein Konto gefunden", "No account found"), T("Melde dich in Steam an oder trag die Steam-ID in den Plugin-Einstellungen ein", "Sign in to Steam, or type the Steam ID in the plugin settings")),
             SteamStatus.Loading => (T("Lädt …", "Loading ..."), progress),
             SteamStatus.Ready => (T("Verbunden", "Connected"), persona.Length > 0 ? persona : null),
@@ -425,8 +491,8 @@ public sealed class AchievementsPlugin : IPlugin
         };
         return new PluginRow("src-steam", "Steam")
         {
-            Section = "sources",
-            Kind = PluginRowKind.Action,
+            Section = "steam",
+            Kind = new PluginRowKind.Link(SteamPage),
             Value = value,
             Detail = detail,
             On = status == SteamStatus.Ready,
@@ -517,13 +583,13 @@ public sealed class AchievementsPlugin : IPlugin
     /// <summary>A press on a row of the list page: the Steam rows do something, the rest are plain.</summary>
     private string? ActivateRow(string rowId)
     {
-        if (rowId == "src-steamkey")
+        if (rowId is "src-steamkey" or "s1")
             return _context.OpenUrl("https://steamcommunity.com/dev/apikey")
-                ? T("Geöffnet. Melde dich bei Steam an, nenne die Domain 'localhost', kopiere den Schlüssel und trag ihn unter Einstellungen › Plugins & Skins › Erfolge ein.", "Opened. Sign in to Steam, type 'localhost' as the domain, copy the key and paste it in Settings › Plugins & skins › Achievements.")
+                ? T("Geöffnet. Melde dich bei Steam an, tippe bei Domain Name: localhost, und kopiere den Schlüssel.", "Opened. Sign in to Steam, type localhost under Domain Name, and copy the key.")
                 : T("Konnte die Seite nicht öffnen: steamcommunity.com/dev/apikey", "Could not open the page: steamcommunity.com/dev/apikey");
-        if (rowId == "src-steam")
+        if (rowId is "src-steam" or "refresh")
         {
-            if (!HasSteamKey()) return T("Erst den Steam-Schlüssel eintragen (Zeile darunter, dann Einstellungen › Plugins & Skins › Erfolge).", "Add the Steam key first (the row below, then Settings › Plugins & skins › Achievements).");
+            if (!HasSteamKey()) return T("Erst den Schlüssel holen (Schritt 1) und einfügen (Schritt 3).", "Get the key first (step 1) and paste it (step 3).");
             ResetSteam();
             return T("Steam wird neu abgefragt …", "Asking Steam again ...");
         }
