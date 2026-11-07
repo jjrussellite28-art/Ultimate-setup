@@ -143,7 +143,8 @@ public sealed class PluginSetupContractTests
             foreach (var word in words) Assert.False(text.Contains(word, StringComparison.Ordinal), $"{file} still mentions {word}");
         }
         // The removal is said plainly in the security notes and in the changelog.
-        var security = Text("SECURITY.md");
+        // Mega Hub: SECURITY.md is the fork's own short note; the inherited document is kept in docs/.
+        var security = Text("docs", "UPSTREAM-SECURITY.md");
         var changelog = Text("CHANGELOG.md");
         Assert.Contains("no-UAC", security);
         Assert.DoesNotContain("CASEHUD-PLUGIN-REMOVE", security);
