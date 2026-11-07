@@ -224,8 +224,22 @@ public sealed class RemoteHost : IAsyncDisposable
 
     public ValueTask DisposeAsync() => new(StopAsync());
 
-    private static IResult Reply(RemoteChannelReply reply) =>
-        reply.Body is null ? Results.StatusCode(reply.Status) : Results.Text(reply.Body, "text/plain; charset=utf-8", statusCode: reply.Status);
+    private static IResult Reply(RemoteChannelReply reply) => new ChannelResult(reply);
+
+    /// <summary>The sealed answer written by hand (status, length, text), with a header that says what the channel meant to send (for the phone page's error text).</summary>
+    private sealed class ChannelResult(RemoteChannelReply reply) : IResult
+    {
+        public async Task ExecuteAsync(HttpContext ctx)
+        {
+            ctx.Response.StatusCode = reply.Status;
+            ctx.Response.Headers["X-MegaHub-Reply"] = $"{reply.Status}/{reply.Body?.Length ?? -1}";
+            if (reply.Body is null) return;
+            var bytes = System.Text.Encoding.UTF8.GetBytes(reply.Body);
+            ctx.Response.ContentType = "text/plain; charset=utf-8";
+            ctx.Response.ContentLength = bytes.Length;
+            await ctx.Response.Body.WriteAsync(bytes, ctx.RequestAborted);
+        }
+    }
 
     /// <summary>A sealed body as text, at most <see cref="RemoteChannel.MaxRequestLength"/> characters (Kestrel cuts at <see cref="MaxBodyBytes"/>).</summary>
     private static async Task<string?> ReadTextAsync(HttpContext ctx)

@@ -781,7 +781,7 @@
         const key = S.fromB64url(answer?.key);
         if (!answer?.id || key?.length !== 32) {
           pairWhy(res.ok // i18n-ignore
-            ? `Pairing failed: the answer of the PC could not be opened. [${opened ? 'opened, but id/key missing: ' + String(opened.text).replace(/"key":"[^"]*"/, '"key":"..."').slice(0, 120) : 'not opened, ' + raw.length + ' chars: ' + raw.slice(0, 40) + ', status ' + res.status + ', ' + (res.headers.get('content-type') || 'no type') + ', length ' + (res.headers.get('content-length') || 'none') + ', ' + res.type}]`
+            ? `Pairing failed: the answer of the PC could not be opened. [${opened ? 'opened, but id/key missing: ' + String(opened.text).replace(/"key":"[^"]*"/, '"key":"..."').slice(0, 120) : 'not opened, ' + raw.length + ' chars: ' + raw.slice(0, 40) + ', status ' + res.status + ', ' + (res.headers.get('content-type') || 'no type') + ', length ' + (res.headers.get('content-length') || 'none') + ', PC meant ' + (res.headers.get('x-megahub-reply') || 'unknown') + ', ' + res.type}]`
             : `Pairing failed: the PC answered ${res.status} (${res.status === 403 ? 'pairing is not open right now' : res.status === 400 ? 'the QR code ran out or was already used' : 'refused'}). Show a new QR code on the TV and scan it again.`);
           return toast(tr('pairFailed'));
         }
