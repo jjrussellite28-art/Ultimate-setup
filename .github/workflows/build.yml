@@ -106,7 +106,9 @@ jobs:
       - name: Browser UI check
         shell: bash
         timeout-minutes: 5
-        run: node scripts/browser-ui-check.mjs
+        run: |
+          set -o pipefail
+          node scripts/browser-ui-check.mjs 2>&1 | tee browser-output.txt
 
       # The tab bar in the default skin at 1280 and 1920 with the plugin tabs, 131 fixture skins, the layers (headless, muted, free ports, three Edges at a time
       # in CI, every wait is for a condition); like the check above a
@@ -114,7 +116,21 @@ jobs:
       - name: Tab bar check
         shell: bash
         timeout-minutes: 40
-        run: node scripts/tabs-check.mjs
+        run: |
+          set -o pipefail
+          node scripts/tabs-check.mjs 2>&1 | tee tabs-output.txt
+
+      # Mega Hub: the failing lines of the two browser checks as readable errors on the run page.
+      - name: Browser check failures (summary)
+        if: always()
+        shell: bash
+        run: |
+          for f in browser-output.txt tabs-output.txt; do
+            [ -f "$f" ] || continue
+            lines=$(grep -E 'FAIL|^ {5}|fail|Error' "$f" | head -25 | tr '\n' '|' | cut -c1-1500)
+            [ -n "$lines" ] && echo "::error title=$f::$lines"
+          done
+          exit 0
 
       - name: Corresponding source archive
         shell: pwsh
