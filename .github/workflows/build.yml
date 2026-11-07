@@ -56,25 +56,34 @@ jobs:
 
       - name: Test
         # One test assembly at a time: the runner has few cores, and the time-bound tests (a hung handler, a slow source) must not starve each other.
-        run: dotnet test CouchHud.slnx --no-build -c Release --logger "console;verbosity=normal" --logger "trx" --results-directory TestResults -- RunConfiguration.MaxCpuCount=1
+        shell: pwsh
+        run: |
+          dotnet test CouchHud.slnx --no-build -c Release --logger "console;verbosity=normal" --logger "trx" --results-directory TestResults -- RunConfiguration.MaxCpuCount=1 2>&1 | Tee-Object -FilePath test-output.txt
+          exit $LASTEXITCODE
 
-      # Mega Hub: every failed test shows up as a readable error on the run page (name and first lines of the message).
+      # Mega Hub: every failed test (and anything else that stopped the run) shows up as a readable error on the run page.
       - name: Failed tests (summary)
         if: always()
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Continue'
           $n = 0
           foreach ($f in Get-ChildItem TestResults -Filter *.trx -Recurse -ErrorAction SilentlyContinue) {
-            [xml]$x = Get-Content $f.FullName
-            $ns = New-Object Xml.XmlNamespaceManager($x.NameTable); $ns.AddNamespace('t', 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
-            foreach ($r in $x.SelectNodes("//t:UnitTestResult[@outcome='Failed']", $ns)) {
-              $n++
-              $msg = ($r.Output.ErrorInfo.Message -replace '[\r\n]+', ' | ')
-              if ($msg.Length -gt 500) { $msg = $msg.Substring(0, 500) }
-              Write-Host "::error title=Test failed::$($r.testName) :: $msg"
-            }
+            try {
+              [xml]$x = Get-Content $f.FullName
+              foreach ($r in @($x.TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq 'Failed' })) {
+                $n++
+                $msg = "$($r.Output.ErrorInfo.Message)" -replace '[\r\n]+', ' | '
+                if ($msg.Length -gt 500) { $msg = $msg.Substring(0, 500) }
+                Write-Host "::error title=Test failed::$($r.testName) :: $msg"
+              }
+            } catch { Write-Host "::warning::could not read $($f.Name): $_" }
           }
           Write-Host "failed tests: $n"
+          if (Test-Path test-output.txt) {
+            $hits = @(Select-String -Path test-output.txt -Pattern 'Failed |error|crash|Aborted|Test Run Failed|Total tests|Passed:|Failed:' -CaseSensitive:$false | Select-Object -First 15 | ForEach-Object { $_.Line.Trim() })
+            if ($hits.Count -gt 0) { Write-Host ("::error title=Test output::" + (($hits -join ' | ') -replace '[\r\n]+', ' ')) }
+          }
           exit 0
 
       # Same UI checks as scripts/check.sh: every file parsed as an ES module, ESLint (eslint.config.mjs), de/en kept in step.
