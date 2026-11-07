@@ -1631,7 +1631,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   // App mode: no system page at all, straight from the questions to the summary.
   assert.deepEqual(W.order(ctx()), ['welcome', 'areas', 'updates', 'mode', 'look', 'sound', 'startask', 'summary']);
   // Shell mode chosen: the explanations come right after the question, in a fixed order, then look and sound, then the summary.
-  assert.deepEqual(W.order(ctx({ intent: 'full' })), ['welcome', 'areas', 'updates', 'mode', 'shell', 'lock', 'autologon', 'launchers', 'services', 'look', 'sound', 'startask', 'clientsInfo', 'summary']);
+  assert.deepEqual(W.order(ctx({ intent: 'full' })), ['welcome', 'areas', 'updates', 'mode', 'shell', 'lock', 'autologon', 'launchers', 'services', 'look', 'sound', 'startask', 'startup', 'clientsInfo', 'summary']);
   // The way back is explained too.
   assert.deepEqual(W.order(ctx({ intent: 'light', full: true })), ['welcome', 'areas', 'updates', 'mode', 'revert', 'look', 'sound', 'startask', 'summary']);
   // No password on the account (it signs in by itself), a sign-in set up already, a lock set already: those pages fall away.

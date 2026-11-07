@@ -363,6 +363,23 @@ function steps(page) {
         }
       }))
     },
+    startup: {
+      icon: 'console',
+      title: () => t('wizard.startup.title'),
+      lead: () => t('wizard.startup.lead'),
+      later: () => where('settings.cat.startup'),
+      options: () => [
+        { id: 'off', icon: '🧹', title: t('wizard.startup.off'), bullets: [t('wizard.startup.off1'), t('wizard.startup.off2')] },
+        { id: 'on', icon: '▶', title: t('wizard.startup.on'), bullets: [t('wizard.startup.on1'), t('wizard.startup.on2')] }
+      ].map((o) => ({
+        ...o, current: !!env.settings.runStartupApps === (o.id === 'on'),
+        run: async () => {
+          if (!(await save('runStartupApps', o.id === 'on'))) return;
+          env.settings.runStartupApps = o.id === 'on';
+          return 'next';
+        }
+      }))
+    },
     clientsInfo: explainStep('clientsInfo', {
       later: () => where('settings.cat.library'),
       choices: () => [

@@ -10,7 +10,7 @@ import { lockStepStatus } from './lock-rules.js';
 export const SEQUENCE = [
   'welcome', 'terms', 'areas', 'updates', 'mode',
   'revert', 'shell', 'lock', 'autologon', 'launchers', 'services',
-  'look', 'sound', 'startask', 'clientsInfo', 'clients', 'tv',
+  'look', 'sound', 'startask', 'startup', 'clientsInfo', 'clients', 'tv',
   'summary', 'result'
 ];
 
@@ -83,6 +83,8 @@ export function applies(id, ctx) {
     case 'services': return ctx.intent === 'full';
     case 'clientsInfo': return full && ctx.launchers > 0 && (ctx.areas ?? ['games']).includes('games');
     case 'clients': return full && ctx.launchers > 0 && (ctx.areas ?? ['games']).includes('games') && choices.clients === 'adjust';
+    // The programs Windows starts at sign-in (Discord, EA, driver tools): only a console install starts them for Mega Hub.
+    case 'startup': return ctx.intent === 'full' || (full && ctx.intent !== 'light');
     case 'tv': return !!ctx.tvPaired;
     case 'result': return false;
     default: return true;
