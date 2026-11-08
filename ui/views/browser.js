@@ -335,7 +335,7 @@ export const browserView = {
       return this.focus === 'page'
         ? (state.inputSource === 'keyboard'
           ? [['F6', t('browser.hintBar')], ['F11', t('browser.hintFullscreen')], ['Y', t('browser.hintAddress')]]
-          : [['🕹', t('browser.hintMouse')], ['A', t('browser.hintClick')], ['B', t('browser.hintBack')], ['X', t('browser.hintType')], ['Y', t('browser.hintAddress')], ['RT', t('browser.hintEnter')], ['LB', t('browser.hintZoomOut')], ['RB', t('browser.hintZoomIn')], ['View', t('browser.hintBar')]])
+          : [['🕹', t('browser.hintMouse')], ['A', t('browser.hintClick')], ['B', t('browser.hintBack')], ['X', t('browser.hintType')], ['L3', t('browser.hintCopy')], ['R3', t('browser.hintPaste')], ['Y', t('browser.hintAddress')], ['RT', t('browser.hintEnter')], ['LB', t('browser.hintZoomOut')], ['RB', t('browser.hintZoomIn')], ['View', t('browser.hintBar')]])
         : [['←→', t('browser.hintPick')], ['A', t('browser.hintPress')], ['Y', t('browser.hintAddress')], ['B', t('browser.hintToPage')], ['LB', t('browser.hintTabs')]];
     }
     const row = this.list?.[this.index];

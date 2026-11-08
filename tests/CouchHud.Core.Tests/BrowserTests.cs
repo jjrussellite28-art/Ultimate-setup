@@ -172,8 +172,8 @@ public sealed class BrowserInputTests
     [InlineData("rb", BrowserPadAction.ZoomIn)]
     [InlineData("rt", BrowserPadAction.Enter)]
     [InlineData("lt", BrowserPadAction.Tab)]
-    [InlineData("ls", BrowserPadAction.Ignore)]
-    [InlineData("rs", BrowserPadAction.Ignore)]
+    [InlineData("ls", BrowserPadAction.CopyText)]
+    [InlineData("rs", BrowserPadAction.PasteText)]
     [InlineData("unknown", BrowserPadAction.Ignore)]
     public void EveryButtonHasAnExplicitMeaning(string button, BrowserPadAction expected) =>
         Assert.Equal(expected, BrowserInput.Route(button, false, Page));

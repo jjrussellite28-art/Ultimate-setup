@@ -80,6 +80,8 @@ export default {
   'browser.hintMouse': 'Mauszeiger (Stick)',
   'browser.hintClick': 'Klick',
   'browser.hintType': 'Tippen',
+  'browser.hintCopy': 'Kopieren',
+  'browser.hintPaste': 'Einfügen',
   'browser.hintEnter': 'Enter',
   'browser.typeTitle': 'In die Seite tippen',
   'browser.typeHint': 'Der Text kommt in das Feld, das auf der Seite gerade ausgewählt ist.',

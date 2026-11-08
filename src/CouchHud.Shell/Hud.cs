@@ -7431,6 +7431,12 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             case BrowserPadAction.TypeText:
                 _ = TypeIntoPageAsync(browser);
                 break;
+            case BrowserPadAction.CopyText:
+                _ = CopyFromPageAsync(browser);
+                break;
+            case BrowserPadAction.PasteText:
+                _ = PasteIntoPageAsync(browser);
+                break;
             case BrowserPadAction.GoBack:
                 browser.GoBack();
                 break;
@@ -7480,6 +7486,57 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         }
         _browser?.NoteInput();
         ControllerMouse.LeftClick();
+    }
+
+    /// <summary>L3 on the page: the selected text (or the focused field's text) to the clipboard. The text is never logged.</summary>
+    private async Task CopyFromPageAsync(BrowserPane browser)
+    {
+        var text = (await browser.SelectedTextAsync())?.Trim();
+        if (_browser != browser) return;
+        if (string.IsNullOrEmpty(text))
+        {
+            BrowserNotice("browser.nothingToCopy", "");
+            return;
+        }
+        try
+        {
+            Application.Current.Dispatcher.Invoke(() => System.Windows.Clipboard.SetText(text));
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            // Another program holds the clipboard right now.
+            BrowserNotice("browser.copyFailed", "");
+            return;
+        }
+        BrowserNotice("browser.copied", "");
+    }
+
+    /// <summary>R3 on the page: the clipboard's text into the page's focused field (the way X types), never into a page without a field.</summary>
+    private async Task PasteIntoPageAsync(BrowserPane browser)
+    {
+        string? raw;
+        try
+        {
+            raw = Application.Current.Dispatcher.Invoke(() => System.Windows.Clipboard.ContainsText() ? System.Windows.Clipboard.GetText(System.Windows.TextDataFormat.UnicodeText) : null);
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            raw = null;
+        }
+        var text = ClipboardText.Clean(raw);
+        if (text is null)
+        {
+            BrowserNotice("browser.pasteEmpty", "");
+            return;
+        }
+        var field = await browser.FocusedFieldAsync();
+        if (_browser != browser) return;
+        if (field == "none")
+        {
+            BrowserNotice("browser.noField", "");
+            return;
+        }
+        await browser.InsertTextAsync(text);
     }
 
     // The field X was pressed on: its page (origin and document) and whether it was secret. Text goes only there, once.

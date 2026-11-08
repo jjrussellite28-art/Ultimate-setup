@@ -1157,6 +1157,43 @@ public sealed class BrowserPane : Grid
         }
     }
 
+    // What L3 copies: the selected text, else the text of the focused field. Never from a password field. Run in a world of its own like FieldScript.
+    private const string SelectionScript = """
+        (() => {
+          let e = document.activeElement;
+          while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
+          const field = e instanceof HTMLInputElement || e instanceof HTMLTextAreaElement;
+          if (e instanceof HTMLInputElement && e.type === 'password') return '';
+          if (field && typeof e.selectionStart === 'number' && e.selectionEnd > e.selectionStart) return e.value.substring(e.selectionStart, e.selectionEnd).slice(0, 20000);
+          const picked = String(window.getSelection() || '');
+          if (picked.length > 0) return picked.slice(0, 20000);
+          return field ? String(e.value).slice(0, 20000) : '';
+        })()
+        """;
+
+    /// <summary>The text L3 copies (selection, else the focused field's text); empty when there is none, null when it could not be read.</summary>
+    public async Task<string?> SelectedTextAsync()
+    {
+        try
+        {
+            if (_web.CoreWebView2 is not { } core || _disposed) return null;
+            using var tree = System.Text.Json.JsonDocument.Parse(await core.CallDevToolsProtocolMethodAsync("Page.getFrameTree", "{}"));
+            var frameId = tree.RootElement.GetProperty("frameTree").GetProperty("frame").GetProperty("id").GetString();
+            using var world = System.Text.Json.JsonDocument.Parse(await core.CallDevToolsProtocolMethodAsync("Page.createIsolatedWorld",
+                System.Text.Json.JsonSerializer.Serialize(new { frameId, worldName = "couchhud-copy", grantUniveralAccess = false })));
+            var context = world.RootElement.GetProperty("executionContextId").GetInt32();
+            using var result = System.Text.Json.JsonDocument.Parse(await core.CallDevToolsProtocolMethodAsync("Runtime.evaluate",
+                System.Text.Json.JsonSerializer.Serialize(new { expression = SelectionScript, contextId = context, returnByValue = true })));
+            return result.RootElement.GetProperty("result").TryGetProperty("value", out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String ? v.GetString() : null;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or ObjectDisposedException
+            or ArgumentException or System.Text.Json.JsonException or KeyNotFoundException)
+        {
+            Console.Error.WriteLine($"[browser] copy: {ex.Message}");
+            return null;
+        }
+    }
+
     /// <summary>Text typed in the HUD into the page's focused field (like typing it on a keyboard).</summary>
     public async Task InsertTextAsync(string text)
     {

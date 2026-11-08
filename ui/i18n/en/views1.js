@@ -80,6 +80,8 @@ export default {
   'browser.hintMouse': 'Mouse pointer (stick)',
   'browser.hintClick': 'Click',
   'browser.hintType': 'Type',
+  'browser.hintCopy': 'Copy',
+  'browser.hintPaste': 'Paste',
   'browser.hintEnter': 'Enter',
   'browser.typeTitle': 'Type into the page',
   'browser.typeHint': 'The text goes into the field that is selected on the page.',

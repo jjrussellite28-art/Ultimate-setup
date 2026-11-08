@@ -17,6 +17,10 @@ public enum BrowserPadAction
     GoBack,
     /// <summary>B on the first page: back to where the browser was opened from.</summary>
     Exit,
+    /// <summary>L3: the selected text of the page (or the text of its focused field) goes to the clipboard.</summary>
+    CopyText,
+    /// <summary>R3: the clipboard's text goes into the page's focused field.</summary>
+    PasteText,
     ZoomOut,
     ZoomIn,
     ExitFullScreen,
@@ -61,6 +65,8 @@ public static class BrowserInput
             "y" => BrowserPadAction.Address,
             "lb" => BrowserPadAction.ZoomOut,
             "rb" => BrowserPadAction.ZoomIn,
+            "ls" => BrowserPadAction.CopyText,
+            "rs" => BrowserPadAction.PasteText,
             "up" => BrowserPadAction.ArrowUp,
             "down" => BrowserPadAction.ArrowDown,
             "left" => BrowserPadAction.ArrowLeft,
