@@ -246,8 +246,6 @@ public sealed class BrowserPane : Grid
     /// <summary>The page changed (address, title, history): the HUD bar shows it.</summary>
     public event Action? PageChanged;
 
-    /// <summary>A right click on the page (the mouse): copy or paste, since the browser's own menu is never shown.</summary>
-    public event Action? CopyPasteRequested;
 
     /// <summary>The page went full screen (video) or came back; also the manual full-screen button.</summary>
     public event Action? FullScreenChanged;
@@ -510,8 +508,9 @@ public sealed class BrowserPane : Grid
         var settings = core.Settings;
         settings.AreDevToolsEnabled = false;
         settings.IsStatusBarEnabled = false;
-        // No "Save as", "Print", "Open in" or browser shortcuts: each could open a Windows dialog.
-        settings.AreDefaultContextMenusEnabled = false;
+        // No "Save as", "Print", "Open in" or browser shortcuts: each could open a Windows dialog. The right-click menu stays, but
+        // ContextMenuRequested below cuts it down to Cut, Copy, Paste and Select all.
+        settings.AreDefaultContextMenusEnabled = true;
         settings.AreBrowserAcceleratorKeysEnabled = false;
         // alert, confirm, prompt and "leave this page?" are answered in the HUD (ScriptDialogOpening below), never as a Windows window.
         settings.AreDefaultScriptDialogsEnabled = false;
@@ -747,11 +746,16 @@ public sealed class BrowserPane : Grid
         // The script above runs per navigation; a frame a script makes (about:blank, srcdoc) is no navigation, so each frame also gets it
         // when its content starts to load. The layers below do not depend on the page's scripts at all.
         core.FrameCreated += (_, e) => GuardFrame(e.Frame);
-        // No context menu at all, not even a page's request for the browser's own (its entries open "Save as", "Print", "Open in …").
+        // The right click (mouse) shows only Cut, Copy, Paste and Select all: every other entry of the browser's own menu ("Save as",
+        // "Print", "Open in …") is taken out, and a menu left without any of them is not shown at all.
         core.ContextMenuRequested += (_, e) =>
         {
-            e.Handled = true;
-            CopyPasteRequested?.Invoke();
+            var items = e.MenuItems;
+            for (var i = items.Count - 1; i >= 0; i--)
+            {
+                if (items[i].Name is not ("cut" or "copy" or "paste" or "selectAll")) items.RemoveAt(i);
+            }
+            if (items.Count == 0) e.Handled = true;
         };
         // The browser never opens its file chooser: the page's file field gets no dialog, whatever the page's own scripts do.
         await InterceptFileChoosersAsync(core);

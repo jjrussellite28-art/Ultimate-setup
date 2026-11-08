@@ -6970,7 +6970,6 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         // A plugin's sign-in: the redirect with the code, cancelled in the pane before it loads.
         pane.PluginSignInRedirect += (url, pageUrl) => OnPluginSignInRedirect(pane, url, pageUrl);
         // A TV page (YouTube TV) is steered by keys: the sticks leave the cursor alone, the left stick gives arrow keys.
-        pane.CopyPasteRequested += () => _ = CopyOrPasteAsync(pane);
         pane.TvModeChanged += () =>
         {
             if (_mouse is not null) _mouse.Paused = pane.TvMode;
@@ -7510,16 +7509,6 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             return;
         }
         BrowserNotice("browser.copied", "");
-    }
-
-    /// <summary>Right click with the mouse: copies the selected text; with nothing selected it pastes into the field.</summary>
-    private async Task CopyOrPasteAsync(BrowserPane browser)
-    {
-        if (_browser != browser) return;
-        var selected = await browser.SelectedTextAsync();
-        if (_browser != browser) return;
-        if (string.IsNullOrWhiteSpace(selected)) await PasteIntoPageAsync(browser);
-        else await CopyFromPageAsync(browser);
     }
 
     /// <summary>R3 on the page: the clipboard's text into the page's focused field (the way X types), never into a page without a field.</summary>
