@@ -17,7 +17,7 @@ namespace CouchHud.Core.Plugins;
 /// For a signed package the statement counts, not this file.
 /// </summary>
 public sealed record PluginManifest(string? Name, string? Version, string? Author, LocalizedText? Description, string? Homepage, int Sdk = 1,
-    string? Id = null, IReadOnlyList<string>? Capabilities = null, string? License = null, IReadOnlyList<PluginServiceManifest>? Services = null);
+    string? Id = null, IReadOnlyList<string>? Capabilities = null, string? License = null, IReadOnlyList<PluginServiceManifest>? Services = null, string? Kind = null);
 
 /// <summary>A text that exists in several languages. In JSON a plain string (all languages) or { "de": …, "en": … }.</summary>
 [System.Text.Json.Serialization.JsonConverter(typeof(LocalizedTextConverter))]
@@ -71,6 +71,9 @@ public sealed record PluginInfo(
     string? Error,
     bool UserInstalled)
 {
+    /// <summary>"addon" for an essential extension that has a tab of its own (Achievements, say), else "plugin". Only ordering and wording differ: an add-on is held to the same rules as a plugin.</summary>
+    public string Kind { get; init; } = "plugin";
+
     /// <summary>The description in every language the plugin.json gave; <see cref="Description"/> is the one for the active language.</summary>
     public LocalizedText? DescriptionText { get; init; }
 
@@ -940,7 +943,10 @@ public sealed partial class PluginManager(IReadOnlyList<(string Dir, bool UserIn
     }
 
     private static PluginInfo Info(string folder, string id, string name, PluginManifest? m, bool enabled, bool loaded, string? error, bool user) =>
-        new(folder, id, name, m?.Version, m?.Author, m?.Description?.For(Strings.Language), m?.Homepage, enabled, loaded, error, user) { DescriptionText = m?.Description };
+        new(folder, id, name, m?.Version, m?.Author, m?.Description?.For(Strings.Language), m?.Homepage, enabled, loaded, error, user) { DescriptionText = m?.Description, Kind = KindOf(m?.Kind) };
+
+    /// <summary>The kind a plugin.json states: "addon", anything else is a plugin.</summary>
+    public static string KindOf(string? kind) => string.Equals(kind?.Trim(), "addon", StringComparison.OrdinalIgnoreCase) ? "addon" : "plugin";
 
     internal static PluginManifest? ReadManifest(string dir)
     {

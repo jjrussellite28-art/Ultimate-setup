@@ -416,13 +416,14 @@ export function pluginsPage(startTab = 0, { expert = false, openId = null } = {}
   const installedRows = () => [
     { icon: '+', label: t('plugins.installed.pluginZip'), detail: t('plugins.installed.pluginZipDetail'), highlight: true, run: () => installZip('plugin') },
     { icon: '🎨', label: t('plugins.installed.skinZip'), detail: t('plugins.installed.skinZipDetail'), highlight: true, run: () => installZip('skin') },
-    ...store.plugins.map((p) => {
+    ...[...store.plugins].sort((a, b) => (b.kind === 'addon') - (a.kind === 'addon')).map((p) => {
       const update = updateFor(p);
       const delisted = isDelisted(p, store.catalog?.entries);
       const badge = p.revoked ? t('plugin.revoked.badge') : badgeText(p);
       return {
-        icon: p.removedAtRestart ? '↻' : p.revoked ? '⛔' : p.loaded ? '◆' : p.enabled ? '⚠' : '○',
+        icon: p.removedAtRestart ? '↻' : p.revoked ? '⛔' : p.loaded ? (p.kind === 'addon' ? '▣' : '◆') : p.enabled ? '⚠' : '○',
         label: `${p.name}${p.version ? ` ${p.version}` : ''}`,
+        meta: p.kind === 'addon' ? t('plugins.kind.addon') : t('plugins.kind.plugin'),
         detail: p.removedAtRestart ? t('plugins.removedAtRestart.detail') : p.error ? t('plugins.installed.error', { error: p.error }) : [update ? t('plugins.installed.updateAvailable', { version: update.version }) : null, delisted ? t('plugin.delisted.badge') : null, p.description, p.author ? t('plugins.by', { author: p.author }) : null].filter(Boolean).join(' · ') || p.folder,
         badge,
         badgeClass: p.revoked ? 'danger' : isThirdParty(p) || p.origin === 'local' ? 'warn' : '',

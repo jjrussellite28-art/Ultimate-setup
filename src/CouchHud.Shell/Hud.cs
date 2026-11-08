@@ -4279,6 +4279,8 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
         p.Author,
         p.Description,
         p.Homepage,
+        // "addon" (an essential extension with a tab of its own) or "plugin": the lists put add-ons first.
+        p.Kind,
         // What the user chose; takes effect at the next start (loaded says what runs now).
         enabled = !config.Current.DisabledPlugins.Contains(p.Folder, StringComparer.OrdinalIgnoreCase),
         // Only what could not be done at once: the choice differs from what runs (a start that is still owed), a plugin that was switched on while its

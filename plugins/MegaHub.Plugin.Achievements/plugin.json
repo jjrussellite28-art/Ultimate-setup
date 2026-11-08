@@ -1,7 +1,7 @@
 {
   "id": "achievements",
   "name": "Achievements",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "author": "russellite06",
   "description": {
     "de": "Eine Erfolge-Seite für Mega Hub: Steam (über Steams Webdienst, mit deinem eigenen kostenlosen Schlüssel) und lokale Erfolgsdateien (z. B. vom Goldberg-Emulator), Fortschritt je Spiel",
@@ -10,6 +10,7 @@
   "homepage": "https://github.com/jjrussellite28-art/mega-hub",
   "license": "GPL-3.0-or-later",
   "sdk": 5,
+  "kind": "addon",
   "capabilities": [
     "pages",
     "tabs",

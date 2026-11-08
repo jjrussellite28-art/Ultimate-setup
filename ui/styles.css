@@ -5462,3 +5462,10 @@ body[data-view="terms"] #notify-stack .notify-card:not(.security) {
   flex: none;
   font-weight: 800;
 }
+
+/* A long category name (Plugins, skins & add-ons) wraps instead of being cut */
+.settings-cats li strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}

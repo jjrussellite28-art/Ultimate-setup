@@ -1877,11 +1877,13 @@ function categories() {
  * links to, e.g. a device picker); the manager, the catalog and building your own are expert rows below.
  */
 function pluginItems() {
-  const withSettings = pluginsWithSettings(installedPlugins);
+  // Add-ons (the essential ones with a tab of their own) first, then the plugins, each by name.
+  const withSettings = pluginsWithSettings(installedPlugins).sort((a, b) => (b.kind === 'addon') - (a.kind === 'addon'));
   const entries = withSettings.map((p) => action(
     p.name,
-    t('settings.plugins.entryDesc', { count: p.settings.length }),
-    () => openPage(pluginSettingsPage(p, (list) => { if (list) installedPlugins = list; }, { expert: !!settings?.expertMode }), t('settings.cat.plugins'))
+    `${p.kind === 'addon' ? `${t('plugins.kind.addon')} · ` : ''}${t('settings.plugins.entryDesc', { count: p.settings.length })}`,
+    () => openPage(pluginSettingsPage(p, (list) => { if (list) installedPlugins = list; }, { expert: !!settings?.expertMode }), t('settings.cat.plugins')),
+    p.kind === 'addon' ? '▣' : '›'
   ));
   return [
     ...(entries.length ? entries : [info(t('settings.plugins.none'), t('settings.plugins.noneDesc'))]),

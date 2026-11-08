@@ -385,6 +385,15 @@ public sealed class PluginReviewTests : IDisposable
         Assert.Equal(PluginRows.MaxOptions, PluginRows.Filter([choice])[0].Options!.Count);
     }
 
+    [Theory]
+    [InlineData("addon", "addon")]
+    [InlineData(" AddOn ", "addon")]
+    [InlineData("plugin", "plugin")]
+    [InlineData("skin", "plugin")]
+    [InlineData("", "plugin")]
+    [InlineData(null, "plugin")]
+    public void A_manifest_kind_is_addon_or_plugin(string? kind, string expected) => Assert.Equal(expected, PluginManager.KindOf(kind));
+
     [Fact]
     public void A_progress_bar_stays_between_0_and_100_and_section_kinds_have_names()
     {
