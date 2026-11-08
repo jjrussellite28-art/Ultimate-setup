@@ -194,7 +194,8 @@ internal static partial class SteamAchievements
             DateTimeOffset? when = null;
             if (earned && a.TryGetProperty("unlocktime", out var u) && u.TryGetInt64(out var seconds) && seconds > 0)
                 when = DateTimeOffset.FromUnixTimeSeconds(seconds);
-            items.Add(new AchievementItem(title, earned, when));
+            var description = a.TryGetProperty("description", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString()?.Trim() : null;
+            items.Add(new AchievementItem(title, earned, when) { Description = description is { Length: > 200 } ? description[..200] : description });
             if (when is { } w && (last is null || w > last)) { last = w; lastName = title; }
         }
         if (items.Count == 0) return null;

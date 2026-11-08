@@ -57,6 +57,12 @@ public sealed record PluginRow(string Id, string Label)
     /// A row without one belongs to its page's function.
     /// </summary>
     public string? Function { get; init; }
+
+    /// <summary>
+    /// A progress bar from 0 to 100 under the row (or on its card or tile). Added to SDK 5 without a new number: an older host ignores it.
+    /// Values outside 0 to 100 are cut to it by the host; null: no bar.
+    /// </summary>
+    public double? Progress { get; init; }
 }
 
 /// <summary>A full-screen list page, reachable from the plugin's entry in the settings.</summary>

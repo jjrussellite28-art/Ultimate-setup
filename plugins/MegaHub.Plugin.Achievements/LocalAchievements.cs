@@ -3,7 +3,11 @@ using System.Text.Json;
 namespace MegaHub.Plugin.Achievements;
 
 /// <summary>One achievement of a game: its name (as the file spells it) and, when earned, the time.</summary>
-internal sealed record AchievementItem(string Name, bool Earned, DateTimeOffset? When);
+internal sealed record AchievementItem(string Name, bool Earned, DateTimeOffset? When)
+{
+    /// <summary>What the achievement asks for, when the source says (Steam does).</summary>
+    public string? Description { get; init; }
+}
 
 /// <summary>One game with achievement progress read from a local file.</summary>
 internal sealed record AchievementGame(string Id, string Name, int Total, int Earned, DateTimeOffset? LastUnlock, string? LastName, string Folder, IReadOnlyList<AchievementItem> Items)

@@ -163,7 +163,13 @@ public sealed class PluginCapabilityException(string message) : InvalidOperation
 public enum PluginSectionKind
 {
     List,
-    Tiles
+    Tiles,
+    /// <summary>Big numbers side by side (the row's Label small, its Value large, an optional Progress bar). Added to SDK 5 without a new number.</summary>
+    Stats,
+    /// <summary>One line of filter chips (the row's Label and Value; On marks the chosen one); a press is a plain press. Added to SDK 5 without a new number.</summary>
+    Chips,
+    /// <summary>Cards with a picture or symbol, name, detail, Value and a Progress bar, three side by side. Added to SDK 5 without a new number.</summary>
+    Cards
 }
 
 /// <summary>A titled group of rows on a page; rows name their section with <see cref="PluginRow.Section"/>.</summary>

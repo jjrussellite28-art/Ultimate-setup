@@ -224,11 +224,13 @@ export const cleanKey = (text) => {
  * Groups the rows of a page by section. Sections come from the plugin in order; a row without a (known) section goes to the first one.
  * Without sections: one plain list. Returns [{ id, title, kind: 'list'|'tiles', rows }]; empty sections are dropped.
  */
+const SECTION_KINDS = ['tiles', 'stats', 'chips', 'cards'];
+
 export function groupRows(rows, sections) {
   const list = Array.isArray(rows) ? rows : [];
   const known = (sections ?? []).filter((s) => s && typeof s.id === 'string');
   if (!known.length) return list.length ? [{ id: '', title: null, kind: 'list', rows: list }] : [];
-  const groups = known.map((s) => ({ id: s.id, title: s.title ?? null, kind: s.kind === 'tiles' ? 'tiles' : 'list', rows: [] }));
+  const groups = known.map((s) => ({ id: s.id, title: s.title ?? null, kind: SECTION_KINDS.includes(s.kind) ? s.kind : 'list', rows: [] }));
   for (const row of list) (groups.find((g) => g.id === row.section) ?? groups[0]).rows.push(row);
   return groups.filter((g) => g.rows.length);
 }
@@ -236,17 +238,26 @@ export function groupRows(rows, sections) {
 /** Cells per line of a tile section: as many as fit a wide screen, never more than the rows. */
 export const tileColumns = (count) => Math.max(1, Math.min(4, count));
 
-/** Rows to cursor lines: a list row is its own line, a tile section is cut into lines of `tileColumns` cells. */
+/** Cells per line of a section of this kind (a list has one): stats up to 4, chips up to 6, cards up to 3, tiles up to 4. */
+export function sectionColumns(kind, count) {
+  const most = { tiles: 4, stats: 4, chips: 6, cards: 3 }[kind];
+  return most ? Math.max(1, Math.min(most, count)) : 1;
+}
+
+/** Rows to cursor lines: a list row is its own line, any other section is cut into lines of `sectionColumns` cells. */
 export function layoutLines(groups) {
   const lines = [];
   for (const g of groups) {
-    if (g.kind === 'tiles') {
-      const cols = tileColumns(g.rows.length);
+    const cols = sectionColumns(g.kind, g.rows.length);
+    if (g.kind !== 'list' && g.kind) {
       for (let i = 0; i < g.rows.length; i += cols) lines.push(g.rows.slice(i, i + cols));
     } else for (const row of g.rows) lines.push([row]);
   }
   return lines;
 }
+
+/** A progress value of a row as 0 to 100, or null when it has none. */
+export const progressOf = (row) => (Number.isFinite(row?.progress) ? Math.max(0, Math.min(100, row.progress)) : null);
 
 const decimals = (step) => (String(step).split('.')[1] ?? '').length;
 

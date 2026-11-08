@@ -19,6 +19,7 @@ public sealed class AchievementsPlugin : IPlugin
     private readonly object _gate = new();
     private string _sort = "recent";
     private string _filter = "all";
+    private string _gameView = "all";
 
     // Steam: refreshed in the background (the page shows what is there and updates itself when a refresh ends).
     private static readonly TimeSpan SteamRefreshAfter = TimeSpan.FromMinutes(30);
@@ -119,9 +120,12 @@ public sealed class AchievementsPlugin : IPlugin
             Description = T("Fortschritt je Spiel aus Steam und lokalen Erfolgsdateien", "Progress per game from Steam and local achievement files"),
             Sections =
             [
-                new PluginSection("view", T("Ansicht", "View")),
-                new PluginSection("summary", T("Übersicht", "Overview")),
-                new PluginSection("games", T("Spiele", "Games")),
+                new PluginSection("stats", null, PluginSectionKind.Stats),
+                new PluginSection("trophies", T("Pokale", "Trophies"), PluginSectionKind.Stats),
+                new PluginSection("recent", T("Zuletzt freigeschaltet", "Recently unlocked"), PluginSectionKind.Cards),
+                new PluginSection("view", T("Spiele anzeigen", "Show games"), PluginSectionKind.Chips),
+                new PluginSection("sort", null),
+                new PluginSection("games", T("Spiele", "Games"), PluginSectionKind.Cards),
                 new PluginSection("months", T("Freigeschaltet nach Monat", "Unlocked by month")),
                 new PluginSection("steam", "Steam"),
                 new PluginSection("sources", T("Weitere Quellen", "Other sources"))
@@ -133,7 +137,6 @@ public sealed class AchievementsPlugin : IPlugin
                 lock (_gate)
                 {
                     if (rowId == "sort" && SortOptions.Any(o => o.Id == value)) _sort = value;
-                    else if (rowId == "filter" && FilterOptions.Any(o => o.Id == value)) _filter = value;
                 }
                 _context.Invalidate(ListPage);
                 return Task.FromResult<string?>(null);
@@ -228,33 +231,59 @@ public sealed class AchievementsPlugin : IPlugin
         };
         var list = shown.Take(MaxGamePages).ToList();
 
+        // Overview: big numbers, then the trophies (a trophy per game by how far it is done).
+        var earned = all.Sum(g => g.Earned);
+        var total = all.Sum(g => g.Total);
+        var doneGames = all.Count(g => g.Percent == 100);
+        var overall = total == 0 ? 0 : 100.0 * earned / total;
+        rows.Add(new PluginRow("st-earned", T("Freigeschaltet", "Unlocked"))
+        {
+            Section = "stats", Icon = "🏆", Value = $"{earned} / {total}", Progress = overall, RequiresUnlock = false
+        });
+        rows.Add(new PluginRow("st-percent", T("Gesamtfortschritt", "Overall completion"))
+        {
+            Section = "stats", Icon = "◔", Value = $"{Math.Round(overall)} %", Progress = overall, RequiresUnlock = false
+        });
+        rows.Add(new PluginRow("st-games", T("Spiele mit Erfolgen", "Games with achievements"))
+        {
+            Section = "stats", Icon = "🎮", Value = all.Count.ToString(CultureInfo.CurrentCulture), RequiresUnlock = false
+        });
+        rows.Add(new PluginRow("st-done", T("Alle Erfolge geholt", "Fully completed"))
+        {
+            Section = "stats", Icon = "✔", Value = doneGames.ToString(CultureInfo.CurrentCulture), On = doneGames > 0, RequiresUnlock = false
+        });
+        rows.Add(new PluginRow("tr-platinum", T("Platin", "Platinum")) { Section = "trophies", Icon = "🏆", Value = all.Count(g => g.Percent >= 100).ToString(CultureInfo.CurrentCulture), Detail = "100 %", On = true, RequiresUnlock = false });
+        rows.Add(new PluginRow("tr-gold", T("Gold", "Gold")) { Section = "trophies", Icon = "🥇", Value = all.Count(g => g.Percent is >= 75 and < 100).ToString(CultureInfo.CurrentCulture), Detail = "75 – 99 %", RequiresUnlock = false });
+        rows.Add(new PluginRow("tr-silver", T("Silber", "Silver")) { Section = "trophies", Icon = "🥈", Value = all.Count(g => g.Percent is >= 50 and < 75).ToString(CultureInfo.CurrentCulture), Detail = "50 – 74 %", RequiresUnlock = false });
+        rows.Add(new PluginRow("tr-bronze", T("Bronze", "Bronze")) { Section = "trophies", Icon = "🥉", Value = all.Count(g => g.Earned > 0 && g.Percent < 50).ToString(CultureInfo.CurrentCulture), Detail = "1 – 49 %", RequiresUnlock = false });
+
+        // Filter chips (with how many games each shows) and the sort choice.
+        foreach (var option in FilterOptions)
+        {
+            var count = option.Id switch
+            {
+                "open" => all.Count(g => g.Earned > 0 && g.Percent < 100),
+                "done" => doneGames,
+                "new" => all.Count(g => g.Earned == 0),
+                _ => all.Count
+            };
+            rows.Add(new PluginRow("f:" + option.Id, option.Label)
+            {
+                Section = "view",
+                Value = count.ToString(CultureInfo.CurrentCulture),
+                On = filter == option.Id,
+                RequiresUnlock = false
+            });
+        }
         rows.Add(new PluginRow("sort", T("Sortieren nach", "Sort by"))
         {
-            Section = "view",
+            Section = "sort",
             Kind = new PluginRowKind.Choice(SortOptions),
             Value = SortOptions.First(o => o.Id == sort).Label,
             RequiresUnlock = false
         });
-        rows.Add(new PluginRow("filter", T("Anzeigen", "Show"))
-        {
-            Section = "view",
-            Kind = new PluginRowKind.Choice(FilterOptions),
-            Value = FilterOptions.First(o => o.Id == filter).Label,
-            RequiresUnlock = false
-        });
 
-        var earned = all.Sum(g => g.Earned);
-        var total = all.Sum(g => g.Total);
-        rows.Add(new PluginRow("sum-games", T("Spiele mit Erfolgen", "Games with achievements")) { Section = "summary", Value = all.Count.ToString(CultureInfo.CurrentCulture), RequiresUnlock = false });
-        rows.Add(new PluginRow("sum-earned", T("Freigeschaltet", "Unlocked")) { Section = "summary", Value = $"{earned} / {total}", RequiresUnlock = false });
-        rows.Add(new PluginRow("sum-done", T("Alle Erfolge geholt", "Fully completed"))
-        {
-            Section = "summary",
-            Value = all.Count(g => g.Percent == 100).ToString(CultureInfo.CurrentCulture),
-            RequiresUnlock = false
-        });
-
-        // A page per game, registered now so the row can open it.
+        // A page per game, registered now so the card can open it.
         var taken = new HashSet<string>();
         var entries = new List<(string PageId, AchievementGame Game)>();
         foreach (var g in list)
@@ -263,6 +292,25 @@ public sealed class AchievementsPlugin : IPlugin
             taken.Add(pageId);
             entries.Add((pageId, g));
             RegisterGamePage(pageId, g);
+        }
+        var pageOf = entries.ToDictionary(e => e.Game.Id, e => e.PageId, StringComparer.OrdinalIgnoreCase);
+
+        // The latest unlocks of every game, as cards.
+        var recent = all.SelectMany(g => g.Items.Where(i => i.Earned && i.When is not null).Select(i => (Game: g, Item: i)))
+            .OrderByDescending(x => x.Item.When).Take(6).ToList();
+        for (var i = 0; i < recent.Count; i++)
+        {
+            var (game, item) = recent[i];
+            rows.Add(new PluginRow("recent:" + i.ToString(CultureInfo.InvariantCulture), Pretty(item.Name))
+            {
+                Section = "recent",
+                Icon = "🏆",
+                On = true,
+                Detail = game.Name,
+                Value = item.When!.Value.ToLocalTime().ToString("d", CultureInfo.CurrentCulture),
+                Kind = pageOf.TryGetValue(game.Id, out var gamePage) ? new PluginRowKind.Link(gamePage) : null,
+                RequiresUnlock = false
+            });
         }
 
         if (list.Count == 0)
@@ -279,15 +327,16 @@ public sealed class AchievementsPlugin : IPlugin
 
         foreach (var (pageId, g) in entries)
         {
-            var detail = $"{g.Percent} % · {Tier(g.Percent)}";
-            if (g.LastUnlock is { } unlockedAt)
-                detail += " · " + T("zuletzt ", "last ") + (g.LastName ?? "") + " (" + unlockedAt.ToLocalTime().ToString("d", CultureInfo.CurrentCulture) + ")";
+            var detail = Tier(g.Percent);
+            if (g.LastUnlock is { } unlockedAt) detail += " · " + T("zuletzt ", "last ") + unlockedAt.ToLocalTime().ToString("d", CultureInfo.CurrentCulture);
             rows.Add(new PluginRow("game:" + pageId, g.Name)
             {
                 Section = "games",
                 Kind = new PluginRowKind.Link(pageId),
+                Icon = g.Percent == 100 ? "🏆" : "🎮",
                 Detail = detail,
                 Value = $"{g.Earned} / {g.Total}",
+                Progress = g.Percent,
                 On = g.Percent == 100,
                 RequiresUnlock = false
             });
@@ -321,7 +370,7 @@ public sealed class AchievementsPlugin : IPlugin
         return rows;
     }
 
-    /// <summary>The page of one game: every achievement, unlocked first.</summary>
+    /// <summary>The page of one game: big numbers, the All / Unlocked / Locked chips, then the achievements.</summary>
     private void RegisterGamePage(string pageId, AchievementGame game)
     {
         var title = game.Name.Length > 40 ? game.Name[..40] : game.Name;
@@ -332,40 +381,81 @@ public sealed class AchievementsPlugin : IPlugin
             Description = $"{game.Earned} / {game.Total} · {game.Percent} % · {Tier(game.Percent)}",
             Sections =
             [
+                new PluginSection("head", null, PluginSectionKind.Stats),
+                new PluginSection("view", null, PluginSectionKind.Chips),
                 new PluginSection("done", T("Freigeschaltet", "Unlocked")),
                 new PluginSection("todo", T("Noch offen", "Still locked"))
             ],
-            Rows = _ => Task.FromResult<IReadOnlyList<PluginRow>>(GameRows(game))
+            Rows = _ => Task.FromResult<IReadOnlyList<PluginRow>>(GameRows(game)),
+            Activate = (rowId, _) =>
+            {
+                if (rowId.StartsWith("af:", StringComparison.Ordinal))
+                {
+                    var value = rowId[3..];
+                    if (value is "all" or "done" or "todo")
+                    {
+                        lock (_gate) _gameView = value;
+                        _context.Invalidate(pageId);
+                    }
+                }
+                return Task.FromResult<string?>(null);
+            }
         });
     }
 
     private IReadOnlyList<PluginRow> GameRows(AchievementGame game)
     {
-        var rows = new List<PluginRow>();
+        string view;
+        lock (_gate) view = _gameView;
+        var rows = new List<PluginRow>
+        {
+            new("h-earned", T("Freigeschaltet", "Unlocked")) { Section = "head", Icon = "🏆", Value = $"{game.Earned} / {game.Total}", Progress = game.Percent, RequiresUnlock = false },
+            new("h-percent", T("Fortschritt", "Completion")) { Section = "head", Icon = "◔", Value = $"{game.Percent} %", Progress = game.Percent, RequiresUnlock = false },
+            new("h-tier", T("Rang", "Rank")) { Section = "head", Icon = game.Percent == 100 ? "🏆" : "🥉", Value = Tier(game.Percent), On = game.Percent == 100, RequiresUnlock = false }
+        };
+        var chips = new (string Id, string Label, int Count)[]
+        {
+            ("all", T("Alle", "All"), game.Total),
+            ("done", T("Freigeschaltet", "Unlocked"), game.Earned),
+            ("todo", T("Gesperrt", "Locked"), game.Total - game.Earned)
+        };
+        foreach (var (id, label, count) in chips)
+            rows.Add(new PluginRow("af:" + id, label) { Section = "view", Value = count.ToString(CultureInfo.CurrentCulture), On = view == id, RequiresUnlock = false });
+
         var done = game.Items.Where(i => i.Earned).OrderByDescending(i => i.When ?? DateTimeOffset.MinValue).ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase);
         var todo = game.Items.Where(i => !i.Earned).OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase);
         var n = 0;
-        foreach (var i in done)
+        if (view is "all" or "done")
         {
-            if (rows.Count >= 190) break;
-            rows.Add(new PluginRow("a" + (n++).ToString(CultureInfo.InvariantCulture), Pretty(i.Name))
+            foreach (var i in done)
             {
-                Section = "done",
-                On = true,
-                Value = T("Freigeschaltet", "Unlocked"),
-                Detail = i.When is { } w ? w.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) : null,
-                RequiresUnlock = false
-            });
+                if (rows.Count >= 190) break;
+                var when = i.When is { } w ? w.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) : null;
+                rows.Add(new PluginRow("a" + (n++).ToString(CultureInfo.InvariantCulture), Pretty(i.Name))
+                {
+                    Section = "done",
+                    Icon = "🏆",
+                    On = true,
+                    Value = T("Freigeschaltet", "Unlocked"),
+                    Detail = string.Join(" · ", new[] { i.Description, when }.Where(x => !string.IsNullOrWhiteSpace(x))),
+                    RequiresUnlock = false
+                });
+            }
         }
-        foreach (var i in todo)
+        if (view is "all" or "todo")
         {
-            if (rows.Count >= 190) break;
-            rows.Add(new PluginRow("a" + (n++).ToString(CultureInfo.InvariantCulture), Pretty(i.Name))
+            foreach (var i in todo)
             {
-                Section = "todo",
-                Value = T("Gesperrt", "Locked"),
-                RequiresUnlock = false
-            });
+                if (rows.Count >= 190) break;
+                rows.Add(new PluginRow("a" + (n++).ToString(CultureInfo.InvariantCulture), Pretty(i.Name))
+                {
+                    Section = "todo",
+                    Icon = "🔒",
+                    Value = T("Gesperrt", "Locked"),
+                    Detail = string.IsNullOrWhiteSpace(i.Description) ? null : i.Description,
+                    RequiresUnlock = false
+                });
+            }
         }
         return rows;
     }
@@ -592,6 +682,11 @@ public sealed class AchievementsPlugin : IPlugin
             if (!HasSteamKey()) return T("Erst den Schlüssel holen (Schritt 1) und einfügen (Schritt 3).", "Get the key first (step 1) and paste it (step 3).");
             ResetSteam();
             return T("Steam wird neu abgefragt …", "Asking Steam again ...");
+        }
+        if (rowId.StartsWith("f:", StringComparison.Ordinal) && FilterOptions.Any(o => o.Id == rowId[2..]))
+        {
+            lock (_gate) _filter = rowId[2..];
+            _context.Invalidate(ListPage);
         }
         return null;
     }

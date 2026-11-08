@@ -12,7 +12,7 @@ import { settler } from '../core/settle.js';
 import { sound } from '../sound.js';
 import { withParentGrant } from '../core/parent-retry.js';
 import { t } from '../core/i18n.js';
-import { pageSync, currentOption, formatStepper, groupRows, layoutLines, parseStepper, pressKind, safeImage, stepValue, tileColumns } from '../core/plugin-rules.js';
+import { pageSync, currentOption, formatStepper, groupRows, layoutLines, parseStepper, pressKind, progressOf, safeImage, sectionColumns, stepValue } from '../core/plugin-rules.js';
 
 // Pages that are open, so a push from the plugin ("this page changed") redraws the one on screen.
 const open = new Set();
@@ -61,12 +61,59 @@ export function declarativePage(plugin, pageInfo, { asTab = false } = {}) {
     }
   }
 
+  /** A progress bar (0 to 100), or null when the row has none. */
+  function barEl(row) {
+    const percent = progressOf(row);
+    if (percent == null) return null;
+    const fill = el('span', { className: 'pp-bar-fill' });
+    fill.style.width = `${percent}%`;
+    return el('span', { className: `pp-bar${percent >= 100 ? ' full' : ''}`, role: 'progressbar' }, fill);
+  }
+
+  /** A big number (Value) with its small name (Label), an optional bar and symbol: read-only, side by side. */
+  function statNode(row, nodes) {
+    const node = el('div', { className: `pp-stat${row.on ? ' on' : ''}` },
+      el('span', { className: 'pp-stat-icon' }, iconEl(row.icon ?? '◆')),
+      el('span', { className: 'pp-stat-text' },
+        el('strong', { className: 'pp-stat-value', textContent: row.value ?? '' }),
+        el('small', { className: 'pp-stat-label', textContent: row.label }),
+        row.detail ? el('small', { className: 'pp-stat-detail', textContent: row.detail }) : null),
+      barEl(row));
+    nodes.set(row.id, { node, refs: {} });
+    return node;
+  }
+
+  /** A filter chip: its name and a count, the chosen one lit. */
+  function chipNode(row, nodes) {
+    const node = el('div', { className: `pp-chip${row.on ? ' on' : ''}` },
+      el('span', { className: 'pp-chip-label', textContent: row.label }),
+      row.value ? el('span', { className: 'pp-chip-count', textContent: row.value }) : null);
+    nodes.set(row.id, { node, refs: {} });
+    return node;
+  }
+
+  /** A card: picture or symbol, name, detail, the numbers and a bar. */
+  function cardNode(row, nodes) {
+    const image = safeImage(row.image);
+    const art = el('span', { className: 'pp-card-art' }, image ? el('img', { className: 'pp-art', src: image, alt: '', draggable: false }) : iconEl(row.icon ?? '◆'));
+    const node = el('div', { className: `pp-card${row.on ? ' on' : ''}` },
+      art,
+      el('span', { className: 'pp-card-main' },
+        el('strong', { className: 'pp-card-name', textContent: row.label }),
+        row.detail ? el('small', { className: 'pp-card-detail', textContent: row.detail }) : null,
+        barEl(row)),
+      row.value ? el('span', { className: 'pp-card-value', textContent: row.value }) : null,
+      row.badge ? el('span', { className: 'pp-badge', textContent: row.badge }) : null);
+    nodes.set(row.id, { node, refs: {} });
+    return node;
+  }
+
   function listNode(row, nodes) {
     const refs = {};
     const image = safeImage(row.image);
     const node = el('div', { className: `check-row update-row pp-row pp-${row.kind ?? 'action'}` },
       el('span', { className: 'check-box' }, image ? el('img', { className: 'pp-icon', src: image, alt: '', draggable: false }) : iconEl(row.icon ?? '·')),
-      el('span', { className: 'check-main' }, el('strong', { textContent: row.label }), row.detail ? el('small', { textContent: row.detail }) : null),
+      el('span', { className: 'check-main' }, el('strong', { textContent: row.label }), row.detail ? el('small', { textContent: row.detail }) : null, barEl(row)),
       row.badge ? el('span', { className: 'plug-badge', textContent: row.badge }) : null,
       control(row, refs));
     nodes.set(row.id, { node, refs });
@@ -119,9 +166,10 @@ export function declarativePage(plugin, pageInfo, { asTab = false } = {}) {
       const content = [];
       for (const g of groups) {
         if (g.title) content.push(el('div', { className: 'update-section', textContent: g.title }));
-        if (g.kind === 'tiles') {
-          const grid = el('div', { className: 'pp-grid' }, g.rows.map((row) => tileNode(row, this.nodes)));
-          grid.style.setProperty('--cols', String(tileColumns(g.rows.length)));
+        if (g.kind !== 'list') {
+          const make = { tiles: tileNode, stats: statNode, chips: chipNode, cards: cardNode }[g.kind] ?? tileNode;
+          const grid = el('div', { className: `pp-grid pp-grid-${g.kind}` }, g.rows.map((row) => make(row, this.nodes)));
+          grid.style.setProperty('--cols', String(sectionColumns(g.kind, g.rows.length)));
           content.push(grid);
         } else content.push(...g.rows.map((row) => listNode(row, this.nodes)));
       }

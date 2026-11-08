@@ -1481,6 +1481,22 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   assert.equal(pr.tileColumns(0), 1);
   const lines = pr.layoutLines([{ kind: 'tiles', rows: [1, 2, 3, 4, 5, 6].map((id) => ({ id })) }, { kind: 'list', rows: [{ id: 'x' }, { id: 'y' }] }]);
   assert.deepEqual(lines.map((l) => l.map((r) => r.id)), [[1, 2, 3, 4], [5, 6], ['x'], ['y']]);
+  // New section kinds (stats, chips, cards) and the progress bar.
+  const kinds = pr.groupRows([{ id: 'a', section: 'x' }, { id: 'b', section: 'y' }, { id: 'c', section: 'z' }, { id: 'd', section: 'w' }],
+    [{ id: 'x', kind: 'stats' }, { id: 'y', kind: 'chips' }, { id: 'z', kind: 'cards' }, { id: 'w', kind: 'weird' }]);
+  assert.deepEqual(kinds.map((g) => g.kind), ['stats', 'chips', 'cards', 'list']);
+  assert.equal(pr.sectionColumns('cards', 9), 3);
+  assert.equal(pr.sectionColumns('stats', 9), 4);
+  assert.equal(pr.sectionColumns('chips', 9), 6);
+  assert.equal(pr.sectionColumns('chips', 3), 3);
+  assert.equal(pr.sectionColumns('list', 5), 1);
+  const cardLines = pr.layoutLines([{ kind: 'cards', rows: [1, 2, 3, 4, 5].map((id) => ({ id })) }]);
+  assert.deepEqual(cardLines.map((l) => l.map((r) => r.id)), [[1, 2, 3], [4, 5]]);
+  assert.equal(pr.progressOf({ progress: 42 }), 42);
+  assert.equal(pr.progressOf({ progress: 140 }), 100);
+  assert.equal(pr.progressOf({ progress: -3 }), 0);
+  assert.equal(pr.progressOf({}), null);
+  assert.equal(pr.progressOf({ progress: 'x' }), null);
   const stepper = { min: 0, max: 100, step: 5 };
   assert.equal(pr.stepValue(stepper, 70, 1), 75);
   assert.equal(pr.stepValue(stepper, 70, -1), 65);

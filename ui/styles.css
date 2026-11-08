@@ -5291,3 +5291,174 @@ body[data-view="terms"] #notify-stack .notify-card:not(.security) {
   color: #ff7a7a;
   font-weight: 600;
 }
+
+/* Progress bar under a row, a card or a stat */
+.pp-bar {
+  display: block;
+  height: 0.5rem;
+  margin-top: 0.45rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.pp-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 0.5rem;
+  background: var(--accent);
+}
+
+.pp-bar.full .pp-bar-fill {
+  background: #f5b942;
+}
+
+/* Stats: big numbers side by side */
+.pp-grid-stats {
+  gap: 0.8rem;
+}
+
+.pp-stat {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.8rem;
+  padding: 0.8rem 1rem;
+  border-radius: 1rem;
+  background: var(--panel);
+  border: 0.1rem solid rgba(255, 255, 255, 0.1);
+  transition: border-color 0.18s, box-shadow 0.25s;
+}
+
+.pp-stat .pp-bar {
+  flex-basis: 100%;
+}
+
+.pp-stat.focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 1.4rem var(--accent-glow);
+}
+
+.pp-stat-icon {
+  font-size: 1.8rem;
+  color: var(--accent-text, var(--accent));
+}
+
+.pp-stat-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pp-stat-value {
+  font-size: 1.7rem;
+  line-height: 1.1;
+}
+
+.pp-stat-label,
+.pp-stat-detail {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Chips: one line of filters */
+.pp-grid-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.2rem 0 0.6rem;
+}
+
+.pp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 1.1rem;
+  border-radius: 2rem;
+  background: var(--panel);
+  border: 0.1rem solid rgba(255, 255, 255, 0.14);
+  transition: border-color 0.18s, box-shadow 0.25s, background 0.18s;
+}
+
+.pp-chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+
+.pp-chip.focused {
+  border-color: #fff;
+  box-shadow: 0 0 1.2rem var(--accent-glow);
+}
+
+.pp-chip-count {
+  opacity: 0.75;
+  font-size: 0.9em;
+}
+
+/* Cards: picture or symbol, name, numbers and a bar, three side by side */
+.pp-grid-cards {
+  gap: 0.8rem;
+}
+
+.pp-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.8rem 1rem;
+  min-width: 0;
+  border-radius: 1rem;
+  background: var(--panel);
+  border: 0.1rem solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.18s var(--ease), border-color 0.18s, box-shadow 0.25s;
+}
+
+.pp-card.on {
+  border-color: #f5b942;
+}
+
+.pp-card.focused {
+  border-color: var(--accent);
+  transform: scale(1.02);
+  box-shadow: 0 0 1.6rem var(--accent-glow);
+}
+
+.pp-card-art {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 0.8rem;
+  overflow: hidden;
+  font-size: 1.8rem;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.pp-card-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.pp-card-name,
+.pp-card-detail {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pp-card-detail {
+  color: var(--muted);
+}
+
+.pp-card-value {
+  flex: none;
+  font-weight: 800;
+}

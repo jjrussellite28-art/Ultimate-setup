@@ -4722,7 +4722,7 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             Title = PluginText.Safe(page.Title, page.Id, plugins.OriginOf(pluginId) == PluginOrigin.FirstParty),
             page.Description,
             rows = PluginRows.Filter(VisibleRows(pluginId, page, locked, rows ?? [])),
-            sections = page.Sections.Take(20).Where(x => !string.IsNullOrEmpty(x.Id) && x.Id.Length <= PluginRows.MaxId).Select(x => new { x.Id, Title = x.Title is { Length: > PluginRows.MaxLabel } longTitle ? longTitle[..PluginRows.MaxLabel] : x.Title, kind = x.Kind == PluginSectionKind.Tiles ? "tiles" : "list" }).ToList(),
+            sections = page.Sections.Take(20).Where(x => !string.IsNullOrEmpty(x.Id) && x.Id.Length <= PluginRows.MaxId).Select(x => new { x.Id, Title = x.Title is { Length: > PluginRows.MaxLabel } longTitle ? longTitle[..PluginRows.MaxLabel] : x.Title, kind = PluginRows.SectionKindName(x.Kind) }).ToList(),
             actions = VisiblePageActions(pluginId, page, locked).Select(a => a.View).ToList(),
             origin = plugins.OriginOf(pluginId).ToString()
         };

@@ -386,6 +386,18 @@ public sealed class PluginReviewTests : IDisposable
     }
 
     [Fact]
+    public void A_progress_bar_stays_between_0_and_100_and_section_kinds_have_names()
+    {
+        var views = PluginRows.Filter([new PluginRow("a", "A") { Progress = 140 }, new PluginRow("b", "B") { Progress = -5 }, new PluginRow("c", "C") { Progress = double.NaN }, new PluginRow("d", "D") { Progress = 42 }, new PluginRow("e", "E")]);
+        Assert.Equal(new double?[] { 100, 0, null, 42, null }, views.Select(v => v.Progress).ToArray());
+        Assert.Equal("stats", PluginRows.SectionKindName(PluginSectionKind.Stats));
+        Assert.Equal("chips", PluginRows.SectionKindName(PluginSectionKind.Chips));
+        Assert.Equal("cards", PluginRows.SectionKindName(PluginSectionKind.Cards));
+        Assert.Equal("tiles", PluginRows.SectionKindName(PluginSectionKind.Tiles));
+        Assert.Equal("list", PluginRows.SectionKindName(PluginSectionKind.List));
+    }
+
+    [Fact]
     public void A_changed_value_must_be_one_the_row_offers()
     {
         var choice = new PluginRow("c", "C") { Kind = new PluginRowKind.Choice([new("de", "DE"), new("us", "US")]) };

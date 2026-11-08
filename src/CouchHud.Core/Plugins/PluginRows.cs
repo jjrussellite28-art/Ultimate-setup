@@ -20,6 +20,9 @@ public sealed record PluginRowView(string Id, string Label)
     public string? Image { get; init; }
     public string? Badge { get; init; }
 
+    /// <summary>A progress bar, 0 to 100; null: none.</summary>
+    public double? Progress { get; init; }
+
     /// <summary>action, toggle, stepper, choice or link.</summary>
     public string Kind { get; init; } = "action";
 
@@ -45,6 +48,16 @@ public static class PluginRows
 
     private static string? Cut(string? text, int max) => text is null ? null : text.Length <= max ? text : text[..max];
 
+    /// <summary>The name the page gets for how a section is drawn.</summary>
+    public static string SectionKindName(PluginSectionKind kind) => kind switch
+    {
+        PluginSectionKind.Tiles => "tiles",
+        PluginSectionKind.Stats => "stats",
+        PluginSectionKind.Chips => "chips",
+        PluginSectionKind.Cards => "cards",
+        _ => "list"
+    };
+
     /// <summary>The rows a page may show: at most <see cref="MaxRows"/>, rows without a usable id dropped, every text bounded.</summary>
     public static IReadOnlyList<PluginRowView> Filter(IReadOnlyList<PluginRow>? rows)
     {
@@ -69,6 +82,7 @@ public static class PluginRows
             Section = Cut(row.Section, MaxId),
             Image = ImageUri(row.Image),
             Badge = Cut(row.Badge, MaxMark),
+            Progress = row.Progress is { } p && double.IsFinite(p) ? Math.Clamp(p, 0, 100) : null,
             AllowedWhileLocked = row.AllowedWhileLocked
         };
         return row.Kind switch
