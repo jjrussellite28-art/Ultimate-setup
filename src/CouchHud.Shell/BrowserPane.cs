@@ -246,6 +246,9 @@ public sealed class BrowserPane : Grid
     /// <summary>The page changed (address, title, history): the HUD bar shows it.</summary>
     public event Action? PageChanged;
 
+    /// <summary>A right click on the page (the mouse): copy or paste, since the browser's own menu is never shown.</summary>
+    public event Action? CopyPasteRequested;
+
     /// <summary>The page went full screen (video) or came back; also the manual full-screen button.</summary>
     public event Action? FullScreenChanged;
 
@@ -745,7 +748,11 @@ public sealed class BrowserPane : Grid
         // when its content starts to load. The layers below do not depend on the page's scripts at all.
         core.FrameCreated += (_, e) => GuardFrame(e.Frame);
         // No context menu at all, not even a page's request for the browser's own (its entries open "Save as", "Print", "Open in …").
-        core.ContextMenuRequested += (_, e) => e.Handled = true;
+        core.ContextMenuRequested += (_, e) =>
+        {
+            e.Handled = true;
+            CopyPasteRequested?.Invoke();
+        };
         // The browser never opens its file chooser: the page's file field gets no dialog, whatever the page's own scripts do.
         await InterceptFileChoosersAsync(core);
         core.SourceChanged += (_, _) => PageChanged?.Invoke();
