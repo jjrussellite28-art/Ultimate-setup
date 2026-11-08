@@ -95,7 +95,7 @@ export const open = async (text) => (await ensureUnlocked(t('browser.openLock'))
 
 async function openAddress() {
   if (!(await ensureUnlocked(t('browser.openLock')))) return;
-  const text = await openKeyboard({ title: t('browser.addressTitle'), hint: t('browser.addressHint'), placeholder: t('browser.enterAddress'), address: true });
+  const text = await openKeyboard({ title: t('browser.addressTitle'), hint: t('browser.addressHint'), placeholder: t('browser.enterAddress'), address: true, paste: true });
   if (!text) return;
   await open(text);
 }
@@ -450,7 +450,7 @@ api.onBrowserUi?.((what) => {
 async function typeIntoPage(secret) {
   sent = { ...sent, focus: false };
   browserView.setFocus('bar');
-  const text = await openKeyboard({ title: t('browser.typeTitle'), hint: t('browser.typeHint'), secret, maxLength: 4000 });
+  const text = await openKeyboard({ title: t('browser.typeTitle'), hint: t('browser.typeHint'), secret, maxLength: 4000, paste: true });
   // Back to the page in any case: the text goes into the field that has the focus there, so the page must be shown again first.
   focusPage();
   if (!text) return;

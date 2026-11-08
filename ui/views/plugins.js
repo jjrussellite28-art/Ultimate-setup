@@ -842,7 +842,7 @@ function settingRows(p, refresh) {
       let value;
       if (s.kind === 'toggle') value = s.value === 'true' ? 'false' : 'true';
       else if (s.kind === 'choice') value = await chooseDialog(s.label, s.choices.map((c) => ({ label: c, value: c })), s.value);
-      else value = await openKeyboard({ title: s.label, value: s.kind === 'secret' ? '' : s.value ?? '', secret: s.kind === 'secret' });
+      else value = await openKeyboard({ title: s.label, value: s.kind === 'secret' ? '' : s.value ?? '', secret: s.kind === 'secret', paste: true });
       if (value === undefined) return;
       // A child's profile: the host asks for the parents' code once (a visit of this plugin's settings); then the change is repeated once.
       refresh(await attempt(() => withParentGrant(() => api.setPluginSetting(p.id, s.key, value)), t('plugins.notSaved')));
