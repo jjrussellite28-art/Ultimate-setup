@@ -6,7 +6,7 @@ name: installer
 
 on:
   push:
-    branches: [mega-hub-rename]
+    branches: [mega-hub-rename, rebrand]
   workflow_dispatch:
 
 permissions:
@@ -70,8 +70,8 @@ jobs:
       - name: Latest installer release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
-          tag_name: latest-installer
-          name: Latest installer
+          tag_name: ${{ github.ref_name == 'rebrand' && 'rebrand-installer' || 'latest-installer' }}
+          name: ${{ github.ref_name == 'rebrand' && 'Mega Hub rebrand installer (test)' || 'Latest installer' }}
           prerelease: true
           body: "Mega Hub installer (app and service), built from the newest push. Download the .exe, run it once, press Yes. Mega Hub is based on Mega Hub by kewe87 (GPL-3.0); source: https://github.com/jjrussellite28-art/mega-hub"
           files: installer/output/*.exe
