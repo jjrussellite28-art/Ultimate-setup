@@ -7,7 +7,7 @@ A skin is a stylesheet plus optional button glyphs of its own. It changes colors
 ## Structure
 
 ```
-%APPDATA%\CouchHud\skins\synthwave\
+%APPDATA%\MegaHub\skins\synthwave\
   skin.json
   skin.css
   (fonts, images …)
@@ -158,7 +158,7 @@ The skins in the catalog (Deep Sea, Green Light, Neon City, Nova, Stardust, Synt
 
 ### Lint
 
-`scripts/skin-check.mjs` (in the CouchHUD repository; `scripts/catalog-entry.ps1` calls it when it packs a skin folder) is a **lint for the catalog review**. It reports as errors what still reaches the page: an `@font-face` with `size-adjust` under 80 % or with `ascent`/`descent`/`line-gap` overrides, an `@font-face` under the name of a system font, and rules on `html`/`body` that hide, fade or mask the page. As notes (not failing) it reports rules for the old bar that do nothing now, and values of the `--tab-*`/`--bar-*` variables that are not a plain number. Give the catalog folder as an argument (a git worktree has no `../couchhud-catalog-src`), or in the environment variable `COUCHHUD_CATALOG_SKINS`.
+`scripts/skin-check.mjs` (in the Mega Hub repository; `scripts/catalog-entry.ps1` calls it when it packs a skin folder) is a **lint for the catalog review**. It reports as errors what still reaches the page: an `@font-face` with `size-adjust` under 80 % or with `ascent`/`descent`/`line-gap` overrides, an `@font-face` under the name of a system font, and rules on `html`/`body` that hide, fade or mask the page. As notes (not failing) it reports rules for the old bar that do nothing now, and values of the `--tab-*`/`--bar-*` variables that are not a plain number. Give the catalog folder as an argument (a git worktree has no `../couchhud-catalog-src`), or in the environment variable `MEGAHUB_CATALOG_SKINS`.
 
 ## Square tiles
 
@@ -212,6 +212,6 @@ It also works without Windows: `node scripts/preview-server.js` starts the inter
 
 ## Sharing
 
-Pack the folder as a `.zip` (with or without the parent folder) and publish it on GitHub with the topic `couchhud-skin`. Others install it in Mega Hub under *Settings › Look › Install new skins*.
+Pack the folder as a `.zip` (with or without the parent folder) and publish it on GitHub with the topic `megahub-skin`. Others install it in Mega Hub under *Settings › Look › Install new skins*.
 
 For the catalog: give the skin a name of its own, not someone else's brand (no console, manufacturer or game name), and use no third-party logos. A style may remind you of something, but must not be named after it.

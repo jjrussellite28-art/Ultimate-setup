@@ -1,4 +1,4 @@
-Mega Hub — independent development fork by jjrussellite28-art; based on CouchHUD by kewe87.
+Mega Hub — independent development fork by jjrussellite28-art; based on Mega Hub by kewe87.
 Not approved for release. See README.md and docs/RELEASE-CHECKLIST.md in the source.
 
 Mega Hub – before you start
@@ -6,7 +6,7 @@ Mega Hub – before you start
 Mega Hub is a console-style interface for your Windows PC on the TV.
 
 What this setup does
-• Installs Mega Hub to C:\Program Files\CouchHud (a protected folder only administrators can change).
+• Installs Mega Hub to C:\Program Files\MegaHub (a protected folder only administrators can change).
 • Installs the Microsoft WebView2 Runtime if it is missing; Mega Hub needs it for its interface.
 • Creates a Start menu entry, and optionally a desktop icon and autostart.
 
@@ -19,7 +19,7 @@ Uninstall
 Uninstalling restores what Mega Hub changed in Windows (shell entry, Task Manager policy, scheduled tasks, firewall rule) and asks whether your settings should be deleted. Emergency at any time: hold Ctrl + Shift (or LB + RB + View on the controller) for about 1.5 seconds while Mega Hub starts. Windows locks, and after you sign in with the account's Windows password the normal desktop comes back.
 
 Damaged settings
-If %APPDATA%\CouchHud\config.json is damaged, Mega Hub runs locked (no game starts) and writes nothing to the file. The way out: repair config.json or put it back. Deleting config.json alone does not start over; for that, remove the whole folder %APPDATA%\CouchHud (play time and profiles go with it). The config.json.broken file next to it is only a copy.
+If %APPDATA%\MegaHub\config.json is damaged, Mega Hub runs locked (no game starts) and writes nothing to the file. The way out: repair config.json or put it back. Deleting config.json alone does not start over; for that, remove the whole folder %APPDATA%\MegaHub (play time and profiles go with it). The config.json.broken file next to it is only a copy.
 
 Disclaimer and privacy
 Mega Hub is free software (GPL-3.0) without any warranty; use at your own risk. No telemetry, no account. The full texts are shown at the first start and under Settings › Info (currently in German).

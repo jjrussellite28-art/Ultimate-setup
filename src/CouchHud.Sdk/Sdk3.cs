@@ -2,11 +2,11 @@ namespace CouchHud.Sdk;
 
 // SDK 3: richer declarative pages, host services behind capabilities, and the process id of a started game.
 // Everything is added through optional members and default interface members, so plugins for SDK 1 and 2 keep working.
-// A plugin never ships HTML or script into the HUD: pages are data that CouchHUD renders (all text as plain text).
+// A plugin never ships HTML or script into the HUD: pages are data that Mega Hub renders (all text as plain text).
 
 /// <summary>
 /// The capabilities a plugin can declare in plugin.json ("capabilities": [...]) and in its signed statement. A context member whose
-/// capability was not declared (and granted) throws <see cref="PluginCapabilityException"/>. Some are for CouchHUD's own (first-party)
+/// capability was not declared (and granted) throws <see cref="PluginCapabilityException"/>. Some are for Mega Hub's own (first-party)
 /// plugins only and are never granted to a plugin of a third-party developer, whatever it declares.
 /// </summary>
 public static class PluginCapabilities
@@ -38,7 +38,7 @@ public static class PluginCapabilities
     public const string SetupRun = "setup.run";
     /// <summary>First-party only: a settings program that is minimized on the locked couch (<see cref="IPluginContext.RestrictWhileLocked"/>).</summary>
     public const string LockRestrict = "lock.restrict";
-    /// <summary>First-party only: adapts the arguments of one program's autostart entry when CouchHUD is the shell (<see cref="IPluginContext.AdaptStartupArgs"/>).</summary>
+    /// <summary>First-party only: adapts the arguments of one program's autostart entry when Mega Hub is the shell (<see cref="IPluginContext.AdaptStartupArgs"/>).</summary>
     public const string StartupArgs = "startup.args";
     /// <summary>First-party only: a web sign-in in the couch browser whose redirect address the host catches without loading it (<see cref="IPluginContext.SignIn"/>).</summary>
     public const string BrowserSignIn = "browser.signin";
@@ -48,7 +48,7 @@ public static class PluginCapabilities
     public const string News = "news";
     /// <summary>SDK 5, first-party only: a cloud provider for the assistant (<see cref="IPluginContext.RegisterChatProvider"/>); it sees the whole conversation.</summary>
     public const string ChatProvider = "assistant.provider";
-    /// <summary>SDK 5: read-only state of CouchHUD itself: version, shell or app mode, PC mode, the running app, the sleep timer, the lock (<see cref="IPluginContext.Host"/>).</summary>
+    /// <summary>SDK 5: read-only state of Mega Hub itself: version, shell or app mode, PC mode, the running app, the sleep timer, the lock (<see cref="IPluginContext.Host"/>).</summary>
     public const string HostState = "host.state";
     /// <summary>First-party only: puts fan speeds and temperatures on the host's sensor board (<see cref="IPluginContext.PublishSensors"/>).</summary>
     public const string SensorsPublish = "sensors.publish";
@@ -74,7 +74,7 @@ public static class PluginCapabilities
     /// <summary>Loading or generating code at run time (Assembly.Load*, Reflection.Emit). Never for third-party plugins.</summary>
     public const string DynamicCode = "dynamicCode";
 
-    /// <summary>Every capability CouchHUD knows; anything else in a manifest or statement is refused.</summary>
+    /// <summary>Every capability Mega Hub knows; anything else in a manifest or statement is refused.</summary>
     public static readonly IReadOnlyList<string> All =
     [
         Library, Pages, QuickActions, Assistant, Notify, Browser, Downloads, NetworkState, Process, Tabs, SetupRun, LockRestrict, StartupArgs, BrowserSignIn,
@@ -86,7 +86,7 @@ public static class PluginCapabilities
 
 /// <summary>
 /// A main tab a plugin asks for (capability "tabs"): a title in German and English, an icon, and the plugin page it shows. The page is
-/// drawn by CouchHUD from the plugin's data like any plugin page; a plugin never ships HTML or script. The host bounds and checks
+/// drawn by Mega Hub from the plugin's data like any plugin page; a plugin never ships HTML or script. The host bounds and checks
 /// everything (id, title length and characters, names that look like a built-in tab, the picture), puts the tab after the built-in
 /// tabs and hides it with its area, in a child's profile, and while the plugin is off or not loaded.
 /// </summary>
@@ -98,7 +98,7 @@ public sealed record PluginTab(string Id, string PageId, string TitleDe, string 
 {
     /// <summary>
     /// A symbol (exactly one emoji, arrow or shape, no letters or digits) shown before the title when there is no <see cref="Icon"/>. For a
-    /// plugin that is not CouchHUD's own, a symbol that CouchHUD draws as one of its own icons (lock, gear, bell …) is replaced by a plain dot.
+    /// plugin that is not Mega Hub's own, a symbol that Mega Hub draws as one of its own icons (lock, gear, bell …) is replaced by a plain dot.
     /// </summary>
     public string? Glyph { get; init; }
 
@@ -109,13 +109,13 @@ public sealed record PluginTab(string Id, string PageId, string TitleDe, string 
 
     /// <summary>
     /// The feature area the tab belongs to: "games", "apps" (the default), "browser", "news" or "always". With that area switched off the
-    /// tab is hidden. An unknown value counts as "apps". "always" (never hidden by an area) is for CouchHUD's own plugins only; for any
+    /// tab is hidden. An unknown value counts as "apps". "always" (never hidden by an area) is for Mega Hub's own plugins only; for any
     /// other plugin it counts as "apps".
     /// </summary>
     public string Area { get; init; } = "apps";
 
     /// <summary>
-    /// Show the tab in a child's profile too. Honoured only for CouchHUD's own plugins (a feature of the core that became a plugin and was
+    /// Show the tab in a child's profile too. Honoured only for Mega Hub's own plugins (a feature of the core that became a plugin and was
     /// visible to children before); ignored for every other plugin, whose tabs are never shown to children. The page behind the tab stays
     /// behind the usual gates (lock, parents' code).
     /// </summary>
@@ -131,7 +131,7 @@ public enum PluginLevel
     /// <summary>Only when the couch is unlocked (and, under parental controls, with the parents' code as for any change).</summary>
     Admin,
 
-    /// <summary>Everyone, also on the locked couch and in a child's profile. Only the owner can choose this for a plugin that is not CouchHUD's own.</summary>
+    /// <summary>Everyone, also on the locked couch and in a child's profile. Only the owner can choose this for a plugin that is not Mega Hub's own.</summary>
     Restricted,
 
     /// <summary>Nobody: hidden, and calls are refused.</summary>
@@ -149,7 +149,7 @@ public enum PluginLevel
 public sealed record PluginFunction(string Id, string LabelDe, string LabelEn)
 {
     /// <summary>
-    /// The level the function starts with. Only a suggestion: the owner's choice wins, and for a plugin that is not CouchHUD's own
+    /// The level the function starts with. Only a suggestion: the owner's choice wins, and for a plugin that is not Mega Hub's own
     /// <see cref="PluginLevel.Restricted"/> and <see cref="PluginLevel.Off"/> count as <see cref="PluginLevel.Admin"/> (such a plugin cannot loosen
     /// anything for itself). Default: <see cref="PluginLevel.Admin"/>.
     /// </summary>
@@ -213,7 +213,7 @@ public interface IPluginDownloads
 }
 
 /// <summary>
-/// A web sign-in (OAuth) in the couch browser, for CouchHUD's own plugins. The plugin names a redirect host that ends in ".invalid"
+/// A web sign-in (OAuth) in the couch browser, for Mega Hub's own plugins. The plugin names a redirect host that ends in ".invalid"
 /// (RFC 6761: it never resolves). The browser cancels every navigation to that host before a request goes out (frames too, other
 /// requests to it get a 403 in the browser), so the address, which carries the code, never reaches a server, the address bar or the
 /// history; the host hands it to the plugin once. One sign-in at a time; it ends with the browser, with the lock, or on

@@ -170,7 +170,7 @@ export default {
   'systemTools.services.setupTitle': 'Übernehmen',
   'systemTools.services.applyTitle': 'Änderungen übernehmen',
   'systemTools.services.doneTitle': 'Übernommen: Umschalten ohne Nachfrage',
-  'systemTools.services.protectedFolder': 'Dafür muss Mega Hub in einem geschützten Ordner liegen, z.B. C:\\Program Files\\CouchHud',
+  'systemTools.services.protectedFolder': 'Dafür muss Mega Hub in einem geschützten Ordner liegen, z.B. C:\\Program Files\\Mega Hub',
   'systemTools.services.legacyDetail': 'Frühere Versionen nutzten geplante Aufgaben. Der Mega-Hub-Dienst ersetzt sie und entfernt sie dabei',
   'systemTools.services.doneDetail': 'Der Mega-Hub-Dienst pausiert nur Dienste aus seiner festen Liste und startet nur die wieder, die er selbst angehalten hat',
   'systemTools.services.setupDetail': 'Der Mega-Hub-Dienst schaltet die Dienste beim Wechsel zwischen Couch und PC um',

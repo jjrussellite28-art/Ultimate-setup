@@ -112,7 +112,7 @@ export default {
   'consoleSetup.step.services.detail': 'Nur gefahrlose Dienste (Suche, Druck …), im PC-Modus laufen sie wieder. Dazu kleine geplante Aufgaben, mit denen die Couch-Sperre ihre Windows-Richtlinien setzt, ohne beim Sperren zu fragen. Braucht eine Bestätigung',
   'consoleSetup.step.servicesTasks.title': 'Sperre ohne Nachfragen vorbereiten',
   'consoleSetup.step.servicesTasks.detail': 'Kleine geplante Aufgaben, mit denen die Sperre ihre Windows-Richtlinien setzt, ohne jedes Mal nachzufragen. Dienste werden nicht pausiert. Braucht eine Bestätigung',
-  'consoleSetup.step.services.unprotected': 'Mega Hub liegt nicht in einem geschützten Ordner (z.B. C:\\Program Files\\CouchHud). Danach im Expertenmodus unter Autostart & Dienste einrichten',
+  'consoleSetup.step.services.unprotected': 'Mega Hub liegt nicht in einem geschützten Ordner (z.B. C:\\Program Files\\Mega Hub). Danach im Expertenmodus unter Autostart & Dienste einrichten',
   'consoleSetup.windowsPromptFailed': 'Dieser Schritt ist nicht gelungen: {error}. „Noch einmal versuchen“ probiert ihn erneut',
   'consoleSetup.step.services.done': 'Dienste werden im Couch-Modus pausiert',
   'consoleSetup.step.xbox.title': 'Guide-Taste für Mega Hub reservieren',

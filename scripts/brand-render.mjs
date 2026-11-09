@@ -1,6 +1,6 @@
 // Renders the branding from its SVG sources with headless Edge (no extra packages):
 //   docs/logo.png (512), docs/banner.png, docs/social-preview.png (needs the docs/screenshot-*.en.png), assets/branding/png/icon-*.png
-//   and src/CouchHud.Shell/couchhud.ico (PNG frames; 16-32 px from the simplified icon-small.svg), the setup pictures installer/wizard*.bmp.
+//   and src/MegaHub.Shell/megahub.ico (PNG frames; 16-32 px from the simplified icon-small.svg), the setup pictures installer/wizard*.bmp.
 //
 //   node scripts/brand-render.mjs            Env: EDGE (path to msedge.exe)
 import { spawn } from 'node:child_process';
@@ -49,7 +49,7 @@ ws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id && waiting.has(d.
 const send = (method, params = {}) => new Promise((res) => { waiting.set(++id, res); ws.send(JSON.stringify({ id, method, params })); });
 
 await send('Page.enable');
-const tmp = mkdtempSync(join(tmpdir(), 'couchhud-brand-page-'));
+const tmp = mkdtempSync(join(tmpdir(), 'megahub-brand-page-'));
 dirs.push(tmp);
 for (const job of jobs) {
   // The SVG is drawn as an <img> at the target size, so the browser scales it (crisp, no CSS from outside).
@@ -77,8 +77,8 @@ frames.forEach((f, i) => {
   header.writeUInt32LE(f.data.length, o + 8); header.writeUInt32LE(offset, o + 12);
   offset += f.data.length;
 });
-writeFileSync(at('src/CouchHud.Shell/couchhud.ico'), Buffer.concat([header, ...frames.map((f) => f.data)]));
-console.log('ico', 'src/CouchHud.Shell/couchhud.ico', ICON_SIZES.join(', '));
+writeFileSync(at('src/MegaHub.Shell/megahub.ico'), Buffer.concat([header, ...frames.map((f) => f.data)]));
+console.log('ico', 'src/MegaHub.Shell/megahub.ico', ICON_SIZES.join(', '));
 
 // Setup pictures (Inno Setup wants 24-bit BMP, 100 % and 200 %): the side picture of the welcome and last page and the small one
 // at the top right. The logo goes in as a nested <svg> (an SVG drawn as <img> loads nothing from outside).

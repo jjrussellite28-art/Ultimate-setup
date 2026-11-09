@@ -11,8 +11,8 @@ Logo generated with Bing Image Creator and supplied by jjrussellite28-art. [Sour
 A controller-first Windows TV interface, independently maintained by **jjrussellite28-art**.
 
 **Development preview — no Mega Hub release is published yet.**
-This is a fork of [CouchHUD](https://github.com/kewe87/CouchHUD) by **kewe87 and contributors**,
-under the GNU GPL v3. It is not an official CouchHUD product and is not endorsed or supported by that project.
+This is a fork of [Mega Hub](https://github.com/kewe87/CouchHUD) by **kewe87 and contributors**,
+under the GNU GPL v3. It is not an official Mega Hub product and is not endorsed or supported by that project.
 
 ## What it does
 
@@ -32,7 +32,7 @@ Mega Hub keeps everything the inherited application does and adds its own work o
 - **Developer mode** (Settings › Power) for testing your own unsigned plugins.
 - Own **Achievements** plugin, a Mega Hub logo and rebranded text.
 
-Credit stays with the original project: the base application is CouchHUD by kewe87 and contributors.
+Credit stays with the original project: the base application is Mega Hub by kewe87 and contributors.
 
 ## Changes in this fork
 
@@ -43,7 +43,7 @@ These changes do not claim authorship of the inherited application or new game-l
 
 ## Downloads and support
 
-There is currently **no approved Mega Hub installer**. Do not treat upstream CouchHUD installers
+There is currently **no approved Mega Hub installer**. Do not treat upstream Mega Hub installers
 as builds of this fork. Future reviewed builds will appear only on
 [this repository's releases page](https://github.com/jjrussellite28-art/mega-hub/releases).
 For development feedback, use [pull requests](https://github.com/jjrussellite28-art/mega-hub/pulls).
@@ -55,15 +55,15 @@ Do not post passwords, API keys, personal configuration or exploit details publi
 Windows 10 (1809+) or Windows 11 x64, .NET 10 SDK, Node.js 22.13+ and an XInput-compatible controller.
 
 ```powershell
-dotnet restore CouchHud.slnx
-dotnet build CouchHud.slnx -c Release
-dotnet test CouchHud.slnx -c Release --no-build
-dotnet run --project src/CouchHud.Shell -- --dev
+dotnet restore MegaHub.slnx
+dotnet build MegaHub.slnx -c Release
+dotnet test MegaHub.slnx -c Release --no-build
+dotnet run --project src/MegaHub.Shell -- --dev
 ```
 
 Browser preview with mock data: `node scripts/preview-server.js`.
 Installer build instructions are in `.github/workflows/build.yml` (Inno Setup 6).
-Internal `CouchHud` assembly, service, data and protocol names are inherited compatibility identifiers.
+Internal `Mega Hub` assembly, service, data and protocol names are inherited compatibility identifiers.
 **Do not install this development fork alongside or over Mega Hub**: those identifiers are not isolated yet.
 Use a disposable Windows test environment for installer and shell-mode testing.
 

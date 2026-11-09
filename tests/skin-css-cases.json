@@ -916,12 +916,12 @@
  },
  {
   "name": "esc-userinfo-local-lookalike",
-  "input": "a{background:url(\"https://local.couchhud:x@evil.com/y\")}",
+  "input": "a{background:url(\"https://local.megahub:x@evil.com/y\")}",
   "output": ""
  },
  {
   "name": "esc-userinfo-local-lookalike-var",
-  "input": "a{--u:\"https://local.couchhud:x@evil.com/y\";background-image:image-set(var(--u) 1x)}",
+  "input": "a{--u:\"https://local.megahub:x@evil.com/y\";background-image:image-set(var(--u) 1x)}",
   "output": ""
  },
  {
@@ -1091,8 +1091,8 @@
  },
  {
   "name": "esc-ok-local-hosts",
-  "input": "a{background:url(\"https://local.couchhud/a.png\")}b{background:url(//art.couchhud/b.png)}",
-  "output": "a{background:url(\"https://local.couchhud/a.png\")}b{background:url(//art.couchhud/b.png)}"
+  "input": "a{background:url(\"https://local.megahub/a.png\")}b{background:url(//art.megahub/b.png)}",
+  "output": "a{background:url(\"https://local.megahub/a.png\")}b{background:url(//art.megahub/b.png)}"
  },
  {
   "name": "esc-ok-content-strings",

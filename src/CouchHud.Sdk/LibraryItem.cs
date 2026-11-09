@@ -18,7 +18,7 @@ public sealed record LaunchTarget(LaunchKind Kind, string Target)
 {
     public IReadOnlyList<string> Args { get; init; } = [];
     public string? WorkingDirectory { get; init; }
-    /// <summary>An http(s) address that opens in CouchHud's own browser instead of the system's.</summary>
+    /// <summary>An http(s) address that opens in MegaHub's own browser instead of the system's.</summary>
     public bool Embedded { get; init; }
 }
 
@@ -55,7 +55,7 @@ public sealed record LibraryItem
     public long SizeOnDisk { get; init; }
     /// <summary>Hidden by the user; still known so it can be shown again.</summary>
     public bool Hidden { get; init; }
-    /// <summary>Total minutes played as tracked by CouchHud.</summary>
+    /// <summary>Total minutes played as tracked by MegaHub.</summary>
     public double PlaytimeMinutes { get; init; }
     /// <summary>
     /// SDK 5, additive: entries of one plugin that share a time limit and lock among themselves, whatever their <see cref="InstallDir"/> (a
@@ -65,6 +65,6 @@ public sealed record LibraryItem
     /// not how a running game is recognized.
     /// </summary>
     public string? LimitGroup { get; init; }
-    /// <summary>Minutes of the last play session as tracked by CouchHud, 0 if unknown.</summary>
+    /// <summary>Minutes of the last play session as tracked by MegaHub, 0 if unknown.</summary>
     public double LastSessionMinutes { get; init; }
 }

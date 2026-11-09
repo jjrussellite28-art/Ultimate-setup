@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>MegaHub.Privileged</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MegaHub.Core\MegaHub.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The code that runs with administrator rights: used by the service, and for now by the shell's elevated helpers. -->
+    <InternalsVisibleTo Include="MegaHub" />
+    <InternalsVisibleTo Include="MegaHub.Privileged.Tests" />
+  </ItemGroup>
+</Project>

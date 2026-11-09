@@ -6,7 +6,7 @@ which reaches the secure desktop. Waits for consent.exe, sends the keys, checks 
 #>
 param(
     [string]$VMName = 'Win11-Test',
-    [string]$CredentialPath = "$env:USERPROFILE\couchhud-vm.cred",
+    [string]$CredentialPath = "$env:USERPROFILE\megahub-vm.cred",
     [int]$TimeoutSeconds = 30,
     [switch]$Decline
 )

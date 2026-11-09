@@ -1,6 +1,6 @@
 // Downloads tab: everything that loads or installs, in one place (like a console's download list). The host gathers the lines
 // (Steam's manifests, Windows Update, winget, Mega Hub's own update, plugins and skins, CaseHUD, installs asked for in a store);
-// see src/CouchHud.Core/Library/DownloadCenter.cs. A bar only where the source really tells its progress.
+// see src/MegaHub.Core/Library/DownloadCenter.cs. A bar only where the source really tells its progress.
 
 import { api } from '../core/api.js';
 import { $, el, formatSize, keepInView, setFocused } from '../core/dom.js';
@@ -43,7 +43,7 @@ function redraw() {
   else renderHints();
 }
 
-const KIND_ICON = { game: '🎮', windows: '🪟', app: '⤓', couchHud: '↻', plugin: '🔌' };
+const KIND_ICON = { game: '🎮', windows: '🪟', app: '⤓', megaHub: '↻', plugin: '🔌' };
 const STATE_ICON = { downloading: '⬇', installing: '⬇', waiting: '⋯', inClient: '⋯', paused: '⏸', queued: '⋯', done: '✓', failed: '⚠' };
 
 const OWN_SOURCE = {
@@ -179,7 +179,7 @@ function pendingRow(p) {
     case 'self': {
       const s = state.selfUpdate;
       return {
-        kind: 'pending', group: 'couchhud', icon: '↻', label: t('updates.self.install', { version: s.version }),
+        kind: 'pending', group: 'megahub', icon: '↻', label: t('updates.self.install', { version: s.version }),
         detail: s.ready ? t('updates.self.installDetail', { current: s.current }) : (s.problem ?? t('updates.self.notReady')),
         hint: t('updates.install'), busyKey: 'update:self', hostBusy: !!s.busy, run: installSelfUpdate
       };
@@ -356,7 +356,7 @@ export const downloadsView = {
           isActive(e) && !bar ? el('span', { className: 'progress progress-unknown' }, el('i')) : null));
     });
     // Each section's heading before its first row, with how many lines it holds; the first row of a section keeps it in view.
-    // i18n-used: downloads.section.running downloads.section.couchhud downloads.section.apps downloads.section.windows downloads.section.plugins downloads.section.finished
+    // i18n-used: downloads.section.running downloads.section.megahub downloads.section.apps downloads.section.windows downloads.section.plugins downloads.section.finished
     this.heads = new Map();
     let at = 0;
     const children = sections.flatMap((s) => {

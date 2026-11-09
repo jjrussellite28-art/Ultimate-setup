@@ -894,7 +894,7 @@ function pluginPage(plugin, store, onChange) {
     rows: () => p.removedAtRestart ? [
       // Uninstalled, files still held: only the note, nothing to switch (the host refuses it as well).
       { icon: '↻', label: t('plugins.value.removedAtRestart'), detail: t('plugins.removedAtRestart.detail'), wrap: true, highlight: true },
-      { icon: '📁', label: t('plugins.page.folder'), detail: `%APPDATA%\\CouchHud\\plugins\\${p.folder}` }
+      { icon: '📁', label: t('plugins.page.folder'), detail: `%APPDATA%\\MegaHub\\plugins\\${p.folder}` }
     ] : [
       ...(isThirdParty(p) ? [{ icon: '⚠', label: t('plugin.thirdParty.badge'), detail: t('plugin.thirdParty.short'), wrap: true, highlight: true }] : []),
       ...(p.revoked ? [{
@@ -968,7 +968,7 @@ function pluginPage(plugin, store, onChange) {
           }
         }
       }] : []),
-      { icon: '📁', label: t('plugins.page.folder'), detail: `${p.userInstalled ? '%APPDATA%\\CouchHud\\plugins\\' : 'plugins\\'}${p.folder}` }
+      { icon: '📁', label: t('plugins.page.folder'), detail: `${p.userInstalled ? '%APPDATA%\\MegaHub\\plugins\\' : 'plugins\\'}${p.folder}` }
     ]
   });
 }

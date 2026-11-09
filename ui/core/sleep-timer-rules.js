@@ -12,7 +12,7 @@ export const TIMER_MINUTES = [30, 60, 90, 120];
 export const DEFAULT_TIMER_ACTION = 'shutdown';
 
 /** Where the last used action is kept in the UI's own storage. */
-export const TIMER_ACTION_KEY = 'couchhud-sleep-timer-action';
+export const TIMER_ACTION_KEY = 'megahub-sleep-timer-action';
 
 /** How long before the end the timer warns (with "Abbrechen" and "Jetzt"). */
 export const TIMER_WARN_MS = 60_000;

@@ -1,6 +1,6 @@
 namespace CouchHud.Sdk;
 
-// Sensor board (additive, no SDK version change): one plugin that reads the PC's sensors (CouchHUD's own CaseHUD plugin, which gets
+// Sensor board (additive, no SDK version change): one plugin that reads the PC's sensors (Mega Hub's own CaseHUD plugin, which gets
 // them from CaseHUD and its LibreHardwareMonitor service) publishes fan speeds and temperatures, and other plugins read them (the
 // FanControl plugin shows them on its page). The plugins never talk to each other: the host keeps the last values, checks and bounds
 // them, names their source itself and drops them when they get old. Reading grants nothing but the numbers: no access to the

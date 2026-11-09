@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- CouchHUD logo: a couch seen from behind, in front of a glowing TV that shows the tile row.
+  <!-- Mega Hub logo: a couch seen from behind, in front of a glowing TV that shows the tile row.
        Same tile and glow language as CaseHUD, own colors (blue to violet). 16-32 px: assets/branding/icon-small.svg -->
   <defs>
     <linearGradient id="frame" x1="0" y1="1" x2="1" y2="0">

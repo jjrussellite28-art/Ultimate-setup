@@ -923,7 +923,7 @@ body[data-view="detail"] #bg-hero.has-image ~ .bg-shade {
   backdrop-filter: none;
 }
 
-/* A web page's question (alert, confirm, download): a frame of its own and the globe, so it never passes for CouchHUD's. */
+/* A web page's question (alert, confirm, download): a frame of its own and the globe, so it never passes for Mega Hub's. */
 #overlay.web .dialog {
   border: 0.2rem dashed rgba(120, 170, 255, 0.85);
   background: #0f1420;
@@ -2907,7 +2907,7 @@ body.quick-open #view {
 }
 
 /* ------------------------------------------------------------------ HDR */
-/* Active with :root[data-hdr] (Windows HDR on, or CouchHud turned it on).
+/* Active with :root[data-hdr] (Windows HDR on, or MegaHub turned it on).
    Artwork and trailers get the full brightness range; the UI switches to
    wide-gamut colours, light sweeps and stronger glow. */
 

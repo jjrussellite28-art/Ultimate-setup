@@ -1,7 +1,7 @@
 # Packs a plugin or skin folder into <Name>-<Version>.zip (the folder name is the top folder of the archive)
 # and prints the SHA-256 for the catalog entry in index.json.
 #
-#   .\scripts\catalog-entry.ps1 -Folder .\publish\CouchHud.Plugin.Wand -Version 1.0.0
+#   .\scripts\catalog-entry.ps1 -Folder .\publish\MegaHub.Plugin.Wand -Version 1.0.0
 param(
     [Parameter(Mandatory)] [string] $Folder,
     [Parameter(Mandatory)] [string] $Version,

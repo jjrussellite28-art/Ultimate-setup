@@ -7,12 +7,12 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <Version>0.7.1</Version>
     <!--
-      Release or development build. A release build (CI on a tag: environment variable or -p:CouchHudRelease=true) carries exactly
+      Release or development build. A release build (CI on a tag: environment variable or -p:MegaHubRelease=true) carries exactly
       <Version>; every other build (a local build, CI without a tag) is a pre-release of it: 0.7.1-dev+<short commit>. A pre-release is
       older than its release, so an installed development build is offered the real release by the updater (a local build with the same
       number as the release once hid the update). The updater ignores the part after "+".
     -->
-    <InformationalVersion Condition="'$(CouchHudRelease)' != 'true'">$(Version)-dev</InformationalVersion>
+    <InformationalVersion Condition="'$(MegaHubRelease)' != 'true'">$(Version)-dev</InformationalVersion>
     <Authors>kewe87; jjrussellite28-art</Authors>
     <Copyright>Copyright © 2026 kewe87</Copyright>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
@@ -20,7 +20,7 @@
   </PropertyGroup>
 
   <!-- The SDK appends the full commit to the informational version; eight characters are enough to name a build. -->
-  <Target Name="CouchHudShortRevision" AfterTargets="InitializeSourceControlInformation">
+  <Target Name="MegaHubShortRevision" AfterTargets="InitializeSourceControlInformation">
     <PropertyGroup Condition="'$(SourceRevisionId)' != '' and $(SourceRevisionId.Length) &gt; 8">
       <SourceRevisionId>$(SourceRevisionId.Substring(0, 8))</SourceRevisionId>
     </PropertyGroup>

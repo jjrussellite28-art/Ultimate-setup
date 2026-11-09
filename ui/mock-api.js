@@ -7,7 +7,7 @@ import { RATING_CHOICES, convertLimit, limitLabel, ratingSteps } from './core/ag
 
 // Cannot import core/i18n.js (that module awaits systemInfo() from here); i18n.js publishes t on globalThis.
 // Only call t() inside functions/getters that run after startup, never at module top level.
-const t = (...a) => globalThis.__couchhudT?.(...a) ?? a[0];
+const t = (...a) => globalThis.__megahubT?.(...a) ?? a[0];
 // Defines properties whose text is computed on read (so the language is known by then) but can still be overwritten.
 const lz = (o, f) => {
   for (const [key, fn] of Object.entries(f)) {
@@ -16,7 +16,7 @@ const lz = (o, f) => {
   }
   return o;
 };
-const previewLanguage = () => { try { return localStorage.getItem('couchhud-preview-language'); } catch { return null; } };
+const previewLanguage = () => { try { return localStorage.getItem('megahub-preview-language'); } catch { return null; } };
 
 const CDN = 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps';
 const day = 86400000;
@@ -125,7 +125,7 @@ const wifi = {
     { ssid: 'Vodafone Hotspot', signal: 18, secured: false, security: 'open', supported: true }
   ]
 };
-const mockProfiles = [{ id: 'default', name: 'CouchHUD', avatar: 'fox', color: '#3fa9f5', restricted: false, hasCode: false, isDefault: true, active: true }];
+const mockProfiles = [{ id: 'default', name: 'Mega Hub', avatar: 'fox', color: '#3fa9f5', restricted: false, hasCode: false, isDefault: true, active: true }];
 const mockProfile = (id) => {
   const p = mockProfiles.find((x) => x.id === id);
   if (!p) throw new Error('unknown profile');
@@ -264,7 +264,7 @@ const fnList = (id) => (fnDefs[id] ?? []).map(([fid, suggested, key]) => ({
 const restrictionsPossible = () => !new URLSearchParams(location.search).has('fnnolock') && (security.couchLock !== 'off' || !!parentalState()?.enabled);
 const plugins = [
   lz({
-    folder: 'CouchHud.Plugin.Wand', id: 'wand', name: 'Wand', version: '1.0.0', author: 'kewe87', homepage: 'https://www.wand.com',
+    folder: 'MegaHub.Plugin.Wand', id: 'wand', name: 'Wand', version: '1.0.0', author: 'kewe87', homepage: 'https://www.wand.com',
     enabled: true, loaded: true, error: null, userInstalled: true, origin: 'firstParty', publisher: null, revoked: false, revokedReason: null,
     capabilities: ['pages', 'quickActions', 'assistant', 'process'],
     pages: [lz({ id: 'status', title: 'Wand', icon: '🪄' }, { description: () => t('mock.wandPageDesc') })],
@@ -390,14 +390,14 @@ const saveBackups = [
   { id: '2026-10-15_20-00_unvollstaendig.zip', created: Date.now() - 4 * 86400_000, sizeBytes: 300_000, fileCount: 3, safety: false, complete: false },
   { id: '2026-10-12_19-05.zip', created: Date.now() - 7 * 86400_000, sizeBytes: 1_020_000, fileCount: 13, safety: false, complete: true }
 ];
-const saveDir = 'C:\\Users\\kewe87\\AppData\\Roaming\\CouchHud\\Backups';
+const saveDir = 'C:\\Users\\kewe87\\AppData\\Roaming\\MegaHub\\Backups';
 const saveSettings = { backupDir: saveDir, defaultBackupDir: saveDir, keep: 5, includeConfig: false, autoBackup: true, autoKeep: 3, autoMaxGameMb: 1000, autoMaxTotalMb: 10000 };
 const saveTotalBytes = () => saveBackups.reduce((sum, b) => sum + b.sizeBytes, 0);
 const notes = [
   lz({ id: 'n1', source: 'windows', app: demoMode ? 'Messenger' : 'WhatsApp', time: Date.now() - 12 * 60_000, read: false }, { title: () => t('mock.noteMomTitle'), body: () => t('mock.noteMomBody') }),
-  lz({ id: 'n2', source: 'couchhud', app: 'CouchHUD', title: library[0].name, time: Date.now() - 3 * 3_600_000, read: true }, { body: () => t('mock.notePlayed') }),
-  lz({ id: 'n9', source: 'couchhud', app: 'Updates', target: 'downloads', time: Date.now() - 20 * 60_000, read: false }, { title: () => t('mock.noteUpdateTitle'), body: () => t('mock.noteUpdateBody') }),
-  lz({ id: 'n10', source: 'couchhud', app: 'Plugins', target: 'downloads', time: Date.now() - 8 * 60_000, read: false }, { title: () => t('mock.noteAutoTitle'), body: () => t('mock.noteAutoBody') }),
+  lz({ id: 'n2', source: 'megahub', app: 'Mega Hub', title: library[0].name, time: Date.now() - 3 * 3_600_000, read: true }, { body: () => t('mock.notePlayed') }),
+  lz({ id: 'n9', source: 'megahub', app: 'Updates', target: 'downloads', time: Date.now() - 20 * 60_000, read: false }, { title: () => t('mock.noteUpdateTitle'), body: () => t('mock.noteUpdateBody') }),
+  lz({ id: 'n10', source: 'megahub', app: 'Plugins', target: 'downloads', time: Date.now() - 8 * 60_000, read: false }, { title: () => t('mock.noteAutoTitle'), body: () => t('mock.noteAutoBody') }),
   lz({ id: 'n3', source: 'windows', app: demoMode ? 'Chat' : 'Discord', time: Date.now() - 5 * 3_600_000, read: true }, { title: () => t('mock.noteLenaTitle'), body: () => t('mock.noteLenaBody') })
 ];
 // Preview: a WhatsApp message arrives a few seconds after start (not in ?demo, it would cover the screenshots).
@@ -499,7 +499,7 @@ let selfUpdate = {
 };
 const setSelfUpdate = (u) => emit('selfUpdate', (selfUpdate = { ...selfUpdate, ...u }));
 const setUpdates = (u) => emit('updates', (updates = { ...updates, ...u }));
-const settings = { padGlyphs: new URLSearchParams(location.search).get('glyphs') ?? 'auto', areas: new URLSearchParams(location.search).get('areas')?.split(',') ?? ['games', 'apps', 'browser', 'news'], language: ['auto', 'de', 'en'].includes(previewLanguage()) ? previewLanguage() : 'auto', weatherPlace: lz({ name: 'Berlin', latitude: 52.52, longitude: 13.41 }, { region: () => t('mock.regionBerlin') }), sounds: true, audioMode: 'music', musicVolume: 35, maximizeBrowser: true, browserHistory: true, favoritesMode: new URLSearchParams(location.search).get('favmode') ?? 'combined', favoritesRecentDays: Number(new URLSearchParams(location.search).get('favdays') ?? 30), favoritesSites: new URLSearchParams(location.search).has('favsites'), guideTapInGame: true, integrationMode: 'full', closeExplorerInLight: false, selfUpdateCheck: true, onlineArtwork: true, offline: new URLSearchParams(location.search).has('offline'), netCatalog: true, netSystemUpdates: true, netSaves: true, pluginServices: [{ plugin: 'weather', pluginName: 'Wetter', id: 'open-meteo', name: 'Open-Meteo', anyHost: false, hosts: ['api.open-meteo.com', 'geocoding-api.open-meteo.com'], on: true }, { plugin: 'news', pluginName: 'Nachrichten', id: 'feeds', name: 'Feeds', anyHost: true, hosts: [], on: true }, { plugin: 'anthropic', pluginName: 'Anthropic', id: 'api', name: 'API', anyHost: false, hosts: ['api.anthropic.com'], on: true }, { plugin: 'homeassistant', pluginName: 'Home Assistant', id: 'hub', name: 'Home Assistant', anyHost: false, lan: true, hosts: [], on: true }], weatherAvailable: !new URLSearchParams(location.search).has('noplugins'), newsAvailable: !new URLSearchParams(location.search).has('noplugins'), catalogUpdateCheck: true, pluginAutoUpdate: false, artworkCacheBytes: 42_000_000, tvInGuide: true, tvOnWithCouchHud: false, tvOffWithPc: false, bluetoothAutoOn: true, reduceMotion: new URLSearchParams(location.search).has("calm"), pointer: new URLSearchParams(location.search).get('pointer') ?? 'skin', mouseUnlocked: new URLSearchParams(location.search).has('mouse'), acceptedTerms: new URLSearchParams(location.search).has('terms') ? 0 : 99, setupWizardDone: ['terms', 'wizard'].some((k) => new URLSearchParams(location.search).has(k)) ? 0 : 99, screensaverMinutes: 5, screensaverStyle: 'art', displayOffMinutes: 0, pixelShift: true, pauseGameInMenu: new URLSearchParams(location.search).has('pauseInMenu'), screenshotCombo: true, gameBarButton: false, suppressCompetitors: true, suppressBySetup: false, rumble: true, autoSwitchHeadphones: true, trailerPreviews: true, returnHoldMs: 1000, runStartupApps: true, killExplorerOnReturn: false, steamGridDbKeySet: false,
+const settings = { padGlyphs: new URLSearchParams(location.search).get('glyphs') ?? 'auto', areas: new URLSearchParams(location.search).get('areas')?.split(',') ?? ['games', 'apps', 'browser', 'news'], language: ['auto', 'de', 'en'].includes(previewLanguage()) ? previewLanguage() : 'auto', weatherPlace: lz({ name: 'Berlin', latitude: 52.52, longitude: 13.41 }, { region: () => t('mock.regionBerlin') }), sounds: true, audioMode: 'music', musicVolume: 35, maximizeBrowser: true, browserHistory: true, favoritesMode: new URLSearchParams(location.search).get('favmode') ?? 'combined', favoritesRecentDays: Number(new URLSearchParams(location.search).get('favdays') ?? 30), favoritesSites: new URLSearchParams(location.search).has('favsites'), guideTapInGame: true, integrationMode: 'full', closeExplorerInLight: false, selfUpdateCheck: true, onlineArtwork: true, offline: new URLSearchParams(location.search).has('offline'), netCatalog: true, netSystemUpdates: true, netSaves: true, pluginServices: [{ plugin: 'weather', pluginName: 'Wetter', id: 'open-meteo', name: 'Open-Meteo', anyHost: false, hosts: ['api.open-meteo.com', 'geocoding-api.open-meteo.com'], on: true }, { plugin: 'news', pluginName: 'Nachrichten', id: 'feeds', name: 'Feeds', anyHost: true, hosts: [], on: true }, { plugin: 'anthropic', pluginName: 'Anthropic', id: 'api', name: 'API', anyHost: false, hosts: ['api.anthropic.com'], on: true }, { plugin: 'homeassistant', pluginName: 'Home Assistant', id: 'hub', name: 'Home Assistant', anyHost: false, lan: true, hosts: [], on: true }], weatherAvailable: !new URLSearchParams(location.search).has('noplugins'), newsAvailable: !new URLSearchParams(location.search).has('noplugins'), catalogUpdateCheck: true, pluginAutoUpdate: false, artworkCacheBytes: 42_000_000, tvInGuide: true, tvOnWithMegaHub: false, tvOffWithPc: false, bluetoothAutoOn: true, reduceMotion: new URLSearchParams(location.search).has("calm"), pointer: new URLSearchParams(location.search).get('pointer') ?? 'skin', mouseUnlocked: new URLSearchParams(location.search).has('mouse'), acceptedTerms: new URLSearchParams(location.search).has('terms') ? 0 : 99, setupWizardDone: ['terms', 'wizard'].some((k) => new URLSearchParams(location.search).has(k)) ? 0 : 99, screensaverMinutes: 5, screensaverStyle: 'art', displayOffMinutes: 0, pixelShift: true, pauseGameInMenu: new URLSearchParams(location.search).has('pauseInMenu'), screenshotCombo: true, gameBarButton: false, suppressCompetitors: true, suppressBySetup: false, rumble: true, autoSwitchHeadphones: true, trailerPreviews: true, returnHoldMs: 1000, runStartupApps: true, killExplorerOnReturn: false, steamGridDbKeySet: false,
   aiProvider: 'anthropic', aiModel: '',
   aiProviders: [{ id: 'anthropic', name: 'Anthropic (Claude)', models: ['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-haiku-5-5'], keySet: true }, { id: 'openai', name: 'OpenAI (GPT)', models: ['gpt-5', 'gpt-5-mini'], keySet: false }],
   mcpEnabled: true, mcpLan: true, mcpPort: 8765, mcpToken: '3f9c1e7a5b2d48e6a0c4f1b7d9e2a6c8b5f0e3d1a7c9b2e4',
@@ -543,7 +543,7 @@ const log = (...args) => {
 // accepted the notice before the assistant existed (it is offered once). Without ?fresh the couch is locked: only the notice shows.
 const previewQuery = new URLSearchParams(location.search);
 const failSteps = (previewQuery.get('fail') ?? '').split(',');
-security.autoLogonState = 'couchhud';
+security.autoLogonState = 'megahub';
 services.pending = false;
 if (previewQuery.has('expert')) settings.expertMode = true;
 if (previewQuery.has('fresh')) {
@@ -558,7 +558,7 @@ if (previewQuery.has('fresh')) {
 }
 
 // Parental controls: a small stand-in with a fake play time account (used 1:45 h of 3 h).
-// In the preview: window.couchhudMockParental({ remainingSeconds: 840, expired: true }) simulates the clock.
+// In the preview: window.megahubMockParental({ remainingSeconds: 840, expired: true }) simulates the clock.
 const parental = {
   enabled: new URLSearchParams(location.search).has('parental'), weekdayMinutes: 120, weekendMinutes: 180, windowStart: -1, windowEnd: -1,
   perGameMinutes: 0, maxAge: Number(new URLSearchParams(location.search).get('maxAge') ?? 0) || 0, lockedItems: ['steam:271590'], usedMinutes: 45, bonusMinutes: 0, expired: false, remainingOverride: null,
@@ -607,7 +607,7 @@ const takeGrant = () => {
   if (Date.now() >= grantUntil) throw new Error(t('mock.needParentCode'));
   grantUntil = 0;
 };
-window.couchhudMockParental = (patch = {}) => {
+window.megahubMockParental = (patch = {}) => {
   if ('remainingSeconds' in patch) parental.remainingOverride = patch.remainingSeconds;
   if ('expired' in patch) parental.expired = patch.expired;
   Object.assign(parental, Object.fromEntries(Object.entries(patch).filter(([k]) => k in parental && k !== 'remainingOverride')));
@@ -615,8 +615,8 @@ window.couchhudMockParental = (patch = {}) => {
 };
 
 // In the preview and the browser check (scripts/browser-ui-check.mjs): what the host would report about the page.
-// window.couchhudMockBrowser('browserdialog', { id: 1, kind: 'confirm', message: 'Leave?', host: 'example.org' })
-window.couchhudMockBrowser = (name, payload) => {
+// window.megahubMockBrowser('browserdialog', { id: 1, kind: 'confirm', message: 'Leave?', host: 'example.org' })
+window.megahubMockBrowser = (name, payload) => {
   if (name === 'refuseFocus') return void (browser.refuseFocus = !!payload);
   if (listeners[name] && name.startsWith('browser')) emit(name, payload);
 };
@@ -628,7 +628,7 @@ const storeMatches = {};
 // "Search artwork": the pinned game per entry.
 const artworkMatches = {};
 
-window.couchhud = {
+window.megahub = {
   getLibrary: async () => library.map((i) => ({ ...i })),
   launch: async (id, from) => {
     const item = library.find((i) => i.id === id);
@@ -725,7 +725,7 @@ window.couchhud = {
   },
   getItemInfo: async (id) => {
     const item = library.find((i) => i.id === id);
-    const d = await window.couchhud.getDetails(id);
+    const d = await window.megahub.getDetails(id);
     const s = storeMatches[id] ?? {};
     return {
       description: d.description, developers: d.developers, publishers: d.publishers, releaseDate: d.releaseDate, genres: d.genres,
@@ -743,7 +743,7 @@ window.couchhud = {
     }
     infoOverrides[id] = o;
     log('setItemInfo', id, changes);
-    return window.couchhud.getItemInfo(id);
+    return window.megahub.getItemInfo(id);
   },
   searchStore: async (query) => {
     await sleep(400);
@@ -759,7 +759,7 @@ window.couchhud = {
     // Without parental controls the stricter rating stays (demo: an 18 from before).
     storeMatches[id] = { match, name: match && match !== 'none' ? name : null, floor: parental.enabled ? null : (before.floor ?? 18) };
     log('setStoreMatch', id, match, name);
-    return window.couchhud.getItemInfo(id);
+    return window.megahub.getItemInfo(id);
   },
   getArtworkMatch: async (id) => {
     const pin = artworkMatches[id];
@@ -782,7 +782,7 @@ window.couchhud = {
     if (match) artworkMatches[id] = { match, name };
     else delete artworkMatches[id];
     log('setArtworkMatch', id, match, name);
-    return window.couchhud.getArtworkMatch(id);
+    return window.megahub.getArtworkMatch(id);
   },
   uninstall: async (id) => (log('uninstall', id), null),
   getSaveInfo: async (id) => {
@@ -825,7 +825,7 @@ window.couchhud = {
     else saveSettings[key] = value;
     return { ...saveSettings, custom: saveSettings.backupDir !== saveSettings.defaultBackupDir, totalBytes: saveTotalBytes() };
   },
-  getSettings: async () => ({ ...settings, isShell, configPath: 'C:\\Users\\kewe87\\AppData\\Roaming\\CouchHud\\config.json', logPath: 'C:\\Users\\kewe87\\AppData\\Local\\CouchHud\\logs' }),
+  getSettings: async () => ({ ...settings, isShell, configPath: 'C:\\Users\\kewe87\\AppData\\Roaming\\MegaHub\\config.json', logPath: 'C:\\Users\\kewe87\\AppData\\Local\\MegaHub\\logs' }),
   setSetting: async (key, value) => {
     if (key === 'steamGridDbApiKey') settings.steamGridDbKeySet = !!value;
     else if (key === 'weatherLocation') settings.weatherPlace = value;
@@ -833,7 +833,7 @@ window.couchhud = {
     else settings[key] = value;
     // The host drops the automatic plugin update with the plugin update search (ConfigStore.NormalizeNet).
     if ((key === 'catalogUpdateCheck' || key === 'netCatalog') && !value) settings.pluginAutoUpdate = false;
-    if (key === 'language') { try { localStorage.setItem('couchhud-preview-language', value); } catch { /* storage unavailable */ } }
+    if (key === 'language') { try { localStorage.setItem('megahub-preview-language', value); } catch { /* storage unavailable */ } }
     // The host couples these two: only one of them may own the Xbox button.
     if (key === 'guideTapInGame' && value) settings.gameBarButton = false;
     // Like the host: any change of the setting clears the setup's mark, the mark only stands while the setting is on.
@@ -948,7 +948,7 @@ window.couchhud = {
     for (const k of Object.keys(o)) if (o[k] === undefined) delete o[k];
     launchOverrides[id] = o;
     log('setLaunchOverride', id, changes);
-    return window.couchhud.getLaunchOptions(id);
+    return window.megahub.getLaunchOptions(id);
   },
   setEntryEdge: async (id, edge) => {
     const item = library.find((i) => i.id === id);
@@ -1123,8 +1123,8 @@ window.couchhud = {
   // The preview has no game in front: the HUD's own question is enough.
   sleepTimerWarning: async (action) => (log('sleepTimerWarning', action), false),
   sleepTimerArm: async (action, seconds) => (log('sleepTimerArm', action, seconds), null),
-  restartCouchHud: async () => {
-    log('restartCouchHud');
+  restartMegaHub: async () => {
+    log('restartMegaHub');
     emit('toast', t('mock.previewRestart'));
   },
   resetMegaHub: async () => log('resetMegaHub'),
@@ -1169,7 +1169,7 @@ window.couchhud = {
     if (kind === 'screenshot') {
       const payload = mockCodeEntry
         ? { ok: false, text: t('mock.shotRefused') }
-        : { ok: true, text: t('mock.shotSaved', { name: session?.name ?? 'CouchHUD' }), url: fakeShot(session?.name ?? 'CouchHUD', 210) };
+        : { ok: true, text: t('mock.shotSaved', { name: session?.name ?? 'Mega Hub' }), url: fakeShot(session?.name ?? 'Mega Hub', 210) };
       setTimeout(() => listeners.screenshot.forEach((cb) => cb(payload)), 450);
       return payload;
     }
@@ -1376,7 +1376,7 @@ window.couchhud = {
     if (!/^https:\/\//i.test(url)) throw new Error('catalog.source.httpsOnly');
     const host = new URL(url).hostname;
     if (/^(localhost|127\.|10\.|192\.168\.)/i.test(host) || !host.includes('.')) throw new Error('catalog.source.privateHost');
-    if (/couchhud|official/i.test(`${host}${name ?? ''}`)) throw new Error('catalog.source.nameImitates');
+    if (/megahub|official/i.test(`${host}${name ?? ''}`)) throw new Error('catalog.source.nameImitates');
     if (url === catalogSources.official.url) throw new Error('catalog.source.isOfficial');
     if (catalogSources.extra.some((s) => s.url === url)) throw new Error('catalog.source.twice');
     if (catalogSources.extra.length >= catalogSources.max) throw new Error('catalog.source.tooMany');
@@ -1761,7 +1761,7 @@ window.couchhud = {
     setTimeout(() => { unlockedUntil = Date.now() + 120_000; listeners.unlocked.forEach((cb) => cb()); }, 1500);
     return { ok: false, pending: true };
   },
-  setPasscode: async (code) => ((passcode = code), (security.hasPasscode = true), window.couchhud.getSecurity()),
+  setPasscode: async (code) => ((passcode = code), (security.hasPasscode = true), window.megahub.getSecurity()),
   // Like the host with the service: the Windows lock or no lock drops the couch code.
   // The code lock without a code that survives the switch is refused, like the host (the service drops a code set at the open couch).
   setCouchLock: async (mode, code = null) => {
@@ -1771,25 +1771,25 @@ window.couchhud = {
     if (security.serviceCodes) security.serviceCodes = { ...security.serviceCodes, couch: mode === 'code', mode };
     if (mode !== 'code') (passcode = null), (security.hasPasscode = false);
     if (code) (passcode = code), (security.hasPasscode = true);
-    return window.couchhud.getSecurity();
+    return window.megahub.getSecurity();
   },
-  setParentCode: async (code) => ((passcode = code), (security.hasPasscode = true), window.couchhud.getSecurity()),
+  setParentCode: async (code) => ((passcode = code), (security.hasPasscode = true), window.megahub.getSecurity()),
   readClipboard: async () => ({ ok: false, reason: 'clipboard' }),
   holdUnlockForSetup: async () => null,
-  setBlockTaskManager: async (on) => ((security.blockTaskManager = on), window.couchhud.getSecurity()),
+  setBlockTaskManager: async (on) => ((security.blockTaskManager = on), window.megahub.getSecurity()),
   openAutoLogonDialog: async () => log('openAutoLogonDialog'),
   enableAutoLogon: async (password) => {
     await sleep(500);
     if (failSteps.includes('autologon')) throw new Error(t('mock.winPromptDenied'));
     if (password !== 'test') return { ok: false, error: t('mock.passwordWrong') };
-    Object.assign(security, { autoLogon: true, autoLogonUser: security.user, autoLogonState: 'couchhud', autoLogonOtherUser: false });
+    Object.assign(security, { autoLogon: true, autoLogonUser: security.user, autoLogonState: 'megahub', autoLogonOtherUser: false });
     return { ok: true, security: structuredClone(security) };
   },
   setAutoLogon: async (mode) => {
     await sleep(400);
     if (mode === 'off') Object.assign(security, { autoLogon: false, autoLogonState: 'off' });
     if (mode === 'allow') security.passwordlessOnly = false;
-    return window.couchhud.getSecurity();
+    return window.megahub.getSecurity();
   },
   setLauncherMode: async (id, mode) => ((launchers.find((l) => l.id === id).mode = mode), structuredClone(launchers)),
   openLauncher: async (id) => log('openLauncher', id),
@@ -1848,4 +1848,4 @@ window.couchhud = {
 };
 
 // Preview helper: what the phone page would send (try it in the console).
-window.couchhudMockPhone = (text, submit = false) => emit('remote', { type: 'text', text, submit });
+window.megahubMockPhone = (text, submit = false) => emit('remote', { type: 'text', text, submit });

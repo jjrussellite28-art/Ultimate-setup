@@ -118,7 +118,7 @@ async function key(k) {
   await sleep(160);
 }
 
-const host = (name, payload) => evaluate(`window.couchhudMockBrowser(${JSON.stringify(name)}, ${JSON.stringify(payload)})`);
+const host = (name, payload) => evaluate(`window.megahubMockBrowser(${JSON.stringify(name)}, ${JSON.stringify(payload)})`);
 const calls = (name) => evaluate(`(window.__mockCalls ?? []).filter((c) => c[0] === ${JSON.stringify(name)})`);
 const clearCalls = () => evaluate('window.__mockCalls = []');
 const view = () => evaluate(`import('/views/browser.js').then(({ browserView: v }) => ({ focus: v.focus, open: v.isOpen }))`);
@@ -138,7 +138,7 @@ await send('Page.navigate', { url: `http://127.0.0.1:${opt.port}/?lang=en` });
 // checks import resolve; waited for instead of a fixed pause.
 let ready = false;
 for (let i = 0; i < 120 && !ready; i++) {
-  ready = await evaluate(`location.href.startsWith('http://127.0.0.1:${opt.port}/') && document.readyState === 'complete' && typeof window.couchhudMockBrowser === 'function' && !!document.querySelector('#boot')`).catch(() => false);
+  ready = await evaluate(`location.href.startsWith('http://127.0.0.1:${opt.port}/') && document.readyState === 'complete' && typeof window.megahubMockBrowser === 'function' && !!document.querySelector('#boot')`).catch(() => false);
   if (!ready) await sleep(250);
 }
 if (!ready) {
@@ -319,11 +319,11 @@ try {
   // 12c. A page in full screen: the HUD's strip above it says it is a website.
   await host('browser', { open: true, url: 'https://example.org/', title: 'Example', canGoBack: true, fullScreen: true });
   await sleep(300);
-  const badge = await evaluate(`window.__couchhudBadge?.root.querySelector('.strip')?.textContent ?? null`);
+  const badge = await evaluate(`window.__megahubBadge?.root.querySelector('.strip')?.textContent ?? null`);
   check(!!badge && badge.includes('example.org'), 'full screen: the website badge is shown', badge);
   await host('browser', { open: true, url: 'https://other.example/', title: 'Other', canGoBack: true, fullScreen: true });
   await sleep(300);
-  const moved = await evaluate(`window.__couchhudBadge?.root.querySelector('.strip')?.textContent ?? null`);
+  const moved = await evaluate(`window.__megahubBadge?.root.querySelector('.strip')?.textContent ?? null`);
   check(!!moved && moved.includes('other.example') && !moved.includes('example.org'), 'full screen: the badge follows a redirect to another site', moved);
   await host('browser', { open: true, url: 'https://example.org/', title: 'Example', canGoBack: true, fullScreen: false });
   await sleep(300);
@@ -358,7 +358,7 @@ try {
   check(!v.open && v.focus === 'bar' && await lastLayout() === 'hidden', 'closed browser: no page, no page focus', v);
 
   // 14. The guard script of every page (from BrowserGuard.cs) in a blank document: no picture-in-picture of either kind.
-  const source = readFileSync(join(here, '..', 'src', 'CouchHud.Core', 'Guard', 'BrowserGuard.cs'), 'utf8');
+  const source = readFileSync(join(here, '..', 'src', 'MegaHub.Core', 'Guard', 'BrowserGuard.cs'), 'utf8');
   const guard = /public const string Script = "{3}\r?\n([\s\S]*?)\r?\n\s*"{3};/.exec(source)?.[1];
   check(!!guard, 'guard script found in BrowserGuard.cs');
   await send('Page.navigate', { url: 'about:blank' });
@@ -416,7 +416,7 @@ try {
     await send('Page.navigate', { url: `http://127.0.0.1:${opt.port}/?${query}` });
     let up = false;
     for (let i = 0; i < 120 && !up; i++) {
-      up = await evaluate(`location.href.startsWith('http://127.0.0.1:${opt.port}/') && document.readyState === 'complete' && typeof window.couchhudMockBrowser === 'function' && !!document.querySelector('#boot')`).catch(() => false);
+      up = await evaluate(`location.href.startsWith('http://127.0.0.1:${opt.port}/') && document.readyState === 'complete' && typeof window.megahubMockBrowser === 'function' && !!document.querySelector('#boot')`).catch(() => false);
       if (!up) await sleep(250);
     }
     if (!up) throw new Error(`the app page did not load for ?${query}`);

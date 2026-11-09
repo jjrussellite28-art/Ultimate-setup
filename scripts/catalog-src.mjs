@@ -10,7 +10,7 @@ const root = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
 
 export function catalogSkinsDir() {
   const candidates = [];
-  if (process.env.COUCHHUD_CATALOG_SKINS) candidates.push(process.env.COUCHHUD_CATALOG_SKINS);
+  if (process.env.MEGAHUB_CATALOG_SKINS) candidates.push(process.env.MEGAHUB_CATALOG_SKINS);
   const env = process.env.COUCHHUD_CATALOG_SRC;
   if (env) candidates.push(existsSync(join(env, 'skins')) ? join(env, 'skins') : env);
   candidates.push(join(root, '..', 'couchhud-catalog-src', 'skins'));

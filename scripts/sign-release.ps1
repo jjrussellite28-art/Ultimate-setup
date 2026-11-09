@@ -1,7 +1,7 @@
 #requires -Version 7
-# Signs the checksum file of a CouchHUD release, the last step of a release. CI cannot do it: the private key
-# only exists on the maintainer's PC (see sign-file.ps1). Without CouchHud-Setup-<v>.exe.sha256.sig an installed
-# CouchHUD refuses to install the update. The signature is what makes every installed CouchHUD trust that file,
+# Signs the checksum file of a Mega Hub release, the last step of a release. CI cannot do it: the private key
+# only exists on the maintainer's PC (see sign-file.ps1). Without MegaHub-Setup-<v>.exe.sha256.sig an installed
+# Mega Hub refuses to install the update. The signature is what makes every installed Mega Hub trust that file,
 # so this script signs nothing it has not checked:
 #
 #   1. The tag points to a commit you recognise (you type its first 8 characters), and that commit's
@@ -20,7 +20,7 @@ param(
     [string] $Repo = 'jjrussellite28-art/mega-hub',
     # Default: a release without a verified build attestation is not signed. Only for a gh that cannot check one (and a setup you built yourself).
     [switch] $SkipAttestation,
-    [string] $KeyFile = (Join-Path $env:USERPROFILE '.couchhud\catalog-signing.key')
+    [string] $KeyFile = (Join-Path $env:USERPROFILE '.megahub\catalog-signing.key')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -35,7 +35,7 @@ if ($LASTEXITCODE -eq 0) { throw "The commit of $Tag still carries catalog/index
 
 # The signature must match the index (checked with the public key pinned in the code): a stale one never ships.
 $env:RELEASE = '1'
-& dotnet test (Join-Path $repoRoot 'tests\CouchHud.Core.Tests') -c Release --nologo -v quiet --filter 'FullyQualifiedName~The_example_index_in_the_repository_parses'
+& dotnet test (Join-Path $repoRoot 'tests\MegaHub.Core.Tests') -c Release --nologo -v quiet --filter 'FullyQualifiedName~The_example_index_in_the_repository_parses'
 $catalogCheck = $LASTEXITCODE
 Remove-Item Env:\RELEASE
 if ($catalogCheck -ne 0) { throw 'catalog/index.json.sig does not match catalog/index.json: sign it again (scripts/catalog-sign.ps1).' }
@@ -47,7 +47,7 @@ function Invoke-Gh {
 }
 
 $version = $Tag.TrimStart('v')
-$setupName = "CouchHud-Setup-$version.exe"
+$setupName = "MegaHub-Setup-$version.exe"
 $sumName = "$setupName.sha256"
 
 # 1. Tag -> commit
@@ -61,7 +61,7 @@ if ($props -notmatch '<Version>([^<]+)</Version>' -or $Matches[1] -ne $version) 
 $answer = Read-Host "Type the first 8 characters of the commit to confirm you built and want to release exactly this"
 if ($answer.Trim().ToLowerInvariant() -ne $commit.Substring(0, 8)) { throw 'Not confirmed.' }
 
-$work = Join-Path ([IO.Path]::GetTempPath()) "couchhud-sign-$([guid]::NewGuid().ToString('N'))"
+$work = Join-Path ([IO.Path]::GetTempPath()) "megahub-sign-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory $work | Out-Null
 try {
     # 2. Setup and checksum file, three ways to the same hash
@@ -95,7 +95,7 @@ try {
 
     & (Join-Path $PSScriptRoot 'sign-file.ps1') -File $file -Context release -KeyFile $KeyFile
     Invoke-Gh release upload $Tag "$file.sig" --repo $Repo --clobber | Out-Null
-    Write-Host "Done: $sumName.sig is attached to $Tag. Installed CouchHUDs offer the update from now on."
+    Write-Host "Done: $sumName.sig is attached to $Tag. Installed Mega Hubs offer the update from now on."
 }
 finally {
     Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue

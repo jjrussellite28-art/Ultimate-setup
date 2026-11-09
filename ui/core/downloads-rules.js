@@ -9,8 +9,8 @@ export const isFinished = (entry) => entry?.state === 'done' || entry?.state ===
  * row names its section in `group`; the restart that is due (`first`) stands with the Windows updates, it finishes them. A start row
  * of a kind this page does not know goes with the plugins (the rest that can be updated), never lost.
  */
-export const SECTIONS = ['running', 'couchhud', 'apps', 'windows', 'plugins', 'finished'];
-const UPDATE_SECTIONS = ['couchhud', 'apps', 'windows', 'plugins'];
+export const SECTIONS = ['running', 'megahub', 'apps', 'windows', 'plugins', 'finished'];
+const UPDATE_SECTIONS = ['megahub', 'apps', 'windows', 'plugins'];
 
 export function downloadSections({ entries = [], first = [], pending = [] } = {}) {
   const rows = new Map(SECTIONS.map((id) => [id, []]));

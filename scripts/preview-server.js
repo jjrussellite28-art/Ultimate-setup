@@ -179,7 +179,7 @@ async function servePhoneChannel(req, urlPath, res) {
     return text(200, S.seal(pk, S.DIR.response, 0, 'pair', JSON.stringify({ id, key: S.b64url(key), name: JSON.parse(opened.text).name })));
   }
   if (urlPath === '/api/session') {
-    const id = req.headers['x-couchhud-device'];
+    const id = req.headers['x-megahub-device'];
     const key = phoneDevices.get(id);
     const opened = key && S.open(key, S.DIR.request, `session|${id}`, body);
     if (!opened) return text(401, '');
@@ -190,7 +190,7 @@ async function servePhoneChannel(req, urlPath, res) {
     return text(200, S.seal(key, S.DIR.response, 0, `session|${id}`, JSON.stringify({ sid, n: S.b64url(n), c, level, name: 'Pixel 9' })));
   }
   if (urlPath === '/api/rpc') {
-    const sid = req.headers['x-couchhud-session'];
+    const sid = req.headers['x-megahub-session'];
     const key = phoneSessions.get(sid);
     const opened = key && S.open(key, S.DIR.request, `rpc|${sid}`, body);
     if (!opened) return text(401, '');
@@ -223,4 +223,4 @@ http.createServer((req, res) => {
     }
     res.writeHead(200, { 'Content-Type': contentType(path.extname(file)) }).end(data);
   });
-}).listen(port, () => console.log(`CouchHud preview: http://localhost:${port}`));
+}).listen(port, () => console.log(`MegaHub preview: http://localhost:${port}`));

@@ -1,7 +1,7 @@
 // Screenshots on the controller (Guide + Y, or the guide menu): pure rules, tested by scripts/ui-logic-check.mjs.
 
 /** Only pictures Mega Hub serves itself from the PC: never an address from anywhere else. */
-const LOCAL_PREFIX = 'https://local.couchhud/';
+const LOCAL_PREFIX = 'https://local.megahub/';
 
 /**
  * What the toast shows for the host's "screenshot" event: { ok, text, url }. The picture only for a saved screenshot and only from

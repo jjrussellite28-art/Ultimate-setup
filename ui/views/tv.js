@@ -1,5 +1,5 @@
 // TV control: switch the TV on and off, volume and mute, choose the input. Settings › TV pairs the TV (search in the network or, in
-// expert mode, its address); the Guide menu has the everyday rows. The host side is src/CouchHud.Shell/Services/TvManager.cs. The
+// expert mode, its address); the Guide menu has the everyday rows. The host side is src/MegaHub.Shell/Services/TvManager.cs. The
 // protocol of each kind of TV is a plugin (LG webOS, Samsung Tizen from the official catalog): without one the page offers it.
 // Locked couch: state, volume, mute and on/off work; pairing, removing the TV and switching the input need the unlock (with parental
 // controls the input needs the parents' code). Names of inputs come from the TV: only ever shown as text.

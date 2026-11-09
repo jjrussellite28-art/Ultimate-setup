@@ -1,5 +1,5 @@
-// Host bridge for WebView2: exposes the window.couchhud API the UI expects,
-// carried over chrome.webview messages. See src/CouchHud.Shell/UiHost/UiBridge.cs.
+// Host bridge for WebView2: exposes the window.megahub API the UI expects,
+// carried over chrome.webview messages. See src/MegaHub.Shell/UiHost/UiBridge.cs.
 
 const webview = window.chrome.webview;
 const pending = new Map();
@@ -42,7 +42,7 @@ const on = (event) => (cb) => {
   listeners.get(event).push(cb);
 };
 
-window.couchhud = {
+window.megahub = {
   setSecondFactorHandler: (handler) => {
     secondFactorHandler = handler;
   },
@@ -120,7 +120,7 @@ window.couchhud = {
   setCollectionOnHome: (id, onHome) => call('setCollectionOnHome', id, onHome),
   setSkin: (id) => call('setSkin', id),
   quit: () => call('quit'),
-  restartCouchHud: () => call('restartCouchHud'),
+  restartMegaHub: () => call('restartMegaHub'),
   resetMegaHub: () => call('resetMegaHub'),
   uninstallMegaHub: () => call('uninstallMegaHub'),
   onInput: on('input'),
@@ -269,7 +269,7 @@ window.couchhud = {
   refreshUpdates: () => call('refreshUpdates'),
   checkSelfUpdate: () => call('checkSelfUpdate'),
   startSelfUpdate: () => call('startSelfUpdate'),
-  // TV control (LG webOS first): src/CouchHud.Shell/Services/TvManager.cs. Locked: state, volume, mute, on/off; the rest needs the unlock.
+  // TV control (LG webOS first): src/MegaHub.Shell/Services/TvManager.cs. Locked: state, volume, mute, on/off; the rest needs the unlock.
   onTv: on('tv'),
   /** refresh: also read volume and input from the TV (skipped by the host right after a failure). */
   tvStatus: (refresh) => call('tvStatus', !!refresh),

@@ -19,7 +19,7 @@ export const SOURCE_LABEL = {
   xbox: 'Xbox',
   get folder() { return t('library.sourceFolder'); },
   get custom() { return t('library.sourceCustom'); },
-  couchhud: 'CouchHUD'
+  megahub: 'Mega Hub'
 };
 
 export function sortLibrary(items) {

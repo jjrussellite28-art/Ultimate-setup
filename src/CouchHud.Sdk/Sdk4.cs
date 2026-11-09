@@ -1,7 +1,7 @@
 namespace CouchHud.Sdk;
 
-// SDK 4: page actions. A plugin page can show a few actions as small controller-button hints in the footer, the way CouchHUD's own pages do.
-// Actions belong in the footer, not in the middle of the page as rows. A plugin that uses them declares "sdk": 4, so an older CouchHUD does
+// SDK 4: page actions. A plugin page can show a few actions as small controller-button hints in the footer, the way Mega Hub's own pages do.
+// Actions belong in the footer, not in the middle of the page as rows. A plugin that uses them declares "sdk": 4, so an older Mega Hub does
 // not load it (it would not know the members). The host ignores Actions of a plugin that declares less than 4 (nothing is shown, a press is
 // refused) and the install check flags them. Nothing else changes: plugins for SDK 1 to 3 run unchanged.
 
@@ -43,10 +43,10 @@ public sealed record PluginPageAction(PluginPageButton Button, string Label)
     /// <summary>The <see cref="PluginFunction"/> this belongs to; null: the page's function.</summary>
     public string? Function { get; init; }
 
-    /// <summary>A press needs the parents' code under parental controls (for a plugin that is not CouchHUD's own it always does, for an action that changes something).</summary>
+    /// <summary>A press needs the parents' code under parental controls (for a plugin that is not Mega Hub's own it always does, for an action that changes something).</summary>
     public bool RequiresParentGrant { get; init; }
 
-    /// <summary>Shown and usable on the locked couch. Honoured only for CouchHUD's own plugins; any other plugin's action is hidden while locked.</summary>
+    /// <summary>Shown and usable on the locked couch. Honoured only for Mega Hub's own plugins; any other plugin's action is hidden while locked.</summary>
     public bool AllowedWhileLocked { get; init; }
 
     /// <summary>An action that opens another page of the same plugin.</summary>

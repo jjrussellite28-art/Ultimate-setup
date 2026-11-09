@@ -7,7 +7,7 @@ Ein Skin ist ein Stylesheet plus optional eigene Button-Symbole. Er ändert Farb
 ## Aufbau
 
 ```
-%APPDATA%\CouchHud\skins\synthwave\
+%APPDATA%\MegaHub\skins\synthwave\
   skin.json
   skin.css
   (Schriften, Bilder …)
@@ -158,7 +158,7 @@ Die Skins im Katalog (Tiefsee, Grünlicht, Neonstadt, Nova, Sternenstaub, Synthw
 
 ### Prüfhilfe
 
-`scripts/skin-check.mjs` (im CouchHUD-Repository; `scripts/catalog-entry.ps1` ruft es beim Packen eines Skin-Ordners auf) ist eine **Prüfhilfe für die Katalog-Durchsicht**. Es meldet als Fehler, was noch an die Seite reicht: ein `@font-face` mit `size-adjust` unter 80 % oder mit `ascent`-/`descent`-/`line-gap-override`, ein `@font-face` unter dem Namen einer Systemschrift und Regeln an `html`/`body`, die die Seite ausblenden, verblassen oder maskieren. Als Hinweis (ohne Fehler) meldet es Regeln für die alte Leiste, die nichts mehr tun, und Werte der `--tab-*`-/`--bar-*`-Variablen, die keine einfache Zahl sind. Den Ordner des Katalogs gibt man als Argument an (in einem Git-Worktree gibt es `../couchhud-catalog-src` nicht), oder in der Umgebungsvariablen `COUCHHUD_CATALOG_SKINS`.
+`scripts/skin-check.mjs` (im MegaHub-Repository; `scripts/catalog-entry.ps1` ruft es beim Packen eines Skin-Ordners auf) ist eine **Prüfhilfe für die Katalog-Durchsicht**. Es meldet als Fehler, was noch an die Seite reicht: ein `@font-face` mit `size-adjust` unter 80 % oder mit `ascent`-/`descent`-/`line-gap-override`, ein `@font-face` unter dem Namen einer Systemschrift und Regeln an `html`/`body`, die die Seite ausblenden, verblassen oder maskieren. Als Hinweis (ohne Fehler) meldet es Regeln für die alte Leiste, die nichts mehr tun, und Werte der `--tab-*`-/`--bar-*`-Variablen, die keine einfache Zahl sind. Den Ordner des Katalogs gibt man als Argument an (in einem Git-Worktree gibt es `../couchhud-catalog-src` nicht), oder in der Umgebungsvariablen `MEGAHUB_CATALOG_SKINS`.
 
 ## Quadratische Kacheln
 
@@ -212,6 +212,6 @@ Ohne Windows geht es auch: `node scripts/preview-server.js` startet die Oberflä
 
 ## Teilen
 
-Ordner als `.zip` packen (mit oder ohne übergeordneten Ordner), auf GitHub mit dem Topic `couchhud-skin` veröffentlichen. Andere installieren ihn in Mega Hub unter *Einstellungen › Darstellung › Neue Skins installieren*.
+Ordner als `.zip` packen (mit oder ohne übergeordneten Ordner), auf GitHub mit dem Topic `megahub-skin` veröffentlichen. Andere installieren ihn in Mega Hub unter *Einstellungen › Darstellung › Neue Skins installieren*.
 
 Für den Katalog: Gib dem Skin einen eigenen Namen, keine fremde Marke (kein Konsolen-, Hersteller- oder Spielename), und verwende keine fremden Logos. Ein Stil darf an etwas erinnern, aber nicht danach heißen.

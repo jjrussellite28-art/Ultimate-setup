@@ -1,4 +1,4 @@
-Mega Hub — independent development fork by jjrussellite28-art; based on CouchHUD by kewe87.
+Mega Hub — independent development fork by jjrussellite28-art; based on Mega Hub by kewe87.
 Not approved for release. See README.md and docs/RELEASE-CHECKLIST.md in the source.
 
 Mega Hub – bevor es losgeht
@@ -6,7 +6,7 @@ Mega Hub – bevor es losgeht
 Mega Hub ist die Konsolen-Oberfläche für deinen Windows-PC am Fernseher.
 
 Was dieses Setup macht
-• Installiert Mega Hub nach C:\Program Files\CouchHud (ein geschützter Ordner, den nur Administratoren ändern dürfen).
+• Installiert Mega Hub nach C:\Program Files\MegaHub (ein geschützter Ordner, den nur Administratoren ändern dürfen).
 • Installiert bei Bedarf die Microsoft-WebView2-Runtime, die Mega Hub für die Oberfläche braucht.
 • Legt einen Startmenü-Eintrag an, auf Wunsch auch ein Desktop-Symbol und den Autostart.
 
@@ -19,7 +19,7 @@ Deinstallation
 Die Deinstallation setzt zurück, was Mega Hub an Windows geändert hat (Shell-Eintrag, Task-Manager-Sperre, geplante Aufgaben, Firewall-Regel) und fragt, ob deine Einstellungen gelöscht werden sollen. Notfall jederzeit: Strg + Umschalt (oder LB + RB + View am Controller) beim Start von Mega Hub etwa 1,5 Sekunden halten. Windows sperrt dann, und nach der Anmeldung mit dem Windows-Kennwort des Kontos kommt der normale Desktop.
 
 Beschädigte Einstellungen
-Ist %APPDATA%\CouchHud\config.json beschädigt, läuft Mega Hub gesperrt (kein Spiel startet) und schreibt nichts in die Datei. Ausweg: config.json reparieren oder zurücklegen. Nur config.json zu löschen, beginnt nicht neu; dazu den ganzen Ordner %APPDATA%\CouchHud entfernen (Spielzeit und Profile gehen mit). Die config.json.broken-Datei daneben ist nur eine Kopie.
+Ist %APPDATA%\MegaHub\config.json beschädigt, läuft Mega Hub gesperrt (kein Spiel startet) und schreibt nichts in die Datei. Ausweg: config.json reparieren oder zurücklegen. Nur config.json zu löschen, beginnt nicht neu; dazu den ganzen Ordner %APPDATA%\MegaHub entfernen (Spielzeit und Profile gehen mit). Die config.json.broken-Datei daneben ist nur eine Kopie.
 
 Haftungsausschluss und Datenschutz
 Mega Hub ist freie Software (GPL-3.0) ohne Gewährleistung, die Nutzung erfolgt auf eigenes Risiko. Keine Telemetrie, kein Konto. Die vollständigen Texte zeigt Mega Hub beim ersten Start und unter Einstellungen › Info.

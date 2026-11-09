@@ -1,13 +1,13 @@
 // Shared by every script that starts a headless Edge with a temporary profile (--user-data-dir): the profile folder is removed
 // on every way out (normal end, error, SIGINT/SIGTERM, uncaught exception), and folders an earlier run left behind (killed
-// hard, so nothing could clean up) are swept on the next start. Only folders named `couchhud-edge-<pid>-<random>` directly in
+// hard, so nothing could clean up) are swept on the next start. Only folders named `megahub-edge-<pid>-<random>` directly in
 // the temp folder are ever touched, and never through a link.
 import { spawnSync } from 'node:child_process';
 import { lstatSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-export const PREFIX = 'couchhud-edge-';
+export const PREFIX = 'megahub-edge-';
 const STALE_MS = 60 * 60 * 1000;
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };

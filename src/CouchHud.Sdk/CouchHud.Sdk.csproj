@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Description>Plugin API for CouchHud.</Description>
+    <Description>Plugin API for MegaHub.</Description>
   </PropertyGroup>
 </Project>

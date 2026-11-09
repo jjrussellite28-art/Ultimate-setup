@@ -2,15 +2,15 @@
 # Signs any file with ECDSA P-256 (SHA-256) and writes <file>.sig (Base64 over a context line plus the exact file bytes).
 # Used for the catalog index (catalog-sign.ps1) and the checksum file of a release (sign-release.ps1).
 #
-# The private key stays OUTSIDE the repository: %USERPROFILE%\.couchhud\catalog-signing.key, protected with
+# The private key stays OUTSIDE the repository: %USERPROFILE%\.megahub\catalog-signing.key, protected with
 # DPAPI (only this Windows user on this PC can read it). Never commit it, never copy it into the repo.
-# The public key is compiled into CouchHUD (CatalogSignature.PublicKeyPem).
+# The public key is compiled into Mega Hub (CatalogSignature.PublicKeyPem).
 #
 #   .\scripts\sign-file.ps1 -GenerateKey          # creates the key pair if missing (only here, never while signing), prints the public key
 #   .\scripts\sign-file.ps1 -File .\catalog\index.json
 #
 # Signing never creates a key: with -File and no key file it stops. It also refuses a key whose public half is not the one
-# compiled into CouchHUD (src/CouchHud.Core/Plugins/Catalog.cs), because every client would reject such a signature.
+# compiled into Mega Hub (src/MegaHub.Core/Plugins/Catalog.cs), because every client would reject such a signature.
 #
 # -BumpSerial (catalog index only, used by catalog-sign.ps1): after the key checks and right before signing, "serial" in the
 # index is raised by 1 (inserted as 1 when missing; only the root property counts, a nested "serial" is left alone). The bumped bytes
@@ -22,13 +22,13 @@
 # Domain separation: the signed bytes are a context line followed by the file, so a signature made for one purpose
 # is worthless for the other (CatalogSignature.CatalogContext / ReleaseContext):
 #   -Context catalog   "couchhud-catalog-v1`n" + file   (default; catalog index.json)
-#   -Context release   "couchhud-release-v1`n" + file   (CouchHud-Setup-<v>.exe.sha256)
+#   -Context release   "couchhud-release-v1`n" + file   (MegaHub-Setup-<v>.exe.sha256)
 param(
     [string] $File,
     [ValidateSet('catalog', 'release')] [string] $Context = 'catalog',
     [switch] $GenerateKey,
     [switch] $BumpSerial,
-    [string] $KeyFile = (Join-Path $env:USERPROFILE '.couchhud\catalog-signing.key')
+    [string] $KeyFile = (Join-Path $env:USERPROFILE '.megahub\catalog-signing.key')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -55,8 +55,8 @@ function Test-InsideRepo([string] $path) {
 if (Test-InsideRepo $KeyFile) { throw 'The private key must not live inside the repository.' }
 
 if (-not (Test-Path $KeyFile)) {
-    # A key is created only on request. A fresh key would silently sign something every installed CouchHUD rejects.
-    if (-not $GenerateKey) { throw "No key at $KeyFile. Signing never creates a key (only -GenerateKey does, and that key is not the one compiled into CouchHUD); use the release owner's key." }
+    # A key is created only on request. A fresh key would silently sign something every installed Mega Hub rejects.
+    if (-not $GenerateKey) { throw "No key at $KeyFile. Signing never creates a key (only -GenerateKey does, and that key is not the one compiled into Mega Hub); use the release owner's key." }
     New-Item -ItemType Directory -Force (Split-Path $KeyFile -Parent) | Out-Null
     $new = [System.Security.Cryptography.ECDsa]::Create([System.Security.Cryptography.ECCurve]::CreateFromFriendlyName('nistP256'))
     $plain = $new.ExportPkcs8PrivateKey()
@@ -78,15 +78,15 @@ $ecdsa.ImportPkcs8PrivateKey($plainBytes, [ref]$read)
 if ($GenerateKey -and -not $File) { Write-PublicKey $ecdsa; $ecdsa.Dispose(); return }
 if (-not $File) { $ecdsa.Dispose(); throw 'Pass -File <path of the file to sign>.' }
 
-# The key must be the one compiled into CouchHUD, exactly as sign-plugin-statement.ps1 checks it.
-$catalogCs = [IO.File]::ReadAllText((Join-Path $repoRoot 'src\CouchHud.Core\Plugins\Catalog.cs'))
+# The key must be the one compiled into Mega Hub, exactly as sign-plugin-statement.ps1 checks it.
+$catalogCs = [IO.File]::ReadAllText((Join-Path $repoRoot 'src\MegaHub.Core\Plugins\Catalog.cs'))
 $pem = [regex]::Match($catalogCs, '-----BEGIN PUBLIC KEY-----[\s\S]+?-----END PUBLIC KEY-----').Value
-if (-not $pem) { $ecdsa.Dispose(); throw 'CouchHUD''s public key not found in Catalog.cs.' }
+if (-not $pem) { $ecdsa.Dispose(); throw 'Mega Hub''s public key not found in Catalog.cs.' }
 $builtIn = [System.Security.Cryptography.ECDsa]::Create()
 $builtIn.ImportFromPem($pem)
 $builtInFingerprint = Get-Fingerprint $builtIn
 $builtIn.Dispose()
-if ((Get-Fingerprint $ecdsa) -ne $builtInFingerprint) { $ecdsa.Dispose(); throw "The key at $KeyFile is not the one compiled into CouchHUD ($builtInFingerprint): nothing signed." }
+if ((Get-Fingerprint $ecdsa) -ne $builtInFingerprint) { $ecdsa.Dispose(); throw "The key at $KeyFile is not the one compiled into Mega Hub ($builtInFingerprint): nothing signed." }
 
 $path = (Resolve-Path $File).Path
 $bytes = [IO.File]::ReadAllBytes($path)
@@ -97,11 +97,11 @@ if ($BumpSerial) {
     # Only the ROOT property "serial" counts (a "serial" nested inside an entry is data of that entry). It is found with a JSON reader, then
     # edited in the bytes, so the rest of the file stays byte for byte as it was. Everything happens in memory: the file is replaced only
     # after the signature over the new bytes exists.
-    if (-not ('CouchHudIndexSerial' -as [type])) {
+    if (-not ('MegaHubIndexSerial' -as [type])) {
         Add-Type -TypeDefinition @'
 using System;
 using System.Text.Json;
-public static class CouchHudIndexSerial
+public static class MegaHubIndexSerial
 {
     // { found (0/1), offset of the number, length of the number, value, offset of the root "{" }
     public static long[] Find(byte[] b)
@@ -136,7 +136,7 @@ public static class CouchHudIndexSerial
 }
 '@
     }
-    try { $f = [CouchHudIndexSerial]::Find($bytes) } catch { $ecdsa.Dispose(); throw }
+    try { $f = [MegaHubIndexSerial]::Find($bytes) } catch { $ecdsa.Dispose(); throw }
     if ($f[0] -eq 1) {
         $next = $f[3] + 1
         $insert = [Text.Encoding]::ASCII.GetBytes([string]$next)
@@ -156,7 +156,7 @@ public static class CouchHudIndexSerial
 }
 
 $signedBytes = if ($newBytes) { $newBytes } else { $bytes }
-$prefix = [Text.Encoding]::ASCII.GetBytes("couchhud-$Context-v1`n")
+$prefix = [Text.Encoding]::ASCII.GetBytes("megahub-$Context-v1`n")
 try {
     $signature = $ecdsa.SignData([byte[]]($prefix + $signedBytes), [System.Security.Cryptography.HashAlgorithmName]::SHA256)
 

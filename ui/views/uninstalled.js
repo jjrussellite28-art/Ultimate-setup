@@ -1,6 +1,6 @@
 // Games of Steam and Epic that the account has but that are not installed here, as a paged cover grid. A on a game asks the store's
 // client to install it through its own install link (the client's dialog asks where and how much space); the line then shows up
-// in the Downloads tab. The host reads only local files of the clients (no account, no web); see src/CouchHud.Core/Library/OwnedGames.cs.
+// in the Downloads tab. The host reads only local files of the clients (no account, no web); see src/MegaHub.Core/Library/OwnedGames.cs.
 
 import { api } from '../core/api.js';
 import { el, keepInView, setFocused } from '../core/dom.js';

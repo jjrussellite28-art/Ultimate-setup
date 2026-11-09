@@ -1,16 +1,16 @@
 namespace CouchHud.Sdk;
 
-// SDK 5, additive: what a plugin may ask about CouchHUD itself, read only. Nothing here carries a handle or an action; a plugin that wants
+// SDK 5, additive: what a plugin may ask about Mega Hub itself, read only. Nothing here carries a handle or an action; a plugin that wants
 // to do something goes through the members that have their own capability and their own gates. Older hosts answer with the defaults
 // (null, false, nothing happens), so a plugin built against this must cope with that.
 
-/// <summary>How CouchHUD runs on this PC.</summary>
+/// <summary>How Mega Hub runs on this PC.</summary>
 public enum PluginShellMode
 {
-    /// <summary>CouchHUD is the Windows shell (full integration).</summary>
+    /// <summary>Mega Hub is the Windows shell (full integration).</summary>
     Shell,
 
-    /// <summary>CouchHUD runs as an ordinary app on top of the Windows desktop.</summary>
+    /// <summary>Mega Hub runs as an ordinary app on top of the Windows desktop.</summary>
     App
 }
 
@@ -23,22 +23,22 @@ public sealed record PluginAppInfo(string Id, string Name)
 }
 
 /// <summary>
-/// CouchHUD's own state, read only (capability "host.state", <see cref="IPluginContext.Host"/>). Every property is read from the host at the
+/// Mega Hub's own state, read only (capability "host.state", <see cref="IPluginContext.Host"/>). Every property is read from the host at the
 /// moment it is asked, so the state at the load of the plugin is readable at once; <see cref="Changed"/> says that something moved.
 /// </summary>
 public interface IPluginHostState
 {
-    /// <summary>CouchHUD's version, e.g. "0.7.0".</summary>
+    /// <summary>Mega Hub's version, e.g. "0.7.0".</summary>
     string Version { get; }
 
-    /// <summary>Shell (CouchHUD replaces the Windows shell) or app. All properties are read from one snapshot that is at most a quarter of a second old.</summary>
+    /// <summary>Shell (Mega Hub replaces the Windows shell) or app. All properties are read from one snapshot that is at most a quarter of a second old.</summary>
     PluginShellMode Mode { get; }
 
     /// <summary>The user is on the Windows desktop (PC mode).</summary>
     bool PcMode { get; }
 
     /// <summary>
-    /// The game or app CouchHUD started and watches, or null. Null as well when the entry is hidden by the user or belongs to a feature
+    /// The game or app Mega Hub started and watches, or null. Null as well when the entry is hidden by the user or belongs to a feature
     /// area that is switched off (Settings › Console › Areas): such an entry is not part of what a plugin may know about.
     /// </summary>
     PluginAppInfo? RunningApp { get; }

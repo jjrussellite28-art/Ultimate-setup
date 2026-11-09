@@ -2,4 +2,4 @@
 if (window.chrome?.webview) await import('../bridge.js');
 else await import('../mock-api.js');
 
-export const api = window.couchhud;
+export const api = window.megahub;

@@ -292,7 +292,7 @@ async function setupAutoLogon() {
 function autoLogonLabel() {
   if (!security?.autoLogon) return security?.autoLogonState === 'lost' ? t('settings.autoLogon.lost') : t('settings.common.off');
   const who = security.autoLogonUser ? ` (${security.autoLogonUser})` : '';
-  return security.autoLogonState === 'couchhud' ? t('settings.autoLogon.labelOn', { who }) : t('settings.autoLogon.labelForeign', { who });
+  return security.autoLogonState === 'megahub' ? t('settings.autoLogon.labelOn', { who }) : t('settings.autoLogon.labelForeign', { who });
 }
 
 async function disableAutoLogon() {
@@ -310,7 +310,7 @@ async function disableAutoLogon() {
 }
 
 // A change from outside the page (the phone remote, a tool): the open page shows the new values.
-window.addEventListener('couchhud:settings', (e) => {
+window.addEventListener('megahub:settings', (e) => {
   if (!settings || !e.detail) return;
   Object.assign(settings, e.detail);
   if (currentView() === settingsView && !state.overlay && state.stack.length === 0) render();
@@ -1045,19 +1045,19 @@ function openPage(page, crumb) {
 }
 
 const xboxModes = (light) => [
-  { label: t('settings.xbox.couchhud'), detail: light ? t('settings.xbox.couchhudLight') :t('settings.xbox.couchhudFull'), value: 'couchhud' },
+  { label: t('settings.xbox.megahub'), detail: light ? t('settings.xbox.megahubLight') :t('settings.xbox.megahubFull'), value: 'megahub' },
   { label: t('settings.xbox.gamebar'), detail: t('settings.xbox.gamebarDetail'), value: 'gamebar' },
   { label: t('settings.xbox.hold'), detail: t('settings.xbox.holdDetail'), value: 'hold' }
 ];
 
 const isLight = (s) => (s.integrationMode ?? 'light') !== 'full';
-const xboxMode = (s) => (s.gameBarButton ? 'gamebar' : s.guideTapInGame ? 'couchhud' : 'hold');
+const xboxMode = (s) => (s.gameBarButton ? 'gamebar' : s.guideTapInGame ? 'megahub' : 'hold');
 
 async function chooseXboxButton() {
   const mode = await chooseDialog(t('settings.xbox.title'), xboxModes(isLight(settings)), xboxMode(settings));
   if (mode === undefined || mode === xboxMode(settings)) return;
   const set = (key, value) => saveSetting(key, value);
-  if (mode === 'couchhud') {
+  if (mode === 'megahub') {
     await set('guideTapInGame', true);
     // Light mode takes the button too while Mega Hub runs (original restored on quit); choosing this explicitly also turns it off.
     if (isLight(settings)) await set('gameBarButton', false);
@@ -1167,7 +1167,7 @@ async function chooseAreas() {
     if (!result) return;
     settings.areas = setAreas(result.areas);
     // The page follows at once: tabs, shelf, library (app.js does the same for the host's event).
-    window.dispatchEvent(new CustomEvent('couchhud:areas', { detail: result.areas }));
+    window.dispatchEvent(new CustomEvent('megahub:areas', { detail: result.areas }));
     toast(t('settings.areas.saved'));
     render();
     return;
@@ -1502,7 +1502,7 @@ function windowsItems(s) {
     security?.autoLogon || security?.autoLogonState === 'lost'
       ? action(security.autoLogon ? t('settings.windows.autoOff') : t('settings.windows.deletePassword'), t('settings.windows.deletePasswordDesc'), disableAutoLogon)
       : action(t('settings.windows.autoSetup'), t('settings.windows.autoSetupDesc'), setupAutoLogon),
-    ...((security?.autoLogon && (security.autoLogonState !== 'couchhud' || security.autoLogonOtherUser)) || security?.autoLogonState === 'lost' ? [action(t('settings.windows.autoRedo'), t('settings.windows.autoRedoDesc'), setupAutoLogon)] : []),
+    ...((security?.autoLogon && (security.autoLogonState !== 'megahub' || security.autoLogonOtherUser)) || security?.autoLogonState === 'lost' ? [action(t('settings.windows.autoRedo'), t('settings.windows.autoRedoDesc'), setupAutoLogon)] : []),
     action(t('settings.windows.netplwiz'), t('settings.windows.netplwizDesc'), async () => { await attempt(() => api.openAutoLogonDialog(), t('settings.windows.netplwizFailed')); }),
     toggle('suppressCompetitors', t('settings.windows.suppress'), t('settings.windows.suppressDesc')),
     toggle('killExplorerOnReturn', t('settings.windows.killExplorer'), t('settings.windows.killExplorerDesc')),
@@ -1748,7 +1748,7 @@ function categories() {
         action(t('tv.settings.open'), state.tv?.paired ? tvHint() || tvLine() : t('tv.settings.openDesc'), () => openPage(tvPage(), t('settings.cat.tv'))),
         toggle('tvInGuide', t('tv.settings.guide'), t('tv.settings.guideDesc'), (on) => setTvInGuide(on)),
         ...expert(
-          toggle('tvOnWithCouchHud', t('tv.settings.followOn'), t('tv.settings.followOnDesc')),
+          toggle('tvOnWithMegaHub', t('tv.settings.followOn'), t('tv.settings.followOnDesc')),
           toggle('tvOffWithPc', t('tv.settings.followOff'), t('tv.settings.followOffDesc'))
         )
       ]
@@ -1764,7 +1764,7 @@ function categories() {
             toast(t('settings.common.confirmWindowsPrompt'), 4000);
             const result = await attempt(() => api.allowFirewall(), t('settings.network.firewallFailed'));
             if (result === undefined) return;
-            // Windows' own block rules for CouchHud.exe win against the allow rule: say so instead of "allowed".
+            // Windows' own block rules for MegaHub.exe win against the allow rule: say so instead of "allowed".
             if (result?.blocked?.length) toast(t('settings.network.firewallBlocked', { names: result.blocked.join(', ') }), 12000);
             else toast(t('settings.network.firewallDone'));
           }),
@@ -1828,7 +1828,7 @@ function categories() {
             ], current);
             if (v === undefined || v === current) return;
             if ((await saveSetting('language', v)) === undefined) return;
-            try { sessionStorage.setItem('couchhud.resume', 'settings:info'); } catch { /* storage blocked: reload lands on Home */ }
+            try { sessionStorage.setItem('megahub.resume', 'settings:info'); } catch { /* storage blocked: reload lands on Home */ }
             location.reload();
           }
         },
@@ -1991,7 +1991,7 @@ async function refreshAssistantTab() {
     // Reloaded anyway: the settings may have broken or been repaired since the start (the setup assistant asks again by itself).
     state.info.configFault = !!info.configFault;
   }
-  window.dispatchEvent(new Event('couchhud:tabs'));
+  window.dispatchEvent(new Event('megahub:tabs'));
   render();
 }
 

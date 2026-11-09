@@ -173,7 +173,7 @@ assert.equal(historyOffNeedsParent(true, false, true), false, 'switching it on i
 assert.equal(historyOffNeedsParent(true, false, false), false);
 assert.equal(historyOffNeedsParent(false, true, false), false);
 assert.equal(historyOffNeedsParent(undefined, true, false), false, 'the host decides when the status is unknown');
-assert.ok(readFileSync(new URL('../src/CouchHud.Core/Security/BrowserRecentPrivacy.cs', import.meta.url), 'utf8').includes(`HistoryOffAction = "${HISTORY_OFF_ACTION}"`));
+assert.ok(readFileSync(new URL('../src/MegaHub.Core/Security/BrowserRecentPrivacy.cs', import.meta.url), 'utf8').includes(`HistoryOffAction = "${HISTORY_OFF_ACTION}"`));
 // The remembered sites go only on the host's own "history off", never on a switch it refused.
 assert.equal(forgetRecent({ history: false }), true);
 assert.equal(forgetRecent({ history: true }), false);
@@ -571,25 +571,25 @@ assert.equal(shouldShowCodeKeys(3), false);
   const selfUpdate = { available: true };
   const catalogUpdates = [{ id: 'wand', kind: 'plugin' }, { id: 'neon', kind: 'skin' }];
   assert.deepEqual(pendingDownloads({ updates, selfUpdate, catalogUpdates }, []).map((p) => p.id),
-    ['update:windows', 'update:apps', 'couchhud:self', 'catalog:plugin:wand', 'catalog:skin:neon']);
+    ['update:windows', 'update:apps', 'megahub:self', 'catalog:plugin:wand', 'catalog:skin:neon']);
   // Already running: not offered again; a finished line of the same id does not hide it.
   const running = [{ id: 'update:windows', state: 'downloading' }, { id: 'catalog:plugin:wand', state: 'installing' }, { id: 'update:apps', state: 'done' }];
-  assert.deepEqual(pendingDownloads({ updates, selfUpdate, catalogUpdates }, running).map((p) => p.id), ['update:apps', 'couchhud:self', 'catalog:skin:neon']);
+  assert.deepEqual(pendingDownloads({ updates, selfUpdate, catalogUpdates }, running).map((p) => p.id), ['update:apps', 'megahub:self', 'catalog:skin:neon']);
   assert.deepEqual(pendingDownloads({ updates: { windows: [], apps: [] }, selfUpdate: { available: false } }, []), []);
   assert.deepEqual(pendingDownloads(undefined, undefined), []);
   // Just finished: hidden while the list it came from is older than the done line, offered again once newer news says it is still there.
-  const done = [{ id: 'update:apps', state: 'done', updatedAt: 2000 }, { id: 'catalog:skin:neon', state: 'done', updatedAt: 2000 }, { id: 'couchhud:self', state: 'failed', updatedAt: 2000 }];
+  const done = [{ id: 'update:apps', state: 'done', updatedAt: 2000 }, { id: 'catalog:skin:neon', state: 'done', updatedAt: 2000 }, { id: 'megahub:self', state: 'failed', updatedAt: 2000 }];
   assert.deepEqual(pendingDownloads({ updates, selfUpdate, catalogUpdates, seen: { updates: 1000, selfUpdate: 1000, catalogUpdates: 1000 } }, done).map((p) => p.id),
-    ['update:windows', 'couchhud:self', 'catalog:plugin:wand']);
+    ['update:windows', 'megahub:self', 'catalog:plugin:wand']);
   assert.deepEqual(pendingDownloads({ updates, selfUpdate, catalogUpdates, seen: { updates: 3000, selfUpdate: 1000, catalogUpdates: 1000 } }, done).map((p) => p.id),
-    ['update:windows', 'update:apps', 'couchhud:self', 'catalog:plugin:wand']);
+    ['update:windows', 'update:apps', 'megahub:self', 'catalog:plugin:wand']);
   // Nothing heard yet counts as old; a foreign timestamp never hides anything.
   assert.deepEqual(pendingDownloads({ updates, seen: undefined }, done).map((p) => p.id), ['update:windows']);
   assert.deepEqual(pendingDownloads({ updates }, [{ id: 'update:apps', state: 'done', updatedAt: '9999' }]).map((p) => p.id), ['update:windows', 'update:apps']);
 
   // Mega Hub's own download while it can be cancelled: cancel; after the hand-over (cancellable false) nothing.
-  assert.deepEqual(downloadActions({ id: 'couchhud:self', kind: 'couchHud', source: 'couchhud', state: 'downloading', cancellable: true }), ['cancel']);
-  assert.deepEqual(downloadActions({ id: 'couchhud:self', kind: 'couchHud', source: 'couchhud', state: 'downloading', cancellable: false }), []);
+  assert.deepEqual(downloadActions({ id: 'megahub:self', kind: 'megaHub', source: 'megahub', state: 'downloading', cancellable: true }), ['cancel']);
+  assert.deepEqual(downloadActions({ id: 'megahub:self', kind: 'megaHub', source: 'megahub', state: 'downloading', cancellable: false }), []);
   // Windows Update and winget while they run: nothing (no pause, no cancel from here).
   assert.deepEqual(downloadActions({ id: 'update:windows', kind: 'windows', source: 'windows', state: 'downloading' }), []);
   assert.deepEqual(downloadActions({ id: 'update:apps', kind: 'app', source: 'winget', state: 'downloading' }), []);
@@ -599,7 +599,7 @@ assert.equal(shouldShowCodeKeys(3), false);
   // Epic: no fixed link to its downloads, only "stop tracking".
   assert.deepEqual(downloadActions({ kind: 'game', source: 'epic', state: 'inClient' }), ['remove']);
   // Finished lines: remove only, a stale "cancellable" never offers a cancel.
-  assert.deepEqual(downloadActions({ kind: 'couchHud', source: 'couchhud', state: 'failed', cancellable: true }), ['remove']);
+  assert.deepEqual(downloadActions({ kind: 'megaHub', source: 'megahub', state: 'failed', cancellable: true }), ['remove']);
   assert.deepEqual(downloadActions({ kind: 'game', source: 'steam', state: 'done' }), ['remove']);
   assert.deepEqual(downloadActions(null), []);
 }
@@ -639,7 +639,7 @@ assert.equal(shouldShowCodeKeys(3), false);
   assert.ok(tools.includes('parental.status ?? (await refreshParental())'), 'the guard loads a missing parental status');
   const retry = readFileSync(new URL('../ui/core/parent-retry.js', import.meta.url), 'utf8');
   assert.ok(retry.includes('err.parent.reason || fallbackReason ||'), 'the page text is the prompt when the host names none');
-  const hud = readFileSync(new URL('../src/CouchHud.Shell/Hud.cs', import.meta.url), 'utf8');
+  const hud = readFileSync(new URL('../src/MegaHub.Shell/Hud.cs', import.meta.url), 'utf8');
   assert.ok(hud.includes('throw new ParentCodeNeededException(Strings.Get("parental.codeRequired"), "startOptions", id)'), 'the host marks the refusal for the prompt');
 }
 
@@ -759,13 +759,13 @@ assert.equal(shouldShowCodeKeys(3), false);
 
 // Screenshot toast: a picture only from Mega Hub's own file host and only for a saved shot; refusals and errors are text.
 {
-  const saved = shotToast({ ok: true, text: 'Saved', url: 'https://local.couchhud/file?p=x.png' });
-  assert.deepEqual(saved, { ok: true, text: 'Saved', image: 'https://local.couchhud/file?p=x.png', ms: 3500 });
+  const saved = shotToast({ ok: true, text: 'Saved', url: 'https://local.megahub/file?p=x.png' });
+  assert.deepEqual(saved, { ok: true, text: 'Saved', image: 'https://local.megahub/file?p=x.png', ms: 3500 });
   assert.equal(shotToast({ ok: true, text: 'x', url: 'https://evil.example/x.png' }).image, null);
-  assert.equal(shotToast({ ok: true, text: 'x', url: 'https://local.couchhud.evil.example/x.png' }).image, null);
+  assert.equal(shotToast({ ok: true, text: 'x', url: 'https://local.megahub.evil.example/x.png' }).image, null);
   assert.equal(shotToast({ ok: true, text: 'x', url: 'data:image/png;base64,AAAA' }).image, null);
   assert.equal(shotToast({ ok: true, text: 'x', url: 'file:///C:/x.png' }).image, null);
-  assert.deepEqual(shotToast({ ok: false, text: 'Refused', url: 'https://local.couchhud/file?p=x.png' }), { ok: false, text: 'Refused', image: null, ms: 5000 });
+  assert.deepEqual(shotToast({ ok: false, text: 'Refused', url: 'https://local.megahub/file?p=x.png' }), { ok: false, text: 'Refused', image: null, ms: 5000 });
   assert.deepEqual(shotToast(null), { ok: false, text: '', image: null, ms: 5000 });
   assert.equal(shotToast({ ok: 'yes', text: 5 }).ok, false);
   assert.equal(shotToast({ ok: 'yes', text: 5 }).text, '');
@@ -1049,10 +1049,10 @@ assert.deepEqual(emptyHint({ mode: 'recent', areas: ['games'] }), { key: 'home.e
 assert.deepEqual(LAUNCH_AREAS.filter((a) => AREAS.includes(a)), LAUNCH_AREAS);
 for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
 
-// The page's map agrees with the host's (src/CouchHud.Core/Config/FeatureAreas.cs), and every setting row of the settings page
+// The page's map agrees with the host's (src/MegaHub.Core/Config/FeatureAreas.cs), and every setting row of the settings page
 // has a key the host knows, so it has an area there.
 {
-  const core = readFileSync(new URL('../src/CouchHud.Core/Config/FeatureAreas.cs', import.meta.url), 'utf8');
+  const core = readFileSync(new URL('../src/MegaHub.Core/Config/FeatureAreas.cs', import.meta.url), 'utf8');
   const block = core.slice(core.indexOf('SettingKeys ='), core.indexOf('SaveSettingKeys ='));
   const coreMap = Object.fromEntries([...block.matchAll(/\["(\w+)"\] = (\w+)/g)].map((m) => [m[1], m[2].toLowerCase()]));
   assert.ok(Object.keys(coreMap).length > 40);
@@ -1083,7 +1083,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   assert.equal(movedSkinCatalogId('nova'), null);
   assert.equal(movedSkinCatalogId('user:stardust'), null);
   assert.equal(movedSkinCatalogId(undefined), null);
-  const catalog = readFileSync(new URL('../src/CouchHud.Core/Skins/SkinCatalog.cs', import.meta.url), 'utf8');
+  const catalog = readFileSync(new URL('../src/MegaHub.Core/Skins/SkinCatalog.cs', import.meta.url), 'utf8');
   const block = catalog.slice(catalog.indexOf('RenamedIds ='), catalog.indexOf('};', catalog.indexOf('RenamedIds =')));
   assert.deepEqual(Object.fromEntries([...block.matchAll(/\["(\w+)"\] = "(\w+)"/g)].map((m) => [m[1], m[2]])), { ...RENAMED_SKINS });
   const list = (name) => catalog.match(new RegExp(`${name} = \\[([^\\]]*)\\]`))[1].match(/"(\w+)"/g).map((x) => x.slice(1, -1));
@@ -1265,7 +1265,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   assert.equal(pr.badgeOf({ kind: 'skin', origin: 'local' }), null);
   assert.equal(pr.badgeOf(null), null);
   assert.equal(pr.publisherOf(third), 'dev · a1b2-c3d4');
-  assert.equal(pr.publisherOf(firstParty, 'CouchHUD'), 'CouchHUD');
+  assert.equal(pr.publisherOf(firstParty, 'Mega Hub'), 'Mega Hub');
 
   // State rendering: one word for every state the page shows.
   const entry = (o) => ({ id: 'e', kind: 'plugin', origin: 'firstParty', status: 'installed', ...o });
@@ -1286,7 +1286,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   // Delisted: installed from a catalog, no entry any more; only once a catalog has loaded; never a local plugin.
   const listed = [{ id: 'wand', kind: 'plugin' }, { id: 'wand', kind: 'skin' }];
   assert.equal(pr.isDelisted({ id: 'kodi', folder: 'Kodi', origin: 'thirdParty', userInstalled: true }, listed), true);
-  assert.equal(pr.isDelisted({ id: 'wand', folder: 'CouchHud.Plugin.Wand', origin: 'firstParty', userInstalled: true }, listed), false);
+  assert.equal(pr.isDelisted({ id: 'wand', folder: 'MegaHub.Plugin.Wand', origin: 'firstParty', userInstalled: true }, listed), false);
   assert.equal(pr.isDelisted({ id: 'kodi', folder: 'Kodi', origin: 'thirdParty', userInstalled: true }, []), false);
   assert.equal(pr.isDelisted({ id: 'kodi', folder: 'Kodi', origin: 'thirdParty', userInstalled: true }, undefined), false);
   assert.equal(pr.isDelisted({ id: 'mine', folder: 'Mine', origin: 'local', userInstalled: true }, listed), false);
@@ -1527,7 +1527,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
 }
 
 
-// needsCode pinned against the table of PluginPolicy.Decide (Core). The same rows are in tests/CouchHud.Core.Tests/PluginPolicyGateTableTests.cs;
+// needsCode pinned against the table of PluginPolicy.Decide (Core). The same rows are in tests/MegaHub.Core.Tests/PluginPolicyGateTableTests.cs;
 // if a rule changes on either side, both tables change, or one test fails. [change, origin, capabilities, parental controls on, update adds capabilities, code needed]
 {
   const TABLE = [
@@ -1916,7 +1916,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
 
   // The UI and the host keep the same lists: the reserved titles, the names of Mega Hub's plugins, the first-party titles and the glyphs
   // that are built-in icons are read from the C# file and compared.
-  const cs = readFileSync(new URL('../src/CouchHud.Core/Plugins/PluginTabs.cs', import.meta.url), 'utf8');
+  const cs = readFileSync(new URL('../src/MegaHub.Core/Plugins/PluginTabs.cs', import.meta.url), 'utf8');
   const strings = (name) => {
     const body = cs.slice(cs.indexOf(`${name} =`));
     return [...body.slice(0, body.indexOf('];')).matchAll(/"([^"]+)"/g)].map((m) => m[1]);
@@ -1925,7 +1925,7 @@ for (const a of AREAS) assert.ok(AREA_NAME_KEYS[a] && AREA_DESC_KEYS[a], a);
   assert.deepEqual(strings('FirstPartyTitles'), ptabs.FIRST_PARTY_TITLES);
   const { BUILTIN_GLYPHS } = await import('../ui/core/glyph-icons.js');
   assert.deepEqual(strings('BuiltInGlyphs'), BUILTIN_GLYPHS);
-  const names = readFileSync(new URL('../src/CouchHud.Core/Plugins/PackageStatement.cs', import.meta.url), 'utf8');
+  const names = readFileSync(new URL('../src/MegaHub.Core/Plugins/PackageStatement.cs', import.meta.url), 'utf8');
   const list = (name) => { const at = names.indexOf(`${name} = [`); const body = names.slice(at, names.indexOf('];', at)); return [...body.matchAll(/"([^"]+)"/g)].map((m) => m[1]); };
   assert.deepEqual(list('Brands'), ptabs.BRAND_NAMES);
   assert.deepEqual(list('Generic'), ptabs.GENERIC_NAMES);
@@ -2548,15 +2548,15 @@ assert.equal(ptabs.isPinnedTab(null), false);
   assert.equal(sanitizeBytes(Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('a{b:c}', 'utf16le')])).refused, true, 'UTF-16 byte order mark');
   assert.equal(sanitizeBytes(Buffer.from([0x61, 0x7b, 0xff, 0x7d])).refused, true, 'not UTF-8');
   assert.deepEqual(sanitizeBytes(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('a{content:"Grüße"}')])), { css: 'a{content:"Grüße"}', refused: false });
-  const host = readFileSync(new URL('../src/CouchHud.Shell/UiHost/LocalFiles.cs', import.meta.url), 'utf8');
+  const host = readFileSync(new URL('../src/MegaHub.Shell/UiHost/LocalFiles.cs', import.meta.url), 'utf8');
   assert.ok(host.includes('"text/css; charset=utf-8"') && host.includes('"image/svg+xml; charset=utf-8"') && host.includes('Sanitize(memory.ToArray(), out var refused)'), 'the host sends charset=utf-8 with every text type it serves');
   assert.ok(readFileSync(new URL('./preview-server.js', import.meta.url), 'utf8').includes('charset=utf-8'));
   assert.equal(mentionsLayerOrImport('a{b:c}'), false);
   for (const css of ['a{b:c}', ':root{--accent:#f0f}', 'a{b:url("x.png")}']) assert.deepEqual(sanitize(css), { css, refused: false });
   // C# and JS pin the same source structure: the refusing backstop and the shared list.
-  const cs = readFileSync(new URL('../src/CouchHud.Core/Skins/SkinCss.cs', import.meta.url), 'utf8');
+  const cs = readFileSync(new URL('../src/MegaHub.Core/Skins/SkinCss.cs', import.meta.url), 'utf8');
   assert.ok(cs.includes('MentionsLayerOrImport') && cs.includes('refused = true') && cs.includes('SkipUrlBody') && cs.includes('IsNl(char c) => c is \'\\n\' or \'\\r\' or \'\\f\''));
-  assert.ok(readFileSync(new URL('../src/CouchHud.Shell/UiHost/LocalFiles.cs', import.meta.url), 'utf8').includes('out var refused'), 'the host logs a refused skin');
+  assert.ok(readFileSync(new URL('../src/MegaHub.Shell/UiHost/LocalFiles.cs', import.meta.url), 'utf8').includes('out var refused'), 'the host logs a refused skin');
 }
 
 // The bar is structure, not a runtime guard (source pins: the DOM part is walked by scripts/tabs-check.mjs).
@@ -2570,8 +2570,8 @@ assert.equal(ptabs.isPinnedTab(null), false);
   for (const pin of ["mode: 'closed'", 'showPopover', 'all: initial', ':host {', ':host::before', ':host::backdrop', '!important', 'document.fonts', 'ANCESTORS', "['zoom', '1']", 'contain: paint',
     'window.chrome?.webview', 'popover-open', 'barSane', 'tabAtPoint']) assert.ok(bar.includes(pin), `tab-bar.js: ${pin}`);
   // The test hook that opens the closed root exists only where the app is not (the preview with the mock API).
-  assert.ok(bar.includes('if (!window.chrome?.webview) window.__couchhudTabBar'), 'the hook is set only without the WebView2 bridge');
-  assert.ok(!read('../ui/bridge.js').includes('__couchhudTabBar') && !nav.includes('__couchhudTabBar'));
+  assert.ok(bar.includes('if (!window.chrome?.webview) window.__megahubTabBar'), 'the hook is set only without the WebView2 bridge');
+  assert.ok(!read('../ui/bridge.js').includes('__megahubTabBar') && !nav.includes('__megahubTabBar'));
   assert.ok(html.includes('id="top" popover="manual"') && html.includes('id="top-gap"') && !html.includes('id="tab-list"') && !html.includes('id="tabs"'));
   assert.ok(/:where\(\[popover\]\)/.test(css), 'the popover defaults of the browser are taken off the core\'s overlays');
   // What the old guard did is gone: no inline holds on tabs, no hit testing of layers, no text measuring, no overlay guard.
@@ -2596,7 +2596,7 @@ assert.equal(ptabs.isPinnedTab(null), false);
   assert.ok(!css.includes('@layer') && !css.includes('#cursor'), 'no cascade layer to take apart, nothing for the pointer in the page\'s CSS');
   const browserJs = read('../ui/views/browser.js');
   assert.ok(browserJs.includes("attachShadow({ mode: 'closed' })") && browserJs.includes('BADGE_CSS') && !css.includes('#web-fullscreen-badge {'), 'the web page mark is a shadow root of its own');
-  assert.ok(read('../src/CouchHud.Core/Skins/SkinCss.cs').includes('StripLayersAndImports') && read('preview-server.js').includes("require('./skin-css.js')"), '@layer and @import never reach the page');
+  assert.ok(read('../src/MegaHub.Core/Skins/SkinCss.cs').includes('StripLayersAndImports') && read('preview-server.js').includes("require('./skin-css.js')"), '@layer and @import never reach the page');
   for (const pin of ['all: initial !important;', 'position-anchor: none', 'position-area: none', 'position-try-fallbacks: none', 'aspect-ratio: auto', 'container-type: normal', 'var(--s-scrim)', 'max-width: 40%', 'a tab is squashed']) assert.ok(bar.includes(pin), `tab-bar.js: ${pin}`);
   assert.ok(nav.includes('matchMedia(q)'), 'media queries read the skin again');
   // The mouse finds a tab through the bar, not through the page.
@@ -3175,9 +3175,9 @@ assert.equal(chipsBlocked(null), false);
 // The detail hero: one key per item and first hero address (a re-render with the same key leaves the layer alone), and a url cannot leave its quotes.
 {
   const { cssUrl, heroKey } = await import('../ui/core/hero-rules.js');
-  const a = { id: 'x', art: { hero: ['https://art.couchhud/1'] } };
+  const a = { id: 'x', art: { hero: ['https://art.megahub/1'] } };
   assert.equal(heroKey(a), heroKey({ ...a, name: 'renamed' }));
-  assert.notEqual(heroKey(a), heroKey({ ...a, art: { hero: ['https://art.couchhud/2'] } }));
+  assert.notEqual(heroKey(a), heroKey({ ...a, art: { hero: ['https://art.megahub/2'] } }));
   assert.notEqual(heroKey(a), heroKey({ ...a, id: 'y' }));
   assert.equal(heroKey({ id: 'x', art: {} }), 'x|');
   assert.equal(cssUrl('https://a/b.png'), 'url("https://a/b.png")');
@@ -3296,9 +3296,9 @@ assert.equal(chipsBlocked(null), false);
   }
   assert.equal(tileArtMode('', 'icon'), 'cover');
 
-  const s = 'https://art.couchhud/s';
-  const c = 'https://art.couchhud/c';
-  const h = 'https://art.couchhud/h';
+  const s = 'https://art.megahub/s';
+  const c = 'https://art.megahub/c';
+  const h = 'https://art.megahub/h';
   const full = { art: { square: [s], cover: [c], hero: [h] } };
   // Square tiles: the square first, the cover as stand-in (a hero strip would be lost in a square).
   const sq = tileArt(full, 'square');
@@ -3539,12 +3539,12 @@ assert.equal(chipsBlocked(null), false);
   assert.ok(hero.classList.contains('art-fit'));
 }
 
-// Wiring: art.js listens for couchhud:skin-styled, applySkin sends it through skin-load.js.
+// Wiring: art.js listens for megahub:skin-styled, applySkin sends it through skin-load.js.
 {
   const artSrc = readFileSync(new URL('../ui/core/art.js', import.meta.url), 'utf8');
   const skinSrc = readFileSync(new URL('../ui/core/skins.js', import.meta.url), 'utf8');
-  assert.match(artSrc, /addEventListener\('couchhud:skin-styled', refreshTiles\)/);
-  assert.match(skinSrc, /new Event\('couchhud:skin-styled'\)/);
+  assert.match(artSrc, /addEventListener\('megahub:skin-styled', refreshTiles\)/);
+  assert.match(skinSrc, /new Event\('megahub:skin-styled'\)/);
   assert.match(skinSrc, /styleSkin\(skin\.css, styled\)/);
   const css = readFileSync(new URL('../ui/styles.css', import.meta.url), 'utf8');
   assert.match(css, /\.shelf \.hero-art \{[^}]*--tile-art: hero;/);
@@ -4070,10 +4070,10 @@ console.log('power menu groups: ok');
   assert.match(src, /function fireSleepTimer\(\) \{[^}]*stopSleepTimer\(\);[^}]*if \(pcModeActive\) return;[^}]*attempt\(\(\) => action\.run\(\), action\.label\);/);
   assert.equal((src.match(/pcModeActive/g) || []).length, 5, 'pcModeActive: declaration, listener (2), start, fire');
   // The host side: entering PC mode ends the timer and tells the phones (Hud.cs / HudRemote.cs), leaving tells them too.
-  const hudSrc = readFileSync(new URL('../src/CouchHud.Shell/Hud.cs', import.meta.url), 'utf8');
+  const hudSrc = readFileSync(new URL('../src/MegaHub.Shell/Hud.cs', import.meta.url), 'utf8');
   assert.match(hudSrc, /_pcMode = true;[^]*?ApplyCouchSecurity\(\);[^]*?PcModeChangedForPhones\(entered: true\);/);
   assert.equal((hudSrc.match(/PcModeChangedForPhones\(entered: false\)/g) || []).length, 2, 'leaving PC mode, and the failed entry');
-  const remoteSrc = readFileSync(new URL('../src/CouchHud.Shell/HudRemote.cs', import.meta.url), 'utf8');
+  const remoteSrc = readFileSync(new URL('../src/MegaHub.Shell/HudRemote.cs', import.meta.url), 'utf8');
   assert.match(remoteSrc, /Emit\("remote", new \{ type = "pcMode", on = entered \}\);/);
   // Security re-review L4/L5: a child's phone neither ends nor replaces a foreign timer; the phone's timer is told by a token, not by time.
   assert.equal((remoteSrc.match(/RemoteRights\.MayEndSleepTimer\(device\.Child, _sleepTimerByChildPhone\)/g) || []).length, 2, 'off and set');
@@ -4190,16 +4190,16 @@ console.log('busy state: ok');
   const pending = [
     { kind: 'pending', group: 'windows', label: 'Windows' }, { kind: 'pending', group: 'plugins', label: 'Plugin' },
     { kind: 'pending', group: 'apps', label: 'All apps' }, { kind: 'pending', group: 'apps', label: 'Discord' },
-    { kind: 'pending', group: 'couchhud', label: 'CouchHUD' }
+    { kind: 'pending', group: 'megahub', label: 'Mega Hub' }
   ];
   // Sections in a fixed order (running, Mega Hub, apps, Windows, plugins, finished); the restart stands first with the Windows updates.
   const sections = downloadSections({ entries, first: [reboot], pending });
   assert.deepEqual(sections.map((s) => [s.id, s.rows.map((r) => r.entry?.id ?? r.label)]), [
-    ['running', ['b', 'd']], ['couchhud', ['CouchHUD']], ['apps', ['All apps', 'Discord']], ['windows', ['restart', 'Windows']],
+    ['running', ['b', 'd']], ['megahub', ['Mega Hub']], ['apps', ['All apps', 'Discord']], ['windows', ['restart', 'Windows']],
     ['plugins', ['Plugin']], ['finished', ['a', 'c']]
   ]);
   const rows = downloadRows({ entries, first: [reboot], pending });
-  assert.deepEqual(rows.map((r) => r.entry?.id ?? r.label), ['b', 'd', 'CouchHUD', 'All apps', 'Discord', 'restart', 'Windows', 'Plugin', 'a', 'c']);
+  assert.deepEqual(rows.map((r) => r.entry?.id ?? r.label), ['b', 'd', 'Mega Hub', 'All apps', 'Discord', 'restart', 'Windows', 'Plugin', 'a', 'c']);
   assert.ok(rows.every((r) => r.kind === 'entry' || r.kind === 'pending'));
   // Empty sections are left out; a start row without a known section is never lost (it goes with the plugins), a note to Windows.
   assert.deepEqual(downloadSections({ entries: [{ id: 'x', state: 'done' }] }).map((s) => s.id), ['finished']);
@@ -4552,7 +4552,7 @@ console.log('limit pickers: ok');
 // "Pausiert seit" after more time: every resume (the extension, "continue", the task list) thaws the game, and the thaw tells the page, because the HUD
 // losing the focus afterwards emits nothing any more (nothing is frozen by then). The home shelf reads session.paused on every session event.
 {
-  const hudSrc = readFileSync(new URL('../src/CouchHud.Shell/Hud.cs', import.meta.url), 'utf8');
+  const hudSrc = readFileSync(new URL('../src/MegaHub.Shell/Hud.cs', import.meta.url), 'utf8');
   assert.match(hudSrc, /var wasPaused = GamePause\.IsPaused;\s+GamePause\.ResumeAll\(\);[^]*?if \(wasPaused\) Ui\(\(\) => Emit\("session", SessionDto\(\)\)\);/);
   assert.match(hudSrc, /public object ParentalExtend\(int minutes\)[^]*?ResumeGame\(\);/);
   assert.match(readFileSync(new URL('../ui/views/home.js', import.meta.url), 'utf8'), /state\.session\.paused \? 'home\.meta\.pausedSince' : 'home\.meta\.runningSince'/);
@@ -4570,7 +4570,7 @@ console.log('paused since after more time: ok');
   for (const [a, b] of [[undefined, 'en'], ['de', undefined], [null, 'en'], ['de', 'fr'], ['fr', 'de'], ['de', ''], ['de', 'DE']]) assert.equal(languageChanged(a, b), false, `${a} -> ${b}`);
   const app = readFileSync(new URL('../ui/app.js', import.meta.url), 'utf8');
   assert.match(app, /languageChanged\(state\.info\.languageSetting, s\.language\)/);
-  assert.match(app, /couchhud\.languageReload/);
+  assert.match(app, /megahub\.languageReload/);
   // The reload waits for a quiet moment: not under a code entry, an open dialog or the profile picker, and it is made up afterwards.
   const { languageReloadWaits } = await import('../ui/core/settings-rules.js');
   assert.equal(languageReloadWaits({}), false);
@@ -4580,10 +4580,10 @@ console.log('paused since after more time: ok');
   assert.match(app, /languageReloadPending = true;\s+reloadForLanguage\(\);/);
   assert.match(app, /setInterval\(reloadForLanguage, 1000\);/);
   assert.match(readFileSync(new URL('../ui/components/passcode.js', import.meta.url), 'utf8'), /export const codeEntryOpen = \(\) => codeEntries\.open > 0;/);
-  assert.match(app, /window\.dispatchEvent\(new CustomEvent\('couchhud:settings', \{ detail: s \}\)\);/);
+  assert.match(app, /window\.dispatchEvent\(new CustomEvent\('megahub:settings', \{ detail: s \}\)\);/);
   assert.match(app, /configureScreensaver\(\{ minutes: s\.screensaverMinutes \?\? 5, style: s\.screensaverStyle \?\? 'art'/);
-  assert.match(readFileSync(new URL('../ui/views/settings.js', import.meta.url), 'utf8'), /window\.addEventListener\('couchhud:settings'/);
-  const host = readFileSync(new URL('../src/CouchHud.Core/Remote/RemoteSettings.cs', import.meta.url), 'utf8');
+  assert.match(readFileSync(new URL('../ui/views/settings.js', import.meta.url), 'utf8'), /window\.addEventListener\('megahub:settings'/);
+  const host = readFileSync(new URL('../src/MegaHub.Core/Remote/RemoteSettings.cs', import.meta.url), 'utf8');
   const keys = [...host.matchAll(/new\("(\w+)", RemoteSettingKind\./g)].map((m) => m[1]);
   assert.deepEqual(keys, ['language', 'favoritesMode', 'favoritesRecentDays', 'favoritesSites', 'screensaverMinutes', 'screensaverStyle', 'audioMode', 'soundVolume', 'musicVolume']);
   // The TV's picker for the screensaver is the host's list.

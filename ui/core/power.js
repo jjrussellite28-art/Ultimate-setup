@@ -51,7 +51,7 @@ export const POWER_ACTIONS = [
     get detail() { return t('power.restartApp.detail'); },
     get confirm() { return { title: t('power.restartApp.confirmTitle'), label: t('power.restartApp.label'), message: t('power.restartApp.confirmMessage') }; },
     get unlock() { return t('power.restartApp.label'); },
-    run: () => api.restartCouchHud()
+    run: () => api.restartMegaHub()
   },
   {
     id: 'restart',

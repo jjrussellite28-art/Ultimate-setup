@@ -1,4 +1,4 @@
-// Age rating systems for the age limit (mirrors CouchHud.Core.Parental.AgeRatings; the host decides, this only shows and offers).
+// Age rating systems for the age limit (mirrors MegaHub.Core.Parental.AgeRatings; the host decides, this only shows and offers).
 // The limit is stored as an age; the picker offers the active system's steps, the labels name them in that system.
 
 /** What the parents can choose: by the Windows region, or one system. */

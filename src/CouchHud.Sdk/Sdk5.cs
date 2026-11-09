@@ -4,7 +4,7 @@ namespace CouchHud.Sdk;
 
 // SDK 5: slots for what used to be built into the core (weather in the header, the News tab, the assistant's cloud providers) and a
 // host-made HTTP client for the network services a plugin declares in plugin.json. A plugin that uses them declares "sdk": 5, so an
-// older CouchHUD does not load it. Plugins for SDK 1 to 4 run unchanged.
+// older Mega Hub does not load it. Plugins for SDK 1 to 4 run unchanged.
 //
 // The core keeps the places where these things are shown (the header, the News tab, the assistant, the settings) and draws them itself
 // from the plugin's data, as plain text; a plugin never ships HTML or script into the HUD.
@@ -26,7 +26,7 @@ public static class PluginNetServices
     public const string AnyHost = "*";
 
     /// <summary>
-    /// The host entry that means a target in the home network that the user types in (a hub, a TV, a PC): not a name CouchHUD can check. It
+    /// The host entry that means a target in the home network that the user types in (a hub, a TV, a PC): not a name Mega Hub can check. It
     /// grants no reach through <see cref="IPluginContext.Http"/> (which never goes to the home network); it only makes the service one that
     /// <see cref="IPluginContext.ServiceAllowed"/> answers for, with its own switch in Settings › Privacy, for plugins that open their own
     /// sockets (capability "network:lan"). "*" does not include it: a plugin that declares both gets two separate approvals.
@@ -52,7 +52,7 @@ public sealed record PluginWeatherReport(string Place, double Temperature, int C
 /// <summary>
 /// The weather source behind the header (capability "weather"). The plugin keeps the chosen place in its own settings; the core's settings
 /// page searches through <see cref="SearchAsync"/> and sets it with <see cref="SetPlace"/>. The host asks <see cref="GetAsync"/> about every
-/// quarter of an hour (with a timeout); the plugin caches as it likes. Only one source is used: CouchHUD's own wins, else the first loaded.
+/// quarter of an hour (with a timeout); the plugin caches as it likes. Only one source is used: Mega Hub's own wins, else the first loaded.
 /// </summary>
 public interface IPluginWeather
 {
@@ -85,7 +85,7 @@ public sealed record PluginNewsItem(string Id, string Feed, string Title, string
 
 /// <summary>
 /// The source behind the News tab (capability "news"). The core shows the tab only while a source is loaded and its area is on, and runs
-/// the feed list on its settings page through <see cref="AddFeed"/> and <see cref="RemoveFeed"/>. Only one source is used: CouchHUD's own
+/// the feed list on its settings page through <see cref="AddFeed"/> and <see cref="RemoveFeed"/>. Only one source is used: Mega Hub's own
 /// wins, else the first loaded.
 /// </summary>
 public interface IPluginNews
@@ -101,7 +101,7 @@ public interface IPluginNews
     Task<IReadOnlyList<PluginNewsItem>> GetItemsAsync(CancellationToken cancellationToken);
 }
 
-// ---- assistant providers (capability "assistant.provider", CouchHUD's own plugins only) ----
+// ---- assistant providers (capability "assistant.provider", Mega Hub's own plugins only) ----
 
 /// <summary>A tool call the model asked for. <paramref name="ArgumentsJson"/> is a JSON object.</summary>
 public sealed record PluginToolCall(string Id, string Name, string ArgumentsJson);
@@ -140,7 +140,7 @@ public sealed class PluginChatException(PluginChatError error, string? message =
 }
 
 /// <summary>
-/// A cloud provider for CouchHUD's assistant (capability "assistant.provider", CouchHUD's own plugins only: the provider sees the whole
+/// A cloud provider for Mega Hub's assistant (capability "assistant.provider", Mega Hub's own plugins only: the provider sees the whole
 /// conversation, tool results included). The assistant itself, its tools and the MCP server stay in the core; the provider only turns a
 /// conversation into the next answer. The API key lives in the plugin's own secret store (<see cref="IPluginSettings.SetSecret"/>): the
 /// core's settings page hands a new key over with <see cref="SetKey"/> and never reads it back.
@@ -167,7 +167,7 @@ public interface IPluginChatProvider
 }
 
 // SDK 5: TV control as a plugin ("tv.control"). The core keeps everything around the TV: the settings page, the pairing dialog, the
-// triggers (TV on with CouchHUD, off with the PC), Wake-on-LAN, discovery, the address policy (home network only, only the paired TV)
+// triggers (TV on with Mega Hub, off with the PC), Wake-on-LAN, discovery, the address policy (home network only, only the paired TV)
 // and the key storage (per TV, DPAPI). A plugin brings only the protocol of one kind of TV (an ITvProvider). It never opens a socket
 // itself: every byte goes through the ITvLink the core hands it, and that link only reaches the one TV being paired or paired before,
 // only on the ports the provider declared, with TLS pinned to the certificate seen at pairing, no proxy, no redirects and hard limits.
@@ -312,7 +312,7 @@ public sealed record TvPairResult(string Key)
     /// <summary>The model, if the TV told it (cleaned by the core).</summary>
     public string? Model { get; init; }
 
-    /// <summary>The app in front on the TV while pairing (the PC's input, since pairing happens from CouchHUD on the TV). "TV off with the PC" only switches off while it is in front.</summary>
+    /// <summary>The app in front on the TV while pairing (the PC's input, since pairing happens from Mega Hub on the TV). "TV off with the PC" only switches off while it is in front.</summary>
     public string? PcApp { get; init; }
 }
 

@@ -7,9 +7,9 @@ Great to have you here! Mega Hub aims to be a free, really good living-room fron
 ## Ways to contribute
 
 - **Skins**: instructions in [docs/SKINS.en.md](docs/SKINS.en.md)
-- **Plugins**: instructions in [docs/PLUGINS.md](docs/PLUGINS.md) (German), example in `plugins/CouchHud.Plugin.Wand`
+- **Plugins**: instructions in [docs/PLUGINS.md](docs/PLUGINS.md) (German), example in `plugins/MegaHub.Plugin.Wand`
 - **Translations and texts**: [docs/i18n.md](docs/i18n.md)
-- **Report bugs**: an issue with your Windows version, what you did and the logs from `%LOCALAPPDATA%\CouchHud\logs`
+- **Report bugs**: an issue with your Windows version, what you did and the logs from `%LOCALAPPDATA%\MegaHub\logs`
 - **Code**: pull requests are welcome. For bigger things, open a short issue first so we can agree on the direction.
 
 ## Development
@@ -17,14 +17,14 @@ Great to have you here! Mega Hub aims to be a free, really good living-room fron
 Requirements: .NET 10 SDK, Node.js (for the UI preview and checks), and on Windows WebView2 to try it out.
 
 ```powershell
-dotnet build CouchHud.slnx
-dotnet test CouchHud.slnx
-dotnet run --project src/CouchHud.Shell -- --dev   # window mode with DevTools
+dotnet build MegaHub.slnx
+dotnet test MegaHub.slnx
+dotnet run --project src/MegaHub.Shell -- --dev   # window mode with DevTools
 ```
 
-`--dev` only works in a Debug build (as above with `dotnet run`). A Release build ignores the switch unless an administrator sets `HKLM\SOFTWARE\CouchHud` `DeveloperMode=1` (DWORD; the key must only be writable by Administrators, SYSTEM and TrustedInstaller). Otherwise a standard account could start Mega Hub with `--dev` from a shortcut and get DevTools.
+`--dev` only works in a Debug build (as above with `dotnet run`). A Release build ignores the switch unless an administrator sets `HKLM\SOFTWARE\Mega Hub` `DeveloperMode=1` (DWORD; the key must only be writable by Administrators, SYSTEM and TrustedInstaller). Otherwise a standard account could start Mega Hub with `--dev` from a shortcut and get DevTools.
 
-The interface (`ui/`) is vanilla JS as ES modules without a build step. Platform-neutral logic belongs in `CouchHud.Core` (with tests in `tests/`), Windows-specific code in `CouchHud.Shell`.
+The interface (`ui/`) is vanilla JS as ES modules without a build step. Platform-neutral logic belongs in `MegaHub.Core` (with tests in `tests/`), Windows-specific code in `MegaHub.Shell`.
 
 ### Before every push: `scripts/check.sh`
 
@@ -59,20 +59,20 @@ Steps: `skin:<id>`, `key:<key>`, `keys:ArrowDown*3`, `wait:<ms>`, `shot:<name>`,
 
 **Screenshots for the README and docs** always with `--query demo`: the preview then shows made-up games with self-generated covers (`ui/mock-demo.js`) instead of real store covers, and no notification pop-ups. The images under `docs/` were made this way (1920×1080, scaled down to 1280×720). `node scripts/docs-shots.mjs` re-shoots all of them in German and English (`docs/<name>.png`, `docs/<name>.en.png`; for the skins image add `--catalog <folder of catalog skins>`).
 
-**Logo and icon**: the sources are `docs/logo.svg` (from 48 px) and `assets/branding/icon-small.svg` (16–32 px), plus `docs/banner.svg` and `docs/social-preview.svg`. `node scripts/brand-render.mjs` renders all PNGs from them with Edge and rebuilds `src/CouchHud.Shell/couchhud.ico`. `ui/assets/icon.svg` is a copy of `docs/logo.svg`.
+**Logo and icon**: the sources are `docs/logo.svg` (from 48 px) and `assets/branding/icon-small.svg` (16–32 px), plus `docs/banner.svg` and `docs/social-preview.svg`. `node scripts/brand-render.mjs` renders all PNGs from them with Edge and rebuilds `src/MegaHub.Shell/megahub.ico`. `ui/assets/icon.svg` is a copy of `docs/logo.svg`.
 
 ### Test VM (Hyper-V)
 
 Windows features (shell replacement, auto sign-in, Guide button, UAC) are best tested in a Hyper-V VM, not on your work PC. The scripts run on the host over PowerShell Direct and need membership in "Hyper-V Administrators". The VM is called `Win11-Test` by default (`-VMName` changes that). Store the VM password once:
 
 ```powershell
-Get-Credential | Export-Clixml "$env:USERPROFILE\couchhud-vm.cred"
+Get-Credential | Export-Clixml "$env:USERPROFILE\megahub-vm.cred"
 ```
 
 | Script | Purpose |
 |---|---|
-| `scripts\deploy-vm.ps1` | Publishes Mega Hub (self-contained), copies it to `C:\Program Files\CouchHud` in the VM and starts it in the signed-in session. `-NoBuild` copies the last publish again, `-NoStart` does not start it, `-Arguments --dev` passes switches through (a Release build only honors `--dev` with `DeveloperMode=1` in `HKLM\SOFTWARE\CouchHud`, see `vm-cdp.ps1 -Enable`). |
-| `scripts\vm-cdp.ps1` | Talks to the UI in the VM over the Chrome DevTools Protocol: `-Eval 'document.title'`, `-Screenshot shot.png`, `-Keys ArrowRight,Enter`, `-Console` (errors since the last call), `-Reload`. Run `-Enable` once first (sets `HKLM\SOFTWARE\CouchHud` `DeveloperMode=1` and `RemoteDebuggingPort=9222`, DWORD, as an administrator of the VM; then restart Mega Hub), and `-Disable` after the tests. The port only listens on 127.0.0.1; the couch browser gets port + 1. `WEBVIEW2_*` environment variables have no effect since 0.4.2 (Mega Hub removes them at start). |
+| `scripts\deploy-vm.ps1` | Publishes Mega Hub (self-contained), copies it to `C:\Program Files\Mega Hub` in the VM and starts it in the signed-in session. `-NoBuild` copies the last publish again, `-NoStart` does not start it, `-Arguments --dev` passes switches through (a Release build only honors `--dev` with `DeveloperMode=1` in `HKLM\SOFTWARE\Mega Hub`, see `vm-cdp.ps1 -Enable`). |
+| `scripts\vm-cdp.ps1` | Talks to the UI in the VM over the Chrome DevTools Protocol: `-Eval 'document.title'`, `-Screenshot shot.png`, `-Keys ArrowRight,Enter`, `-Console` (errors since the last call), `-Reload`. Run `-Enable` once first (sets `HKLM\SOFTWARE\Mega Hub` `DeveloperMode=1` and `RemoteDebuggingPort=9222`, DWORD, as an administrator of the VM; then restart Mega Hub), and `-Disable` after the tests. The port only listens on 127.0.0.1; the couch browser gets port + 1. `WEBVIEW2_*` environment variables have no effect since 0.4.2 (Mega Hub removes them at start). |
 | `scripts\vm-screenshot.ps1` | Saves the VM's console screen as a PNG (`-Path shot.png`), also at the sign-in screen, where the UI cannot be reached. |
 | `scripts\vm-uac.ps1` | Confirms (or with `-Decline` declines) a UAC prompt in the VM through the virtual keyboard, which also reaches the secure desktop. |
 
@@ -82,7 +82,7 @@ Typical flow: `deploy-vm.ps1`, then walk through the interface with `vm-cdp.ps1 
 
 The interface exists in German and English. Rules (details and the terminology table in [docs/i18n.md](docs/i18n.md)):
 
-- **Every new text always comes in German and English.** UI: `ui/i18n/de/*.js` and `ui/i18n/en/*.js` (same file names, same keys), accessed with `t('area.key', { name })`. Host (C#): `Strings.Get("key", args)` in `src/CouchHud.Core/Localization/`. Installer: `[CustomMessages]` in `installer/CouchHud.iss`.
+- **Every new text always comes in German and English.** UI: `ui/i18n/de/*.js` and `ui/i18n/en/*.js` (same file names, same keys), accessed with `t('area.key', { name })`. Host (C#): `Strings.Get("key", args)` in `src/MegaHub.Core/Localization/`. Installer: `[CustomMessages]` in `installer/MegaHub.iss`.
 - Do not send finished German sentences from the host to the UI that the UI compares or stores: states as a **code** (`errorCode`), notifications as a key plus arguments (`Strings.Ref`).
 - Only call `t()` when building the text, never in a top-level constant. Date, time and numbers with `fmtDate`, `fmtTime`, `fmtNumber`.
 - Terms as in the table (e.g. "Guide button", "Skin", "Sleep timer"); paths in the settings with `›`.
@@ -98,11 +98,11 @@ The principles: everything through the GUI, controller first, seamless full scre
 
 ## Release
 
-Maintainers only. The private signing key is not in the repository and not in CI, but in the maintainer's user profile (`%USERPROFILE%\.couchhud\catalog-signing.key`, protected with DPAPI).
+Maintainers only. The private signing key is not in the repository and not in CI, but in the maintainer's user profile (`%USERPROFILE%\.megahub\catalog-signing.key`, protected with DPAPI).
 
-1. Raise the version in `Directory.Build.props`, merge, set and push the tag: `git tag v0.4.0 && git push origin v0.4.0`. CI builds the setup with this version (and stops if tag and version do not match), creates the build attestation and attaches `CouchHud-Setup-<v>.exe` and `CouchHud-Setup-<v>.exe.sha256` to a GitHub release.
-   Only the CI's tag build is a release build (`CouchHudRelease=true`, set by the CI from the tag) and carries exactly this number. Every other build, a local one too, is called `<Version>-dev+<commit>` (e.g. `0.7.0-dev+f627fe74`): a pre-release the updater sees as older than the release.
-2. `.\scripts\sign-release.ps1 -Tag v0.4.0` (PowerShell 7, `gh` signed in): checks commit and version, downloads the setup and compares its hash with GitHub and the `.sha256`, checks the attestation and only then signs the `.sha256` (context `couchhud-release-v1`). Uploads `.sha256.sig`. **Only then do installed CouchHUDs offer the update.**
+1. Raise the version in `Directory.Build.props`, merge, set and push the tag: `git tag v0.4.0 && git push origin v0.4.0`. CI builds the setup with this version (and stops if tag and version do not match), creates the build attestation and attaches `MegaHub-Setup-<v>.exe` and `MegaHub-Setup-<v>.exe.sha256` to a GitHub release.
+   Only the CI's tag build is a release build (`MegaHubRelease=true`, set by the CI from the tag) and carries exactly this number. Every other build, a local one too, is called `<Version>-dev+<commit>` (e.g. `0.7.0-dev+f627fe74`): a pre-release the updater sees as older than the release.
+2. `.\scripts\sign-release.ps1 -Tag v0.4.0` (PowerShell 7, `gh` signed in): checks commit and version, downloads the setup and compares its hash with GitHub and the `.sha256`, checks the attestation and only then signs the `.sha256` (context `couchhud-release-v1`). Uploads `.sha256.sig`. **Only then do installed Mega Hubs offer the update.**
 3. Edit the release notes in the GitHub release as needed (they appear shortened on the TV).
 
 Signing scripts (PowerShell 7):

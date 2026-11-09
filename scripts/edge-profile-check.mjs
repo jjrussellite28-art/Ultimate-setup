@@ -20,7 +20,7 @@ try {
   const fresh = make(`${PREFIX}222-abc`, false);
   const running = make(`${PREFIX}333-abc`);
   const foreign = make('someone-elses-folder');
-  const foreignPrefix = make('couchhud-brand-111-abc');
+  const foreignPrefix = make('megahub-brand-111-abc');
   const target = make('link-target', false); // a folder outside our prefix, reachable only through a link
   const link = join(root, `${PREFIX}444-link`);
   let linked = true;

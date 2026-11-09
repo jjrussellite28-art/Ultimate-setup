@@ -1,7 +1,7 @@
 # CI only (GitHub's Windows runner, a throwaway VM where the job runs as administrator). Never on a developer's PC: it installs
-# CouchHUD with its SYSTEM service and uninstalls it again.
+# Mega Hub with its SYSTEM service and uninstalls it again.
 # 1. Silent install, then the service as the SCM sees it: LocalSystem, auto start, sid type, privileges, DACL, failure actions,
-#    event source, folder ACL - against the values in CouchHud.iss (InstallerTests pins those to ServiceHardening).
+#    event source, folder ACL - against the values in MegaHub.iss (InstallerTests pins those to ServiceHardening).
 # 2. It runs, stays running and serves its pipe; the same after an update over itself the way the service runs one (DACL and
 #    failure actions restored, {app}\service\data kept).
 # 3. The emergency repair (repair-service.cmd) works and leaves the same configuration.
@@ -18,11 +18,11 @@ foreach ($line in Get-Content -LiteralPath $Iss) {
 }
 $name = $defines.ServiceName
 $sc = Join-Path ([Environment]::SystemDirectory) 'sc.exe'
-$app = Join-Path $env:ProgramFiles 'CouchHud'
+$app = Join-Path $env:ProgramFiles 'MegaHub'
 $serviceDir = Join-Path $app $defines.ServiceFolder
 $dataDir = Join-Path $serviceDir $defines.ServiceDataFolder
-$log = Join-Path $env:RUNNER_TEMP 'couchhud-setup.log'
-$uninstallLog = Join-Path $env:RUNNER_TEMP 'couchhud-uninstall.log'
+$log = Join-Path $env:RUNNER_TEMP 'megahub-setup.log'
+$uninstallLog = Join-Path $env:RUNNER_TEMP 'megahub-uninstall.log'
 $failures = [Collections.Generic.List[string]]::new()
 
 function Check([bool]$Ok, [string]$What) {
@@ -92,7 +92,7 @@ function Test-Running([string]$When) {
     Check (Wait-Until { (Get-Service $name -ErrorAction SilentlyContinue).Status -eq 'Running' } 30) "$When service running"
     Start-Sleep -Seconds 5
     Check ((Get-Service $name -ErrorAction SilentlyContinue).Status -eq 'Running') "$When service still running after 5 s"
-    Check (Wait-Until { [IO.Directory]::GetFiles('\\.\pipe\') -contains '\\.\pipe\CouchHud.Service.v1' } 15) "$When pipe CouchHud.Service.v1 served"
+    Check (Wait-Until { [IO.Directory]::GetFiles('\\.\pipe\') -contains '\\.\pipe\MegaHub.Service.v1' } 15) "$When pipe MegaHub.Service.v1 served"
 }
 
 # ---- 1. install --------------------------------------------------------------------------------------------------------------
@@ -131,7 +131,7 @@ Check (Wait-Until { -not (Get-Service $name -ErrorAction SilentlyContinue) } 30)
 Check (-not (Test-Path "HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\Application\$($defines.EventSource)")) 'event source removed'
 Check (-not (Test-Path -LiteralPath $serviceDir)) 'service folder removed'
 Check (-not (Test-Path -LiteralPath $dataDir)) 'service data removed'
-Check (-not (Test-Path -LiteralPath (Join-Path $env:ProgramData 'CouchHud\Service'))) 'nothing below ProgramData'
+Check (-not (Test-Path -LiteralPath (Join-Path $env:ProgramData 'MegaHub\Service'))) 'nothing below ProgramData'
 
 if ($failures.Count -gt 0) {
     foreach ($f in $log, "$log.update", $uninstallLog) {

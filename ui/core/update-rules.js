@@ -44,7 +44,7 @@ export function pendingDownloads({ updates = null, selfUpdate = null, catalogUpd
   const list = [];
   if (updates?.windows?.length && !hidden('update:windows', 'updates')) list.push({ id: 'update:windows', kind: 'windows' });
   if (updates?.apps?.length && !hidden('update:apps', 'updates')) list.push({ id: 'update:apps', kind: 'apps' });
-  if (selfUpdate?.available && !hidden('couchhud:self', 'selfUpdate')) list.push({ id: 'couchhud:self', kind: 'self' });
+  if (selfUpdate?.available && !hidden('megahub:self', 'selfUpdate')) list.push({ id: 'megahub:self', kind: 'self' });
   for (const c of catalogUpdates ?? []) {
     const id = `catalog:${c?.kind}:${c?.id}`;
     if (c?.id && !hidden(id, 'catalogUpdates')) list.push({ id, kind: 'catalog', entry: c });

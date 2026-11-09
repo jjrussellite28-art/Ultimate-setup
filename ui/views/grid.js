@@ -49,7 +49,7 @@ const addTile = (kind) => ({
 });
 
 /** Opens the mixed games-and-apps page of a collection (app.js pushes it). */
-const openCollection = (id) => window.dispatchEvent(new CustomEvent('couchhud:show-collection', { detail: { id } }));
+const openCollection = (id) => window.dispatchEvent(new CustomEvent('megahub:show-collection', { detail: { id } }));
 
 /**
  * Cover grid for the game and app tabs. With collectionId it is the page of one collection

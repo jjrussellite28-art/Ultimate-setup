@@ -27,7 +27,7 @@ import { favorites, toggleFavoriteSite } from '../core/favorites.js';
 const isFavoriteSite = (url) => favorites.entries.some((e) => e.kind === 'site' && e.url === url);
 
 const ZOOMS = [100, 125, 150, 175, 200, 250];
-const RECENT_KEY = 'couchhud.browser.recent';
+const RECENT_KEY = 'megahub.browser.recent';
 
 let browserState = null;
 /** When the last browser state arrived (performance.now()): the close countdown counts from here. */
@@ -561,7 +561,7 @@ function showFullBadge(on) {
     fullBadge?.remove();
     fullBadge = null;
     badgeStrip = null;
-    if (!window.chrome?.webview) delete window.__couchhudBadge;
+    if (!window.chrome?.webview) delete window.__megahubBadge;
     return;
   }
   if (!fullBadge?.isConnected) {
@@ -576,7 +576,7 @@ function showFullBadge(on) {
       el('span', { className: 'web-badge-say' }));
     root.append(el('style', { textContent: BADGE_CSS }), badgeStrip);
     // The checks of the preview (never the app) read the closed root through this.
-    if (!window.chrome?.webview) window.__couchhudBadge = { root };
+    if (!window.chrome?.webview) window.__megahubBadge = { root };
     document.body.append(fullBadge);
   }
   const label = badgeStrip.querySelector('.web-badge-label');

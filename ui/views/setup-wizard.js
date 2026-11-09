@@ -45,7 +45,7 @@ import { EXPLAINS, applies, parseResume, defaultIndex, freshChoices, isConsoleRe
 export const WIZARD_VERSION = 1;
 
 // A language switch reloads the page: the assistant comes back at the next step.
-const RESUME_KEY = 'couchhud.wizard';
+const RESUME_KEY = 'megahub.wizard';
 
 const where = (...parts) => t('settings.crumb', { page: parts.map((p) => t(p)).join(' › ') });
 
@@ -491,7 +491,7 @@ function wizardPage({ firstRun = false, startAt = null } = {}) {
         full: isFull(env),
         lockOn: lockOn(env),
         accountPassword: env.security.accountPassword,
-        autoLogonDone: !!env.security.autoLogon && env.security.autoLogonState === 'couchhud' && !env.security.autoLogonOtherUser,
+        autoLogonDone: !!env.security.autoLogon && env.security.autoLogonState === 'megahub' && !env.security.autoLogonOtherUser,
         launchers: env.launchers.length,
         tvPaired: tvPaired(),
         choices: this.choices,
@@ -519,7 +519,7 @@ function wizardPage({ firstRun = false, startAt = null } = {}) {
       const result = await call(() => api.setFeatureAreas(this.areas), t('settings.areas.failed'));
       if (!result.ok) return;
       this.areas = setAreas(result.value?.areas ?? this.areas);
-      window.dispatchEvent(new CustomEvent('couchhud:areas', { detail: this.areas }));
+      window.dispatchEvent(new CustomEvent('megahub:areas', { detail: this.areas }));
       // The game clients appear (or go) with Gaming.
       await this.reload();
       return 'next';
@@ -628,7 +628,7 @@ function wizardPage({ firstRun = false, startAt = null } = {}) {
       // The explanation and the summary were the confirmation; the unlock and the host's checks stay.
       if (plan.changes.includes('tvOn') || plan.changes.includes('tvBoth')) {
         await run(plan.changes.includes('tvBoth') ? 'tvBoth' : 'tvOn', async () => {
-          const on = await save('tvOnWithCouchHud', true);
+          const on = await save('tvOnWithMegaHub', true);
           return plan.changes.includes('tvBoth') ? (await save('tvOffWithPc', true)) && on : on;
         }, { where: where('settings.cat.tv') });
       }

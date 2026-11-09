@@ -208,7 +208,7 @@ export function declarativePage(plugin, pageInfo, { asTab = false } = {}) {
             console.error(err);
             note = t('plugins.tab.unavailable');
             // The plugin may be gone: the tab bar asks the host again and drops the tab (back to the first tab).
-            window.dispatchEvent(new Event('couchhud:tabs'));
+            window.dispatchEvent(new Event('megahub:tabs'));
           }
         }
       } else {

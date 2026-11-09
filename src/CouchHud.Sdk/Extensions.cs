@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace CouchHud.Sdk;
 
-// SDK v1: plugins describe their UI as data. CouchHud renders it in the current
+// SDK v1: plugins describe their UI as data. MegaHub renders it in the current
 // skin, so every plugin screen looks right and works with the controller.
 
 /// <summary>One row on a plugin page.</summary>
@@ -41,12 +41,12 @@ public sealed record PluginRow(string Id, string Label)
 
     /// <summary>
     /// A press needs the parents' code under parental controls (on top of the unlock). Enforced by the host, never by the plugin; for a
-    /// plugin that is not CouchHUD's own it is on for every row that changes something, whatever the plugin says.
+    /// plugin that is not Mega Hub's own it is on for every row that changes something, whatever the plugin says.
     /// </summary>
     public bool RequiresParentGrant { get; init; }
 
     /// <summary>
-    /// Shown, and for CouchHUD's own plugins also usable, on the locked couch. For any other plugin the row is shown read-only on the
+    /// Shown, and for Mega Hub's own plugins also usable, on the locked couch. For any other plugin the row is shown read-only on the
     /// locked couch (a press is refused).
     /// </summary>
     public bool AllowedWhileLocked { get; init; }
@@ -92,7 +92,7 @@ public sealed class PluginPage
 
     /// <summary>
     /// The page may be opened on the locked couch; then only its rows with <see cref="PluginRow.AllowedWhileLocked"/> are shown (read-only
-    /// for plugins that are not CouchHUD's own).
+    /// for plugins that are not Mega Hub's own).
     /// </summary>
     public bool AllowedWhileLocked { get; init; }
 
@@ -125,12 +125,12 @@ public sealed class QuickAction
     /// <summary>Return a short message for a toast, or null.</summary>
     public required Func<CancellationToken, Task<string?>> Run { get; init; }
 
-    /// <summary>SDK 3: needs the parents' code under parental controls. The host enforces it (and forces it for plugins that are not CouchHUD's own).</summary>
+    /// <summary>SDK 3: needs the parents' code under parental controls. The host enforces it (and forces it for plugins that are not Mega Hub's own).</summary>
     public bool RequiresParentGrant { get; init; }
 
     /// <summary>
-    /// SDK 3: may run on the locked couch (and is shown there). Honoured only for CouchHUD's own plugins; for any other plugin the entry is
-    /// hidden while locked and a run is refused, whatever it says. Leave it off for anything that changes CouchHUD's own settings.
+    /// SDK 3: may run on the locked couch (and is shown there). Honoured only for Mega Hub's own plugins; for any other plugin the entry is
+    /// hidden while locked and a run is refused, whatever it says. Leave it off for anything that changes Mega Hub's own settings.
     /// </summary>
     public bool AllowedWhileLocked { get; init; }
 
@@ -157,7 +157,7 @@ public enum SettingKind
     Page
 }
 
-/// <summary>A setting on the plugin's page in the settings. Values are stored by CouchHud.</summary>
+/// <summary>A setting on the plugin's page in the settings. Values are stored by MegaHub.</summary>
 public sealed class PluginSetting
 {
     public required string Key { get; init; }
@@ -194,7 +194,7 @@ public sealed class PluginSetting
 /// </summary>
 public sealed class PluginTool
 {
-    /// <summary>snake_case; CouchHud prefixes it with the plugin id.</summary>
+    /// <summary>snake_case; MegaHub prefixes it with the plugin id.</summary>
     public required string Name { get; init; }
 
     /// <summary>English works best for the models.</summary>
@@ -205,7 +205,7 @@ public sealed class PluginTool
 
     public bool Writes { get; init; }
 
-    /// <summary>SDK 3: may run on the locked couch. Honoured only for CouchHUD's own plugins (the TV still asks first when it writes).</summary>
+    /// <summary>SDK 3: may run on the locked couch. Honoured only for Mega Hub's own plugins (the TV still asks first when it writes).</summary>
     public bool AllowedWhileLocked { get; init; }
 
     /// <summary>
@@ -262,7 +262,7 @@ public interface IPluginEvents
     }
 
     /// <summary>
-    /// SDK 5, additive: CouchHUD is about to quit or restart. Close connections, save what is open and put back what you changed; the host
+    /// SDK 5, additive: Mega Hub is about to quit or restart. Close connections, save what is open and put back what you changed; the host
     /// waits for all handlers together for two seconds at most and then quits regardless, so do the essential part first. Called once, on a
     /// pool thread. Not called for a plugin that is paused by Offline mode. Older hosts never raise it. Not raised on a crash, a kill or a
     /// power loss and so not guaranteed: restore state at the next start as well.

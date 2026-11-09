@@ -20,7 +20,7 @@ for (let i = 0; i < args.length; i += 2) opt[args[i].replace(/^--/, '')] = args[
 const langs = opt.lang === 'both' ? ['de', 'en'] : [opt.lang];
 const only = opt.only ? opt.only.split(',') : null;
 const edge = process.env.EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const tmp = mkdtempSync(join(tmpdir(), 'couchhud-docs-'));
+const tmp = mkdtempSync(join(tmpdir(), 'megahub-docs-'));
 
 // The mock's demo data without a battery, a running download and notification pop-ups.
 const query = (lang) => `demo&favs=demo&nobattery&nodownloads&lang=${lang}`;
@@ -39,7 +39,7 @@ const SCENES = {
 };
 
 const SKINS = [ // id, short line per language, built in or from the catalog
-  { id: 'default', name: { de: 'CouchHUD', en: 'CouchHUD' }, line: { de: 'klar und ruhig', en: 'clear and calm' }, builtIn: true },
+  { id: 'default', name: { de: 'Mega Hub', en: 'Mega Hub' }, line: { de: 'klar und ruhig', en: 'clear and calm' }, builtIn: true },
   { id: 'user:deepsea', folder: 'deepsea', line: { de: 'Wellen in Tiefblau', en: 'waves in deep blue' } },
   { id: 'user:greenlight', folder: 'greenlight', line: { de: 'dunkel mit Grün', en: 'dark with green' } },
   { id: 'user:neoncity', folder: 'neoncity', line: { de: 'Neon und Scanlines', en: 'neon and scanlines' } },

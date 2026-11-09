@@ -400,7 +400,7 @@ const APPROVAL_TEXT = {
   ReleaseLockPolicies: 'passcode.approve.release',
   CleanupPolicyKeys: 'passcode.approve.release',
   SetRemoteFirewall: 'passcode.approve.firewall',
-  InstallCouchHudUpdate: 'passcode.approve.update',
+  InstallMegaHubUpdate: 'passcode.approve.update',
   ResetCodeStore: 'passcode.approve.resetCodes',
   ResetServiceState: 'passcode.approve.resetServiceState'
 };

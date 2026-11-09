@@ -42,11 +42,11 @@ export function setPadGlyphs({ padKind, padGlyphs } = {}) {
 }
 
 let styleSkin = null;
-const styled = () => window.dispatchEvent(new Event('couchhud:skin-styled'));
+const styled = () => window.dispatchEvent(new Event('megahub:skin-styled'));
 
 export function applySkin(skin) {
   const link = $('#skin-css');
-  // Once the skin's stylesheet is in, what it declares can be read (the tiles' --tile-art, art.js): "couchhud:skin-styled".
+  // Once the skin's stylesheet is in, what it declares can be read (the tiles' --tile-art, art.js): "megahub:skin-styled".
   // Only for the skin applied last; a stylesheet that fails to load still counts, the app's own rules then apply (skin-load.js).
   styleSkin ??= skinStyler(link);
   styleSkin(skin.css, styled);

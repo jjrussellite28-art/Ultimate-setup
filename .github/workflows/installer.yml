@@ -23,7 +23,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Publish app
-        run: dotnet publish src/CouchHud.Shell/CouchHud.Shell.csproj -c Release -r win-x64 --self-contained true -o publish
+        run: dotnet publish src/MegaHub.Shell/MegaHub.Shell.csproj -c Release -r win-x64 --self-contained true -o publish
 
       - name: Record source commit
         shell: pwsh
@@ -33,7 +33,7 @@ jobs:
       - name: Publish service
         shell: pwsh
         run: |
-          dotnet publish src/CouchHud.Service/CouchHud.Service.csproj -c Release -r win-x64 --self-contained true -p:DebugType=embedded -o publish/service
+          dotnet publish src/MegaHub.Service/MegaHub.Service.csproj -c Release -r win-x64 --self-contained true -p:DebugType=embedded -o publish/service
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Setup version
@@ -59,7 +59,7 @@ jobs:
           Start-Process -FilePath $isExe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=`"$isDir`"" -Wait
           $iscc = Join-Path $isDir 'ISCC.exe'
           if (-not (Test-Path $iscc)) { throw "ISCC.exe not found after installing Inno Setup" }
-          & $iscc "/DAppVersion=${{ steps.version.outputs.version }}" "/DPublishDir=..\publish" "/DWebView2Setup=MicrosoftEdgeWebview2Setup.exe" installer\CouchHud.iss
+          & $iscc "/DAppVersion=${{ steps.version.outputs.version }}" "/DPublishDir=..\publish" "/DWebView2Setup=MicrosoftEdgeWebview2Setup.exe" installer\MegaHub.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -73,5 +73,5 @@ jobs:
           tag_name: latest-installer
           name: Latest installer
           prerelease: true
-          body: "Mega Hub installer (app and service), built from the newest push. Download the .exe, run it once, press Yes. Mega Hub is based on CouchHUD by kewe87 (GPL-3.0); source: https://github.com/jjrussellite28-art/mega-hub"
+          body: "Mega Hub installer (app and service), built from the newest push. Download the .exe, run it once, press Yes. Mega Hub is based on Mega Hub by kewe87 (GPL-3.0); source: https://github.com/jjrussellite28-art/mega-hub"
           files: installer/output/*.exe

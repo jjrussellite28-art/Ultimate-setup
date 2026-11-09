@@ -13,7 +13,7 @@ public interface ILibraryProvider
 }
 
 /// <summary>
-/// Entry point of a plugin. CouchHud loads every public, non-abstract type
+/// Entry point of a plugin. MegaHub loads every public, non-abstract type
 /// implementing this interface from the DLLs in plugins/&lt;name&gt;/.
 /// </summary>
 public interface IPlugin
@@ -36,7 +36,7 @@ public interface IPluginContext
     // ---- SDK v1 ----
 
     /// <summary>
-    /// The language CouchHud shows right now: "de" or "en". Texts registered once (settings, pages, quick actions)
+    /// The language MegaHub shows right now: "de" or "en". Texts registered once (settings, pages, quick actions)
     /// are written in this language; <see cref="IPluginEvents.LanguageChanged"/> says when to register them again.
     /// Hosts older than this member answer "de" (the default implementation), so plugins keep working.
     /// </summary>
@@ -57,7 +57,7 @@ public interface IPluginContext
     /// <summary>Game started/ended, PC mode, couch mode.</summary>
     IPluginEvents Events { get; }
 
-    /// <summary>Settings shown on the plugin's page in CouchHud's settings.</summary>
+    /// <summary>Settings shown on the plugin's page in MegaHub's settings.</summary>
     void RegisterSettings(params PluginSetting[] settings);
 
     /// <summary>A list page, opened from the plugin's entry in the settings.</summary>
@@ -73,7 +73,7 @@ public interface IPluginContext
     void Notify(string title, string body);
 
     /// <summary>
-    /// Opens an http(s) address in CouchHud's own couch browser (never in the system's browser; other schemes are refused).
+    /// Opens an http(s) address in MegaHub's own couch browser (never in the system's browser; other schemes are refused).
     /// Needs the unlocked couch. Returns false when refused. Older hosts answer false (the default implementation).
     /// </summary>
     bool OpenUrl(string url) => false;
@@ -101,7 +101,7 @@ public interface IPluginContext
     /// <summary>
     /// Runs the command line of a program below Program Files that the user confirmed for this plugin: no shell, no window, a hard
     /// timeout (at most one minute), stdout not read, stderr capped. Capability "process". Refused (see <see cref="PluginCliResult.Refused"/>)
-    /// for an exe that is not confirmed, not below Program Files, or on a locked couch for a plugin that is not CouchHUD's own.
+    /// for an exe that is not confirmed, not below Program Files, or on a locked couch for a plugin that is not Mega Hub's own.
     /// </summary>
     Task<PluginCliResult> RunTrustedCliAsync(string exePath, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken) =>
         Task.FromResult(new PluginCliResult(null, "", false, "unsupported"));
@@ -126,7 +126,7 @@ public interface IPluginContext
     bool RestrictWhileLocked(string exePath) => false;
 
     /// <summary>
-    /// First-party only, capability "startup.args": when CouchHUD runs the autostart entries as the shell, the arguments of the entry
+    /// First-party only, capability "startup.args": when Mega Hub runs the autostart entries as the shell, the arguments of the entry
     /// that starts this program (canonical, below Program Files) go through <paramref name="adapt"/> (null keeps them).
     /// </summary>
     bool AdaptStartupArgs(string exePath, Func<string, string?> adapt) => false;
@@ -156,7 +156,7 @@ public interface IPluginContext
     /// <summary>The source of the News tab (<see cref="IPluginNews"/>). Capability "news". Older hosts do nothing.</summary>
     void RegisterNews(IPluginNews news) { }
 
-    /// <summary>A cloud provider for the assistant (<see cref="IPluginChatProvider"/>). Capability "assistant.provider", CouchHUD's own plugins only.</summary>
+    /// <summary>A cloud provider for the assistant (<see cref="IPluginChatProvider"/>). Capability "assistant.provider", Mega Hub's own plugins only.</summary>
     void RegisterChatProvider(IPluginChatProvider provider) { }
 
     // ---- SDK 5, additive (older hosts answer with the defaults: false, nothing, null) ----
@@ -166,7 +166,7 @@ public interface IPluginContext
     /// Settings › Privacy is on and the plugin is not paused. Fail closed: false for a service that was not declared (or not approved), for a
     /// plugin without a network capability ("network:internet" or "network:lan") and when the host cannot tell. For a plugin that opens its
     /// own sockets in the home network (capability "network:lan", service host <see cref="PluginNetServices.LanHost"/>) this is the question
-    /// whether it may talk to the user's device at all. This is a declaration plus a privacy switch, not a technical fence: CouchHUD cannot
+    /// whether it may talk to the user's device at all. This is a declaration plus a privacy switch, not a technical fence: Mega Hub cannot
     /// fence those sockets, so the plugin must ask before it connects and stop when <see cref="ServiceAllowedChanged"/> says false. Needs no capability.
     /// </summary>
     bool ServiceAllowed(string serviceId) => false;
@@ -182,7 +182,7 @@ public interface IPluginContext
         remove { }
     }
 
-    /// <summary>CouchHUD's own state, read only. Capability "host.state"; null without it and on older hosts.</summary>
+    /// <summary>Mega Hub's own state, read only. Capability "host.state"; null without it and on older hosts.</summary>
     IPluginHostState? Host => null;
 
     // ---- sensor board (additive; see PluginSensorReading) ----
@@ -202,14 +202,14 @@ public interface IPluginContext
     PluginSensorSnapshot? ReadSensors() => null;
     /// <summary>
     /// Registers the protocol of one kind of TV (<see cref="ITvProvider"/>). Capability "tv.control" and "sdk": 5 in plugin.json. The core
-    /// refuses an id another plugin owns or that is reserved for one of CouchHUD's own TV plugins, and more than two providers per plugin.
+    /// refuses an id another plugin owns or that is reserved for one of Mega Hub's own TV plugins, and more than two providers per plugin.
     /// Older hosts do nothing (the default implementation).
     /// </summary>
     void RegisterTvProvider(ITvProvider provider) { }
 }
 
 /// <summary>
-/// The SDK version this build of CouchHud implements. Plugins can declare the version
+/// The SDK version this build of MegaHub implements. Plugins can declare the version
 /// they need in plugin.json ("sdk": 1); newer ones are not loaded.
 /// Version 2 adds <see cref="IPluginContext.Locked"/> and <see cref="IPluginEvents.LockChanged"/>; plugins for version 1 keep working unchanged.
 /// Version 3 adds capabilities, richer pages (sections, images, steppers, choices, links), pushed state and the host services.

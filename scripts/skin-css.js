@@ -1,6 +1,6 @@
 'use strict';
 
-// The same as SkinCss in Core (src/CouchHud.Core/Skins/SkinCss.cs), for the preview server and the checks. Keep the two identical: both read
+// The same as SkinCss in Core (src/MegaHub.Core/Skins/SkinCss.cs), for the preview server and the checks. Keep the two identical: both read
 // tests/skin-css-cases.json (scripts/ui-logic-check.mjs here, SkinCssLayerTests there).
 //
 // A skin's stylesheet may not use @import (a second stylesheet nobody checked, with layer() and supports()) and may not use @layer (a layer declared first
@@ -254,7 +254,7 @@ function addressText(s) {
 }
 
 // The two virtual hosts of the app and the art host may be written out (the same exceptions as EXTERNAL).
-const LOCAL_ADDRESS = /^(?:https?:)?\/\/(?:local|art|app)\.couchhud(?::\d+)?(?:[/?#]|$)/i;
+const LOCAL_ADDRESS = /^(?:https?:)?\/\/(?:local|art|app)\.megahub(?::\d+)?(?:[/?#]|$)/i;
 
 // Schemes that reach out (or run code); a string that is no fetch (an attribute value like "user:nova", "a: b") may use any other scheme-like start, but not one of these.
 const NETWORK_SCHEMES = new Set(['http', 'https', 'ftp', 'ftps', 'ws', 'wss', 'file', 'blob', 'filesystem', 'javascript', 'vbscript', 'view-source', 'chrome', 'chrome-extension', 'edge', 'ms-appx', 'ms-appx-web']);
@@ -338,7 +338,7 @@ function hasBadAddress(css) {
 }
 
 // An absolute or protocol-relative web address, not preceded by a letter or digit (the same pattern as SkinCss.External in Core).
-const EXTERNAL = /(?<![A-Za-z0-9_-])(?:https?:)?\/\/(?!(?:local|art|app)\.couchhud(?:[/:"') \t\n\r\f]|$)|www\.w3\.org\/)[^ \t\n\r\f"')]+/gi;
+const EXTERNAL = /(?<![A-Za-z0-9_-])(?:https?:)?\/\/(?!(?:local|art|app)\.megahub(?:[/:"') \t\n\r\f]|$)|www\.w3\.org\/)[^ \t\n\r\f"')]+/gi;
 
 // C0 control characters other than tab, line feed, form feed and carriage return. In a stylesheet decoded from another charset (iso-2022-jp: ESC ( B
 // produces no character at all) they would hide "@layer" or "https://" from this scan while the browser reads them; an honest skin has none.

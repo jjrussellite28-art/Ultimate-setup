@@ -49,7 +49,7 @@ export function t(key, params = {}) {
 }
 
 // The preview backend (mock-api.js) is loaded before this module finishes and cannot import it (cycle): it calls this.
-globalThis.__couchhudT = t;
+globalThis.__megahubT = t;
 
 export const fmtNumber = (n, options) => Number(n).toLocaleString(activeLocale, options);
 /** 35 -> "35 %" (de) or "35%" (en). */

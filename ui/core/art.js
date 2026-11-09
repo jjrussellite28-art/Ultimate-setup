@@ -69,7 +69,7 @@ export function refreshTiles() {
   tiles.refresh(document.querySelectorAll('.art[data-tile-art]'));
 }
 
-window.addEventListener('couchhud:skin-styled', refreshTiles);
+window.addEventListener('megahub:skin-styled', refreshTiles);
 
 const bgLayers = () => [...document.querySelectorAll('.bg-layer')];
 let bgFront = 0;
@@ -110,7 +110,7 @@ export function refreshBackground() {
 
 /** Neutral backdrop for screens without an item (empty lists, "Alle Spiele"). */
 export function plainBackground() {
-  setBackground({ id: '__plain', name: 'CouchHUD', hue: 220, art: {} });
+  setBackground({ id: '__plain', name: 'Mega Hub', hue: 220, art: {} });
 }
 
 /**

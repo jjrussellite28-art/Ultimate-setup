@@ -1,42 +1,42 @@
 <#
-Publishes CouchHUD locally and copies it into the Hyper-V test VM over PowerShell Direct.
+Publishes Mega Hub locally and copies it into the Hyper-V test VM over PowerShell Direct.
 Run on the host as a member of "Hyper-V-Administratoren". The VM credential is stored once with:
-    Get-Credential | Export-Clixml "$env:USERPROFILE\couchhud-vm.cred"
+    Get-Credential | Export-Clixml "$env:USERPROFILE\megahub-vm.cred"
 
     scripts\deploy-vm.ps1                 # publish, copy, start in the signed-in desktop session
     scripts\deploy-vm.ps1 -NoBuild        # copy the last publish again
     scripts\deploy-vm.ps1 -Arguments --dev
-    scripts\deploy-vm.ps1 -Service        # also update CouchHud.Service (stop, replace <InstallDir>\service\CouchHud.Service.exe, start)
+    scripts\deploy-vm.ps1 -Service        # also update MegaHub.Service (stop, replace <InstallDir>\service\MegaHub.Service.exe, start)
 
 -Service needs the service installed by the setup (it does not register one) and a VM credential that is an administrator of the VM.
 #>
 param(
     [string]$VMName = 'Win11-Test',
-    [string]$CredentialPath = "$env:USERPROFILE\couchhud-vm.cred",
-    [string]$InstallDir = 'C:\Program Files\CouchHud',
+    [string]$CredentialPath = "$env:USERPROFILE\megahub-vm.cred",
+    [string]$InstallDir = 'C:\Program Files\MegaHub',
     [string[]]$Arguments = @(),
     [switch]$NoBuild,
     [switch]$NoStart,
-    # Also replace the installed CouchHud.Service (published like the release build into publish\service).
+    # Also replace the installed MegaHub.Service (published like the release build into publish\service).
     [switch]$Service
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $publish = Join-Path $root 'publish'
-# The setup's layout (installer\CouchHud.iss): the service as one self-contained exe in {app}\service, its data below it.
+# The setup's layout (installer\MegaHub.iss): the service as one self-contained exe in {app}\service, its data below it.
 $servicePublish = Join-Path $publish 'service'
-$serviceName = 'CouchHud'
-$serviceExe = 'CouchHud.Service.exe'
+$serviceName = 'MegaHub'
+$serviceExe = 'MegaHub.Service.exe'
 
 if (-not $NoBuild) {
     Write-Host '› dotnet publish'
     if (Test-Path $publish) { Remove-Item $publish -Recurse -Force }
-    dotnet publish "$root\src\CouchHud.Shell\CouchHud.Shell.csproj" -c Release -r win-x64 --self-contained true -o $publish --nologo -v quiet
+    dotnet publish "$root\src\MegaHub.Shell\MegaHub.Shell.csproj" -c Release -r win-x64 --self-contained true -o $publish --nologo -v quiet
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     if ($Service) {
         Write-Host '› dotnet publish (service)'
         # As in .github/workflows/build.yml: single file, symbols embedded, the folder holds exactly the one exe.
-        dotnet publish "$root\src\CouchHud.Service\CouchHud.Service.csproj" -c Release -r win-x64 --self-contained true -p:DebugType=embedded -o $servicePublish --nologo -v quiet
+        dotnet publish "$root\src\MegaHub.Service\MegaHub.Service.csproj" -c Release -r win-x64 --self-contained true -p:DebugType=embedded -o $servicePublish --nologo -v quiet
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 }
@@ -46,10 +46,10 @@ if ($Service -and -not (Test-Path (Join-Path $servicePublish $serviceExe))) {
 
 $session = New-PSSession -VMName $VMName -Credential (Import-Clixml $CredentialPath)
 try {
-    Write-Host "› stop CouchHUD in $VMName"
+    Write-Host "› stop Mega Hub in $VMName"
     # As the shell, explorer.exe is not there to take over; the copy only replaces files, it never touches the shell entry.
     Invoke-Command -Session $session -ScriptBlock {
-        Get-Process CouchHud -ErrorAction SilentlyContinue | Stop-Process -Force
+        Get-Process MegaHub -ErrorAction SilentlyContinue | Stop-Process -Force
         Start-Sleep -Milliseconds 500
     }
 
@@ -64,7 +64,7 @@ try {
         Write-Host "› stop $serviceName in $VMName"
         Invoke-Command -Session $session -ScriptBlock {
             $svc = Get-Service -Name $using:serviceName -ErrorAction SilentlyContinue
-            if (-not $svc) { throw "The service $($using:serviceName) is not installed in the VM; install CouchHUD with the setup first." }
+            if (-not $svc) { throw "The service $($using:serviceName) is not installed in the VM; install Mega Hub with the setup first." }
             if (-not (Test-Path (Join-Path $using:serviceDir $using:serviceExe))) { throw "$($using:serviceExe) not found in $($using:serviceDir); the service is installed elsewhere." }
             if ($svc.Status -ne 'Stopped') { Stop-Service -Name $using:serviceName -Force }
             try { $svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30)) }
@@ -105,7 +105,7 @@ try {
         Invoke-Command -Session $session -ScriptBlock {
             $user = (Get-CimInstance Win32_ComputerSystem).UserName
             if (-not $user) { throw 'Nobody is signed in to the VM desktop.' }
-            $exe = Join-Path $using:InstallDir 'CouchHud.exe'
+            $exe = Join-Path $using:InstallDir 'MegaHub.exe'
             $action = if ($using:Arguments) {
                 New-ScheduledTaskAction -Execute $exe -Argument ($using:Arguments -join ' ') -WorkingDirectory $using:InstallDir
             } else {
@@ -113,11 +113,11 @@ try {
             }
             $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
             $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
-            Register-ScheduledTask -TaskName 'CouchHudDeploy' -Action $action -Principal $principal -Settings $settings -Force | Out-Null
-            Start-ScheduledTask -TaskName 'CouchHudDeploy'
+            Register-ScheduledTask -TaskName 'MegaHubDeploy' -Action $action -Principal $principal -Settings $settings -Force | Out-Null
+            Start-ScheduledTask -TaskName 'MegaHubDeploy'
             Start-Sleep -Seconds 2
-            Unregister-ScheduledTask -TaskName 'CouchHudDeploy' -Confirm:$false
-            Get-Process CouchHud -ErrorAction SilentlyContinue | Select-Object Id, SessionId, StartTime
+            Unregister-ScheduledTask -TaskName 'MegaHubDeploy' -Confirm:$false
+            Get-Process MegaHub -ErrorAction SilentlyContinue | Select-Object Id, SessionId, StartTime
         }
     }
 }

@@ -1,5 +1,5 @@
 // Switchable feature areas, the page's side (pure, no DOM; tested by scripts/ui-logic-check.mjs). The one map of what belongs
-// where is in the host (src/CouchHud.Core/Config/FeatureAreas.cs), which also refuses every call of an area that is off; this
+// where is in the host (src/MegaHub.Core/Config/FeatureAreas.cs), which also refuses every call of an area that is off; this
 // module only hides what the page would otherwise show. The test checks that both maps agree.
 
 /** All areas, in the order the setup assistant and the settings show them. */

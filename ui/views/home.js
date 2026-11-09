@@ -181,7 +181,7 @@ export const homeView = {
   activate() {
     const item = this.list[this.index];
     if (!item) return undefined;
-    if (item.collection) return window.dispatchEvent(new CustomEvent('couchhud:show-collection', { detail: { id: item.collection.id } }));
+    if (item.collection) return window.dispatchEvent(new CustomEvent('megahub:show-collection', { detail: { id: item.collection.id } }));
     if (item.site) return openSite(item.url);
     if (item.running) return attempt(() => api.resumeGame(), t('home.resumeFailed'));
     push(detailPage(item));

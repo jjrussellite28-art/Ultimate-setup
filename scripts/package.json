@@ -1,5 +1,5 @@
 {
-  "name": "couchhud-checks",
+  "name": "megahub-checks",
   "private": true,
   "description": "Dev tooling for the UI checks only. ui/ itself has no build.",
   "devDependencies": {

@@ -170,7 +170,7 @@ export default {
   'systemTools.services.setupTitle': 'Apply',
   'systemTools.services.applyTitle': 'Apply changes',
   'systemTools.services.doneTitle': 'Applied: switching without prompts',
-  'systemTools.services.protectedFolder': 'Mega Hub has to be in a protected folder for this, e.g. C:\\Program Files\\CouchHud',
+  'systemTools.services.protectedFolder': 'Mega Hub has to be in a protected folder for this, e.g. C:\\Program Files\\Mega Hub',
   'systemTools.services.legacyDetail': 'Earlier versions used scheduled tasks. The Mega Hub service replaces them and removes them on the way',
   'systemTools.services.doneDetail': 'The Mega Hub service only pauses services from its fixed list and only restarts the ones it paused itself',
   'systemTools.services.setupDetail': 'The Mega Hub service switches the services when you change between couch and PC',

@@ -115,7 +115,7 @@ const entries = () => [
     what: t('transparency.xbox.what'),
     where: t('transparency.xbox.where'),
     undo: t('transparency.xbox.undo'),
-    state: (s) => (s.settings.gameBarButton ? 'Game Bar' : 'CouchHUD')
+    state: (s) => (s.settings.gameBarButton ? 'Game Bar' : 'Mega Hub')
   },
   {
     title: t('transparency.clients.title'),

@@ -10,7 +10,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: CouchHUD-Version / CouchHUD version
+      label: MegaHub-Version / Mega Hub version
       description: Zu finden unter Einstellungen › Info. / Found under Settings › About.
       placeholder: "0.x.y"
     validations:
@@ -36,7 +36,7 @@ body:
     id: skin
     attributes:
       label: Skin
-      placeholder: "CouchHUD, Deep Sea, Neon City, Stardust, ..."
+      placeholder: "Mega Hub, Deep Sea, Neon City, Stardust, ..."
     validations:
       required: true
   - type: dropdown
@@ -76,9 +76,9 @@ body:
     attributes:
       label: Logdatei / Log file
       description: |
-        Die Logs liegen unter `%LOCALAPPDATA%\CouchHud\logs`. Füge den relevanten Ausschnitt ein oder hänge die Datei an.
+        Die Logs liegen unter `%LOCALAPPDATA%\MegaHub\logs`. Füge den relevanten Ausschnitt ein oder hänge die Datei an.
         Prüfe sie vorher auf persönliche Daten (Benutzername, Pfade, Namen, Adressen) und entferne sie.
-        Logs are in `%LOCALAPPDATA%\CouchHud\logs`. Paste the relevant part or attach the file.
+        Logs are in `%LOCALAPPDATA%\MegaHub\logs`. Paste the relevant part or attach the file.
         Check it for personal data (user name, paths, names, addresses) and remove it first.
       render: text
     validations:

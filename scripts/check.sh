@@ -13,11 +13,11 @@ if [ -e catalog/index.json.unsigned ]; then
 fi
 
 echo "› dotnet build"
-dotnet build CouchHud.slnx -c Release -p:EnableWindowsTargeting=true --nologo -v quiet
+dotnet build MegaHub.slnx -c Release -p:EnableWindowsTargeting=true --nologo -v quiet
 
 echo "› dotnet test"
 if [ "${RELEASE:-}" = "1" ]; then echo "  RELEASE=1: the catalog test also demands that index.json.sig matches index.json (pinned key from the code)."; fi
-dotnet test CouchHud.slnx -c Release -p:EnableWindowsTargeting=true --no-build --nologo -v quiet
+dotnet test MegaHub.slnx -c Release -p:EnableWindowsTargeting=true --no-build --nologo -v quiet
 
 echo "› UI syntax"
 # The UI files are ES modules; plain `node --check file.js` can pass a module with a syntax error.
@@ -42,9 +42,9 @@ for edge in "${EDGE:-}" "/c/Program Files (x86)/Microsoft/Edge/Application/msedg
   if [ -n "$edge" ] && [ -e "$edge" ]; then edge_found=1; fi
 done
 if [ "$edge_found" = "1" ]; then
-  # COUCHHUD_UI_PORT / COUCHHUD_UI_DEBUG move the checks to other ports when several runs share a machine.
-  ui_port="${COUCHHUD_UI_PORT:-5198}"
-  ui_debug="${COUCHHUD_UI_DEBUG:-9334}"
+  # MEGAHUB_UI_PORT / MEGAHUB_UI_DEBUG move the checks to other ports when several runs share a machine.
+  ui_port="${MEGAHUB_UI_PORT:-5198}"
+  ui_debug="${MEGAHUB_UI_DEBUG:-9334}"
   node scripts/browser-ui-check.mjs --port "$ui_port" --debug "$ui_debug"
   node scripts/companions-ui-check.mjs --port "$((ui_port + 1))" --debug "$((ui_debug + 1))"
 else

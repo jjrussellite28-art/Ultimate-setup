@@ -206,7 +206,7 @@ function closePicker(page) {
 /** After a switch: the page reloads for the new profile's language, skin, sounds, favorites and collections. */
 function reloadForProfile() {
   try {
-    sessionStorage.removeItem('couchhud.resume');
+    sessionStorage.removeItem('megahub.resume');
   } catch { /* storage blocked */ }
   screen(false);
   location.reload();

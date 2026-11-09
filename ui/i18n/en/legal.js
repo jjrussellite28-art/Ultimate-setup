@@ -17,7 +17,7 @@ export default {
   'legal.privacy.telemetryTitle': 'No telemetry',
   'legal.privacy.telemetryText': 'No account, no usage statistics, no ads. The developers of Mega Hub do not receive any data from you.',
   'legal.privacy.storedTitle': 'Stored locally',
-  'legal.privacy.storedText': 'Settings, play time, bookmarks and caches in %APPDATA%\\CouchHud; logs, UI profile and browser profile in %LOCALAPPDATA%\\CouchHud. API keys are encrypted with Windows DPAPI, the lock code is stored only as a hash. Mega Hub never sees your Windows password.',
+  'legal.privacy.storedText': 'Settings, play time, bookmarks and caches in %APPDATA%\\Mega Hub; logs, UI profile and browser profile in %LOCALAPPDATA%\\Mega Hub. API keys are encrypted with Windows DPAPI, the lock code is stored only as a hash. Mega Hub never sees your Windows password.',
   'legal.privacy.connectionsTitle': 'Connections',
   'legal.privacy.connectionsText': 'Steam Store/CDN (app IDs and game names for info and artwork, throttled and once per image, kept on this PC), SteamGridDB (only with a key), Open-Meteo (only with a weather location), RSS feeds, Home Assistant (your server), Windows Update/winget, websites you open in the browser (search via DuckDuckGo).',
   'legal.privacy.assistantTitle': 'AI assistant',

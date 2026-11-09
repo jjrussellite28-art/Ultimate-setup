@@ -106,7 +106,7 @@ function mountBar() {
   showBar();
   watchLayers();
   // The preview in a plain browser (the mock API) and the checks reach into the closed root through this; the app (WebView2) never sets it.
-  if (!window.chrome?.webview) window.__couchhudTabBar = { host, root };
+  if (!window.chrome?.webview) window.__megahubTabBar = { host, root };
   return refs;
 }
 

@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CouchHud.Sdk/CouchHud.Sdk.csproj" />
+    <Project Path="src/MegaHub.Core/MegaHub.Core.csproj" />
+    <Project Path="src/MegaHub.Privileged/MegaHub.Privileged.csproj" />
+    <Project Path="src/MegaHub.Shell/MegaHub.Shell.csproj" />
+    <Project Path="src/MegaHub.Service.Contracts/MegaHub.Service.Contracts.csproj" />
+    <Project Path="src/MegaHub.Service/MegaHub.Service.csproj" />
+    <Project Path="src/MegaHub.ServiceClient/MegaHub.ServiceClient.csproj" />
+  </Folder>
+  <Folder Name="/plugins/">
+    <Project Path="plugins/MegaHub.Plugin.Wand/MegaHub.Plugin.Wand.csproj" />
+    <Project Path="plugins/MegaHub.Plugin.Achievements/MegaHub.Plugin.Achievements.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MegaHub.Core.Tests/MegaHub.Core.Tests.csproj" />
+    <Project Path="tests/MegaHub.Service.Tests/MegaHub.Service.Tests.csproj" />
+    <Project Path="tests/MegaHub.Privileged.Tests/MegaHub.Privileged.Tests.csproj" />
+    <Project Path="tests/MegaHub.ServiceClient.Tests/MegaHub.ServiceClient.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -14,7 +14,7 @@ Status: DEVELOPMENT ONLY. No approved public or commercial release.
 
 - [x] Select the Mega Hub logo and retain its original file and Bing generation source.
 - [ ] Complete remaining branding variants and installer wizard artwork; refresh screenshots.
-- [ ] Isolate installation ID, folders, service/pipe names, mutexes, data, registry/task/firewall identities from CouchHUD, or implement and test an explicit migration that cannot damage an upstream install.
+- [ ] Isolate installation ID, folders, service/pipe names, mutexes, data, registry/task/firewall identities from Mega Hub, or implement and test an explicit migration that cannot damage an upstream install.
 - [ ] Configure a fork-owned release signing identity and verification key. Do not weaken signature validation or claim an upstream signature authenticates this fork.
 - [ ] Decide whether to use the upstream catalog; label it accurately and verify its permitted use, or provision a fork catalog and trust key.
 - [ ] Review privacy/security notices against actual fork behavior and establish a private security-reporting route; inherited documents describe upstream.

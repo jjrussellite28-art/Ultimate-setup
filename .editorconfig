@@ -21,5 +21,5 @@ dotnet_diagnostic.IDE0051.severity = error
 dotnet_diagnostic.IDE0052.severity = error
 
 # PrintMembers of the records that keep secrets out of ToString is called by the compiler, not by name
-[{src/CouchHud.Service.Contracts/**.cs,src/CouchHud.Service/Authorization/GrantStore.cs}]
+[{src/MegaHub.Service.Contracts/**.cs,src/MegaHub.Service/Authorization/GrantStore.cs}]
 dotnet_diagnostic.IDE0051.severity = none

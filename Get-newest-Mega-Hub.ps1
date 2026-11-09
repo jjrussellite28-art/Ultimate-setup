@@ -8,11 +8,11 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $zip  = Join-Path $env:TEMP 'mega-hub-newest.zip'
 $tmp  = Join-Path $env:TEMP 'mega-hub-newest'
 $stamp = Join-Path $here '.installed-stamp'
-$installDir = Join-Path $env:ProgramFiles 'CouchHud'
-$installedExe = Join-Path $installDir 'CouchHud.exe'
+$installDir = Join-Path $env:ProgramFiles 'MegaHub'
+$installedExe = Join-Path $installDir 'MegaHub.exe'
 
-# Progress for the screen inside Mega Hub (the update runs without a window of its own): %APPDATA%\CouchHud\update-status.json.
-$statusFile = Join-Path $env:APPDATA 'CouchHud\update-status.json'
+# Progress for the screen inside Mega Hub (the update runs without a window of its own): %APPDATA%\MegaHub\update-status.json.
+$statusFile = Join-Path $env:APPDATA 'MegaHub\update-status.json'
 function Say([string]$text, [string]$err = '') {
   Write-Host $text
   try {
@@ -23,7 +23,7 @@ function Say([string]$text, [string]$err = '') {
 }
 
 function Stop-MegaHub {
-  Get-Process CouchHud -ErrorAction SilentlyContinue | Stop-Process -Force
+  Get-Process MegaHub -ErrorAction SilentlyContinue | Stop-Process -Force
   Start-Sleep -Milliseconds 800
 }
 
@@ -31,7 +31,7 @@ function Stop-MegaHub {
 function Update-Plugins {
   $src = Join-Path $here 'plugins'
   if (-not (Test-Path $src)) { return }
-  $dest = Join-Path $env:APPDATA 'CouchHud\plugins'
+  $dest = Join-Path $env:APPDATA 'MegaHub\plugins'
   foreach ($d in @(Get-ChildItem $src -Directory | Where-Object { $_.Name -like 'MegaHub.Plugin.*' })) {
     $name = $d.Name
     $target = Join-Path $dest $name
@@ -60,7 +60,7 @@ function Find-Iscc {
 
 try {
   # So the button inside Mega Hub (Settings > Power > Update Mega Hub) finds this folder from Program Files.
-  $remember = Join-Path $env:APPDATA 'CouchHud'
+  $remember = Join-Path $env:APPDATA 'MegaHub'
   New-Item -ItemType Directory -Force -Path $remember | Out-Null
   Set-Content -Path (Join-Path $remember 'update-folder.txt') -Value $here -Encoding UTF8
 
@@ -102,18 +102,18 @@ try {
     if (-not $iscc) { throw 'Inno Setup could not be installed. Install it from https://jrsoftware.org/isdl.php and run this again.' }
     Push-Location $here
     if (Test-Path publish) { Remove-Item publish -Recurse -Force }
-    dotnet publish src\CouchHud.Shell\CouchHud.Shell.csproj -c Release -r win-x64 --self-contained true -o publish
+    dotnet publish src\MegaHub.Shell\MegaHub.Shell.csproj -c Release -r win-x64 --self-contained true -o publish
     if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'The app build failed.' }
-    dotnet publish src\CouchHud.Service\CouchHud.Service.csproj -c Release -r win-x64 --self-contained true -p:DebugType=embedded -o publish\service
+    dotnet publish src\MegaHub.Service\MegaHub.Service.csproj -c Release -r win-x64 --self-contained true -p:DebugType=embedded -o publish\service
     if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'The service build failed.' }
     $wv = 'installer\MicrosoftEdgeWebview2Setup.exe'
     if (-not (Test-Path $wv)) { Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $wv -UseBasicParsing }
     $ver = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version | Select-Object -First 1
     if (-not $ver) { $ver = '1.0.0' }
     if (Test-Path installer\output) { Remove-Item installer\output\*.exe -Force -ErrorAction SilentlyContinue }
-    & $iscc "/DAppVersion=$ver-megahub" '/DPublishDir=..\publish' '/DWebView2Setup=MicrosoftEdgeWebview2Setup.exe' installer\CouchHud.iss
+    & $iscc "/DAppVersion=$ver-megahub" '/DPublishDir=..\publish' '/DWebView2Setup=MicrosoftEdgeWebview2Setup.exe' installer\MegaHub.iss
     if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'Building Setup.exe failed.' }
-    $setup = Get-ChildItem installer\output\CouchHud-Setup-*.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $setup = Get-ChildItem installer\output\MegaHub-Setup-*.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     Pop-Location
     Say '[5/5] Installing into Program Files. Windows asks once: say Yes...'
     Stop-MegaHub

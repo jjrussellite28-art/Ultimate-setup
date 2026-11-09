@@ -582,8 +582,8 @@
     document.getElementById('status').textContent = tr('connecting');
     document.getElementById('fieldTitle').textContent = tr('sendToTv');
 
-    const KEY = 'couchhud-token';
-    const CHANNEL_KEY = 'couchhud-channel';
+    const KEY = 'megahub-token';
+    const CHANNEL_KEY = 'megahub-channel';
     const $ = (id) => document.getElementById(id);
     const LEVELS = ['control', 'library', 'full'];
     let token = null;
@@ -643,7 +643,7 @@
     async function openSession() {
       const nonce = S.randomBytes(16);
       const aad = `session|${channel.id}`;
-      const res = await post('/api/session', { 'X-CouchHud-Device': channel.id }, S.seal(channel.key, S.DIR.request, 0, aad, JSON.stringify({ c: S.b64url(nonce) })));
+      const res = await post('/api/session', { 'X-MegaHub-Device': channel.id }, S.seal(channel.key, S.DIR.request, 0, aad, JSON.stringify({ c: S.b64url(nonce) })));
       if (res.status === 401) {
         forget();
         throw new RemoteError(tr('notPaired'), { unpaired: true });
@@ -665,7 +665,7 @@
       const s = session ?? (await openSession());
       const seq = ++s.seq;
       const aad = `rpc|${s.sid}`;
-      const res = await post('/api/rpc', { 'X-CouchHud-Session': s.sid }, S.seal(s.key, S.DIR.request, seq, aad, JSON.stringify({ op, args })), signal);
+      const res = await post('/api/rpc', { 'X-MegaHub-Session': s.sid }, S.seal(s.key, S.DIR.request, seq, aad, JSON.stringify({ op, args })), signal);
       if (res.status === 401 || res.status === 400) {
         // The session ran out (or the PC restarted): one new session, one more try.
         if (session === s) { stopEvents(); session = null; }
@@ -688,7 +688,7 @@
       if (channel) return rpc(ROUTES[path], body ?? {}, signal);
       const res = await fetch(path, {
         method: body ? 'POST' : 'GET',
-        headers: { 'Content-Type': 'application/json', 'X-CouchHUD-Token': token ?? '' },
+        headers: { 'Content-Type': 'application/json', 'X-MegaHub-Token': token ?? '' },
         body: body ? JSON.stringify(body) : undefined,
         signal
       });

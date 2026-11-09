@@ -1,12 +1,12 @@
 #requires -Version 7
-# Packs one of CouchHUD's own plugins, signs its package statement with CouchHUD's key (first-party) and writes the statement, its
+# Packs one of Mega Hub's own plugins, signs its package statement with Mega Hub's key (first-party) and writes the statement, its
 # signature, the package hash and the version into the plugin's entry in catalog/index.json.
 #
 # Run by the release owner only, on the PC that holds the key. It never creates a key: without the key it stops.
-# The private key stays OUTSIDE the repository (%USERPROFILE%\.couchhud\catalog-signing.key, DPAPI, see sign-file.ps1).
+# The private key stays OUTSIDE the repository (%USERPROFILE%\.megahub\catalog-signing.key, DPAPI, see sign-file.ps1).
 #
-#   dotnet publish plugins/CouchHud.Plugin.Wand/CouchHud.Plugin.Wand.csproj -c Release -o publish-plugins/CouchHud.Plugin.Wand
-#   .\scripts\sign-plugin-statement.ps1 -Statement .\catalog\statements\wand.json -Folder .\publish-plugins\CouchHud.Plugin.Wand -OutDir .\publish-plugins
+#   dotnet publish plugins/MegaHub.Plugin.Wand/MegaHub.Plugin.Wand.csproj -c Release -o publish-plugins/MegaHub.Plugin.Wand
+#   .\scripts\sign-plugin-statement.ps1 -Statement .\catalog\statements\wand.json -Folder .\publish-plugins\MegaHub.Plugin.Wand -OutDir .\publish-plugins
 #
 # Afterwards: upload the printed .zip to the release named in the entry's download URL, then sign the index again
 # (.\scripts\catalog-sign.ps1 -Index .\catalog\index.json), because the index changed.
@@ -18,7 +18,7 @@ param(
     [Parameter(Mandatory)] [string] $Folder,
     [string] $Index = (Join-Path $PSScriptRoot '..\catalog\index.json'),
     [string] $OutDir = '.',
-    [string] $KeyFile = (Join-Path $env:USERPROFILE '.couchhud\catalog-signing.key')
+    [string] $KeyFile = (Join-Path $env:USERPROFILE '.megahub\catalog-signing.key')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -39,9 +39,9 @@ if ((Split-Path $Folder -Leaf) -ne $folderName) { throw "The folder must be name
 $files = Get-ChildItem -Recurse -File $Folder
 $refused = $files | Where-Object { $_.Extension -in '.exe', '.bat', '.cmd', '.ps1', '.vbs', '.js', '.msi', '.sys', '.lnk', '.scr', '.com' }
 if ($refused) { throw "Programs or scripts in the package: $($refused.Name -join ', ')" }
-# The SDK and CouchHUD's own assemblies come from CouchHUD; a copy in the package is refused when it loads.
-$hostCopies = $files | Where-Object { $_.Name -match '^CouchHud\.(Sdk|Core|Shell|Service|Service\.Contracts|ServiceClient|Privileged)\.dll$' }
-if ($hostCopies) { throw "CouchHUD's own assemblies in the package: $($hostCopies.Name -join ', ')" }
+# The SDK and Mega Hub's own assemblies come from Mega Hub; a copy in the package is refused when it loads.
+$hostCopies = $files | Where-Object { $_.Name -match '^MegaHub\.(Sdk|Core|Shell|Service|Service\.Contracts|ServiceClient|Privileged)\.dll$' }
+if ($hostCopies) { throw "Mega Hub's own assemblies in the package: $($hostCopies.Name -join ', ')" }
 
 # 1. The package, exactly as it will be uploaded.
 New-Item -ItemType Directory -Force $OutDir | Out-Null
@@ -51,7 +51,7 @@ Compress-Archive -Path $Folder -DestinationPath $zip
 $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
 $size = (Get-Item $zip).Length
 
-# 2. The key, and a check that it is the one compiled into CouchHUD (else the statement would not count as first-party).
+# 2. The key, and a check that it is the one compiled into Mega Hub (else the statement would not count as first-party).
 $protectedBytes = [Convert]::FromBase64String([IO.File]::ReadAllText($KeyFile).Trim())
 $plainBytes = [System.Security.Cryptography.ProtectedData]::Unprotect($protectedBytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
 $ecdsa = [System.Security.Cryptography.ECDsa]::Create()
@@ -61,14 +61,14 @@ try {
     [Array]::Clear($plainBytes, 0, $plainBytes.Length)
     $fingerprint = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($ecdsa.ExportSubjectPublicKeyInfo())).ToLowerInvariant()
 
-    $catalogCs = [IO.File]::ReadAllText((Join-Path $repoRoot 'src\CouchHud.Core\Plugins\Catalog.cs'))
+    $catalogCs = [IO.File]::ReadAllText((Join-Path $repoRoot 'src\MegaHub.Core\Plugins\Catalog.cs'))
     $pem = [regex]::Match($catalogCs, '-----BEGIN PUBLIC KEY-----[\s\S]+?-----END PUBLIC KEY-----').Value
-    if (-not $pem) { throw 'CouchHUD''s public key not found in Catalog.cs.' }
+    if (-not $pem) { throw 'Mega Hub''s public key not found in Catalog.cs.' }
     $builtIn = [System.Security.Cryptography.ECDsa]::Create()
     $builtIn.ImportFromPem($pem)
     $builtInFingerprint = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($builtIn.ExportSubjectPublicKeyInfo())).ToLowerInvariant()
     $builtIn.Dispose()
-    if ($fingerprint -ne $builtInFingerprint) { throw "The key at $KeyFile is not the one compiled into CouchHUD ($builtInFingerprint)." }
+    if ($fingerprint -ne $builtInFingerprint) { throw "The key at $KeyFile is not the one compiled into Mega Hub ($builtInFingerprint)." }
 
     # 3. The statement: the template with the package's hash, size and the key's fingerprint, as compact UTF-8 JSON.
     $template['sha256'] = $sha

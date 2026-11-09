@@ -71,7 +71,7 @@ const gamesView = gridView(t('app.games.title'), games, {
 gamesView.id = 'games';
 
 // The browser is the first app (while the Browser area is on).
-const BROWSER_TILE = { id: '__browser', name: 'Browser', type: 'app', source: 'couchhud', builtin: true, art: { cover: ['assets/browser-tile.svg'], hero: [], logo: [] }, open: () => switchTab(tabsIndexOf(browserView)) };
+const BROWSER_TILE = { id: '__browser', name: 'Browser', type: 'app', source: 'megahub', builtin: true, art: { cover: ['assets/browser-tile.svg'], hero: [], logo: [] }, open: () => switchTab(tabsIndexOf(browserView)) };
 
 const appsView = gridView(t('app.apps.title'), () => [...(areaOn('browser') ? [BROWSER_TILE] : []), ...apps()], {
   columns: 4,
@@ -146,7 +146,7 @@ function applyAreas(list) {
 }
 
 // A collection (from Home or the filter menu) opens as its own page with games and apps together.
-window.addEventListener('couchhud:show-collection', (e) => push(collectionPage(e.detail.id)));
+window.addEventListener('megahub:show-collection', (e) => push(collectionPage(e.detail.id)));
 
 /**
  * Tells the host while the phone's pairing code (QR or text) is on screen: it refuses screenshots then. Watches the page itself, so
@@ -227,7 +227,7 @@ function missingSkinNotice(id) {
   const catalogId = movedSkinCatalogId(id);
   if (!catalogId) return;
   // Once per page session and skin: not at every profile reload after the host has given up.
-  const seenKey = `couchhud.skinMissingShown.${catalogId}`;
+  const seenKey = `megahub.skinMissingShown.${catalogId}`;
   try {
     if (sessionStorage.getItem(seenKey)) return;
     sessionStorage.setItem(seenKey, '1');
@@ -246,8 +246,8 @@ function reloadForLanguage() {
   languageReloadPending = false;
   let recent = false;
   try {
-    recent = Date.now() - Number(sessionStorage.getItem('couchhud.languageReload') || 0) < 10000;
-    if (!recent) sessionStorage.setItem('couchhud.languageReload', String(Date.now()));
+    recent = Date.now() - Number(sessionStorage.getItem('megahub.languageReload') || 0) < 10000;
+    if (!recent) sessionStorage.setItem('megahub.languageReload', String(Date.now()));
   } catch { /* storage blocked: reload anyway, the guard above is then the host's saying the same */ }
   if (!recent) location.reload();
 }
@@ -320,7 +320,7 @@ async function init() {
   // A mode switch that was cut off by a crash or a power loss: after the unlock the person can undo or finish it.
   setTimeout(() => checkInterruptedSwitch().catch(console.error), 4000);
   // Settings that add or remove a tab (assistant) ask for a refresh.
-  window.addEventListener('couchhud:tabs', () => {
+  window.addEventListener('megahub:tabs', () => {
     updateTabs();
     refreshPluginTabs().catch(console.error);
   });
@@ -329,7 +329,7 @@ async function init() {
   api.onPluginTabs?.(() => refreshPluginTabs().catch(console.error));
   api.onProfiles?.(() => refreshPluginTabs().catch(console.error));
   refreshPluginTabs().catch(console.error);
-  window.addEventListener('couchhud:areas', (e) => applyAreas(e.detail));
+  window.addEventListener('megahub:areas', (e) => applyAreas(e.detail));
   // The assistant can change the design and settings from the host side.
   api.onSkinRestore?.(async (restore) => {
     await reloadSkins();
@@ -360,7 +360,7 @@ async function init() {
     state.info.screensaverMinutes = s.screensaverMinutes;
     state.info.screensaverStyle = s.screensaverStyle;
     configureScreensaver({ minutes: s.screensaverMinutes ?? 5, style: s.screensaverStyle ?? 'art', displayOff: s.displayOffMinutes ?? 0, pixelShift: s.pixelShift ?? true });
-    window.dispatchEvent(new CustomEvent('couchhud:settings', { detail: s }));
+    window.dispatchEvent(new CustomEvent('megahub:settings', { detail: s }));
     // The language is read once at the start: a new one needs the page again (at most once in ten seconds, so a host that keeps
     // saying something else can never loop).
     // Not under a code entry, an open dialog or the profile picker: then it waits and is made up as soon as they are gone.
@@ -480,8 +480,8 @@ async function init() {
   setInterval(tickClock, 10_000);
   // A language switch reloads the page: come back to Settings > Info, where it happened.
   try {
-    const back = sessionStorage.getItem('couchhud.resume');
-    sessionStorage.removeItem('couchhud.resume');
+    const back = sessionStorage.getItem('megahub.resume');
+    sessionStorage.removeItem('megahub.resume');
     const at = back === 'settings:info' ? tabsIndexOf(settingsView) : -1;
     if (at >= 0) {
       state.tab = at;

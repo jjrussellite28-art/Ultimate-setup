@@ -1,5 +1,5 @@
 // The tab bar in the preview (mock API, headless Edge, sound off). The bar is a closed shadow root in the top layer (ui/core/tab-bar.js); the
-// preview (never the app) exposes the root as window.__couchhudTabBar for exactly this check.
+// preview (never the app) exposes the root as window.__megahubTabBar for exactly this check.
 //
 // 1. The catalog skins and the default skin with the plugin tabs (?hatab: Smart Home, Lumen) at 1280x720 and 1920x1080, in two states:
 //    "stress" (the downloads chip and every status icon shown) and "normal" (only the bell, weather and clock; the Unlock chip of Mega Hub only shows with a lock). Checked in every state of an
@@ -50,7 +50,7 @@ process.env.EDGE = edge;
 const SHOW_STATUS = `(() => { for (const id of ['session-status', 'parental-status', 'downloads-status', 'weather']) { const n = document.getElementById(id); if (!n) continue; n.hidden = false; if (!n.textContent.trim()) n.textContent = '99 min'; } return 1; })()`;
 const NORMAL_STATUS = `(() => { const st = document.createElement('style'); st.textContent = '#session-status, #parental-status, #downloads-status, #unlock-chip { display: none !important; }'; document.head.append(st); return 1; })()`;
 // The closed root, through the preview's test hook.
-const ROOT = `const { root, host } = window.__couchhudTabBar; const rem = innerHeight / 54;`;
+const ROOT = `const { root, host } = window.__megahubTabBar; const rem = innerHeight / 54;`;
 const CHECK_FN = `() => {
   ${ROOT}
   const list = root.querySelector('.list'); const lr = list.getBoundingClientRect();
@@ -91,14 +91,14 @@ const CHECK_FN = `() => {
 // Waiting is by condition, never by the clock: a slow runner (the CI machine needed twice the time of a developer's PC and then more) must get as long as it needs,
 // a fast one must not wait. READY: the bar is built and both plugin tabs of the preview are in it. SETTLED: skin, positions and widths of the tabs and the
 // scroll position stay the same for a while (the skin is read, the transitions are over).
-const READY = `(() => { const b = window.__couchhudTabBar; if (!b) return false; const t = b.root.querySelector('.list').textContent; return t.includes('Smart Home') && t.includes('Lumen'); })()`;
-const SIG_FN = `() => { const b = window.__couchhudTabBar; if (!b) return null; const l = b.root.querySelector('.list'); return document.documentElement.dataset.skin + '|' + Math.round(l.scrollLeft) + '|' + [...l.children].map((x) => { const r = x.getBoundingClientRect(); return x.className + ',' + Math.round(r.left * 4) + ',' + Math.round(r.width * 4) + ',' + (x.style.clipPath || ''); }).join(';'); }`;
+const READY = `(() => { const b = window.__megahubTabBar; if (!b) return false; const t = b.root.querySelector('.list').textContent; return t.includes('Smart Home') && t.includes('Lumen'); })()`;
+const SIG_FN = `() => { const b = window.__megahubTabBar; if (!b) return null; const l = b.root.querySelector('.list'); return document.documentElement.dataset.skin + '|' + Math.round(l.scrollLeft) + '|' + [...l.children].map((x) => { const r = x.getBoundingClientRect(); return x.className + ',' + Math.round(r.left * 4) + ',' + Math.round(r.width * 4) + ',' + (x.style.clipPath || ''); }).join(';'); }`;
 // Put on the page once and called by name (a Windows command line holds 32767 characters, and a walk reads the bar ten times).
 const DEFS = `eval:(window.__sig = ${SIG_FN}, 1)`;
 const settled = (ms) => `settle:${ms}:window.__sig()`;
 const wait = (js) => `waitfor:${js}`;
 
-const WIZARD_READY = "document.body.dataset.view === 'setup-wizard' && !!window.__couchhudTabBar";
+const WIZARD_READY = "document.body.dataset.view === 'setup-wizard' && !!window.__megahubTabBar";
 const WIZARD = `(() => { ${ROOT} return JSON.stringify({ view: document.body.dataset.view, shown: [...root.querySelectorAll('li')].filter((x) => getComputedStyle(x).visibility !== 'hidden').length, arrows: [...root.querySelectorAll('.more')].filter((n) => getComputedStyle(n).visibility !== 'hidden' && getComputedStyle(n).display !== 'none').length }); })()`;
 
 let failed = 0;
@@ -106,7 +106,7 @@ let n = 0;
 // A run that printed no reading at all (Edge did not start, a port was taken, the page threw before the first reading) is started once more on new ports.
 // A run that read the bar and found a problem is never repeated.
 // The steps go to ui-shot in a file (a group of checks is longer than a Windows command line).
-const stepsDir = mkdtempSync(join(tmpdir(), 'couchhud-tabs-steps-'));
+const stepsDir = mkdtempSync(join(tmpdir(), 'megahub-tabs-steps-'));
 process.on('exit', () => rmSync(stepsDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }));
 let stepsFiles = 0;
 const spawnShot = (extra, size, steps) => new Promise((res) => {
@@ -315,7 +315,7 @@ for (const size of ['1280x720', '1920x1080']) for (const group of chunks((fixtur
 // The top layer: the overlays that may stand over the bar do so while they are open, and leave it when shut.
 if (!opt.skins || opt.skins.split(',').includes('layers')) task(async (console) => {
   const LAYERS = (what, expect) => `(async () => {
-    const L = await import('/core/layers.js'); const { host } = window.__couchhudTabBar;
+    const L = await import('/core/layers.js'); const { host } = window.__megahubTabBar;
     const up = L.layersUp(); const at = (x, y) => document.elementFromPoint(x, y);
     const inside = (node, hit) => !!node && !!hit && (hit === node || node.contains(hit));
     const probs = [];
@@ -381,7 +381,7 @@ if (!opt.skins || opt.skins.split(',').includes('sanitizer')) task(async (consol
   fuzz(2400, 7777).forEach((input, i) => { outputs['fuzz-' + i] = sanitize(input).css; });
   // The same kind of soup with web addresses, quotes and comment marks in it: the address replacement must not turn text into a rule.
   fuzz(2400, 4242, ['//x', 'https://x', 'http://x/y', '//x' + String.fromCharCode(92), '*/', '/*', '"', "'", String.fromCharCode(92), '@//x', 'url(//x']).forEach((input, i) => { outputs['fuzzext-' + i] = sanitize(input).css; });
-  const dir = mkdtempSync(join(tmpdir(), 'couchhud-sanitizer-'));
+  const dir = mkdtempSync(join(tmpdir(), 'megahub-sanitizer-'));
   mkdirSync(join(dir, 'oracle'));
   writeFileSync(join(dir, 'oracle', 'cases.json'), JSON.stringify(outputs));
   // The network oracle: the raw attack sheets (addresses spelled with escapes) must show a remote address in the parsed stylesheet (the control), the served ones none.
@@ -397,7 +397,7 @@ if (!opt.skins || opt.skins.split(',').includes('sanitizer')) task(async (consol
   writeFileSync(join(dir, 'oracle', 'skin.json'), '{"name":{"de":"o","en":"o"},"description":{"de":"o","en":"o"}}');
   const ORACLE = `(async () => { const d = await (await fetch('/__catalog-skins/oracle/cases.json')).json(); const bad = []; const walk = (rules) => { for (const r of rules) { if (/Layer|Import/.test(r.constructor.name)) return true; if (r.cssRules && walk(r.cssRules)) return true; } return false; }; for (const [k, v] of Object.entries(d)) { const s = document.createElement('style'); s.textContent = v; document.head.append(s); if (walk(s.sheet.cssRules)) bad.push(k); s.remove(); } return JSON.stringify({ n: Object.keys(d).length, bad }); })()`;
   // Every address the parsed sheet would fetch: the url( and image-set( values of the rules and, because var() carries values into properties, the computed style of test elements.
-  const NET = `(async () => { const d = await (await fetch('/__catalog-skins/oracle/net.json')).json(); const local = (h) => h === location.hostname || h === "www.w3.org" || /^(local|art|app)\\.couchhud$/.test(h); const pick = (text, out) => { for (const a of (text.match(/https?:\\/\\/[^"')\\s]+/g) || [])) { let h = ''; try { h = new URL(a).hostname; } catch { h = a; } if (!local(h)) out.push(a); } for (const m of (text.match(/(?:url\\(\\s*|image-set\\(\\s*(?=["']))["']?[^"')\\s]*/g) || [])) { const u = m.replace(/^(?:url\\(\\s*|image-set\\(\\s*)["']?/, ''); if (!u || /^var\\(/.test(u)) continue; let x; try { x = new URL(u, location.href); } catch { out.push(u); continue; } if (!/^(data:|about:)/.test(x.protocol) && !local(x.hostname)) out.push(u); } }; const rules = (list, out) => { for (const r of list) { pick(r.cssText, out); if (r.cssRules) rules(r.cssRules, out); } }; const probe = (css) => { const s = document.createElement('style'); s.textContent = css; document.head.append(s); const out = []; rules(s.sheet.cssRules, out); const els = ['a', 'b', 'c', 'div'].map((t) => document.body.appendChild(document.createElement(t))); for (const el of els) { const cs = getComputedStyle(el); for (const p of ['backgroundImage', 'listStyleImage', 'borderImageSource', 'maskImage', 'content', 'cursor']) pick(cs[p] || '', out); } els.forEach((e) => e.remove()); s.remove(); return out; }; const raw = {}; const served = {}; for (const [k, v] of Object.entries(d.raw)) raw[k] = probe(v).length; for (const [k, v] of Object.entries(d.served)) served[k] = probe(v); return JSON.stringify({ raw, served }); })()`;
+  const NET = `(async () => { const d = await (await fetch('/__catalog-skins/oracle/net.json')).json(); const local = (h) => h === location.hostname || h === "www.w3.org" || /^(local|art|app)\\.megahub$/.test(h); const pick = (text, out) => { for (const a of (text.match(/https?:\\/\\/[^"')\\s]+/g) || [])) { let h = ''; try { h = new URL(a).hostname; } catch { h = a; } if (!local(h)) out.push(a); } for (const m of (text.match(/(?:url\\(\\s*|image-set\\(\\s*(?=["']))["']?[^"')\\s]*/g) || [])) { const u = m.replace(/^(?:url\\(\\s*|image-set\\(\\s*)["']?/, ''); if (!u || /^var\\(/.test(u)) continue; let x; try { x = new URL(u, location.href); } catch { out.push(u); continue; } if (!/^(data:|about:)/.test(x.protocol) && !local(x.hostname)) out.push(u); } }; const rules = (list, out) => { for (const r of list) { pick(r.cssText, out); if (r.cssRules) rules(r.cssRules, out); } }; const probe = (css) => { const s = document.createElement('style'); s.textContent = css; document.head.append(s); const out = []; rules(s.sheet.cssRules, out); const els = ['a', 'b', 'c', 'div'].map((t) => document.body.appendChild(document.createElement(t))); for (const el of els) { const cs = getComputedStyle(el); for (const p of ['backgroundImage', 'listStyleImage', 'borderImageSource', 'maskImage', 'content', 'cursor']) pick(cs[p] || '', out); } els.forEach((e) => e.remove()); s.remove(); return out; }; const raw = {}; const served = {}; for (const [k, v] of Object.entries(d.raw)) raw[k] = probe(v).length; for (const [k, v] of Object.entries(d.served)) served[k] = probe(v); return JSON.stringify({ raw, served }); })()`;
   const HEADER = `(async () => { const walk = (rules) => [...rules].some((r) => /Layer|Import/.test(r.constructor.name) || (r.cssRules && walk(r.cssRules))); const load = (href) => new Promise((res) => { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; l.onload = () => res(l); l.onerror = () => res(l); document.head.append(l); }); const served = await load('/__catalog-skins/oracle/raw-iso.css'); const control = await load('/__catalog-skins/oracle/raw-iso.nocharset.css'); const hdr = (await fetch('/__catalog-skins/oracle/raw-iso.css')).headers.get('content-type'); return JSON.stringify({ hdr, served: walk(served.sheet.cssRules), control: walk(control.sheet.cssRules) }); })()`;
   const result = await run({ ...(await ports()), catalog: dir, ready: 'document.readyState === "complete"' }, '800x600', [`eval:${ORACLE}`, `eval:${HEADER}`, `eval:${NET}`]);
   rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });

@@ -1,6 +1,6 @@
 // The phone remote's encrypted channel ("seal v1"), the phone's half. The page is served over plain HTTP in the home network, where the
 // browser gives it no WebCrypto (that needs a secure context), so this file carries its own SHA-256 and HMAC-SHA256 and nothing else.
-// Format and derivations are the PC's (src/CouchHud.Core/Remote/RemoteSeal.cs); both are checked against the same test vectors
+// Format and derivations are the PC's (src/MegaHub.Core/Remote/RemoteSeal.cs); both are checked against the same test vectors
 // (tests RemoteSealTests, scripts/ui-logic-check.mjs).
 //
 //   message = "1." + seq + "." + base64url(nonce16 | ciphertext | tag32)

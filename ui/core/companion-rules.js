@@ -1,5 +1,5 @@
 // Companion apps and apps in the Guide menu, the page's side (pure, no DOM; tested by scripts/ui-logic-check.mjs). The host decides everything
-// (src/CouchHud.Core/Library/CompanionRules.cs, GuideAppRules.cs) and checks again at each start; this module only shapes what the page shows
+// (src/MegaHub.Core/Library/CompanionRules.cs, GuideAppRules.cs) and checks again at each start; this module only shapes what the page shows
 // and what it sends. A rule names a library app by id and never a path or a parameter.
 
 /** Mirrors of the host's limits (the host refuses more). */

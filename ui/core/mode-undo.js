@@ -195,7 +195,7 @@ export function createUndoTables({ api, state, wait = (ms) => new Promise((resol
       undo: async (before) => {
         if (!before) throw new Error('no record');
         const now = await api.getSecurity();
-        if (before.on || !now?.autoLogon || now.autoLogonState !== 'couchhud') return 'unchanged';
+        if (before.on || !now?.autoLogon || now.autoLogonState !== 'megahub') return 'unchanged';
         await api.setAutoLogon('off');
         return 'undone';
       }
