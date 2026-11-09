@@ -120,7 +120,7 @@ public static class CatalogSourceRules
     {
         var folded = new string(name.Normalize(System.Text.NormalizationForm.FormD).Where(c => char.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
         var skeleton = PluginNames.Skeleton(folded);
-        return new[] { "megahub", "offiziell", "official", "kewe87", "verified", "geprueft" }.Any(w => skeleton.Contains(PluginNames.Skeleton(w), StringComparison.Ordinal));
+        return new[] { "megahub", "couchhud", "offiziell", "official", "kewe87", "verified", "geprueft" }.Any(w => skeleton.Contains(PluginNames.Skeleton(w), StringComparison.Ordinal));
     }
 
     /// <summary>
