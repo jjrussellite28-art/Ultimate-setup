@@ -24,3 +24,23 @@ Status: DEVELOPMENT ONLY. No approved public or commercial release.
 - [ ] Review draft release notes and downloads, add hashes/signatures, and explicitly approve publication.
 
 Do not mark these tasks complete on the basis of documentation changes alone.
+
+## Own signing key and own catalog (asked for by the CouchHUD author)
+
+kewe87 agreed to the fork on 2026-11-10 on the condition that Mega Hub uses its own key and its own catalog, and does
+not hand out packages that look signed by CouchHUD. Status today: the key compiled into
+`src/MegaHub.Core/Plugins/Catalog.cs` (`CatalogSignature.PublicKeyPem`, fingerprint `247bba62...709f`) and the official catalog
+(`CatalogDefaults.IndexUrl`, `kewe87/CouchHUD-Catalog`) are still CouchHUD's. Mega Hub's own releases cannot be signed with that
+key, so the built-in signed-update check and the service's setup check would refuse them (the Update button works today
+only because it runs `Get-newest-Mega-Hub.ps1`).
+
+Steps (the first one needs the owner's PC with PowerShell 7 and the .NET 10 SDK; the private key never leaves it):
+
+- [ ] `.\scripts\sign-file.ps1 -GenerateKey` on the owner's PC; send the printed public key and fingerprint.
+- [ ] Put the new public key into `CatalogSignature.PublicKeyPem`; update the tests that pin the old fingerprint.
+- [ ] Decide the catalog: an own repository (for example `mega-hub-catalog`) with an own, signed `index.json`
+      (`scripts/catalog-sign.ps1`), and change `CatalogDefaults.IndexUrl` and `CatalogUrl.CanonicalRepositories`.
+      CouchHUD's plugins may stay available only as a separate, clearly labelled third-party source with his key pinned.
+- [ ] Re-sign or remove `catalog/statements/*.json` (they are signed with CouchHUD's key).
+- [ ] Sign every release with `scripts/sign-release.ps1` (own key) before it is offered to other users.
+
