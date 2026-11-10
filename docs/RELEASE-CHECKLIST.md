@@ -12,7 +12,7 @@ Status: DEVELOPMENT ONLY. No approved public or commercial release.
 
 ## Required before any installer is published
 
-- [x] Select the Mega Hub logo and retain its original file and Bing generation source.
+- [x] Select the Mega Hub logo and retain its original files and generation source (ChatGPT; replaced the earlier Bing logo on 2026-11-10).
 - [ ] Complete remaining branding variants and installer wizard artwork; refresh screenshots.
 - [ ] Isolate installation ID, folders, service/pipe names, mutexes, data, registry/task/firewall identities from Mega Hub, or implement and test an explicit migration that cannot damage an upstream install.
 - [ ] Configure a fork-owned release signing identity and verification key. Do not weaken signature validation or claim an upstream signature authenticates this fork.

@@ -1,8 +1,8 @@
 # Mega Hub
 
-<img src="ui/assets/mega-hub-original.jpg" alt="Mega Hub logo: a silver key with teal panels on a dark blue background" width="480">
+<img src="docs/banner.png" alt="Mega Hub: a console-style interface for your PC and phone" width="760">
 
-Logo generated with Bing Image Creator and supplied by jjrussellite28-art. [Source and provenance](ui/assets/MEGA-HUB-LOGO.md).
+Logo generated with ChatGPT and supplied by jjrussellite28-art. [Source and provenance](ui/assets/MEGA-HUB-LOGO.md).
 
 [![build](https://github.com/jjrussellite28-art/mega-hub/actions/workflows/build.yml/badge.svg?branch=mega-hub-rename)](https://github.com/jjrussellite28-art/mega-hub/actions/workflows/build.yml)
 [![installer](https://github.com/jjrussellite28-art/mega-hub/actions/workflows/installer.yml/badge.svg?branch=mega-hub-rename)](https://github.com/jjrussellite28-art/mega-hub/actions/workflows/installer.yml)

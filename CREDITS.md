@@ -8,7 +8,7 @@ Mega Hub is an independent fork of [CouchHUD](https://github.com/kewe87/CouchHUD
 - The original README is preserved in [docs/UPSTREAM-README.md](docs/UPSTREAM-README.md).
 
 Names, logos, signatures and support channels of upstream do not imply endorsement of this fork.
-The selected Mega Hub logo was generated with Bing Image Creator and supplied by jjrussellite28-art.
-See [logo provenance](ui/assets/MEGA-HUB-LOGO.md) for the generation link and original file.
+The selected Mega Hub logo was generated with ChatGPT and supplied by jjrussellite28-art.
+See [logo provenance](ui/assets/MEGA-HUB-LOGO.md) for the original files and what was made from them.
 Remaining inherited branding variants and installer artwork must be replaced before release.
 Refer to THIRD-PARTY-NOTICES.md for dependencies, data and services.
