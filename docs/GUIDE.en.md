@@ -183,7 +183,7 @@ Requirements: Windows 10/11 (the WebView2 runtime is included from Windows 11), 
 
 **Without the setup:** unpack the ZIP `MegaHub-win-x64` from the artifacts to `C:\Program Files\Mega Hub` and start `MegaHub.exe`. The build brings .NET along (self-contained); it only needs the WebView2 runtime, which is included in Windows 11.
 
-**Creating a release** (for maintainers, details in [CONTRIBUTING.en.md](../CONTRIBUTING.en.md#release)):
+**Creating a release** (for maintainers, details in [CONTRIBUTING.md](../CONTRIBUTING.md#release)):
 
 1. Set the version in `Directory.Build.props`, push a tag: `git tag v0.4.0 && git push origin v0.4.0`. CI builds the setup with this version and attaches `MegaHub-Setup-0.4.0.exe` and `MegaHub-Setup-0.4.0.exe.sha256` to a GitHub release. A tag build fails if the tag does not match the version in `Directory.Build.props`.
 2. Check and sign locally: `.\scripts\sign-release.ps1 -Tag v0.4.0` (PowerShell 7, GitHub CLI `gh` signed in). The script checks the commit, version and hash of the setup and the CI's build attestation, and only then signs the `.sha256` (context `couchhud-release-v1`) with the private key from the user profile; then it uploads `.sha256.sig`.
@@ -325,7 +325,7 @@ Mega Hub is meant to grow with the community. Both can be installed directly in 
 - **Catalog**: *Plugins & skins › Catalog* lists plugins and skins from a JSON index on GitHub (default `kewe87/CouchHUD-Catalog`, more sources in `config.json`). The default catalog's index is signed; installing and updating work with A, only over https and with a mandatory checksum (SHA-256); before plugins Mega Hub warns that they run with your rights. In the background (never during a game) Mega Hub checks for updates and reports them in the notifications and in the Downloads tab. Format and security: [PLUGINS.md](PLUGINS.md#katalog) (German)
 - **Approved plugins**: the list of approved plugins (`plugin-trust.json`) is signed with an HMAC (same key as `playtime.json`, bound to the Windows account with DPAPI). It protects against a program or script that merely writes files, not against a program running as the same account (it can read the key too). If the signature does not fit, the plugins show an error, nothing unknown loads and the file is not overwritten; delete it to start over (what lies in the plugin folder then counts as approved at the next start, as on the very first start).
 
-How you can contribute: [CONTRIBUTING.en.md](../CONTRIBUTING.en.md)
+How you can contribute: [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 ## Architecture
 
@@ -366,7 +366,7 @@ Everything with admin rights is done by the Windows service **MegaHub.Service** 
 node scripts/preview-server.js   # http://localhost:5173, the complete UI with mock data in the browser (?lang=en for English)
 ```
 
-More on this (screenshots with `ui-shot.mjs`, VM tests) in [CONTRIBUTING.en.md](../CONTRIBUTING.en.md).
+More on this (screenshots with `ui-shot.mjs`, VM tests) in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Disclaimer and privacy
 

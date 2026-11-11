@@ -183,7 +183,7 @@ Voraussetzungen: Windows 10/11 (WebView2-Runtime ist ab Windows 11 dabei), ein X
 
 **Ohne Setup:** Das ZIP `MegaHub-win-x64` aus den Artifacts nach `C:\Program Files\Mega Hub` entpacken und `MegaHub.exe` starten. Der Build bringt .NET mit (self-contained), es braucht nur die WebView2-Runtime, die bei Windows 11 dabei ist.
 
-**Release erstellen** (für Maintainer, Details in [CONTRIBUTING.md](../CONTRIBUTING.md#release)):
+**Release erstellen** (für Maintainer, Details in [CONTRIBUTING.md](../CONTRIBUTING.de.md#release)):
 
 1. Version in `Directory.Build.props` setzen, Tag pushen: `git tag v0.4.0 && git push origin v0.4.0`. Die CI baut das Setup mit dieser Version und hängt `MegaHub-Setup-0.4.0.exe` und `MegaHub-Setup-0.4.0.exe.sha256` an ein GitHub-Release. Ein Tag-Build bricht ab, wenn das Tag nicht zur Version in `Directory.Build.props` passt.
 2. Lokal prüfen und signieren: `.\scripts\sign-release.ps1 -Tag v0.4.0` (PowerShell 7, GitHub CLI `gh` angemeldet). Das Skript prüft Commit, Version und Hash des Setups, die Build-Attestierung der CI und signiert erst dann die `.sha256` (Kontext `couchhud-release-v1`) mit dem privaten Schlüssel aus dem Benutzerprofil; danach lädt es `.sha256.sig` hoch.
@@ -324,7 +324,7 @@ Mega Hub soll mit der Community wachsen. Beides lässt sich direkt in der Oberfl
 - Im Repository: das **Wand**-Plugin (`plugins/MegaHub.Plugin.Wand`) als reines SDK-Beispiel für eigene Plugins, ohne Katalogeintrag. Wand selbst ist seit 0.7 eine normale App und läuft als Begleit-App (siehe oben).
 - **Katalog**: *Plugins & Skins › Katalog* listet Plugins und Skins aus einem JSON-Index auf GitHub (Standard `kewe87/CouchHUD-Catalog`, weitere Quellen in der `config.json`). Der Index des Standard-Katalogs ist signiert, Installation und Updates laufen mit A, nur über https und mit Pflicht-Prüfsumme (SHA-256); vor Plugins warnt Mega Hub, dass sie mit deinen Rechten laufen. Im Hintergrund (nie im Spiel) sucht Mega Hub nach Updates und meldet sie in den Benachrichtigungen und im Tab Downloads. Format und Sicherheit: [PLUGINS.md](PLUGINS.md#katalog)
 
-Wie du beitragen kannst: [CONTRIBUTING.md](../CONTRIBUTING.md)
+Wie du beitragen kannst: [CONTRIBUTING.md](../CONTRIBUTING.de.md)
 
 ## Architektur
 
@@ -365,7 +365,7 @@ Alles mit Admin-Rechten erledigt der Windows-Dienst **MegaHub.Service** (`src/Me
 node scripts/preview-server.js   # http://localhost:5173, komplette UI mit Mock-Daten im Browser (?lang=en für Englisch)
 ```
 
-Mehr dazu (Screenshots per `ui-shot.mjs`, VM-Tests) in [CONTRIBUTING.md](../CONTRIBUTING.md).
+Mehr dazu (Screenshots per `ui-shot.mjs`, VM-Tests) in [CONTRIBUTING.md](../CONTRIBUTING.de.md).
 
 ## Haftungsausschluss und Datenschutz
 

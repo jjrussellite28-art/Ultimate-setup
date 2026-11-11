@@ -5,8 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Der Katalog liegt im Repo [kewe87/CouchHUD-Catalog](https://github.com/kewe87/CouchHUD-Catalog), das Format steht in [docs/PLUGINS.md](https://github.com/kewe87/CouchHUD/blob/master/docs/PLUGINS.md). Der Inhaber prüft den Quellcode und signiert den Katalog selbst.
-        The catalog lives in [kewe87/CouchHUD-Catalog](https://github.com/kewe87/CouchHUD-Catalog); the format is in [docs/PLUGINS.md](https://github.com/kewe87/CouchHUD/blob/master/docs/PLUGINS.md). The owner reviews the source and signs the catalog.
+        Der aktuelle Katalog ist der von CouchHUD ([kewe87/CouchHUD-Catalog](https://github.com/kewe87/CouchHUD-Catalog), von kewe87 betrieben und signiert); Mega Hub bekommt später einen eigenen. Das Format steht in [docs/PLUGINS.md](docs/PLUGINS.md).
+        The catalog currently used is CouchHUD's ([kewe87/CouchHUD-Catalog](https://github.com/kewe87/CouchHUD-Catalog), run and signed by kewe87); Mega Hub will get its own later. The format is in [docs/PLUGINS.md](docs/PLUGINS.md).
   - type: input
     id: name
     attributes:

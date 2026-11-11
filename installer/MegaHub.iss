@@ -113,8 +113,6 @@ Name: "de"; MessagesFile: "compiler:Languages\German.isl"; InfoBeforeFile: "info
 [CustomMessages]
 de.DesktopIcon=Desktop-Symbol anlegen
 en.DesktopIcon=Create a desktop icon
-de.Autostart=Mega Hub bei der Windows-Anmeldung starten (App-Modus, ändert nicht die Shell)
-en.Autostart=Start Mega Hub when signing in to Windows (app mode, doesn't replace the shell)
 de.WebView2=Microsoft WebView2 Runtime wird installiert …
 en.WebView2=Installing the Microsoft WebView2 Runtime …
 de.Launch=Mega Hub jetzt starten
@@ -140,7 +138,6 @@ en.ServicePipeSquatted=The Mega Hub service was not started: another program alr
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:DesktopIcon}"; Flags: unchecked
-Name: "autostart"; Description: "{cm:Autostart}"; Flags: unchecked
 
 [InstallDelete]
 ; Only single program files an older version installed and this one no longer has (an update copies over the folder, it does not
@@ -180,9 +177,6 @@ Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Registry]
-; Per user, like any autostart program; removed with the uninstall. Never in an update the service runs (/SERVICEUPDATE=1): that
-; setup runs as SYSTEM, its HKCU is HKU\S-1-5-18, and the remembered task selection would put the entry there (P0 spike).
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "MegaHub"; ValueData: """{app}\{#AppExe}"""; Tasks: autostart; Check: not IsServiceUpdate; Flags: uninsdeletevalue
 ; The event source of the service (it never registers one itself). Gone with the uninstall.
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\EventLog\Application\{#EventSource}"; ValueType: expandsz; ValueName: "EventMessageFile"; ValueData: "{#EventMessageFile}"; Flags: uninsdeletekey
 
@@ -299,7 +293,7 @@ begin
 end;
 
 { ---- Command line of an update that MegaHub.Service runs (P6) ---------------------------------------------------------------
-  /SERVICEUPDATE=1   the setup runs as SYSTEM: no per-user entries (HKCU is HKU\S-1-5-18 then). Pass /MERGETASKS=!autostart too.
+  /SERVICEUPDATE=1   the setup runs as SYSTEM: no per-user entries (HKCU is HKU\S-1-5-18 then). There is no autostart task any more; the old /MERGETASKS=!autostart switch is harmless.
   /KEEPSESSION=<id>  the session of the user who asked for the update: stop-megahub.ps1 does not disconnect it. Digits only.
   /LOG="<app folder>\service\data\logs\setup-<version>.log"   the setup log, next to the service's own data (admin-only). }
 

@@ -73,5 +73,5 @@ jobs:
           tag_name: ${{ github.ref_name == 'rebrand' && 'rebrand-installer' || 'latest-installer' }}
           name: ${{ github.ref_name == 'rebrand' && 'Mega Hub rebrand installer (test)' || 'Latest installer' }}
           prerelease: true
-          body: "Mega Hub installer (app and service), built from the newest push. Download the .exe, run it once, press Yes. Mega Hub is based on Mega Hub by kewe87 (GPL-3.0); source: https://github.com/jjrussellite28-art/mega-hub"
+          body: "Mega Hub installer (app and service), built from the newest push. Download the .exe, run it once, press Yes. Mega Hub is an independent fork of CouchHUD by kewe87 (GPL-3.0); source: https://github.com/jjrussellite28-art/mega-hub"
           files: installer/output/*.exe

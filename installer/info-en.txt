@@ -1,4 +1,4 @@
-Mega Hub — independent development fork by jjrussellite28-art; based on Mega Hub by kewe87.
+Mega Hub — independent development fork by jjrussellite28-art; a fork of CouchHUD by kewe87.
 Not approved for release. See README.md and docs/RELEASE-CHECKLIST.md in the source.
 
 Mega Hub – before you start
@@ -23,3 +23,6 @@ If %APPDATA%\MegaHub\config.json is damaged, Mega Hub runs locked (no game start
 
 Disclaimer and privacy
 Mega Hub is free software (GPL-3.0) without any warranty; use at your own risk. No telemetry, no account. The full texts are shown at the first start and under Settings › Info (currently in German).
+
+Windows or browser warning
+When you download or start this setup, Windows (SmartScreen) or your browser may say it "isn't commonly downloaded", "unknown publisher" or even "unsafe". That is normal for a new, free, independent program that is not signed with a paid certificate; it does not mean the file is a virus. Mega Hub is open source (GPL-3.0) and has no cheating or harmful code. If you downloaded it from the official Mega Hub page on GitHub, you can continue: choose "More info" and then "Run anyway".

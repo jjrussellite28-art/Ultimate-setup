@@ -1,125 +1,125 @@
-# Mitmachen bei Mega Hub
+# Contributing to Mega Hub
 
-**Deutsch** | [English](CONTRIBUTING.en.md)
+[Deutsch](CONTRIBUTING.de.md) | **English**
 
-Schön, dass du da bist! Mega Hub soll ein freies, richtig gutes Wohnzimmer-Frontend für Windows werden, und das geht am besten gemeinsam.
+Great to have you here! Mega Hub aims to be a free, really good living-room frontend for Windows, and that works best together.
 
-## Wege, beizutragen
+## Ways to contribute
 
-- **Skins**: Anleitung in [docs/SKINS.md](docs/SKINS.md)
-- **Plugins**: Anleitung in [docs/PLUGINS.md](docs/PLUGINS.md), Beispiel in `plugins/MegaHub.Plugin.Wand`
-- **Übersetzungen und Texte**: [docs/i18n.md](docs/i18n.md)
-- **Fehler melden**: Issue mit Windows-Version, was du gemacht hast und den Logs aus `%LOCALAPPDATA%\MegaHub\logs`
-- **Code**: Pull Requests sind willkommen. Bei größeren Dingen vorher kurz ein Issue aufmachen, damit wir die Richtung abstimmen.
+- **Skins**: instructions in [docs/SKINS.en.md](docs/SKINS.en.md)
+- **Plugins**: instructions in [docs/PLUGINS.md](docs/PLUGINS.md) (German), example in `plugins/MegaHub.Plugin.Wand`
+- **Translations and texts**: [docs/i18n.md](docs/i18n.md)
+- **Report bugs**: an issue with your Windows version, what you did and the logs from `%LOCALAPPDATA%\MegaHub\logs`
+- **Code**: pull requests are welcome. For bigger things, open a short issue first so we can agree on the direction.
 
-## Entwickeln
+## Development
 
-Voraussetzungen: .NET 10 SDK, Node.js (für UI-Vorschau und Prüfungen), unter Windows zum Ausprobieren WebView2.
+Requirements: .NET 10 SDK, Node.js (for the UI preview and checks), and on Windows WebView2 to try it out.
 
 ```powershell
 dotnet build MegaHub.slnx
 dotnet test MegaHub.slnx
-dotnet run --project src/MegaHub.Shell -- --dev   # Fenstermodus mit DevTools
+dotnet run --project src/MegaHub.Shell -- --dev   # window mode with DevTools
 ```
 
-`--dev` wirkt nur in einem Debug-Build (wie oben mit `dotnet run`). Ein Release-Build ignoriert den Schalter, außer ein Administrator setzt `HKLM\SOFTWARE\Mega Hub` `DeveloperMode=1` (DWORD; der Schlüssel darf nur für Administratoren, SYSTEM und TrustedInstaller beschreibbar sein). Sonst könnte ein Standardkonto Mega Hub mit `--dev` aus einer Verknüpfung starten und DevTools bekommen.
+`--dev` only works in a Debug build (as above with `dotnet run`). A Release build ignores the switch unless an administrator sets `HKLM\SOFTWARE\Mega Hub` `DeveloperMode=1` (DWORD; the key must only be writable by Administrators, SYSTEM and TrustedInstaller). Otherwise a standard account could start Mega Hub with `--dev` from a shortcut and get DevTools.
 
-Die Oberfläche (`ui/`) ist Vanilla JS als ES-Module ohne Build-Schritt. Plattformneutrale Logik gehört nach `MegaHub.Core` (mit Tests in `tests/`), Windows-spezifisches nach `MegaHub.Shell`.
+The interface (`ui/`) is vanilla JS as ES modules without a build step. Platform-neutral logic belongs in `MegaHub.Core` (with tests in `tests/`), Windows-specific code in `MegaHub.Shell`.
 
-### Vor jedem Push: `scripts/check.sh`
+### Before every push: `scripts/check.sh`
 
 ```bash
 ./scripts/check.sh
 ```
 
-Das Skript läuft unter Windows (Git Bash), Linux und macOS und macht der Reihe nach:
+The script runs on Windows (Git Bash), Linux and macOS and does, in order:
 
-1. `dotnet build` der ganzen Solution (auch die Windows-Projekte, außerhalb von Windows über `EnableWindowsTargeting`),
-2. `dotnet test` aller Tests,
-3. **UI-Syntax**: jede `.js`/`.mjs`-Datei in `ui/` und `scripts/` wird als **ES-Modul** geprüft (`node --input-type=module --check`; ein einfaches `node --check` lässt Modulfehler durch),
-4. **i18n-Prüfung** (`scripts/i18n-check.mjs`): jeder Schlüssel in Deutsch und Englisch mit gleichen Platzhaltern, jeder benutzte Schlüssel existiert, keine verwaisten Schlüssel, kein deutscher Text im Code,
-5. **Browser-UI** (`scripts/browser-ui-check.mjs`): die HUD-Seite des Couch-Browsers in einem **headless** Edge (`--headless=new --mute-audio`, kein Fenster, kein Ton); ohne Edge (Variable `EDGE` oder die üblichen Installationsorte) oder ohne Node 22 meldet sie „skipped“ und hält nichts auf; in der CI (`CI=true`) ist das ein Fehler. Nach 180 Sekunden ohne Ergebnis bricht sie ab (Fehler). `SKIP_BROWSER_UI=1` lässt den Schritt in `scripts/check.sh` weg.
+1. `dotnet build` of the whole solution (the Windows projects too; outside Windows through `EnableWindowsTargeting`),
+2. `dotnet test` of all tests,
+3. **UI syntax**: every `.js`/`.mjs` file in `ui/` and `scripts/` is checked as an **ES module** (`node --input-type=module --check`; a plain `node --check` lets module errors through),
+4. **i18n check** (`scripts/i18n-check.mjs`): every key in German and English with the same placeholders, every key used exists, no orphaned keys, no German text in code,
+5. **Browser UI** (`scripts/browser-ui-check.mjs`): the couch browser's HUD side in a **headless** Edge (`--headless=new --mute-audio`, no window, no sound); without an Edge (variable `EDGE` or the usual install places) or without Node 22 it reports "skipped" and holds nothing up; in CI (`CI=true`) that is a failure. After 180 seconds without a result it stops (failure). `SKIP_BROWSER_UI=1` leaves the step out of `scripts/check.sh`.
 
-Es ist mindestens so streng wie die CI (die baut und testet auf Windows). Rot bleibt lokal, nicht im Postfach der anderen.
+It is at least as strict as CI (which builds and tests on Windows). Red stays local, not in everyone else's inbox.
 
-### UI ohne Windows: Vorschau und Screenshots
+### UI without Windows: preview and screenshots
 
 ```bash
-node scripts/preview-server.js          # http://localhost:5173, komplette UI mit Mock-Daten (?lang=en für Englisch)
+node scripts/preview-server.js          # http://localhost:5173, the complete UI with mock data (?lang=en for English)
 ```
 
-`scripts/ui-shot.mjs` steuert die Vorschau in einem Edge ohne Fenster (über das DevTools-Protokoll), drückt Tasten, wechselt Skins, macht Screenshots und prüft Kontraste. Gut für UI-Änderungen und als Beleg im Pull Request:
+`scripts/ui-shot.mjs` drives the preview in a windowless Edge (over the DevTools protocol), presses keys, switches skins, takes screenshots and checks contrasts. Good for UI changes and as evidence in a pull request:
 
 ```bash
 node scripts/ui-shot.mjs --out shots skin:default wait:300 shot:home key:ArrowRight shot:next
 node scripts/ui-shot.mjs --out shots --size 3840x2160 --query lang=en shot:home4k
 ```
 
-Schritte: `skin:<id>`, `key:<Taste>`, `keys:ArrowDown*3`, `wait:<ms>`, `shot:<name>`, `eval:<js>`, `contrast:<label>`, `text:<text>`. Tasten: Pfeile, `Enter` = A, `Escape` = B, `q`/`e` = LB/RB, `x`, `y`, `m` = Start, `Home` = Guide. Der Pfad zu Edge lässt sich über die Umgebungsvariable `EDGE` setzen.
+Steps: `skin:<id>`, `key:<key>`, `keys:ArrowDown*3`, `wait:<ms>`, `shot:<name>`, `eval:<js>`, `contrast:<label>`, `text:<text>`. Keys: arrows, `Enter` = A, `Escape` = B, `q`/`e` = LB/RB, `x`, `y`, `m` = Start, `Home` = Guide. The path to Edge can be set with the environment variable `EDGE`.
 
-**Screenshots für README und Doku** immer mit `--query demo`: Die Vorschau zeigt dann ausgedachte Spiele mit selbst erzeugten Covern (`ui/mock-demo.js`) statt echter Store-Cover, und keine eingeblendete Nachricht. Die Bilder unter `docs/` sind so entstanden (1920×1080, verkleinert auf 1280×720). `node scripts/docs-shots.mjs` erzeugt sie alle neu, auf Deutsch und Englisch (`docs/<Name>.png`, `docs/<Name>.en.png`; für das Skin-Bild `--catalog <Ordner mit Katalog-Skins>` angeben).
+**Screenshots for the README and docs** always with `--query demo`: the preview then shows made-up games with self-generated covers (`ui/mock-demo.js`) instead of real store covers, and no notification pop-ups. The images under `docs/` were made this way (1920×1080, scaled down to 1280×720). `node scripts/docs-shots.mjs` re-shoots all of them in German and English (`docs/<name>.png`, `docs/<name>.en.png`; for the skins image add `--catalog <folder of catalog skins>`).
 
-**Logo und Icon**: Quellen sind `docs/logo.svg` (ab 48 px) und `assets/branding/icon-small.svg` (16–32 px), dazu `docs/banner.svg` und `docs/social-preview.svg`. `node scripts/brand-render.mjs` rendert daraus mit Edge alle PNGs und baut `src/MegaHub.Shell/megahub.ico` neu. `ui/assets/icon.svg` ist eine Kopie von `docs/logo.svg`.
+**Logo and icon**: the sources are `docs/logo.svg` (from 48 px) and `assets/branding/icon-small.svg` (16–32 px), plus `docs/banner.svg` and `docs/social-preview.svg`. `node scripts/brand-render.mjs` renders all PNGs from them with Edge and rebuilds `src/MegaHub.Shell/megahub.ico`. `ui/assets/icon.svg` is a copy of `docs/logo.svg`.
 
-### Test-VM (Hyper-V)
+### Test VM (Hyper-V)
 
-Windows-Funktionen (Shell-Ersatz, Autologin, Guide-Taste, UAC) testest du am besten in einer Hyper-V-VM, nicht auf deinem Arbeits-PC. Die Skripte laufen auf dem Host über PowerShell Direct und brauchen die Mitgliedschaft in „Hyper-V-Administratoren“. Die VM heißt standardmäßig `Win11-Test` (`-VMName` ändert das). Einmalig das VM-Kennwort ablegen:
+Windows features (shell replacement, auto sign-in, Guide button, UAC) are best tested in a Hyper-V VM, not on your work PC. The scripts run on the host over PowerShell Direct and need membership in "Hyper-V Administrators". The VM is called `Win11-Test` by default (`-VMName` changes that). Store the VM password once:
 
 ```powershell
 Get-Credential | Export-Clixml "$env:USERPROFILE\megahub-vm.cred"
 ```
 
-| Skript | Zweck |
+| Script | Purpose |
 |---|---|
-| `scripts\deploy-vm.ps1` | Veröffentlicht Mega Hub (self-contained), kopiert es nach `C:\Program Files\Mega Hub` in der VM und startet es in der angemeldeten Sitzung. `-NoBuild` kopiert den letzten Publish erneut, `-NoStart` startet nicht, `-Arguments --dev` reicht Schalter durch (eine Release-Version beachtet `--dev` nur mit `DeveloperMode=1` in `HKLM\SOFTWARE\Mega Hub`, siehe `vm-cdp.ps1 -Enable`). |
-| `scripts\vm-cdp.ps1` | Spricht über das Chrome DevTools Protocol mit der UI in der VM: `-Eval 'document.title'`, `-Screenshot shot.png`, `-Keys ArrowRight,Enter`, `-Console` (Fehler seit dem letzten Aufruf), `-Reload`. Vorher einmal `-Enable` (setzt als Administrator der VM `HKLM\SOFTWARE\Mega Hub` `DeveloperMode=1` und `RemoteDebuggingPort=9222`, DWORD; danach Mega Hub neu starten), nach den Tests `-Disable`. Der Port hört nur auf 127.0.0.1, der Couch-Browser bekommt Port + 1. `WEBVIEW2_*`-Umgebungsvariablen wirken seit 0.4.2 nicht mehr (Mega Hub entfernt sie beim Start). |
-| `scripts\vm-screenshot.ps1` | Speichert den Konsolen-Bildschirm der VM als PNG (`-Path shot.png`), auch am Anmeldebildschirm, wo die UI nicht erreichbar ist. |
-| `scripts\vm-uac.ps1` | Bestätigt (oder mit `-Decline` verneint) eine UAC-Abfrage in der VM über die virtuelle Tastatur, die auch den sicheren Desktop erreicht. |
+| `scripts\deploy-vm.ps1` | Publishes Mega Hub (self-contained), copies it to `C:\Program Files\Mega Hub` in the VM and starts it in the signed-in session. `-NoBuild` copies the last publish again, `-NoStart` does not start it, `-Arguments --dev` passes switches through (a Release build only honors `--dev` with `DeveloperMode=1` in `HKLM\SOFTWARE\Mega Hub`, see `vm-cdp.ps1 -Enable`). |
+| `scripts\vm-cdp.ps1` | Talks to the UI in the VM over the Chrome DevTools Protocol: `-Eval 'document.title'`, `-Screenshot shot.png`, `-Keys ArrowRight,Enter`, `-Console` (errors since the last call), `-Reload`. Run `-Enable` once first (sets `HKLM\SOFTWARE\Mega Hub` `DeveloperMode=1` and `RemoteDebuggingPort=9222`, DWORD, as an administrator of the VM; then restart Mega Hub), and `-Disable` after the tests. The port only listens on 127.0.0.1; the couch browser gets port + 1. `WEBVIEW2_*` environment variables have no effect since 0.4.2 (Mega Hub removes them at start). |
+| `scripts\vm-screenshot.ps1` | Saves the VM's console screen as a PNG (`-Path shot.png`), also at the sign-in screen, where the UI cannot be reached. |
+| `scripts\vm-uac.ps1` | Confirms (or with `-Decline` declines) a UAC prompt in the VM through the virtual keyboard, which also reaches the secure desktop. |
 
-Typischer Ablauf: `deploy-vm.ps1`, dann mit `vm-cdp.ps1 -Keys …` durch die Oberfläche gehen, mit `-Screenshot` und `-Console` prüfen, bei UAC-Dialogen `vm-uac.ps1`, bei schwarzem Bild `vm-screenshot.ps1`.
+Typical flow: `deploy-vm.ps1`, then walk through the interface with `vm-cdp.ps1 -Keys …`, check with `-Screenshot` and `-Console`, use `vm-uac.ps1` for UAC prompts and `vm-screenshot.ps1` for a black screen.
 
-## Texte und Sprachen (i18n)
+## Texts and languages (i18n)
 
-Die Oberfläche gibt es auf Deutsch und Englisch. Regeln (Details und Begriffstabelle in [docs/i18n.md](docs/i18n.md)):
+The interface exists in German and English. Rules (details and the terminology table in [docs/i18n.md](docs/i18n.md)):
 
-- **Jeder neue Text kommt immer in Deutsch und Englisch.** UI: `ui/i18n/de/*.js` und `ui/i18n/en/*.js` (gleiche Dateinamen, gleiche Schlüssel), Zugriff mit `t('bereich.schluessel', { name })`. Host (C#): `Strings.Get("key", args)` in `src/MegaHub.Core/Localization/`. Installer: `[CustomMessages]` in `installer/MegaHub.iss`.
-- Keine fertigen deutschen Sätze aus dem Host an die UI schicken, die die UI vergleicht oder speichert: Zustände als **Code** (`errorCode`), Benachrichtigungen als Schlüssel plus Argumente (`Strings.Ref`).
-- `t()` erst beim Bauen des Textes aufrufen, nie in einer Konstante auf oberster Ebene. Datum, Zeit und Zahlen mit `fmtDate`, `fmtTime`, `fmtNumber`.
-- Begriffe wie in der Tabelle (z.B. „Guide-Taste“, „Skin“, „Ausschalt-Timer“); Pfade in den Einstellungen mit `›`.
-- `scripts/i18n-check.mjs` (Teil von `check.sh`) muss grün sein.
-- Code und Kommentare auf Englisch.
+- **Every new text always comes in German and English.** UI: `ui/i18n/de/*.js` and `ui/i18n/en/*.js` (same file names, same keys), accessed with `t('area.key', { name })`. Host (C#): `Strings.Get("key", args)` in `src/MegaHub.Core/Localization/`. Installer: `[CustomMessages]` in `installer/MegaHub.iss`.
+- Do not send finished German sentences from the host to the UI that the UI compares or stores: states as a **code** (`errorCode`), notifications as a key plus arguments (`Strings.Ref`).
+- Only call `t()` when building the text, never in a top-level constant. Date, time and numbers with `fmtDate`, `fmtTime`, `fmtNumber`.
+- Terms as in the table (e.g. "Guide button", "Skin", "Sleep timer"); paths in the settings with `›`.
+- `scripts/i18n-check.mjs` (part of `check.sh`) must be green.
+- Code and comments in English.
 
-## Leitplanken
+## Guiding principles
 
-Die Grundsätze: alles über die GUI, Controller zuerst, nahtloser Fullscreen, Fremdsoftware in Plugins, ein kaputtes Plugin darf nie die Shell killen.
+The principles: everything through the GUI, controller first, seamless full screen, third-party software in plugins, a broken plugin must never kill the shell.
 
-- Jede Einstellung nur an einer Stelle, im Einfach-Modus keine Fachbegriffe.
-- Jeder Eingriff in Windows ist umkehrbar und steht in der Transparenz-Seite („Was Mega Hub an Windows ändert“).
+- Every setting in only one place, no jargon in Simple mode.
+- Every change to Windows can be undone and is listed on the transparency page ("What Mega Hub changes in Windows").
 
 ## Release
 
-Nur für Maintainer. Der private Signaturschlüssel liegt nicht im Repository und nicht in der CI, sondern im Benutzerprofil des Maintainers (`%USERPROFILE%\.megahub\catalog-signing.key`, DPAPI-geschützt).
+Maintainers only. The private signing key is not in the repository and not in CI, but in the maintainer's user profile (`%USERPROFILE%\.megahub\catalog-signing.key`, protected with DPAPI).
 
-1. Version in `Directory.Build.props` anheben, mergen, Tag setzen und pushen: `git tag v0.4.0 && git push origin v0.4.0`. Die CI baut das Setup mit dieser Version (bricht ab, wenn Tag und Version nicht zusammenpassen), erzeugt die Build-Attestierung und hängt `MegaHub-Setup-<v>.exe` und `MegaHub-Setup-<v>.exe.sha256` an ein GitHub-Release.
-   Nur der Tag-Build der CI ist ein Release-Build (`MegaHubRelease=true`, von der CI aus dem Tag gesetzt) und trägt genau diese Nummer. Jeder andere Build, auch ein lokaler, heißt `<Version>-dev+<Commit>` (z. B. `0.7.0-dev+f627fe74`): eine Vorabversion, die der Updater als älter als das Release sieht.
-2. `.\scripts\sign-release.ps1 -Tag v0.4.0` (PowerShell 7, `gh` angemeldet): prüft Commit und Version, lädt das Setup und vergleicht den Hash mit GitHub und der `.sha256`, prüft die Attestierung und signiert erst dann die `.sha256` (Kontext `couchhud-release-v1`). Lädt `.sha256.sig` hoch. **Erst damit bieten installierte Mega Hubs das Update an.**
-3. Release-Notes nach Bedarf im GitHub-Release nachbearbeiten (sie erscheinen gekürzt auf dem TV).
+1. Raise the version in `Directory.Build.props`, merge, set and push the tag: `git tag v0.4.0 && git push origin v0.4.0`. CI builds the setup with this version (and stops if tag and version do not match), creates the build attestation and attaches `MegaHub-Setup-<v>.exe` and `MegaHub-Setup-<v>.exe.sha256` to a GitHub release.
+   Only the CI's tag build is a release build (`MegaHubRelease=true`, set by the CI from the tag) and carries exactly this number. Every other build, a local one too, is called `<Version>-dev+<commit>` (e.g. `0.7.0-dev+f627fe74`): a pre-release the updater sees as older than the release.
+2. `.\scripts\sign-release.ps1 -Tag v0.4.0` (PowerShell 7, `gh` signed in): checks commit and version, downloads the setup and compares its hash with GitHub and the `.sha256`, checks the attestation and only then signs the `.sha256` (context `couchhud-release-v1`). Uploads `.sha256.sig`. **Only then do installed Mega Hubs offer the update.**
+3. Edit the release notes in the GitHub release as needed (they appear shortened on the TV).
 
-Signier-Skripte (PowerShell 7):
+Signing scripts (PowerShell 7):
 
-| Skript | Zweck |
+| Script | Purpose |
 |---|---|
-| `scripts\sign-file.ps1` | Signiert eine Datei mit ECDSA P-256 (SHA-256) und schreibt `<Datei>.sig`. `-GenerateKey` legt das Schlüsselpaar beim ersten Mal an und zeigt den öffentlichen Schlüssel (der im Code als `CatalogSignature.PublicKeyPem` steht). `-Context catalog` (Standard) oder `release` trennt die Verwendungszwecke. `-BumpSerial` (nur Katalog-Index, nutzt `catalog-sign.ps1`) erhöht vor dem Signieren die `serial` an der Wurzel des Index um 1; die Datei und die `.sig` werden erst ersetzt, wenn die Signatur steht. Signieren legt nie einen Schlüssel an und lehnt einen Schlüssel ab, der nicht der in Mega Hub eingebaute ist. |
-| `scripts\catalog-sign.ps1` | Signiert den Plugin-Katalog: `-Index .\catalog\index.json` erhöht `serial` um 1 (jede Änderung braucht eine höhere Nummer, sonst lehnen Clients den Index als älter ab) und schreibt `index.json.sig`. Legt nie einen Schlüssel an und lehnt einen Schlüssel ab, der nicht der in Mega Hub eingebaute ist. Die Datei vor dem Signieren nicht mehr ändern (auch keine Zeilenenden). |
-| `scripts\sign-release.ps1` | Der Release-Schritt oben. |
-| `scripts\catalog-entry.ps1` | Packt ein Plugin- oder Skin-Verzeichnis als `<Name>-<Version>.zip` und gibt die SHA-256 für den Katalogeintrag aus. |
+| `scripts\sign-file.ps1` | Signs a file with ECDSA P-256 (SHA-256) and writes `<file>.sig`. `-GenerateKey` creates the key pair the first time and shows the public key (which is in the code as `CatalogSignature.PublicKeyPem`). `-Context catalog` (default) or `release` keeps the purposes apart. `-BumpSerial` (catalog index only, used by `catalog-sign.ps1`) raises the root `serial` of the index by 1 before signing; the file and the `.sig` are replaced only once the signature exists. Signing never creates a key and refuses a key that is not the one compiled into Mega Hub. |
+| `scripts\catalog-sign.ps1` | Signs the plugin catalog: `-Index .\catalog\index.json` raises `serial` by 1 (every change needs a higher number, or clients refuse the index as older) and writes `index.json.sig`. It never creates a key and refuses a key that is not the one compiled into Mega Hub. Do not change the file after signing (not even line endings). |
+| `scripts\sign-release.ps1` | The release step above. |
+| `scripts\catalog-entry.ps1` | Packs a plugin or skin folder as `<Name>-<Version>.zip` and prints the SHA-256 for the catalog entry. |
 
-Katalogeinträge ändern: `catalog-entry.ps1`, Eintrag in der `index.json` des Katalog-Repos anpassen, mit `catalog-sign.ps1` signieren, beides committen. Format und Sicherheit: [docs/PLUGINS.md](docs/PLUGINS.md#katalog).
+Changing catalog entries: `catalog-entry.ps1`, adjust the entry in the catalog repo's `index.json`, sign with `catalog-sign.ps1`, commit both. Format and security: [docs/PLUGINS.md](docs/PLUGINS.md#katalog) (German).
 
-## Pull Requests
+## Pull requests
 
-Dieses Repo veröffentlicht nur Release-Stände als einzelne Commits. Gute Vorschläge werden deshalb lokal übernommen und erscheinen mit dem nächsten Release; der PR wird dann mit Dank geschlossen statt gemergt. Sicherheitslücken bitte nicht als Issue oder PR melden, sondern wie in [SECURITY.md](SECURITY.md) beschrieben.
+This repo only publishes release states as single commits. Good suggestions are therefore taken over locally and appear with the next release; the PR is then closed with thanks instead of merged. Please do not report security vulnerabilities as an issue or PR, but as described in [SECURITY.md](SECURITY.md#english).
 
-## Lizenz
+## License
 
-Mit einem Beitrag stimmst du zu, dass er unter der GPL-3.0 steht wie der Rest des Projekts.
+By contributing you agree that your contribution is under the GPL-3.0 like the rest of the project.

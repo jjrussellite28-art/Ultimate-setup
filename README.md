@@ -11,15 +11,15 @@ Logo generated with ChatGPT and supplied by jjrussellite28-art. [Source and prov
 A controller-first Windows TV interface, independently maintained by **jjrussellite28-art**.
 
 **Development preview — no Mega Hub release is published yet.**
-This is a fork of [Mega Hub](https://github.com/kewe87/CouchHUD) by **kewe87 and contributors**,
-under the GNU GPL v3. It is not an official Mega Hub product and is not endorsed or supported by that project.
+This is an independent fork of [CouchHUD](https://github.com/kewe87/CouchHUD) by **kewe87 and contributors**,
+under the GNU GPL v3. It is not an official CouchHUD product and is not endorsed or supported by that project.
 
 ## What it does
 
 The inherited application brings game launchers and a game library into a controller-driven TV interface.
 It includes an optional Windows shell mode, a background service, parental controls, and plugin support.
 See the [English guide](docs/GUIDE.en.md) for inherited functionality. Older guide pages and screenshots
-still use Mega Hub terminology; they are being reviewed for this fork.
+still use CouchHUD terminology; they are being reviewed for this fork.
 
 ## What is new in Mega Hub
 
@@ -32,7 +32,7 @@ Mega Hub keeps everything the inherited application does and adds its own work o
 - **Developer mode** (Settings › Power) for testing your own unsigned plugins.
 - Own **Achievements** plugin, a Mega Hub logo and rebranded text.
 
-Credit stays with the original project: the base application is Mega Hub by kewe87 and contributors.
+Credit stays with the original project: the base application is [CouchHUD](https://github.com/kewe87/CouchHUD) by kewe87 and contributors.
 
 ## Changes in this fork
 
@@ -43,11 +43,11 @@ These changes do not claim authorship of the inherited application or new game-l
 
 ## Downloads and support
 
-There is currently **no approved Mega Hub installer**. Do not treat upstream Mega Hub installers
-as builds of this fork. Future reviewed builds will appear only on
-[this repository's releases page](https://github.com/jjrussellite28-art/mega-hub/releases).
+Development builds of the installer (`MegaHub-Setup-*.exe`) are published on
+[this repository's releases page](https://github.com/jjrussellite28-art/mega-hub/releases) under **Latest installer**.
+Installers from the original CouchHUD project are not builds of this fork.
 For development feedback, use [pull requests](https://github.com/jjrussellite28-art/mega-hub/pulls).
-Issues are currently disabled. Do not send fork support requests to Mega Hub's maintainer.
+Issues are currently disabled. Do not send support requests for this fork to the CouchHUD maintainer.
 Do not post passwords, API keys, personal configuration or exploit details publicly.
 
 ## Build a development version
@@ -63,8 +63,8 @@ dotnet run --project src/MegaHub.Shell -- --dev
 
 Browser preview with mock data: `node scripts/preview-server.js`.
 Installer build instructions are in `.github/workflows/build.yml` (Inno Setup 6).
-Internal `Mega Hub` assembly, service, data and protocol names are inherited compatibility identifiers.
-**Do not install this development fork alongside or over Mega Hub**: those identifiers are not isolated yet.
+A few internal names are kept from CouchHUD for compatibility (for example the `couchhud-*-v1` signature labels and the `CouchHud.Sdk` plugin SDK).
+Do not install this development fork next to CouchHUD until installer isolation has been verified (see the release checklist).
 Use a disposable Windows test environment for installer and shell-mode testing.
 
 ## License, source and commercial distribution
@@ -81,3 +81,17 @@ See [SOURCE.md](SOURCE.md) and the [release checklist](docs/RELEASE-CHECKLIST.md
 Remaining installer artwork, installer isolation, fork-owned release signing, third-party commercial-use review,
 and Windows installer/shell recovery testing remain open. A README update is not certification of release readiness.
 No release should be published until the checklist is complete.
+
+## Windows or browser says the download is unsafe
+
+When you download or run the installer, Windows (SmartScreen) or your browser may say something like
+*"MegaHub-Setup isn't commonly downloaded"*, *"Windows protected your PC"* or *"unknown publisher"*.
+
+This is **expected for a new, independent program** and does not mean the file is a virus. These warnings appear for any
+installer that is new, has few downloads, or is not signed with a paid code-signing certificate from a commercial company.
+Mega Hub is free, open source (GPL v3) and not signed that way yet, so Windows cannot recognise it. The whole source code is in this
+repository, and the installer is built here by GitHub Actions from that source.
+
+To continue anyway: in the browser choose the **⋯** menu next to the download and then **Keep**; in Windows choose
+**More info** and then **Run anyway**. Only do this for files you downloaded from this repository's releases page.
+Paid code signing may be added in the future, which would reduce these warnings.
