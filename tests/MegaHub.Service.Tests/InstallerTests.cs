@@ -223,8 +223,8 @@ public class InstallerTests
         // P6 starts the setup with /SERVICEUPDATE=1 /KEEPSESSION=<id> (plus /MERGETASKS=!autostart).
         Assert.Contains("{param:SERVICEUPDATE|0}", Code);
         Assert.Contains("{param:KEEPSESSION|}", Code);
-        var run = Iss.Split('\n').Single(l => l.StartsWith("Root: HKCU;", StringComparison.Ordinal) && l.Contains(@"CurrentVersion\Run", StringComparison.Ordinal));
-        Assert.Contains("Check: not IsServiceUpdate", run);
+        // There is no autostart entry any more; any per-user entry that comes back must be guarded.
+        Assert.DoesNotContain(Iss.Split('\n'), l => l.StartsWith("Root: HKCU;", StringComparison.Ordinal) && l.Contains(@"CurrentVersion\Run", StringComparison.Ordinal));
         Assert.DoesNotContain(Iss.Split('\n'), l => l.StartsWith("Root: HKCU;", StringComparison.Ordinal) && !l.Contains("Check: not IsServiceUpdate", StringComparison.Ordinal));
         Assert.Contains("' -KeepSession ' + Value", Code);
         Assert.Contains("RunScript('stop-megahub.ps1', ' -MaxSeconds 15' + KeepSessionArgument)", Code);
