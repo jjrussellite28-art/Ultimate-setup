@@ -63,8 +63,8 @@ public class CatalogUrlTests
     public void A_developer_list_entry_that_only_looks_like_the_official_one_is_not_a_second_official_or_an_unsigned_developer_source()
     {
         // Same address in another spelling: the one official source, not twice. Different path: its own address, never "default".
-        Assert.True(CatalogUrl.Same("https://RAW.githubusercontent.com/KEWE87/couchhud-catalog/main/index.json", Official));
-        Assert.False(CatalogService.IsDefaultSource("https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/index.json/"));
+        Assert.True(CatalogUrl.Same("https://RAW.githubusercontent.com/JJRUSSELLITE28-ART/mega-hub/mega-hub-rename/catalog/index.json", Official));
+        Assert.False(CatalogService.IsDefaultSource("https://raw.githubusercontent.com/jjrussellite28-art/mega-hub/mega-hub-rename/catalog/index.json/"));
     }
 
     [Fact]
@@ -78,10 +78,10 @@ public class CatalogUrlTests
     [Fact]
     public void A_mixed_case_official_address_cannot_be_added_as_a_foreign_source()
     {
-        var problem = CatalogSourceRules.CheckNew("https://RAW.githubusercontent.com/KEWE87/couchhud-catalog/main/index.json", null, null, []);
+        var problem = CatalogSourceRules.CheckNew("https://RAW.githubusercontent.com/JJRUSSELLITE28-ART/mega-hub/mega-hub-rename/catalog/index.json", null, null, []);
         Assert.Equal("catalog.source.isOfficial", problem);
         // A different branch of the same repository is another address: it is a foreign (unsigned, never first-party) source.
-        Assert.False(CatalogService.IsDefaultSource("https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/dev/index.json"));
+        Assert.False(CatalogService.IsDefaultSource("https://raw.githubusercontent.com/jjrussellite28-art/mega-hub/dev/catalog/index.json"));
     }
 
     [Theory]

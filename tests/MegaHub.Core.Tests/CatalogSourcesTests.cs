@@ -241,7 +241,7 @@ public sealed class CatalogSourcesTests : IDisposable
     [Fact]
     public async Task A_spelling_of_the_official_address_in_the_lists_is_the_official_source_not_a_second_unsigned_one()
     {
-        const string Variant = "https://raw.githubusercontent.com/KEWE87/couchhud-catalog/main/index.json";
+        const string Variant = "https://raw.githubusercontent.com/JJRUSSELLITE28-ART/mega-hub/mega-hub-rename/catalog/index.json";
         var official = Index(Entry("tool", "tool"));
         var requests = new List<string>();
         HttpResponseMessage Respond(Uri u)
