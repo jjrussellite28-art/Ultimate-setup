@@ -1110,7 +1110,7 @@ body[data-view="passcode"] #toast {
   border-radius: 1.2rem;
   border: 0.1rem solid rgba(255, 255, 255, 0.4);
   background: var(--accent, #1ea7fd);
-  color: #fff;
+  color: var(--accent-contrast, #fff);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
