@@ -1687,11 +1687,10 @@ function categories() {
         listenerToggle('remoteEnabled', t('settings.phone.connect'), t('settings.phone.connectDesc')),
         ...(s.remoteEnabled ? [
           action(t('settings.phone.pair'), t('settings.phone.pairDesc'), () => openPage(pairingPage(), t('settings.cat.phone'))),
-          toggle('remotePower', t('settings.phone.power'), t('settings.phone.powerDesc')),
-          secondFactorRow(),
-          ...expert(action(t('settings.phone.manage'), t('settings.phone.manageDesc'), manageRemoteDevices))
-        ] : []),
-        info(t('settings.phone.trouble'), t('settings.phone.troubleDesc'))
+          action(t('settings.phone.manage'), t('settings.phone.manageDesc'), manageRemoteDevices),
+          // Hidden unless it is already on, so that it can still be switched off.
+          ...(secondFactor?.on ? [secondFactorRow()] : [])
+        ] : [])
       ]
     },
     // The feeds and the weather place come from their plugins (0.7): without the plugin the category is not there.

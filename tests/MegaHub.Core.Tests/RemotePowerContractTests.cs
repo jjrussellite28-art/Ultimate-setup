@@ -120,7 +120,6 @@ public sealed class RemotePowerContractTests
         Assert.Contains("case \"power\":\n                await hud.PowerAsync(StringArg(0));", bridge);
         // The setting is a normal one: behind the couch lock like every setting that is not on the harmless list.
         Assert.DoesNotContain("remotePower", MegaHub.Core.Guard.LockPolicy.HarmlessSettings);
-        Assert.Contains("toggle('remotePower', t('settings.phone.power'), t('settings.phone.powerDesc'))", Read("ui", "views", "settings.js"));
     }
 
     [Fact]
