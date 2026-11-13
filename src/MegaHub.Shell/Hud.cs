@@ -4187,10 +4187,27 @@ public sealed partial class Hud(ConfigStore config, LibraryService library, Artw
             // Not readable: the folder above the app stays.
         }
         var script = Path.Combine(folder, "Get-newest-Mega-Hub.ps1");
-        if (!File.Exists(script)) return false;
         try { File.Delete(UpdateStatusFile); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-        var info = new System.Diagnostics.ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = folder };
-        foreach (var a in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script, "auto" }) info.ArgumentList.Add(a);
+        var info = new System.Diagnostics.ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetTempPath() };
+        if (File.Exists(script))
+        {
+            info.WorkingDirectory = folder;
+            foreach (var a in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script, "auto" }) info.ArgumentList.Add(a);
+        }
+        else
+        {
+            // No project folder on this PC (nobody ran the .bat): the button fetches the update script itself into a folder of its own, then runs it.
+            // The script remembers that folder (update-folder.txt), so the next update finds it. Any failure is shown on the update screen.
+            var own = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MegaHub", "source");
+            var status = UpdateStatusFile;
+            var boot = "$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; "
+                + "try { $d='" + own.Replace("'", "''") + "'; New-Item -ItemType Directory -Force -Path $d | Out-Null; "
+                + "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/jjrussellite28-art/mega-hub/mega-hub-rename/Get-newest-Mega-Hub.ps1' -OutFile (Join-Path $d 'Get-newest-Mega-Hub.ps1') -UseBasicParsing; "
+                + "Set-Location $d; & (Join-Path $d 'Get-newest-Mega-Hub.ps1') auto } "
+                + "catch { $f='" + status.Replace("'", "''") + "'; New-Item -ItemType Directory -Force -Path (Split-Path $f) | Out-Null; "
+                + "[IO.File]::WriteAllText($f, '{\"text\":\"The update stopped.\",\"error\":' + (ConvertTo-Json $_.Exception.Message) + '}') }";
+            foreach (var a in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", boot }) info.ArgumentList.Add(a);
+        }
         _updateProc = System.Diagnostics.Process.Start(info);
         return _updateProc is not null;
     }
