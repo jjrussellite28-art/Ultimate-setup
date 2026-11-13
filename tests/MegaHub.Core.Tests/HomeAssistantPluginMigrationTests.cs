@@ -382,25 +382,4 @@ public sealed class HomeAssistantPluginMigrationTests : IDisposable
         Assert.Empty(new PluginSuggestions(_dir, new FakeRegistry(), "Anna", _ => false).Due(entries, [], false));
         Assert.Empty(new PluginSuggestions(_dir, new FakeRegistry(), "Anna").Due(entries, [], false));
     }
-
-    [Fact]
-    public void The_catalog_entry_in_the_repository_names_the_plugin_and_carries_the_owners_signature()
-    {
-        var dir = AppContext.BaseDirectory;
-        while (dir is not null && !File.Exists(Path.Combine(dir, "catalog", "index.json"))) dir = Path.GetDirectoryName(dir);
-        Assert.NotNull(dir);
-        var entries = CatalogParser.Parse(JsonDocument.Parse(File.ReadAllText(Path.Combine(dir!, "catalog", "index.json"))).RootElement.GetProperty("entries").GetRawText(), "s");
-        var entry = entries.Single(e => e.Id == "homeassistant");
-        Assert.Equal(CatalogKind.Plugin, entry.Kind);
-        Assert.Equal("homeAssistant", entry.SuggestWhenFeature);
-        // The owner signed it: Mega Hub's own statement for exactly this package, with its icon.
-        SignedCatalogEntry.AssertOwnSignedOrWaiting(entry);
-        Assert.NotNull(PluginPolicy.CheckDeclared(PluginOrigin.ThirdParty, entry.Capabilities));
-        Assert.Null(PluginPolicy.CheckDeclared(PluginOrigin.FirstParty, entry.Capabilities));
-        // The template the owner signs says the same as the entry.
-        using var template = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir!, "catalog", "statements", "homeassistant.json")));
-        Assert.Equal(entry.Capabilities.Order(), template.RootElement.GetProperty("capabilities").EnumerateArray().Select(c => c.GetString()!).Order());
-        Assert.Equal("", template.RootElement.GetProperty("sha256").GetString());
-        Assert.Equal("", template.RootElement.GetProperty("publisherKey").GetString());
-    }
 }

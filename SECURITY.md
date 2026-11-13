@@ -19,8 +19,9 @@ Security fixes in CouchHUD are reviewed and brought into this fork.
 
 ## Signatures and trust
 
-Mega Hub does not yet have its own release-signing key or plugin catalog; until it does, the signatures and keys described in
-[docs/UPSTREAM-SECURITY.md](docs/UPSTREAM-SECURITY.md) belong to CouchHUD and do not authenticate Mega Hub builds.
+Mega Hub has its own catalog signing key and its own plugin catalog (`catalog/index.json`, signed with that key).
+CouchHUD's key and catalog are not trusted by default and nothing in Mega Hub claims to be signed by CouchHUD.
+Mega Hub does not yet sign its installers; the signatures described in [docs/UPSTREAM-SECURITY.md](docs/UPSTREAM-SECURITY.md) belong to CouchHUD.
 The open items are tracked in [docs/RELEASE-CHECKLIST.md](docs/RELEASE-CHECKLIST.md).
 The inherited technical background (what the lock does and does not protect against) is kept in
 [docs/UPSTREAM-SECURITY.md](docs/UPSTREAM-SECURITY.md).

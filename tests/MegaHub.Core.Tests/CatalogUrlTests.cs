@@ -7,8 +7,8 @@ public class CatalogUrlTests
     private const string Official = CatalogDefaults.IndexUrl;
 
     [Theory]
-    [InlineData("HTTPS://RAW.GITHUBUSERCONTENT.COM/KEWE87/COUCHHUD-CATALOG/main/index.json")]
-    [InlineData("https://raw.githubusercontent.com/kewe87/couchhud-catalog/main/index.json")]
+    [InlineData("HTTPS://RAW.GITHUBUSERCONTENT.COM/JJRUSSELLITE28-ART/MEGA-HUB/mega-hub-rename/catalog/index.json")]
+    [InlineData("https://raw.githubusercontent.com/jjrussellite28-art/mega-hub/mega-hub-rename/catalog/index.json")]
     public void Scheme_host_and_owner_repo_ignore_case(string url)
     {
         Assert.True(CatalogUrl.Same(url, Official));

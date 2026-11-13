@@ -1,4 +1,3 @@
-using System.Text.Json;
 using MegaHub.Core.Config;
 using MegaHub.Core.Plugins;
 using CouchHud.Sdk;
@@ -190,45 +189,4 @@ public sealed class VpnPluginMigrationTests : IDisposable
 
     // =====================================================================
     // The catalog entry
-
-    [Fact]
-    public void The_catalog_entry_in_the_repository_names_the_plugin_and_carries_the_owners_signature()
-    {
-        var dir = AppContext.BaseDirectory;
-        while (dir is not null && !File.Exists(Path.Combine(dir, "catalog", "index.json"))) dir = Path.GetDirectoryName(dir);
-        Assert.NotNull(dir);
-        var entries = CatalogParser.Parse(JsonDocument.Parse(File.ReadAllText(Path.Combine(dir!, "catalog", "index.json"))).RootElement.GetProperty("entries").GetRawText(), "s");
-        var entry = entries.Single(e => e.Id == "vpn");
-        Assert.Equal(CatalogKind.Plugin, entry.Kind);
-        Assert.Equal("NordVPN", entry.SuggestWhenUninstallEntry);
-        Assert.Equal("CouchHud.Plugin.Vpn", entry.Folder);
-        Assert.Equal("GPL-3.0-only", entry.License);
-        // The owner signed it: Mega Hub's own statement for exactly this package, with its icon.
-        SignedCatalogEntry.AssertOwnSignedOrWaiting(entry);
-        // Its rights are the smallest set; a first-party plugin may have them (the lint of the package decides the rest).
-        Assert.Null(PluginPolicy.CheckDeclared(PluginOrigin.FirstParty, entry.Capabilities));
-        Assert.Equal(new[] { "native", "pages", "process", "quickActions", "registry" }, entry.Capabilities.Order());
-        Assert.DoesNotContain(PluginCapabilities.SetupRun, entry.Capabilities);
-        Assert.DoesNotContain(PluginCapabilities.Assistant, entry.Capabilities);
-        Assert.DoesNotContain(PluginCapabilities.Tabs, entry.Capabilities);
-        Assert.DoesNotContain(entry.Capabilities, c => c.StartsWith("network", StringComparison.Ordinal));
-        // The template the owner signs says the same as the entry.
-        using var template = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir!, "catalog", "statements", "vpn.json")));
-        Assert.Equal(entry.Capabilities.Order(), template.RootElement.GetProperty("capabilities").EnumerateArray().Select(c => c.GetString()!).Order());
-        Assert.Equal("", template.RootElement.GetProperty("sha256").GetString());
-        Assert.Equal("", template.RootElement.GetProperty("publisherKey").GetString());
-        Assert.Equal(entry.Version.ToString(), template.RootElement.GetProperty("version").GetString());
-        Assert.Equal("vpn", template.RootElement.GetProperty("id").GetString());
-        Assert.Equal(entry.Folder, template.RootElement.GetProperty("folder").GetString());
-        // The description in the catalog, the summary of the statement and the plugin's manifest all say the same.
-        using var all = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir!, "catalog", "index.json")));
-        var raw = all.RootElement.GetProperty("entries").EnumerateArray().Single(e => e.GetProperty("id").GetString() == "vpn");
-        Assert.Equal(template.RootElement.GetProperty("summary").GetString(), raw.GetProperty("description").GetProperty("en").GetString());
-        var text0 = File.ReadAllText(Path.Combine(dir!, "catalog", "index.json"));
-        Assert.DoesNotContain("},    {", text0);
-        // The addresses are written in the canonical form.
-        var text = File.ReadAllText(Path.Combine(dir!, "catalog", "index.json"));
-        Assert.Contains("kewe87/CouchHUD-Catalog/releases/download/vpn-1.0.1/CouchHud.Plugin.Vpn-1.0.1.zip", text);
-        Assert.DoesNotContain("couchhud-catalog/releases/download/vpn", text);
-    }
 }

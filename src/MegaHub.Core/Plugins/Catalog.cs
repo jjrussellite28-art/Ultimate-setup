@@ -68,7 +68,7 @@ public readonly record struct SemVer(int Major, int Minor, int Patch, string Pre
 
 public static class CatalogDefaults
 {
-    public const string IndexUrl = "https://raw.githubusercontent.com/kewe87/CouchHUD-Catalog/main/index.json";
+    public const string IndexUrl = "https://raw.githubusercontent.com/jjrussellite28-art/mega-hub/mega-hub-rename/catalog/index.json";
 }
 
 public enum CatalogKind
@@ -465,8 +465,8 @@ public static class CatalogSignature
 {
     public const string PublicKeyPem = """
         -----BEGIN PUBLIC KEY-----
-        MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEKAXgwgjwj5Rjl37hmf04Cj+/vP8S
-        JIKCCqRKrBy7MlNVIntuH2DjOkZMiobyQwlIZ3A20ypGgx77rtHg8vs88Q==
+        MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEhHwZe5LjS0m0zDuXnjgyoODU2k7i
+        OQOtN3rYIKTwl72zS3azdKzh0qFBP6Fqs9g4yrbN8+L6hGeEtbBQgiIj3g==
         -----END PUBLIC KEY-----
         """;
 

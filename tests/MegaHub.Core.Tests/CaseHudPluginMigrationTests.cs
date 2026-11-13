@@ -1,4 +1,3 @@
-using System.Text.Json;
 using MegaHub.Core.Config;
 using MegaHub.Core.Plugins;
 using CouchHud.Sdk;
@@ -181,34 +180,6 @@ public sealed class CaseHudPluginMigrationTests : IDisposable
 
     // =====================================================================
     // The catalog entry
-
-    [Fact]
-    public void The_catalog_entry_in_the_repository_names_the_plugin_and_carries_the_owners_signature()
-    {
-        var dir = AppContext.BaseDirectory;
-        while (dir is not null && !File.Exists(Path.Combine(dir, "catalog", "index.json"))) dir = Path.GetDirectoryName(dir);
-        Assert.NotNull(dir);
-        var entries = CatalogParser.Parse(JsonDocument.Parse(File.ReadAllText(Path.Combine(dir!, "catalog", "index.json"))).RootElement.GetProperty("entries").GetRawText(), "s");
-        var entry = entries.Single(e => e.Id == "casehud");
-        Assert.Equal(CatalogKind.Plugin, entry.Kind);
-        Assert.Equal("CaseHUD", entry.SuggestWhenUninstallEntry);
-        Assert.Equal("CouchHud.Plugin.CaseHud", entry.Folder);
-        Assert.Equal("GPL-3.0-only", entry.License);
-        // The owner signed it: Mega Hub's own statement for exactly this package, with its icon.
-        SignedCatalogEntry.AssertOwnSignedOrWaiting(entry);
-        // Its rights: Mega Hub's own plugin may have them all, a third party could not even declare the three host services.
-        Assert.Null(PluginPolicy.CheckDeclared(PluginOrigin.FirstParty, entry.Capabilities));
-        Assert.NotNull(PluginPolicy.CheckDeclared(PluginOrigin.ThirdParty, entry.Capabilities));
-        Assert.Contains(PluginCapabilities.SetupRun, entry.Capabilities);
-        Assert.Contains(PluginCapabilities.LockRestrict, entry.Capabilities);
-        Assert.DoesNotContain(PluginCapabilities.Assistant, entry.Capabilities);
-        // The template the owner signs says the same as the entry.
-        using var template = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir!, "catalog", "statements", "casehud.json")));
-        Assert.Equal(entry.Capabilities.Order(), template.RootElement.GetProperty("capabilities").EnumerateArray().Select(c => c.GetString()!).Order());
-        Assert.Equal("", template.RootElement.GetProperty("sha256").GetString());
-        Assert.Equal("", template.RootElement.GetProperty("publisherKey").GetString());
-        Assert.Equal(entry.Version.ToString(), template.RootElement.GetProperty("version").GetString());
-    }
 
     // =====================================================================
     // The host hands a downloaded setup to Windows (setup.run): first-party only, and the shell re-checks everything

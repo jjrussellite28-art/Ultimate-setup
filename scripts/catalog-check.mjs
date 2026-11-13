@@ -3,7 +3,7 @@
 // so the index stays one form and a reviewer sees a different spelling as a mistake or a look-alike. Mirrors CatalogUrl.NonCanonicalReason.
 import { readFileSync, readdirSync } from 'node:fs';
 
-const CANONICAL = ['kewe87/CouchHUD-Catalog', 'kewe87/CouchHUD', 'kewe87/CaseHUD'];
+const CANONICAL = ['jjrussellite28-art/mega-hub', 'kewe87/CouchHUD-Catalog', 'kewe87/CouchHUD', 'kewe87/CaseHUD'];
 const GITHUB = ['github.com', 'raw.githubusercontent.com'];
 
 const text = readFileSync(new URL('../catalog/index.json', import.meta.url), 'utf8');

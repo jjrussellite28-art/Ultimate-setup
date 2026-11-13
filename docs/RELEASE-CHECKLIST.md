@@ -36,11 +36,11 @@ only because it runs `Get-newest-Mega-Hub.ps1`).
 
 Steps (the first one needs the owner's PC with PowerShell 7 and the .NET 10 SDK; the private key never leaves it):
 
-- [ ] `.\scripts\sign-file.ps1 -GenerateKey` on the owner's PC; send the printed public key and fingerprint.
-- [ ] Put the new public key into `CatalogSignature.PublicKeyPem`; update the tests that pin the old fingerprint.
-- [ ] Decide the catalog: an own repository (for example `mega-hub-catalog`) with an own, signed `index.json`
+- [x] Own key pair made (2026-11-13). The private key is held by the owner and is not in this repository.
+- [x] New public key is in `CatalogSignature.PublicKeyPem`.
+- [x] Decided the catalog (own, in this repository, `catalog/index.json`, starts empty; `CatalogDefaults.IndexUrl` and `CatalogUrl.CanonicalRepositories` changed): an own repository (for example `mega-hub-catalog`) with an own, signed `index.json`
       (`scripts/catalog-sign.ps1`), and change `CatalogDefaults.IndexUrl` and `CatalogUrl.CanonicalRepositories`.
       CouchHUD's plugins may stay available only as a separate, clearly labelled third-party source with his key pinned.
-- [ ] Re-sign or remove `catalog/statements/*.json` (they are signed with CouchHUD's key).
+- [x] `catalog/statements/*.json` removed (they were signed with CouchHUD's key).
 - [ ] Sign every release with `scripts/sign-release.ps1` (own key) before it is offered to other users.
 

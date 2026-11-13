@@ -158,7 +158,8 @@ public class CatalogTests : IDisposable
         else if (File.Exists(marker)) Assert.False(signed, "index.json is signed again: delete catalog/index.json.unsigned");
         else Assert.True(signed);
         var entries = Parse(File.ReadAllText(file));
-        Assert.Equal(["homeassistant", "casehud", "vpn", "weather", "news", "anthropic", "openai", "streaming", "fancontrol", "webostv", "samsungtv", "synthwave", "stardust", "deepsea", "greenlight", "neoncity", "nova"], entries.Select(e => e.Id));
+        // Mega Hub's own catalog starts empty: CouchHUD's plugins are not offered under Mega Hub's key.
+        Assert.Empty(entries);
         // Every entry works with the release of this build: a local build is the pre-release 0.7.0-dev, older than the 0.7.0 that the 0.7 plugins ask for.
         var releaseVersion = CatalogRules.AppVersion with { Pre = "" };
         Assert.All(entries, e => Assert.True(CatalogRules.IsCompatible(e, releaseVersion), $"{e.Id} needs {e.MinCouchHud}"));
@@ -181,8 +182,6 @@ public class CatalogTests : IDisposable
         });
         // Wand is a companion app of the core since 0.7 and no longer in the catalog; every entry names its category.
         Assert.DoesNotContain(entries, e => e.Id == "wand");
-        Assert.Equal("CouchHud.Plugin.HomeAssistant", entries[0].Folder);
-        Assert.Equal(["smartHome", "hardware", "other", "information", "information", "ai", "ai", "streaming", "hardware", "hardware", "hardware", "skins", "skins", "skins", "skins", "skins", "skins"], entries.Select(e => e.Category));
     }
 
     // ---- hash

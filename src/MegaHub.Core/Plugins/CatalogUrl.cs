@@ -12,7 +12,7 @@ public static class CatalogUrl
     private static readonly string[] GitHubHosts = ["github.com", "raw.githubusercontent.com"];
 
     /// <summary>The repositories of the project with the spelling the index uses (the form new entries must have).</summary>
-    public static readonly IReadOnlyList<string> CanonicalRepositories = ["kewe87/CouchHUD-Catalog", "kewe87/CouchHUD", "kewe87/CaseHUD"];
+    public static readonly IReadOnlyList<string> CanonicalRepositories = ["jjrussellite28-art/mega-hub", "kewe87/CouchHUD-Catalog", "kewe87/CouchHUD", "kewe87/CaseHUD"];
 
     /// <summary>The comparison form of an address, or null when it is not a plain https address.</summary>
     public static string? Normalize(string? url)
