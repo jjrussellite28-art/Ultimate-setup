@@ -92,32 +92,47 @@ try {
   [IO.File]::WriteAllText((Join-Path $here 'ui\build.json'), $stampJson)
 
   if ($install) {
-    Say '[4/5] Program code changed (or first install): building the installer. about 10 minutes, Mega Hub stays open until it is ready.'
-    $iscc = Find-Iscc
-    if (-not $iscc) {
-      Say 'Inno Setup is missing. Installing it...'
-      winget install --id JRSoftware.InnoSetup -e --accept-package-agreements --accept-source-agreements
+    # First choice: the ready-made installer GitHub built for the newest push. Needs no developer tools on this PC.
+    $setupFile = $null
+    try {
+      Say '[4/5] Program code changed: downloading the ready-made installer from GitHub...'
+      $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/jjrussellite28-art/mega-hub/releases/tags/latest-installer' -Headers @{ 'User-Agent' = 'MegaHubUpdate' } -UseBasicParsing
+      $asset = @($rel.assets | Where-Object { $_.name -like 'MegaHub-Setup-*.exe' }) | Select-Object -First 1
+      if ($asset) {
+        $setupFile = Join-Path $env:TEMP $asset.name
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $setupFile -UseBasicParsing
+      }
+    } catch { $setupFile = $null }
+    if (-not $setupFile -or -not (Test-Path $setupFile)) {
+      Say '[4/5] Could not download the installer: building it here (needs .NET and Inno Setup). about 10 minutes.'
+      if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { throw 'The ready-made installer could not be downloaded and .NET is not installed here. Check the internet connection and try again.' }
       $iscc = Find-Iscc
+      if (-not $iscc) {
+        Say 'Inno Setup is missing. Installing it...'
+        winget install --id JRSoftware.InnoSetup -e --accept-package-agreements --accept-source-agreements
+        $iscc = Find-Iscc
+      }
+      if (-not $iscc) { throw 'Inno Setup could not be installed. Install it from https://jrsoftware.org/isdl.php and run this again.' }
+      Push-Location $here
+      if (Test-Path publish) { Remove-Item publish -Recurse -Force }
+      dotnet publish src\MegaHub.Shell\MegaHub.Shell.csproj -c Release -r win-x64 --self-contained true -o publish
+      if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'The app build failed.' }
+      dotnet publish src\MegaHub.Service\MegaHub.Service.csproj -c Release -r win-x64 --self-contained true -p:DebugType=embedded -o publish\service
+      if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'The service build failed.' }
+      $wv = 'installer\MicrosoftEdgeWebview2Setup.exe'
+      if (-not (Test-Path $wv)) { Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $wv -UseBasicParsing }
+      $ver = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version | Select-Object -First 1
+      if (-not $ver) { $ver = '1.0.0' }
+      if (Test-Path installer\output) { Remove-Item installer\output\*.exe -Force -ErrorAction SilentlyContinue }
+      & $iscc "/DAppVersion=$ver-megahub" '/DPublishDir=..\publish' '/DWebView2Setup=MicrosoftEdgeWebview2Setup.exe' installer\MegaHub.iss
+      if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'Building Setup.exe failed.' }
+      $setup = Get-ChildItem installer\output\MegaHub-Setup-*.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+      $setupFile = $setup.FullName
+      Pop-Location
     }
-    if (-not $iscc) { throw 'Inno Setup could not be installed. Install it from https://jrsoftware.org/isdl.php and run this again.' }
-    Push-Location $here
-    if (Test-Path publish) { Remove-Item publish -Recurse -Force }
-    dotnet publish src\MegaHub.Shell\MegaHub.Shell.csproj -c Release -r win-x64 --self-contained true -o publish
-    if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'The app build failed.' }
-    dotnet publish src\MegaHub.Service\MegaHub.Service.csproj -c Release -r win-x64 --self-contained true -p:DebugType=embedded -o publish\service
-    if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'The service build failed.' }
-    $wv = 'installer\MicrosoftEdgeWebview2Setup.exe'
-    if (-not (Test-Path $wv)) { Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $wv -UseBasicParsing }
-    $ver = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version | Select-Object -First 1
-    if (-not $ver) { $ver = '1.0.0' }
-    if (Test-Path installer\output) { Remove-Item installer\output\*.exe -Force -ErrorAction SilentlyContinue }
-    & $iscc "/DAppVersion=$ver-megahub" '/DPublishDir=..\publish' '/DWebView2Setup=MicrosoftEdgeWebview2Setup.exe' installer\MegaHub.iss
-    if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'Building Setup.exe failed.' }
-    $setup = Get-ChildItem installer\output\MegaHub-Setup-*.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    Pop-Location
     Say '[5/5] Installing into Program Files. Windows asks once: say Yes...'
     Stop-MegaHub
-    $p = Start-Process -FilePath $setup.FullName -ArgumentList '/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS' -Wait -PassThru
+    $p = Start-Process -FilePath $setupFile -ArgumentList '/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS' -Wait -PassThru
     if ($p.ExitCode -ne 0) { throw "The installer stopped (code $($p.ExitCode))." }
     Set-Content -Path $stamp -Value $code
   } else {
