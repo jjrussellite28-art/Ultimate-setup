@@ -50,19 +50,14 @@ export async function attempt(action, label, { quietLocked = false, lockedValue 
       return undefined;
     }
     console.error(err);
-    // A locked couch: the message gets an "Unlock now" button; after the unlock the page is built again.
+    // A locked couch: the code screen opens right away (controller, keyboard or mouse), no message with a button to hunt for; after the
+    // unlock the page is built again. A cancel leaves everything as it was.
     if (err?.locked) {
-      toast(`${label ?? t('feedback.failed')}: ${err?.message || err}`, 7000, {
-        action: {
-          label: t('feedback.unlockNow'),
-          run: async () => {
-            const { ensureUnlocked } = await import('../components/passcode.js');
-            if (!(await ensureUnlocked(label ?? ''))) return;
-            const { render } = await import('./nav.js');
-            render();
-          }
-        }
-      });
+      const { ensureUnlocked } = await import('../components/passcode.js');
+      if (await ensureUnlocked(label ?? '')) {
+        const { render } = await import('./nav.js');
+        render();
+      }
       return undefined;
     }
     toast(`${label ?? t('feedback.failed')}: ${err?.message || err}`, 5000);

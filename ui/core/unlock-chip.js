@@ -1,6 +1,6 @@
 // The Unlock button at the top right of the bar (before the bell). Locked: it asks for the Windows sign-in and the Mega Hub code, and
-// then everything stays open (no timer; it locks again when the lid was closed for about 3 minutes, on a shutdown or restart, or with
-// Lock). Unlocked: it shows "Lock". Hidden while there is no couch lock. LB/RB reach it like the bell ("unlock" in bar-chips.js).
+// then everything stays open (no timer; it locks again when the lid was closed for about 3 minutes, or on a shutdown or restart).
+// Unlocked: the button is hidden (no Lock button). Hidden while there is no couch lock. LB/RB reach it like the bell ("unlock" in bar-chips.js).
 
 import { $, el } from './dom.js';
 import { api } from './api.js';
@@ -19,9 +19,10 @@ function paint(security) {
     return n;
   })();
   const lockOn = !!security && security.couchLock && security.couchLock !== 'off';
-  node.hidden = !lockOn;
-  if (!lockOn) return;
-  const open = !!security.unlocked;
+  const open = !!security?.unlocked;
+  // Once unlocked there is no "Lock" button: it stays open until the lid was closed for a while, a restart or a shutdown.
+  node.hidden = !lockOn || open;
+  if (!lockOn || open) return;
   node.classList.toggle('open', open);
   node.textContent = open ? `🔓︎ ${t('unlockChip.lock')}` : `🔒︎ ${t('unlockChip.unlock')}`;
   node.title = open ? t('unlockChip.lockTitle') : t('unlockChip.unlockTitle');
