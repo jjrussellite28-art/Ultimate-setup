@@ -52,7 +52,7 @@ public sealed class CatalogSourcesTests : IDisposable
 
     [Theory]
     [InlineData(CatalogDefaults.IndexUrl)]
-    [InlineData("HTTPS://RAW.GITHUBUSERCONTENT.COM/KEWE87/COUCHHUD-CATALOG/main/index.json")]
+    [InlineData("HTTPS://RAW.GITHUBUSERCONTENT.COM/JJRUSSELLITE28-ART/MEGA-HUB/mega-hub-rename/catalog/index.json")]
     public void The_official_catalog_cannot_be_removed_whatever_else_is_true(string url)
     {
         var decision = CatalogSourceRules.Decide(Gate(), CatalogSourceChange.Remove, url, null, null, true, [new CatalogSourceEntry { Url = Extra }]);
